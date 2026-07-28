@@ -7,12 +7,6 @@ import {
   Label,
   Modal,
   SearchField,
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Slider,
   Switch,
   Tabs,
@@ -31,12 +25,7 @@ import { notify } from "../lib/toast";
 import { useSettings, type SettingsResetScope } from "../lib/settings";
 import { useT, LANGUAGE_OPTIONS } from "../lib/i18n";
 import { cn } from "../lib/utils";
-import {
-  getMediaCapableProviders,
-  MEDIA_GENERATION_KINDS,
-  parseMediaGenerationSettings,
-  serializeMediaGenerationSettings,
-} from "../lib/chat-media";
+
 import { ConfirmDialog } from "./ConfirmDialog";
 import { DesktopPetsSettings } from "./DesktopPetsSettings";
 import { AboutSettings } from "./AboutSettings";
@@ -65,9 +54,6 @@ import {
   type CustomProviderInput,
   type FontPreset,
   type ManagedModelInfo,
-  type MediaGenerationKind,
-  type MediaGenerationOptions,
-  type MediaGenerationSettings,
   type ModelCapabilities,
   type ModelOption,
   type ProviderInfo,
@@ -81,8 +67,6 @@ import {
   type DiffMark,
   type ToolServer,
   type ToolSkill,
-  DEFAULT_MEDIA_GENERATION_SETTINGS,
-  SettingKey,
 } from "@shared/types";
 
 interface SettingsDialogProps {
@@ -1637,306 +1621,6 @@ function createModelOptionsForm(providerId: string, model?: ModelOption): ModelO
   };
 }
 
-function MediaDefaultsSection({
-  providers,
-  settings,
-  onChange,
-}: {
-  providers: ProviderInfo[];
-  settings: MediaGenerationSettings;
-  onChange: (settings: MediaGenerationSettings) => void;
-}): React.JSX.Element {
-  const { t } = useT();
-  const [kind, setKind] = useState<MediaGenerationKind>("image");
-  const current = settings.defaults[kind];
-  const capableProviders = getMediaCapableProviders(providers, kind);
-  const modelChoices = [
-    { value: null as string | null, label: t("settings.media.auto") },
-    ...capableProviders.flatMap((provider) =>
-      provider.models.map((model) => ({
-        value: `${provider.id}/${model.id}`,
-        label: `${provider.label} / ${model.label ?? model.id}`,
-      })),
-    ),
-  ];
-  const selectedModel =
-    modelChoices.find((choice) => choice.value === current.modelRef) ?? modelChoices[0];
-
-  const updateCurrent = (patch: {
-    modelRef?: string | null;
-    options?: MediaGenerationOptions;
-  }): void => {
-    onChange({
-      version: 1,
-      defaults: {
-        ...settings.defaults,
-        [kind]: {
-          modelRef: patch.modelRef !== undefined ? patch.modelRef : current.modelRef,
-          options: patch.options ?? current.options,
-        },
-      },
-    });
-  };
-
-  const updateOption = <K extends keyof MediaGenerationOptions>(
-    key: K,
-    value: MediaGenerationOptions[K] | undefined,
-  ): void => updateCurrent({ options: { ...current.options, [key]: value } });
-
-  return (
-    <section className="flex shrink-0 flex-col gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.018] p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h4 className="text-sm font-medium">{t("settings.media.title")}</h4>
-          <p className="mt-0.5 text-xs text-foreground/50">{t("settings.media.desc")}</p>
-        </div>
-        <Tabs
-          value={kind}
-          onValueChange={(value) => {
-            if (MEDIA_GENERATION_KINDS.includes(value as MediaGenerationKind)) {
-              setKind(value as MediaGenerationKind);
-            }
-          }}
-        >
-          <TabsList aria-label={t("settings.media.title")}>
-            {MEDIA_GENERATION_KINDS.map((item) => (
-              <TabsTrigger key={item} value={item}>
-                {t(mediaKindLabelKey(item))}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <div className="grid items-end gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <TextField className="sm:col-span-2">
-          <Label>{t("input.media.model")}</Label>
-          <Select
-            items={modelChoices}
-            value={selectedModel}
-            isItemEqualToValue={(choice, selected) => choice.value === selected.value}
-            itemToStringLabel={(choice) => choice.label}
-            itemToStringValue={(choice) => choice.value ?? "auto"}
-            onValueChange={(choice) => updateCurrent({ modelRef: choice?.value ?? null })}
-          >
-            <SelectTrigger className="h-9 w-full" aria-label={t("input.media.model")}>
-              <SelectValue>
-                {(choice: (typeof modelChoices)[number] | null) => choice?.label ?? ""}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} align="start">
-              <SelectGroup>
-                {modelChoices.map((choice) => (
-                  <SelectItem key={choice.value ?? "auto"} value={choice}>
-                    {choice.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </TextField>
-
-        {kind === "image" ? (
-          <>
-            <MediaTextOption
-              label={t("input.media.size")}
-              value={current.options.size}
-              placeholder="1024x1024"
-              onChange={(value) => updateOption("size", value)}
-            />
-            <MediaTextOption
-              label={t("input.media.aspectRatio")}
-              value={current.options.aspectRatio}
-              placeholder="1:1"
-              onChange={(value) => updateOption("aspectRatio", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.count")}
-              value={current.options.count}
-              min={1}
-              max={8}
-              integer
-              onChange={(value) => updateOption("count", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.seed")}
-              value={current.options.seed}
-              integer
-              onChange={(value) => updateOption("seed", value)}
-            />
-          </>
-        ) : null}
-
-        {kind === "speech" ? (
-          <>
-            <MediaTextOption
-              label={t("input.media.voice")}
-              value={current.options.voice}
-              onChange={(value) => updateOption("voice", value)}
-            />
-            <MediaTextOption
-              label={t("input.media.format")}
-              value={current.options.outputFormat}
-              placeholder="mp3"
-              onChange={(value) => updateOption("outputFormat", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.speed")}
-              value={current.options.speed}
-              min={0.25}
-              max={4}
-              step={0.05}
-              onChange={(value) => updateOption("speed", value)}
-            />
-            <MediaTextOption
-              label={t("input.media.language")}
-              value={current.options.language}
-              onChange={(value) => updateOption("language", value)}
-            />
-            <MediaTextOption
-              label={t("input.media.instructions")}
-              value={current.options.instructions}
-              className="sm:col-span-2"
-              onChange={(value) => updateOption("instructions", value)}
-            />
-          </>
-        ) : null}
-
-        {kind === "transcription" ? (
-          <MediaTextOption
-            label={t("input.media.language")}
-            value={current.options.language}
-            onChange={(value) => updateOption("language", value)}
-          />
-        ) : null}
-
-        {kind === "video" ? (
-          <>
-            <MediaTextOption
-              label={t("input.media.aspectRatio")}
-              value={current.options.aspectRatio}
-              placeholder="16:9"
-              onChange={(value) => updateOption("aspectRatio", value)}
-            />
-            <MediaTextOption
-              label={t("input.media.resolution")}
-              value={current.options.resolution}
-              placeholder="1920x1080"
-              onChange={(value) => updateOption("resolution", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.duration")}
-              value={current.options.duration}
-              min={1}
-              max={60}
-              onChange={(value) => updateOption("duration", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.fps")}
-              value={current.options.fps}
-              min={1}
-              max={120}
-              onChange={(value) => updateOption("fps", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.count")}
-              value={current.options.count}
-              min={1}
-              max={4}
-              integer
-              onChange={(value) => updateOption("count", value)}
-            />
-            <MediaNumberOption
-              label={t("input.media.seed")}
-              value={current.options.seed}
-              integer
-              onChange={(value) => updateOption("seed", value)}
-            />
-            <Switch
-              size="sm"
-              className="h-9"
-              isSelected={current.options.generateAudio === true}
-              onChange={(selected) => updateOption("generateAudio", selected || undefined)}
-            >
-              {t("input.media.generateAudio")}
-            </Switch>
-          </>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function MediaTextOption({
-  label,
-  value,
-  placeholder,
-  className,
-  onChange,
-}: {
-  label: string;
-  value?: string;
-  placeholder?: string;
-  className?: string;
-  onChange: (value: string | undefined) => void;
-}): React.JSX.Element {
-  return (
-    <TextField className={className}>
-      <Label>{label}</Label>
-      <Input
-        className="h-9 select-text"
-        value={value ?? ""}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.currentTarget.value.trim() || undefined)}
-      />
-    </TextField>
-  );
-}
-
-function MediaNumberOption({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  integer = false,
-  onChange,
-}: {
-  label: string;
-  value?: number;
-  min?: number;
-  max?: number;
-  step?: number;
-  integer?: boolean;
-  onChange: (value: number | undefined) => void;
-}): React.JSX.Element {
-  return (
-    <TextField>
-      <Label>{label}</Label>
-      <Input
-        type="number"
-        className="h-9 select-text"
-        value={value ?? ""}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => {
-          if (!event.currentTarget.value) {
-            onChange(undefined);
-            return;
-          }
-          const next = Number(event.currentTarget.value);
-          onChange(Number.isFinite(next) ? (integer ? Math.floor(next) : next) : undefined);
-        }}
-      />
-    </TextField>
-  );
-}
-
-function mediaKindLabelKey(kind: MediaGenerationKind): string {
-  return `input.media.${kind}`;
-}
-
 function ProviderModelWorkbench({
   settings,
   update,
@@ -1965,9 +1649,6 @@ function ProviderModelWorkbench({
   } | null>(null);
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
   const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null);
-  const [mediaSettings, setMediaSettings] = useState<MediaGenerationSettings>(
-    DEFAULT_MEDIA_GENERATION_SETTINGS,
-  );
 
   const refreshCatalog = useCallback((): void => {
     void api.providers.list().then((providerList) => {
@@ -1983,19 +1664,6 @@ function ProviderModelWorkbench({
   useEffect(() => {
     refreshCatalog();
   }, [refreshCatalog]);
-
-  useEffect(() => {
-    void api.settings.get(SettingKey.MediaGeneration).then((raw) => {
-      setMediaSettings(parseMediaGenerationSettings(raw));
-    });
-  }, []);
-
-  const handleMediaSettingsChange = (next: MediaGenerationSettings): void => {
-    setMediaSettings(next);
-    void api.settings
-      .set(SettingKey.MediaGeneration, serializeMediaGenerationSettings(next))
-      .catch((error) => console.error("[settings] failed to save media defaults:", error));
-  };
 
   const enabledModelRefs = useMemo(
     () =>
@@ -2117,14 +1785,24 @@ function ProviderModelWorkbench({
 
   const handleSaveProvider = (): void => {
     if (!selectedProvider || !canSaveProvider) return;
+
+    const saveProviderAndApiKey = async (): Promise<void> => {
+      await api.providers.upsertCustomProvider({
+        id: selectedProvider.id,
+        label: providerForm.label,
+        baseUrl: providerForm.baseUrl,
+        helpUrl: providerForm.helpUrl,
+      });
+
+      if (providerApiKey.trim()) {
+        await api.providers.setProviderApiKey(selectedProvider.id, providerApiKey.trim());
+        setProviderApiKey("");
+      }
+    };
+
     void notify
       .promise(
-        api.providers.upsertCustomProvider({
-          id: selectedProvider.id,
-          label: providerForm.label,
-          baseUrl: providerForm.baseUrl,
-          helpUrl: providerForm.helpUrl,
-        }),
+        saveProviderAndApiKey(),
         {
           loading: t("toast.model.providerSaving"),
           success: t("toast.model.providerSaved"),
@@ -2145,25 +1823,6 @@ function ProviderModelWorkbench({
           loading: t("toast.apikey.saving"),
           success: t("toast.apikey.saved"),
           error: t("toast.apikey.saveFailed"),
-        },
-        locale,
-      )
-      .then(() => {
-        setProviderApiKey("");
-        refreshCatalog();
-      })
-      .catch(() => undefined);
-  };
-
-  const handleClearProviderApiKey = (): void => {
-    if (!selectedProvider || !selectedProvider.hasProviderApiKey) return;
-    void notify
-      .promise(
-        api.providers.deleteProviderApiKey(selectedProvider.id),
-        {
-          loading: t("toast.apikey.clearing"),
-          success: t("toast.apikey.cleared"),
-          error: t("toast.apikey.clearFailed"),
         },
         locale,
       )
@@ -2296,12 +1955,6 @@ function ProviderModelWorkbench({
         </div>
       </header>
 
-      <MediaDefaultsSection
-        providers={providers}
-        settings={mediaSettings}
-        onChange={handleMediaSettingsChange}
-      />
-
       <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.018] lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
         <aside className="min-h-0 flex flex-col border-b border-foreground/10 p-3 lg:border-b-0 lg:border-r">
           <SearchField
@@ -2428,13 +2081,13 @@ function ProviderModelWorkbench({
                     <IconRefresh className="mr-1 size-3.5" />
                     {t("model.provider.sync")}
                   </Button>
-                  {canEditProvider && (
+                  {canEditProvider ? (
                     <>
                       <Button
                         variant="secondary"
                         size="sm"
                         onPress={handleSaveProvider}
-                        isDisabled={!canSaveProvider}
+                        isDisabled={!canSaveProvider && !providerApiKey.trim()}
                       >
                         {t("common.save")}
                       </Button>
@@ -2446,6 +2099,12 @@ function ProviderModelWorkbench({
                         <IconTrash className="size-3.5" />
                       </Button>
                     </>
+                  ) : (
+                    providerApiKey.trim() && (
+                      <Button variant="secondary" size="sm" onPress={handleSaveProviderApiKey}>
+                        {t("common.save")}
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -2526,22 +2185,6 @@ function ProviderModelWorkbench({
                       </a>
                     )}
                   </Description>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onPress={handleSaveProviderApiKey}
-                      isDisabled={!providerApiKey.trim()}
-                    >
-                      <IconKey className="mr-1 size-3.5" />
-                      {t("apikey.save")}
-                    </Button>
-                    {selectedProvider.hasProviderApiKey && (
-                      <Button variant="tertiary" size="sm" onPress={handleClearProviderApiKey}>
-                        {t("apikey.clear")}
-                      </Button>
-                    )}
-                  </div>
                 </TextField>
               </div>
 
