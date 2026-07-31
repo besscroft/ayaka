@@ -151,8 +151,8 @@ void app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // 1. 初始化数据库（node:sqlite，实验性 API，需 flag 启用）
-  //    通过 NODE_OPTIONS 或环境变量在启动前已设置 --experimental-sqlite
+  // 1. 初始化数据库（better-sqlite3 + drizzle-orm）
+  //    迁移文件位于 apps/desktop/drizzle，生产环境从 process.resourcesPath/drizzle 读取
   try {
     initDb();
     migrateProviderApiKeysToModelKeys();

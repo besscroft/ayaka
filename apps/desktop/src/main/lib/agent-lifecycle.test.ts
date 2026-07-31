@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import Database from "better-sqlite3";
-import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import Module, { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -49,59 +47,6 @@ afterEach(async () => {
 });
 
 void describe("agent lifecycle persistence", () => {
-  void it("backs up and rebuilds an incompatible cognitive memory schema", async () => {
-    db.closeDb();
-    const dataDir = path.join(testRoot, "data");
-    await rm(dataDir, { recursive: true, force: true });
-    await mkdir(dataDir, { recursive: true });
-    const dbPath = path.join(dataDir, "void-ai.db");
-    const legacyDatabase = new Database(dbPath);
-    legacyDatabase.exec(`
-      CREATE TABLE __drizzle_migrations (
-        id SERIAL PRIMARY KEY,
-        hash text NOT NULL,
-        created_at numeric
-      );
-      INSERT INTO __drizzle_migrations (hash, created_at)
-      VALUES ('legacy-initial', 1784102400001);
-      CREATE TABLE memories (id text PRIMARY KEY NOT NULL);
-      CREATE TABLE memory_jobs (id text PRIMARY KEY NOT NULL);
-    `);
-    legacyDatabase.close();
-
-    db.initDb();
-
-    const backups = readdirSync(dataDir).filter((entry) =>
-      entry.startsWith("backup-before-runtime-schema-"),
-    );
-    assert.equal(backups.length, 1);
-    assert.equal(existsSync(path.join(dataDir, backups[0]!, "void-ai.db")), true);
-
-    const rebuiltDatabase = new Database(dbPath, { readonly: true });
-    try {
-      const memoryColumns = rebuiltDatabase
-        .prepare("PRAGMA table_info(`memories`)")
-        .all()
-        .map((column) => (column as { name: string }).name);
-      const memoryJobColumns = rebuiltDatabase
-        .prepare("PRAGMA table_info(`memory_jobs`)")
-        .all()
-        .map((column) => (column as { name: string }).name);
-      const observationsTable = rebuiltDatabase
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-        .get("memory_observations");
-
-      assert.ok(memoryColumns.includes("mem0_id"));
-      assert.ok(memoryColumns.includes("sync_status"));
-      assert.ok(memoryColumns.includes("strength"));
-      assert.ok(memoryColumns.includes("last_reinforced_at"));
-      assert.ok(memoryJobColumns.includes("idempotency_key"));
-      assert.ok(observationsTable);
-    } finally {
-      rebuiltDatabase.close();
-    }
-  });
-
   void it("classifies only active runtime work as busy", () => {
     const busyStatuses = [
       "queued",

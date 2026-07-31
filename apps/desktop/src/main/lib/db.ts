@@ -5,8 +5,8 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, or } from "dr
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { decrypt, encrypt, type EncryptedPayload } from "./crypto";
 import {
   DEFAULT_BUILTIN_TOOL_SEEDS,
@@ -128,7 +128,6 @@ import {
 } from "../../shared/types";
 import { resolveDesktopPet } from "./desktop-pet-assets";
 import { applyDesktopPetIdleTimeout, resolveDesktopPetActivity } from "./desktop-pet-activity";
-import { assertCognitiveMemorySchema, isRecoverableSchemaInitError } from "./schema-init";
 export type {
   AgentRunInput,
   AgentProfile,
@@ -195,13 +194,7 @@ export function initDb(): DbInstance {
   if (dbInstance) return dbInstance;
 
   const dbPath = join(resolveDataDir(), DB_FILENAME);
-  try {
-    return openAndMigrateDb(dbPath);
-  } catch (error) {
-    if (!isRecoverableSchemaInitError(error)) throw error;
-    resetDatabaseFiles(dbPath, error);
-    return openAndMigrateDb(dbPath);
-  }
+  return openAndMigrateDb(dbPath);
 }
 
 function openAndMigrateDb(dbPath: string): DbInstance {
@@ -213,7 +206,6 @@ function openAndMigrateDb(dbPath: string): DbInstance {
   dbInstance = drizzle(rawDb, { schema });
   try {
     migrate(dbInstance, { migrationsFolder: resolveMigrationsFolder() });
-    assertCognitiveMemorySchema(rawDb);
     cancelStaleRuntimeRuns();
     purgeExpiredDeletedConversations();
     seedDefaults();
@@ -254,33 +246,6 @@ function cancelStaleRuntimeRuns(): void {
 export function getDb(): DbInstance {
   if (!dbInstance) return initDb();
   return dbInstance;
-}
-
-function resetDatabaseFiles(dbPath: string, cause: unknown): void {
-  const message = cause instanceof Error ? cause.message : String(cause);
-  console.warn(
-    "[db] Incompatible runtime schema; backing up and rebuilding local database:",
-    message,
-  );
-  closeDb();
-
-  const backupDir = join(dirname(dbPath), `backup-before-runtime-schema-${Date.now()}`);
-  mkdirSync(backupDir, { recursive: true });
-
-  for (const filePath of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
-    if (!existsSync(filePath)) continue;
-    const targetPath = join(backupDir, basename(filePath));
-    moveDatabaseFile(filePath, targetPath);
-  }
-}
-
-function moveDatabaseFile(sourcePath: string, targetPath: string): void {
-  try {
-    renameSync(sourcePath, targetPath);
-  } catch {
-    copyFileSync(sourcePath, targetPath);
-    unlinkSync(sourcePath);
-  }
 }
 
 export function closeDb(): void {
