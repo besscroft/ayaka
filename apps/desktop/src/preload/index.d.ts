@@ -229,25 +229,6 @@ export interface VoidAIApi {
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
     ) => Promise<ToolRecord>;
-    mcp: {
-      create: (input: ToolServerInput) => Promise<ToolServer>;
-      update: (id: string, input: Partial<ToolServerInput>) => Promise<ToolServer>;
-      delete: (id: string) => Promise<boolean>;
-      listDeleted: () => Promise<ToolServer[]>;
-      restore: (id: string) => Promise<ToolServer>;
-      permanentDelete: (id: string) => Promise<boolean>;
-      permanentDeleteBatch: (ids: string[]) => Promise<number>;
-      purgeExpired: () => Promise<number>;
-      setEnabled: (id: string, enabled: boolean) => Promise<ToolServer>;
-      test: (id: string) => Promise<ToolDiscoveryResult>;
-      discover: (id: string) => Promise<ToolDiscoveryResult>;
-      updateTool: (
-        id: string,
-        patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
-      ) => Promise<ToolRecord>;
-      setSecret: (input: ToolSecretInput) => Promise<ToolSecretPublic>;
-      deleteSecret: (id: string) => Promise<boolean>;
-    };
     skills: {
       create: (input: ToolSkillInput) => Promise<ToolSkill>;
       generateDraft: (input: SkillDraftRequest) => Promise<SkillDraftResult>;
@@ -263,6 +244,25 @@ export interface VoidAIApi {
       setSecret: (input: ToolSecretInput) => Promise<ToolSecretPublic>;
       deleteSecret: (id: string) => Promise<boolean>;
     };
+  };
+  mcp: {
+    create: (input: ToolServerInput) => Promise<ToolServer>;
+    update: (id: string, input: Partial<ToolServerInput>) => Promise<ToolServer>;
+    delete: (id: string) => Promise<boolean>;
+    listDeleted: () => Promise<ToolServer[]>;
+    restore: (id: string) => Promise<ToolServer>;
+    permanentDelete: (id: string) => Promise<boolean>;
+    permanentDeleteBatch: (ids: string[]) => Promise<number>;
+    purgeExpired: () => Promise<number>;
+    setEnabled: (id: string, enabled: boolean) => Promise<ToolServer>;
+    test: (id: string) => Promise<ToolDiscoveryResult>;
+    discover: (id: string) => Promise<ToolDiscoveryResult>;
+    updateTool: (
+      id: string,
+      patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
+    ) => Promise<ToolRecord>;
+    setSecret: (input: ToolSecretInput) => Promise<ToolSecretPublic>;
+    deleteSecret: (id: string) => Promise<boolean>;
   };
   providers: {
     list: () => Promise<ProviderInfo[]>;

@@ -13,7 +13,6 @@ export function SkillsPanel(): React.JSX.Element {
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight">{t("skills.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("skills.subtitle")}</p>
         </div>
         <Tabs
           value={tab}

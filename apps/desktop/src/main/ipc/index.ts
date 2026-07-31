@@ -415,38 +415,38 @@ export function registerIpcHandlers(): void {
       },
     ) => updateToolRecord(id, patch),
   );
-  ipcMain.handle("tools:mcp:create", (_e, input: ToolServerInput) => createToolServer(input));
-  ipcMain.handle("tools:mcp:update", async (_e, id: string, input: Partial<ToolServerInput>) => {
+  ipcMain.handle("mcp:create", (_e, input: ToolServerInput) => createToolServer(input));
+  ipcMain.handle("mcp:update", async (_e, id: string, input: Partial<ToolServerInput>) => {
     const server = updateToolServer(id, input);
     await closeMcpClient(id);
     return server;
   });
-  ipcMain.handle("tools:mcp:delete", async (_e, id: string) => {
+  ipcMain.handle("mcp:delete", async (_e, id: string) => {
     await closeMcpClient(id);
     deleteToolServer(id);
     return true;
   });
-  ipcMain.handle("tools:mcp:listDeleted", () => listDeletedToolServers("mcp"));
-  ipcMain.handle("tools:mcp:restore", (_e, id: string) => restoreToolServer(id));
-  ipcMain.handle("tools:mcp:permanentDelete", async (_e, id: string) => {
+  ipcMain.handle("mcp:listDeleted", () => listDeletedToolServers("mcp"));
+  ipcMain.handle("mcp:restore", (_e, id: string) => restoreToolServer(id));
+  ipcMain.handle("mcp:permanentDelete", async (_e, id: string) => {
     await closeMcpClient(id);
     permanentlyDeleteToolServer(id);
     return true;
   });
-  ipcMain.handle("tools:mcp:permanentDeleteBatch", async (_e, ids: string[]) => {
+  ipcMain.handle("mcp:permanentDeleteBatch", async (_e, ids: string[]) => {
     await Promise.all(ids.map((id) => closeMcpClient(id)));
     return permanentlyDeleteToolServers(ids);
   });
-  ipcMain.handle("tools:mcp:purgeExpired", () => purgeExpiredDeletedToolServers());
-  ipcMain.handle("tools:mcp:setEnabled", async (_e, id: string, enabled: boolean) => {
+  ipcMain.handle("mcp:purgeExpired", () => purgeExpiredDeletedToolServers());
+  ipcMain.handle("mcp:setEnabled", async (_e, id: string, enabled: boolean) => {
     const server = setToolServerEnabled(id, enabled);
     if (!enabled) await closeMcpClient(id);
     return server;
   });
-  ipcMain.handle("tools:mcp:test", (_e, id: string) => testMcpServer(id));
-  ipcMain.handle("tools:mcp:discover", (_e, id: string) => discoverMcpServer(id));
+  ipcMain.handle("mcp:test", (_e, id: string) => testMcpServer(id));
+  ipcMain.handle("mcp:discover", (_e, id: string) => discoverMcpServer(id));
   ipcMain.handle(
-    "tools:mcp:updateTool",
+    "mcp:updateTool",
     (
       _e,
       id: string,
@@ -457,10 +457,10 @@ export function registerIpcHandlers(): void {
       },
     ) => updateToolRecord(id, patch),
   );
-  ipcMain.handle("tools:mcp:setSecret", (_e, input: ToolSecretInput) =>
+  ipcMain.handle("mcp:setSecret", (_e, input: ToolSecretInput) =>
     setToolSecret({ ...input, ownerType: "server" }),
   );
-  ipcMain.handle("tools:mcp:deleteSecret", (_e, id: string) => {
+  ipcMain.handle("mcp:deleteSecret", (_e, id: string) => {
     deleteToolSecret(id);
     return true;
   });

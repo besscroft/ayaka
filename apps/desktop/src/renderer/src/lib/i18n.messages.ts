@@ -1357,15 +1357,20 @@ const entries = {
     zh: "配置身份、角色、指令、人格、模型与策略。",
     en: "Configure identity, role, instructions, persona, model, and policy.",
   },
+  "main.subtitle.mcp": {
+    zh: "管理 MCP 服务器：连接、发现工具、启用/禁用、密钥。",
+    en: "Manage MCP servers: connect, discover tools, enable/disable, secrets.",
+  },
   "main.subtitle.memory": {
     zh: "全局、agent 与对话级记忆。",
     en: "Global, agent, and conversation-scoped memory.",
   },
   "main.subtitle.tools": {
-    zh: "管理 MCP、技能、内置工具、审批策略与密钥。",
-    en: "Manage MCP, Skills, built-in tools, approval policy, and secrets.",
+    zh: "管理内置工具、沙箱工具与审批策略。",
+    en: "Manage built-in tools, sandbox tools, and approval policy.",
   },
   "main.title.agents": { zh: "智能体", en: "Agents" },
+  "main.title.mcp": { zh: "MCP", en: "MCP" },
   "main.title.memory": { zh: "记忆", en: "Memory" },
   "main.title.tools": { zh: "工具", en: "Tools" },
   "skills.title": { zh: "Skills", en: "Skills" },

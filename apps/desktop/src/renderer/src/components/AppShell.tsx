@@ -11,6 +11,7 @@ import {
   IconTrash,
   IconCpu,
   IconDatabase,
+  IconGlobe,
   IconWrench,
   IconSearch,
   IconClose,
@@ -40,6 +41,7 @@ const primaryNav: { id: AppView; labelKey: TranslationKey; Icon: typeof IconMess
   { id: "agents", labelKey: "main.title.agents", Icon: IconCpu },
   // Agent Loop status and controls are shown in the chat header.
   { id: "tools", labelKey: "main.title.tools", Icon: IconWrench },
+  { id: "mcp", labelKey: "main.title.mcp", Icon: IconGlobe },
   { id: "skills", labelKey: "skills.title", Icon: IconSparkles },
   { id: "automations", labelKey: "automation.title", Icon: IconClock },
   { id: "memory", labelKey: "main.title.memory", Icon: IconDatabase },

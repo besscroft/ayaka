@@ -155,25 +155,6 @@ const api = {
   tools: {
     snapshot: () => ipcRenderer.invoke("tools:snapshot"),
     updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("tools:updateTool", id, patch),
-    mcp: {
-      create: (input: unknown) => ipcRenderer.invoke("tools:mcp:create", input),
-      update: (id: string, input: unknown) => ipcRenderer.invoke("tools:mcp:update", id, input),
-      delete: (id: string) => ipcRenderer.invoke("tools:mcp:delete", id),
-      listDeleted: () => ipcRenderer.invoke("tools:mcp:listDeleted"),
-      restore: (id: string) => ipcRenderer.invoke("tools:mcp:restore", id),
-      permanentDelete: (id: string) => ipcRenderer.invoke("tools:mcp:permanentDelete", id),
-      permanentDeleteBatch: (ids: string[]) =>
-        ipcRenderer.invoke("tools:mcp:permanentDeleteBatch", ids),
-      purgeExpired: () => ipcRenderer.invoke("tools:mcp:purgeExpired"),
-      setEnabled: (id: string, enabled: boolean) =>
-        ipcRenderer.invoke("tools:mcp:setEnabled", id, enabled),
-      test: (id: string) => ipcRenderer.invoke("tools:mcp:test", id),
-      discover: (id: string) => ipcRenderer.invoke("tools:mcp:discover", id),
-      updateTool: (id: string, patch: unknown) =>
-        ipcRenderer.invoke("tools:mcp:updateTool", id, patch),
-      setSecret: (input: unknown) => ipcRenderer.invoke("tools:mcp:setSecret", input),
-      deleteSecret: (id: string) => ipcRenderer.invoke("tools:mcp:deleteSecret", id),
-    },
     skills: {
       create: (input: unknown) => ipcRenderer.invoke("tools:skills:create", input),
       generateDraft: (input: unknown) => ipcRenderer.invoke("tools:skills:generateDraft", input),
@@ -192,6 +173,22 @@ const api = {
       setSecret: (input: unknown) => ipcRenderer.invoke("tools:skills:setSecret", input),
       deleteSecret: (id: string) => ipcRenderer.invoke("tools:skills:deleteSecret", id),
     },
+  },
+  mcp: {
+    create: (input: unknown) => ipcRenderer.invoke("mcp:create", input),
+    update: (id: string, input: unknown) => ipcRenderer.invoke("mcp:update", id, input),
+    delete: (id: string) => ipcRenderer.invoke("mcp:delete", id),
+    listDeleted: () => ipcRenderer.invoke("mcp:listDeleted"),
+    restore: (id: string) => ipcRenderer.invoke("mcp:restore", id),
+    permanentDelete: (id: string) => ipcRenderer.invoke("mcp:permanentDelete", id),
+    permanentDeleteBatch: (ids: string[]) => ipcRenderer.invoke("mcp:permanentDeleteBatch", ids),
+    purgeExpired: () => ipcRenderer.invoke("mcp:purgeExpired"),
+    setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke("mcp:setEnabled", id, enabled),
+    test: (id: string) => ipcRenderer.invoke("mcp:test", id),
+    discover: (id: string) => ipcRenderer.invoke("mcp:discover", id),
+    updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("mcp:updateTool", id, patch),
+    setSecret: (input: unknown) => ipcRenderer.invoke("mcp:setSecret", input),
+    deleteSecret: (id: string) => ipcRenderer.invoke("mcp:deleteSecret", id),
   },
   providers: {
     list: () => ipcRenderer.invoke("providers:list"),

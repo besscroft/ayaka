@@ -268,29 +268,6 @@ export const api = {
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
     ): Promise<ToolRecord> => assertApi().tools.updateTool(id, patch),
-    mcp: {
-      create: (input: ToolServerInput): Promise<ToolServer> => assertApi().tools.mcp.create(input),
-      update: (id: string, input: Partial<ToolServerInput>): Promise<ToolServer> =>
-        assertApi().tools.mcp.update(id, input),
-      delete: (id: string): Promise<boolean> => assertApi().tools.mcp.delete(id),
-      listDeleted: (): Promise<ToolServer[]> => assertApi().tools.mcp.listDeleted(),
-      restore: (id: string): Promise<ToolServer> => assertApi().tools.mcp.restore(id),
-      permanentDelete: (id: string): Promise<boolean> => assertApi().tools.mcp.permanentDelete(id),
-      permanentDeleteBatch: (ids: string[]): Promise<number> =>
-        assertApi().tools.mcp.permanentDeleteBatch(ids),
-      purgeExpired: (): Promise<number> => assertApi().tools.mcp.purgeExpired(),
-      setEnabled: (id: string, enabled: boolean): Promise<ToolServer> =>
-        assertApi().tools.mcp.setEnabled(id, enabled),
-      test: (id: string): Promise<ToolDiscoveryResult> => assertApi().tools.mcp.test(id),
-      discover: (id: string): Promise<ToolDiscoveryResult> => assertApi().tools.mcp.discover(id),
-      updateTool: (
-        id: string,
-        patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
-      ): Promise<ToolRecord> => assertApi().tools.mcp.updateTool(id, patch),
-      setSecret: (input: ToolSecretInput): Promise<ToolSecretPublic> =>
-        assertApi().tools.mcp.setSecret(input),
-      deleteSecret: (id: string): Promise<boolean> => assertApi().tools.mcp.deleteSecret(id),
-    },
     skills: {
       create: (input: ToolSkillInput): Promise<ToolSkill> => assertApi().tools.skills.create(input),
       generateDraft: (input: SkillDraftRequest): Promise<SkillDraftResult> =>
@@ -313,6 +290,29 @@ export const api = {
         assertApi().tools.skills.setSecret(input),
       deleteSecret: (id: string): Promise<boolean> => assertApi().tools.skills.deleteSecret(id),
     },
+  },
+  mcp: {
+    create: (input: ToolServerInput): Promise<ToolServer> => assertApi().mcp.create(input),
+    update: (id: string, input: Partial<ToolServerInput>): Promise<ToolServer> =>
+      assertApi().mcp.update(id, input),
+    delete: (id: string): Promise<boolean> => assertApi().mcp.delete(id),
+    listDeleted: (): Promise<ToolServer[]> => assertApi().mcp.listDeleted(),
+    restore: (id: string): Promise<ToolServer> => assertApi().mcp.restore(id),
+    permanentDelete: (id: string): Promise<boolean> => assertApi().mcp.permanentDelete(id),
+    permanentDeleteBatch: (ids: string[]): Promise<number> =>
+      assertApi().mcp.permanentDeleteBatch(ids),
+    purgeExpired: (): Promise<number> => assertApi().mcp.purgeExpired(),
+    setEnabled: (id: string, enabled: boolean): Promise<ToolServer> =>
+      assertApi().mcp.setEnabled(id, enabled),
+    test: (id: string): Promise<ToolDiscoveryResult> => assertApi().mcp.test(id),
+    discover: (id: string): Promise<ToolDiscoveryResult> => assertApi().mcp.discover(id),
+    updateTool: (
+      id: string,
+      patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
+    ): Promise<ToolRecord> => assertApi().mcp.updateTool(id, patch),
+    setSecret: (input: ToolSecretInput): Promise<ToolSecretPublic> =>
+      assertApi().mcp.setSecret(input),
+    deleteSecret: (id: string): Promise<boolean> => assertApi().mcp.deleteSecret(id),
   },
   providers: {
     list: (): Promise<ProviderInfo[]> => assertApi().providers.list(),

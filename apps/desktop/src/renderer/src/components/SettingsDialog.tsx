@@ -2886,9 +2886,9 @@ function TrashTab(): React.JSX.Element {
 
   const refreshMcp = (): void => {
     setKindLoading("mcp", true);
-    void api.tools.mcp
+    void api.mcp
       .purgeExpired()
-      .then(() => api.tools.mcp.listDeleted())
+      .then(() => api.mcp.listDeleted())
       .then(setMcpItems)
       .catch((error) => notify.error(t("toast.trash.loadMcpFailed"), error, locale))
       .finally(() => setKindLoading("mcp", false))
@@ -3025,7 +3025,7 @@ function TrashTab(): React.JSX.Element {
       row.kind === "conversations"
         ? api.conversations.restore(row.id)
         : row.kind === "mcp"
-          ? api.tools.mcp.restore(row.id)
+          ? api.mcp.restore(row.id)
           : api.tools.skills.restore(row.id);
 
     void notify
@@ -3084,7 +3084,7 @@ function TrashTab(): React.JSX.Element {
       item.kind === "conversations"
         ? api.conversations.permanentDelete(item.id)
         : item.kind === "mcp"
-          ? api.tools.mcp.permanentDelete(item.id)
+          ? api.mcp.permanentDelete(item.id)
           : api.tools.skills.permanentDelete(item.id);
 
     void notify
@@ -3115,7 +3115,7 @@ function TrashTab(): React.JSX.Element {
       kind === "conversations"
         ? api.conversations.permanentDeleteBatch(ids)
         : kind === "mcp"
-          ? api.tools.mcp.permanentDeleteBatch(ids)
+          ? api.mcp.permanentDeleteBatch(ids)
           : api.tools.skills.permanentDeleteBatch(ids);
 
     void notify
