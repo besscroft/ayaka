@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Button,
   Card,
@@ -149,13 +149,22 @@ type MemoryPanelTab = "entries" | MemoryFileKind;
 function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element {
   const { t, f } = useT();
   const [activeTab, setActiveTab] = useState<MemoryPanelTab>("entries");
-  const [selectedAgentId, setSelectedAgentId] = useState("agent-root");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const hasUserSelectedAgent = useRef(false);
   const [memoryFiles, setMemoryFiles] = useState<Record<
     MemoryFileKind,
     AgentMemoryFileSnapshot
   > | null>(null);
 
+  // agents 列表加载完成后，默认选中主智能体（kind === "main"），仅在用户未手动选择时生效
+  useEffect(() => {
+    if (hasUserSelectedAgent.current || agents.length === 0) return;
+    const primary = agents.find((agent) => agent.kind === "main") ?? agents[0];
+    if (primary) setSelectedAgentId(primary.id);
+  }, [agents]);
+
   const loadFiles = useCallback(async () => {
+    if (!selectedAgentId) return;
     const files = await api.agents.memoryFiles.list(selectedAgentId);
     setMemoryFiles(files);
   }, [selectedAgentId]);
@@ -164,6 +173,11 @@ function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadFiles();
   }, [loadFiles]);
+
+  const handleAgentChange = useCallback((agentId: string) => {
+    hasUserSelectedAgent.current = true;
+    setSelectedAgentId(agentId);
+  }, []);
 
   const sidebarItems: {
     key: MemoryPanelTab;
@@ -251,7 +265,7 @@ function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element 
             onRefresh={loadFiles}
             agentId={selectedAgentId}
             agents={agents}
-            onAgentChange={setSelectedAgentId}
+            onAgentChange={handleAgentChange}
           />
         )}
         {activeTab !== "entries" && !memoryFiles && (
