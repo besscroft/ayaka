@@ -198,6 +198,17 @@ void describe("runtime architecture", () => {
       }),
       false,
     );
+    for (const toolName of ["agent_create", "agent_update"]) {
+      assert.equal(
+        rootToolRequiresApproval({
+          toolName,
+          reviewAll: true,
+          dynamicallyRequiresApproval: true,
+          policyRequiresApproval: true,
+        }),
+        false,
+      );
+    }
     assert.equal(
       rootToolRequiresApproval({
         toolName: "conversation_search",

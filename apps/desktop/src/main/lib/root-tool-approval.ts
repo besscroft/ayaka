@@ -16,7 +16,12 @@ export function builtinChatToolRequiresApproval(toolName: string, input?: unknow
 }
 
 export function rootToolRequiresApproval(input: RootToolApprovalInput): boolean {
-  if (isSilentRootMemoryTool(input.toolName) || input.toolName === MEDIA_GENERATION_TOOL_NAME) {
+  if (
+    isSilentRootMemoryTool(input.toolName) ||
+    input.toolName === MEDIA_GENERATION_TOOL_NAME ||
+    input.toolName === "agent_create" ||
+    input.toolName === "agent_update"
+  ) {
     return false;
   }
   return (

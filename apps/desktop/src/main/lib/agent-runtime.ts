@@ -90,6 +90,7 @@ import { ROOT_AGENT_STOP_WHEN } from "./agent-run-policy";
 import { agentLoopSessions, type AgentLoopMode, type AgentLoopSession } from "./agent-loop-session";
 import { RunToolScheduler, scheduleToolSet } from "./run-tool-scheduler";
 import { buildMediaGenerationToolRequest, executeMediaGeneration } from "./media-generation";
+import { addAgentManagementTools } from "./agent-management-tools";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -577,6 +578,11 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   const activeTools = new Set<string>(silentMemoryRuntime.activeTools);
   assignTool(tools, MEDIA_GENERATION_TOOL_NAME, createMediaGenerationTool(context));
   activeTools.add(MEDIA_GENERATION_TOOL_NAME);
+  addAgentManagementTools(tools, activeTools, {
+    actorAgentId: DEFAULT_AGENT_ID,
+    runId: context.runId,
+    conversationId: context.conversationId,
+  });
 
   // The remaining orchestration tools follow the user's selection as before.
   // When the user turns chat tools off, only the silently-enabled memory tools

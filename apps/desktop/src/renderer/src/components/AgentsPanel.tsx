@@ -534,7 +534,12 @@ function AgentCard({
   const runtimeBusy = isAgentRuntimeBusy(runtime?.status);
   const cardBusy = pendingAction !== undefined;
   return (
-    <Card className={selected ? "border-accent/45 bg-accent/[0.035]" : ""}>
+    <Card
+      className={cn(
+        "flex h-full min-h-0 flex-col",
+        selected && "border-accent/45 bg-accent/[0.035]",
+      )}
+    >
       <Card.Header>
         <div className="flex items-start justify-between gap-3">
           <button
@@ -560,11 +565,11 @@ function AgentCard({
           </div>
         </div>
       </Card.Header>
-      <Card.Content className="space-y-3">
+      <Card.Content className="flex min-h-0 flex-1 flex-col gap-3">
         <p className="line-clamp-3 min-h-12 text-sm text-foreground/60">
           {agent.description || t("agents.noDescription")}
         </p>
-        <div className="grid grid-cols-2 gap-2 text-xs text-foreground/50">
+        <div className="mt-auto grid grid-cols-2 gap-2 text-xs text-foreground/50">
           <Info label={t("agents.field.model")} value={agent.model_ref || t("agents.inherit")} />
           <Info
             label={t("agents.field.updated")}
