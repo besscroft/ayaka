@@ -56,7 +56,11 @@ void describe("local chat server", () => {
     });
 
     assert.equal(response.status, 401);
-    assert.deepEqual(await response.json(), { error: "Unauthorized chat session" });
+    assert.deepEqual(await response.json(), {
+      error: "The chat session expired. Restart the app and try again.",
+      code: "unauthorized",
+      retryable: false,
+    });
   });
 
   void it("rejects empty message arrays", async () => {
@@ -72,7 +76,27 @@ void describe("local chat server", () => {
     });
 
     assert.equal(response.status, 400);
-    assert.deepEqual(await response.json(), { error: "messages cannot be empty" });
+    assert.deepEqual(await response.json(), {
+      error: "The chat request is invalid. Check the message and try again.",
+      code: "invalid_request",
+      retryable: false,
+    });
+  });
+
+  void it("returns a safe response for malformed chat JSON", async () => {
+    const app = createApp({ sessionToken: token });
+
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: "{",
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, "invalid_request");
   });
 
   void it("rejects requests without a model reference", async () => {
@@ -89,7 +113,9 @@ void describe("local chat server", () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(await response.json(), {
-      error: "model is required in provider/model format",
+      error: "No available model is selected. Choose or configure a model first.",
+      code: "missing_model",
+      retryable: false,
     });
   });
 
@@ -106,8 +132,9 @@ void describe("local chat server", () => {
     });
 
     assert.equal(response.status, 400);
-    const body = (await response.json()) as { error: string };
-    assert.match(body.error, /reasoning must be one of/);
+    const body = (await response.json()) as { code: string; retryable: boolean };
+    assert.equal(body.code, "invalid_request");
+    assert.equal(body.retryable, false);
   });
 
   void it("validates agent run identity and mode", async () => {
@@ -253,6 +280,35 @@ void describe("local chat server", () => {
     });
     assert.equal(response.status, 409);
     assert.equal((await response.json()).code, "run_not_active");
+  });
+
+  void it("returns safe chat failures without exposing provider diagnostics", async () => {
+    const model = new MockLanguageModelV4({});
+    const app = createApp({
+      sessionToken: token,
+      resolveModel: () => ({ model, temperature: 0.7, topP: 1, maxOutputTokens: 256 }),
+      buildAgentSystemPrompt: async () => "test",
+      runAgentChat: async () => {
+        throw Object.assign(new Error("provider response api_key=sk-super-secret"), {
+          status: 429,
+        });
+      },
+    });
+
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({ messages: validMessages, model: "mock/chat" }),
+    });
+
+    const body = (await response.json()) as { error: string; code: string; retryable: boolean };
+    assert.equal(response.status, 429);
+    assert.equal(body.code, "rate_limited");
+    assert.equal(body.retryable, true);
+    assert.equal(body.error.includes("sk-super-secret"), false);
   });
 
   void it("filters legacy empty assistant messages before invoking the runtime", async () => {

@@ -189,7 +189,9 @@ export function MessageList({
         {error && (
           <div className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
             <p className="font-medium">{t("msg.error.title")}</p>
-            <p className="mt-1 leading-relaxed opacity-85">{errorDetail || error.message}</p>
+            <p className="mt-1 leading-relaxed opacity-85">
+              {errorDetail || t("error.chat.unknown")}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {onRetry && (
                 <button

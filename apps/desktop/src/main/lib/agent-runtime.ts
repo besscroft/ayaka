@@ -39,6 +39,7 @@ import {
   type AgentRuntimeStatus,
   type AgentToolPolicy,
   type ChatMessageMetadata,
+  type ChatErrorCode,
   type ChatReasoningLevel,
   type ChatToolId,
   type ChatToolSelectionRequest,
@@ -91,6 +92,7 @@ import { agentLoopSessions, type AgentLoopMode, type AgentLoopSession } from "./
 import { RunToolScheduler, scheduleToolSet } from "./run-tool-scheduler";
 import { buildMediaGenerationToolRequest, executeMediaGeneration } from "./media-generation";
 import { addAgentManagementTools } from "./agent-management-tools";
+import { classifyChatError } from "./chat-errors";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -429,7 +431,11 @@ async function streamRootAgentLoop({
               ? (initialMessages as UIMessage<ChatMessageMetadata>[])
               : undefined,
             messageMetadata: tracker.messageMetadata,
-            onError: (error) => (error instanceof Error ? error.message : String(error)),
+            onError: (error) =>
+              classifyChatError(error, {
+                phase: "stream",
+                abortSignal: context.session.signal,
+              }).error,
           });
           for await (const chunk of finalUiStream) writer.write(chunk);
           lastFinishReason = await finalResult.finishReason;
@@ -478,7 +484,11 @@ async function streamRootAgentLoop({
               ? (initialMessages as UIMessage<ChatMessageMetadata>[])
               : undefined,
             messageMetadata: tracker.messageMetadata,
-            onError: (error) => (error instanceof Error ? error.message : String(error)),
+            onError: (error) =>
+              classifyChatError(error, {
+                phase: "stream",
+                abortSignal: context.session.signal,
+              }).error,
           });
           for await (const chunk of uiStream) writer.write(chunk);
 
@@ -531,14 +541,39 @@ async function streamRootAgentLoop({
           writer.write({ type: "finish", finishReason: lastFinishReason });
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (context.session.isActive) finishRun(context, "failed", { error: message });
-        console.error("[agent-runtime] stream failed:", message);
-        writer.write({ type: "error", errorText: message || "Agent stream failed" });
+        const classification = classifyChatError(error, {
+          phase: "stream",
+          abortSignal: context.session.signal,
+        });
+        if (classification.code === "cancelled") {
+          if (context.session.isActive) finishRun(context, "cancelled");
+          writer.write({
+            type: "abort",
+            reason: String(context.session.signal.reason ?? "cancelled"),
+          });
+          return;
+        }
+        if (context.session.isActive) {
+          finishRun(context, "failed", {
+            error: classification.error,
+            errorCode: classification.code,
+            diagnostic: classification.diagnostic,
+          });
+        }
+        console.error(
+          "[agent-runtime] stream failed:",
+          classification.code,
+          classification.diagnostic,
+        );
+        writer.write({ type: "error", errorText: classification.error });
         writer.write({ type: "finish", finishReason: "error" });
       }
     },
-    onError: (error) => (error instanceof Error ? error.message : String(error)),
+    onError: (error) =>
+      classifyChatError(error, {
+        phase: "stream",
+        abortSignal: context.session.signal,
+      }).error,
   });
 
   return createUIMessageStreamResponse({ stream });
@@ -1379,11 +1414,14 @@ function finishRun(
   status: "succeeded" | "failed" | "cancelled",
   extra: {
     error?: string;
+    errorCode?: ChatErrorCode;
+    diagnostic?: string;
     execution?: ChatMessageMetadata["execution"];
     outputSummary?: string;
   } = {},
 ): void {
   const finishedAt = Date.now();
+  const failed = status === "failed";
   const finalStatus =
     context.approvalRequested && status === "succeeded" ? "waiting_approval" : status;
   if (finalStatus === "waiting_approval") {
@@ -1400,12 +1438,16 @@ function finishRun(
   createRuntimeStep({
     run_id: context.runId,
     agent_id: context.finalAgentId,
-    kind: extra.error ? "error" : "output_guardrail",
-    status: extra.error ? "failed" : "succeeded",
-    title: extra.error ? "Agent run failed" : "Output guardrails passed",
+    kind: failed ? "error" : status === "cancelled" ? "diagnostic" : "output_guardrail",
+    status: failed ? "failed" : status === "cancelled" ? "cancelled" : "succeeded",
+    title: failed
+      ? "Agent run failed"
+      : status === "cancelled"
+        ? "Agent run cancelled"
+        : "Output guardrails passed",
     detail: extra,
     finished_at: finishedAt,
-    error: extra.error ?? null,
+    error: failed ? (extra.error ?? "Agent run failed") : null,
   });
   for (const agent of [context.rootAgent, ...context.enabledChildren]) {
     const isFinalHandoffAgent =
@@ -1423,32 +1465,36 @@ function finishRun(
       active_agent_id: context.finalAgentId,
       current_run_id: context.approvalRequested ? context.runId : null,
       current_step_id: null,
-      status: context.approvalRequested ? "reviewing" : extra.error ? "failed" : "idle",
+      status: context.approvalRequested ? "reviewing" : failed ? "failed" : "idle",
       summary: context.approvalRequested
         ? "Waiting for user approval"
-        : extra.error
+        : failed
           ? extra.error
           : "Agent run finished",
     });
   }
   insertRuntimeEvent({
     kind: "agent",
-    title: extra.error
+    title: failed
       ? context.rootAgent.name + " orchestration failed"
       : context.rootAgent.name + " orchestration finished",
-    status: extra.error ? "failed" : finalStatus === "waiting_approval" ? "queued" : "succeeded",
+    status: failed ? "failed" : finalStatus === "waiting_approval" ? "queued" : status,
     detail: { runId: context.runId, finalAgentId: context.finalAgentId, ...extra },
   });
   context.protocolRecorder({
     id: randomUUID(),
     runId: context.runId,
     sequence: 0,
-    type: extra.error ? "run.failed" : "run.completed",
+    type: failed ? "run.failed" : "run.completed",
     agentPath: context.coordinator.currentOwnerPath(),
     parentAgentPath: null,
-    phase: extra.error ? "error" : "end",
+    phase: failed ? "error" : "end",
     createdAt: finishedAt,
-    payload: { finalAgentId: context.finalAgentId, error: extra.error ?? null },
+    payload: {
+      finalAgentId: context.finalAgentId,
+      error: extra.error ?? null,
+      errorCode: extra.errorCode ?? null,
+    },
   });
 }
 

@@ -23,7 +23,7 @@ import { MessageInput } from "./MessageInput";
 import { Button } from "./ui";
 import { api, type RuntimeSnapshot } from "../lib/api";
 import { hasMeaningfulConversationTitle } from "../lib/conversation-title";
-import { getChatErrorMessage } from "../lib/errors";
+import { getChatErrorInfo, getChatErrorMessage } from "../lib/errors";
 import { AgentStatusWidget } from "./AgentStatusWidget";
 import {
   appendOrReplaceMessage,
@@ -31,6 +31,7 @@ import {
   getAgentLearningQueueKey,
   hydrateStoredMessage,
   isNonEmptyUIMessage,
+  prepareFailedChatSnapshot,
   toFileUIParts,
 } from "../lib/chat-messages";
 import {
@@ -116,6 +117,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "error">("loading");
   const [hydrationRetry, setHydrationRetry] = useState(0);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [chatErrorRetryable, setChatErrorRetryable] = useState(false);
   const [isStopped, setIsStopped] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<Pick<
@@ -149,6 +151,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const revisionRef = useRef(0);
   const persistenceDirtyRef = useRef(false);
   const learningQueueKeyRef = useRef<string | null>(null);
+  const chatFailureRef = useRef(false);
+  const errorReportedRef = useRef(false);
   const persistenceQueue = useMemo(
     () =>
       createSnapshotPersistenceQueue<MessagePersistenceRequest>(
@@ -211,16 +215,21 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       err: unknown,
       opts: { persistSnapshot?: UIMessage[]; toastKey?: string } = {},
     ): void => {
-      const detail = getChatErrorMessage(err, locale);
-      setChatError(detail);
-      console.error(`[chat] ${source} failed:`, err);
+      const info = getChatErrorInfo(err, locale);
+      if (info.code === "cancelled" || errorReportedRef.current) return;
+      errorReportedRef.current = true;
+      chatFailureRef.current = true;
+      setChatError(info.message);
+      setChatErrorRetryable(info.retryable);
+      console.error(`[chat] ${source} failed:`, info.code, info.message);
       if (opts.persistSnapshot) {
         if (hydrationStateRef.current === "ready") {
+          const snapshot = prepareFailedChatSnapshot(opts.persistSnapshot);
           persistenceDirtyRef.current = true;
-          persistenceQueue.request({ messages: opts.persistSnapshot });
+          persistenceQueue.request(snapshot);
         }
       }
-      notify.error(t(opts.toastKey ?? "toast.chat.failed"), detail, locale);
+      notify.error(t(opts.toastKey ?? "toast.chat.failed"), info.message, locale);
     },
     [locale, persistenceQueue, t],
   );
@@ -352,7 +361,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setHydrationState("loading");
     hydrationStateRef.current = "loading";
     setChatError(null);
+    setChatErrorRetryable(false);
     setIsStopped(false);
+    chatFailureRef.current = false;
+    errorReportedRef.current = false;
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
     runIdRef.current = null;
     runModeRef.current = "start";
@@ -405,13 +417,19 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: ({ messages, isError }) => {
       if (runIdRef.current) runModeRef.current = "resume";
-      if (!isError) setChatError(null);
+      if (!isError) {
+        chatFailureRef.current = false;
+        errorReportedRef.current = false;
+        setChatError(null);
+        setChatErrorRetryable(false);
+      }
       setIsStopped(false);
       const learningKey = getAgentLearningQueueKey(conversationId, messages, isError);
       const shouldQueueLearning =
         learningKey != null && learningQueueKeyRef.current !== learningKey;
       if (shouldQueueLearning) learningQueueKeyRef.current = learningKey;
-      void persistAndTouch(messages)
+      const snapshot = isError ? prepareFailedChatSnapshot(messages) : { messages, deleteIds: [] };
+      void persistAndTouch(snapshot.messages, snapshot.deleteIds)
         .then((persisted) => {
           if (!persisted && shouldQueueLearning && learningQueueKeyRef.current === learningKey) {
             learningQueueKeyRef.current = null;
@@ -427,9 +445,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           console.error("[chat] failed to persist messages or queue learning:", err);
         });
       // 鑷姩鐢熸垚鏍囬锛氭湰杞彂閫佷簡娑堟伅 + assistant 瀹屾暣浜х敓 + 杩樻病鐢熸垚杩?
-      tryAutoTitle(conversationId, messages, titledRef);
+      if (!isError) tryAutoTitle(conversationId, messages, titledRef);
       // 异步生成追问建议
-      void fetchFollowupSuggestions(messages);
+      if (!isError) void fetchFollowupSuggestions(messages);
     },
     onError: (err) => {
       reportChatError("streaming", err, {
@@ -460,14 +478,20 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (hydrationState !== "ready" || !isChatLoading) return;
     const persistLatest = (): void => {
       persistenceDirtyRef.current = true;
-      persistenceQueue.request({ messages: latestMessagesRef.current });
+      const snapshot = chatFailureRef.current
+        ? prepareFailedChatSnapshot(latestMessagesRef.current)
+        : { messages: latestMessagesRef.current, deleteIds: [] };
+      persistenceQueue.request(snapshot);
     };
     persistLatest();
     const id = window.setInterval(persistLatest, 750);
     return () => {
       window.clearInterval(id);
+      const snapshot = chatFailureRef.current
+        ? prepareFailedChatSnapshot(latestMessagesRef.current)
+        : { messages: latestMessagesRef.current, deleteIds: [] };
       void persistenceQueue
-        .flush({ messages: latestMessagesRef.current })
+        .flush(snapshot)
         .catch((error) => console.error("[chat] failed to flush streaming snapshot:", error));
     };
   }, [hydrationState, isChatLoading, persistenceQueue]);
@@ -475,8 +499,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   useEffect(
     () => () => {
       if (hydrationStateRef.current !== "ready" || !persistenceDirtyRef.current) return;
+      const snapshot = chatFailureRef.current
+        ? prepareFailedChatSnapshot(latestMessagesRef.current)
+        : { messages: latestMessagesRef.current, deleteIds: [] };
       void persistenceQueue
-        .flush({ messages: latestMessagesRef.current })
+        .flush(snapshot)
         .catch((error) => console.error("[chat] failed to flush final snapshot:", error));
     },
     [persistenceQueue],
@@ -576,7 +603,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
 
     setChatError(null);
+    setChatErrorRetryable(false);
     setIsStopped(false);
+    chatFailureRef.current = false;
+    errorReportedRef.current = false;
     chat.clearError();
 
     const pendingMessages = appendOrReplaceMessage(latestMessagesRef.current, userMessage);
@@ -640,8 +670,16 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   };
 
   const handleRetry = (): void => {
+    if (!chatErrorRetryable) return;
+    const snapshot = prepareFailedChatSnapshot(chat.messages);
+    chat.setMessages(snapshot.messages);
+    latestMessagesRef.current = snapshot.messages;
+    persistInBackground(snapshot.messages, "cleared failed response", snapshot.deleteIds);
     setChatError(null);
+    setChatErrorRetryable(false);
     setIsStopped(false);
+    chatFailureRef.current = false;
+    errorReportedRef.current = false;
     chat.clearError();
     void chat.regenerate().finally(() => {
       persistInBackground(latestMessagesRef.current, "retried response");
@@ -650,6 +688,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   const handleDismissError = (): void => {
     setChatError(null);
+    setChatErrorRetryable(false);
     setIsStopped(false);
     chat.clearError();
   };
@@ -834,7 +873,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           errorDetail={chatError}
           emptySuggestions={starterSuggestions}
           followupSuggestions={followupSuggestions}
-          onRetry={handleRetry}
+          onRetry={chatErrorRetryable ? handleRetry : undefined}
           onDismissError={handleDismissError}
           onEditMessage={handleEditMessage}
           onResendMessage={handleResendMessage}

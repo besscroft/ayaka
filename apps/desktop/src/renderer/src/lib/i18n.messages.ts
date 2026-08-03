@@ -624,6 +624,14 @@ const entries = {
     zh: "请求内容不完整，请重新发送。",
     en: "The request is incomplete. Please send it again.",
   },
+  "error.chat.cancelled": {
+    zh: "\u8bf7\u6c42\u5df2\u53d6\u6d88\u3002",
+    en: "The request was cancelled.",
+  },
+  "error.chat.configuration": {
+    zh: "\u9009\u4e2d\u7684\u6a21\u578b\u914d\u7f6e\u4e0d\u6b63\u786e\u3002\u8bf7\u68c0\u67e5\u670d\u52a1\u5546\u8bbe\u7f6e\u3002",
+    en: "The selected model is not configured correctly. Check its provider settings.",
+  },
   "error.chat.missingModel": {
     zh: "还没有选择可用模型。请先选择或配置一个模型。",
     en: "No available model is selected. Choose or configure a model first.",
@@ -632,6 +640,18 @@ const entries = {
     zh: "无法连接到本地聊天服务。请稍等几秒后重试，或重启应用。",
     en: "Unable to connect to the local chat service. Wait a few seconds and try again, or restart the app.",
   },
+  "error.chat.provider": {
+    zh: "\u6a21\u578b\u670d\u52a1\u5546\u65e0\u6cd5\u5b8c\u6210\u672c\u6b21\u8bf7\u6c42\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",
+    en: "The model provider could not complete the request. Try again shortly.",
+  },
+  "error.chat.rateLimited": {
+    zh: "\u6a21\u578b\u670d\u52a1\u5546\u6682\u65f6\u9650\u5236\u4e86\u8bf7\u6c42\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",
+    en: "The model provider is rate limiting requests. Wait a moment and try again.",
+  },
+  "error.chat.runtime": {
+    zh: "\u672c\u5730\u667a\u80fd\u4f53\u8fd0\u884c\u65f6\u65e0\u6cd5\u5b8c\u6210\u8bf7\u6c42\u3002\u8bf7\u91cd\u8bd5\u3002",
+    en: "The local agent runtime could not complete the request. Try again.",
+  },
   "error.chat.server": {
     zh: "本地聊天服务处理失败。",
     en: "The local chat service failed to process the request.",
@@ -639,6 +659,10 @@ const entries = {
   "error.chat.unauthorized": {
     zh: "聊天会话已过期，请重启应用后重试。",
     en: "The chat session expired. Restart the app and try again.",
+  },
+  "error.chat.timeout": {
+    zh: "\u6a21\u578b\u8bf7\u6c42\u8d85\u65f6\u3002\u8bf7\u91cd\u8bd5\u6216\u7f29\u77ed\u8bf7\u6c42\u5185\u5bb9\u3002",
+    en: "The model request timed out. Try again or use a shorter request.",
   },
   "error.chat.unknown": {
     zh: "请求失败，请稍后重试。",

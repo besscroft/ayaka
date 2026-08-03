@@ -4,8 +4,8 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { generateText, type UIMessage } from "ai";
 import {
-  CHAT_REASONING_LEVELS,
   CHAT_SESSION_HEADER,
+  type ChatErrorResponse,
   isChatReasoningLevel,
   type ChatReasoningLevel,
   type ChatToolSelectionRequest,
@@ -20,6 +20,7 @@ import {
   mediaErrorStatus,
   validateMediaGenerationRequest,
 } from "../lib/media-generation";
+import { chatErrorResponse, chatErrorStatus, classifyChatError } from "../lib/chat-errors";
 
 const ALLOWED_ORIGIN_PATTERNS = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/];
 
@@ -126,10 +127,10 @@ export function createApp(options: CreateAppOptions = {}): Hono {
   });
   app.post("/api/chat", async (c) => {
     if (!isAuthorized(c, token)) {
-      return c.json({ error: "Unauthorized chat session" }, 401);
+      return c.json(chatErrorResponse("unauthorized"), 401);
     }
 
-    const body = (await c.req.json()) as {
+    let body: {
       messages: UIMessage[];
       /** Formatted as "provider/model". */
       model?: string;
@@ -142,28 +143,30 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       runId?: string;
       mode?: "start" | "resume";
     };
+    try {
+      body = (await c.req.json()) as typeof body;
+    } catch {
+      return c.json(chatErrorResponse("invalid_request"), 400);
+    }
 
     const messages = body.messages?.filter(
       (message) => Array.isArray(message.parts) && message.parts.length > 0,
     );
     if (!messages?.length) {
-      return c.json({ error: "messages cannot be empty" }, 400);
+      return c.json(chatErrorResponse("invalid_request"), 400);
     }
     if (!body.model) {
-      return c.json({ error: "model is required in provider/model format" }, 400);
+      return c.json(chatErrorResponse("missing_model"), 400);
     }
     if (body.runId !== undefined && !isUuid(body.runId)) {
-      return c.json({ error: "runId must be a UUID", code: "invalid_run_id" }, 400);
+      return c.json(chatErrorResponse("invalid_run_id"), 400);
     }
     if (body.mode !== undefined && body.mode !== "start" && body.mode !== "resume") {
-      return c.json({ error: "mode must be start or resume", code: "invalid_mode" }, 400);
+      return c.json(chatErrorResponse("invalid_mode"), 400);
     }
     const parsedReasoning = parseChatReasoningLevel(body.reasoning);
     if (!parsedReasoning.ok) {
-      return c.json(
-        { error: "reasoning must be one of: " + CHAT_REASONING_LEVELS.join(", ") },
-        400,
-      );
+      return c.json(chatErrorResponse("invalid_request"), 400);
     }
 
     try {
@@ -192,13 +195,19 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         abortSignal: c.req.raw.signal,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("[server] /api/chat failed:", message);
-      if (isAgentLoopSessionError(err)) {
-        const status = err.code === "run_not_found" ? 404 : 409;
-        return c.json({ error: message, code: err.code }, status);
-      }
-      return c.json({ error: message }, getHttpErrorStatus(err));
+      const classification = classifyChatError(err, {
+        phase: "request",
+        abortSignal: c.req.raw.signal,
+      });
+      console.error("[server] /api/chat failed:", classification.code, classification.diagnostic);
+      return c.json(
+        {
+          error: classification.error,
+          code: classification.code,
+          retryable: classification.retryable,
+        } satisfies ChatErrorResponse,
+        chatErrorStatus(classification),
+      );
     }
   });
 
@@ -525,32 +534,6 @@ function sanitizeTitle(raw: string): string {
   return text.trim();
 }
 
-function getHttpErrorStatus(err: unknown): 400 | 500 {
-  if (err && typeof err === "object" && (err as { status?: unknown }).status === 400) {
-    return 400;
-  }
-  return 500;
-}
-
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isAgentLoopSessionError(error: unknown): error is Error & {
-  code:
-    | "run_conflict"
-    | "run_not_found"
-    | "run_not_active"
-    | "conversation_mismatch"
-    | "conversation_busy";
-} {
-  if (!(error instanceof Error) || error.name !== "AgentLoopSessionError") return false;
-  const code = (error as { code?: unknown }).code;
-  return (
-    code === "run_conflict" ||
-    code === "run_not_found" ||
-    code === "run_not_active" ||
-    code === "conversation_mismatch" ||
-    code === "conversation_busy"
-  );
 }

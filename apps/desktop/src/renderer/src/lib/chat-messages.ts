@@ -99,6 +99,15 @@ export function isNonEmptyUIMessage(message: UIMessage): boolean {
   return Array.isArray(message.parts) && message.parts.length > 0;
 }
 
+export function prepareFailedChatSnapshot(messages: UIMessage[]): {
+  messages: UIMessage[];
+  deleteIds: string[];
+} {
+  const last = messages.at(-1);
+  if (!last || last.role !== "assistant") return { messages, deleteIds: [] };
+  return { messages: messages.slice(0, -1), deleteIds: [last.id] };
+}
+
 export function hasPendingToolApproval(messages: UIMessage[]): boolean {
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   return (

@@ -887,6 +887,32 @@ export interface ChatMessageMetadata {
   mediaGeneration?: JsonObject;
 }
 
+export type ChatErrorCode =
+  | "invalid_request"
+  | "invalid_run_id"
+  | "invalid_mode"
+  | "missing_model"
+  | "unauthorized"
+  | "configuration"
+  | "network"
+  | "rate_limited"
+  | "timeout"
+  | "provider"
+  | "runtime"
+  | "run_conflict"
+  | "run_not_found"
+  | "run_not_active"
+  | "conversation_mismatch"
+  | "conversation_busy"
+  | "cancelled"
+  | "unknown";
+
+export interface ChatErrorResponse {
+  error: string;
+  code: ChatErrorCode;
+  retryable: boolean;
+}
+
 export const CHAT_TOOL_IDS = [
   "web_search",
   "web_open",

@@ -11,6 +11,7 @@ import {
   hasPendingToolApproval,
   hydrateStoredMessage,
   isNonEmptyUIMessage,
+  prepareFailedChatSnapshot,
   readChatMessageMetadata,
   toFileUIParts,
   updateMessageReaction,
@@ -141,6 +142,18 @@ void describe("chat message helpers", () => {
     );
     assert.equal(isNonEmptyUIMessage(messages[0]), true);
     assert.equal(isNonEmptyUIMessage(messages[1]), false);
+  });
+
+  void it("removes the incomplete assistant response while preserving the user retry message", () => {
+    const messages: UIMessage[] = [
+      { id: "u1", role: "user", parts: [{ type: "text", text: "Question" }] },
+      { id: "a1", role: "assistant", parts: [{ type: "text", text: "Partial" }] },
+    ];
+
+    assert.deepEqual(prepareFailedChatSnapshot(messages), {
+      messages: [messages[0]],
+      deleteIds: ["a1"],
+    });
   });
 
   void it("queues learning only for successful final responses without pending approvals", () => {
