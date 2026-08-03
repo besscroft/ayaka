@@ -54,6 +54,7 @@ void describe("chat tool UI helpers", () => {
     assert.equal(web?.execution, "provider");
     assert.deepEqual(getActiveChatToolIds({ mode: "auto", selectedToolIds: [] }, descriptors), [
       "web_search",
+      "web_open",
       "current_time",
       "runtime_snapshot",
       "model_capabilities",

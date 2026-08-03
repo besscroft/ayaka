@@ -507,6 +507,11 @@ const entries = {
   "chatTools.web_search.description.host": { zh: "目标站点", en: "target site" },
   "chatTools.web_search.description.provider": { zh: "搜索服务", en: "search service" },
   "chatTools.web_search.label": { zh: "联网搜索", en: "Web search" },
+  "chatTools.web_open.description": {
+    zh: "读取用户提供的公开网页。",
+    en: "Read a public HTML web page provided by the user.",
+  },
+  "chatTools.web_open.label": { zh: "打开网页", en: "Open web page" },
   "chatTools.cron.label": { zh: "自动化管理", en: "Automation management" },
   "chatTools.cron.description": {
     zh: "查询或管理定时智能体任务；修改操作需要审批。",
@@ -1608,6 +1613,8 @@ const zhOverrides: Dict = {
   "chatTools.web_search.description.host": "使用本地搜索工具。",
   "chatTools.web_search.description.provider": "使用模型服务商的原生搜索。",
   "chatTools.web_search.label": "网页搜索",
+  "chatTools.web_open.description": "读取用户提供的公开网页。",
+  "chatTools.web_open.label": "打开网页",
   "common.empty": "暂无内容",
   "format.unit.px": "px",
   "input.attach": "添加附件",

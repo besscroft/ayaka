@@ -49,6 +49,14 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     defaultAuto: 1,
   },
   {
+    id: "web_open",
+    title: "Open web page",
+    description: "Read a public HTML web page provided by the user.",
+    category: "web",
+    requiresApproval: 0,
+    defaultAuto: 1,
+  },
+  {
     id: "file_search",
     title: "File search",
     description: "Search configured OpenAI vector stores for relevant file content.",

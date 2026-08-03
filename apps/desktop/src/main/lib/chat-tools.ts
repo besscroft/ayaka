@@ -37,6 +37,7 @@ import {
 import { getCronScheduler } from "./cron-scheduler";
 import { builtinChatToolRequiresApproval } from "./root-tool-approval";
 import type { CronJobInput } from "../../shared/types";
+import { readWebPage } from "./web-page-reader";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 
@@ -129,6 +130,10 @@ interface WebSearchInput {
   maxResults?: number;
 }
 
+interface WebOpenInput {
+  url: string;
+}
+
 interface ConversationSearchInput {
   query: string;
   limit?: number;
@@ -165,6 +170,15 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     label: "Web search",
     description: "Search the live web with native provider search or a host fallback.",
     kind: "provider",
+    category: "web",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  web_open: {
+    id: "web_open",
+    label: "Open web page",
+    description: "Read a public HTML web page provided by the user.",
+    kind: "host",
     category: "web",
     defaultAuto: true,
     requiresApproval: false,
@@ -572,6 +586,8 @@ export async function executeChatHostTool({
           return getCurrentSystemTime();
         case "web_search":
           return searchWebFallback(input as WebSearchInput);
+        case "web_open":
+          return readWebPage((input as WebOpenInput).url);
         case "memory_search": {
           const value = input as MemorySearchInput;
           const query = normalizeQuery(value.query);
@@ -646,6 +662,12 @@ function createToolInstructions(activeTools: string[]): string | undefined {
       "Use the search results in the final answer and include source links or source names when available.",
     );
   }
+  if (activeTools.includes("web_open")) {
+    instructions.push(
+      "When the user provides a URL and asks you to read, summarize, explain, or find information on that page, call the web_open tool before answering.",
+      "Use the returned page text and final URL as the source of truth; do not infer page contents from the URL alone.",
+    );
+  }
   if (activeTools.includes("cron")) {
     instructions.push(
       "When the user asks to schedule a reminder or recurring task, use the cron tool instead of only describing a schedule.",
@@ -698,6 +720,23 @@ function createHostTools({
           execute: (input) =>
             executeWithAudit("web_search", "Web search", model, conversationId, async () =>
               searchWebFallback(input),
+            ),
+        })
+      : undefined,
+    web_open: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.web_open.description,
+          inputSchema: jsonSchema<WebOpenInput>({
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Public HTTP(S) page URL to read." },
+            },
+            required: ["url"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit("web_open", "Open web page", model, conversationId, async () =>
+              readWebPage(input.url),
             ),
         })
       : undefined,
@@ -1371,6 +1410,7 @@ async function searchWebFallback(input: WebSearchInput): Promise<{
   source: "host_fallback";
   count: number;
   results: Array<{ title: string; url: string; snippet: string }>;
+  sources: Array<{ type: "url"; url: string; title: string }>;
 }> {
   const query = normalizeQuery(input.query);
   const maxResults = normalizeLimit(input.maxResults, 5, 10);
@@ -1387,6 +1427,11 @@ async function searchWebFallback(input: WebSearchInput): Promise<{
           source: "host_fallback",
           count: results.length,
           results,
+          sources: results.map((result) => ({
+            type: "url" as const,
+            url: result.url,
+            title: result.title,
+          })),
         };
       }
       errors.push(`${attempt.label}: no parseable results`);

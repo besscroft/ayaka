@@ -43,6 +43,7 @@ const NATIVE_ONLY_TOOL_IDS = new Set<ChatToolId>([
 
 const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "web_search",
+  "web_open",
   "current_time",
   "runtime_snapshot",
   "model_capabilities",

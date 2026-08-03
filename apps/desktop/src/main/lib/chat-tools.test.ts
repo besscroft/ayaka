@@ -111,6 +111,7 @@ void describe("chat tool runtime", () => {
 
     assert.deepEqual(runtime.activeTools, [
       "web_search",
+      "web_open",
       "current_time",
       "runtime_snapshot",
       "model_capabilities",
@@ -161,6 +162,39 @@ void describe("chat tool runtime", () => {
     });
     assert.deepEqual(google.activeTools, ["google_search"]);
     assert.deepEqual(google.toolChoice, { type: "tool", toolName: "google_search" });
+  });
+
+  void it("reads a user-provided public page through the host tool", async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        "<html><head><title>Public page</title></head><body><main><p>Page text.</p></main></body></html>",
+        { status: 200, headers: { "content-type": "text/html" } },
+      )) as typeof fetch;
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["web_open"] },
+      model: modelContext("openai"),
+      conversationId: "c1",
+    });
+    const webOpen = runtime.tools?.web_open as {
+      execute?: (input: { url: string }) => Promise<unknown>;
+    };
+
+    assert.deepEqual(runtime.activeTools, ["web_open"]);
+    assert.deepEqual(runtime.toolChoice, { type: "tool", toolName: "web_open" });
+    const output = (await webOpen.execute?.({ url: "https://93.184.216.34/page" })) as {
+      finalUrl: string;
+      title: string;
+      text: string;
+      sources: Array<{ url: string }>;
+    };
+    assert.equal(output.finalUrl, "https://93.184.216.34/page");
+    assert.equal(output.title, "Public page");
+    assert.equal(output.text, "Page text.");
+    assert.deepEqual(output.sources, [
+      { type: "url", url: "https://93.184.216.34/page", title: "Public page" },
+    ]);
+    assert.equal(dbInsertRuntimeEvent.mock.callCount(), 1);
   });
 
   void it("exposes configured provider-native hosted tools without host executors", () => {
@@ -335,11 +369,16 @@ void describe("chat tool runtime", () => {
       source: string;
       count: number;
       results: Array<{ title: string; url: string; snippet: string }>;
+      sources: Array<{ type: "url"; url: string; title: string }>;
     };
 
     assert.equal(output.query, "fresh news");
     assert.equal(output.source, "host_fallback");
     assert.equal(output.count, 2);
+    assert.deepEqual(output.sources, [
+      { type: "url", url: "https://example.com/one", title: "One & Result" },
+      { type: "url", url: "https://example.org/two", title: "Two Result" },
+    ]);
     assert.deepEqual(output.results[0], {
       title: "One & Result",
       url: "https://example.com/one",

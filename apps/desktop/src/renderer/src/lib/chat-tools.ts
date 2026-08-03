@@ -13,6 +13,7 @@ import {
 
 const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "web_search",
+  "web_open",
   "current_time",
   "runtime_snapshot",
   "model_capabilities",
@@ -31,6 +32,13 @@ const TOOL_METADATA: Record<
     label: "Web search",
     description: "Search the live web with native provider search or a host fallback.",
     kind: "provider",
+    category: "web",
+    requiresApproval: false,
+  },
+  web_open: {
+    label: "Open web page",
+    description: "Read a public HTML web page provided by the user.",
+    kind: "host",
     category: "web",
     requiresApproval: false,
   },

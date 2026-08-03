@@ -166,6 +166,7 @@ void describe("runtime architecture", () => {
     });
 
     assert.equal(runtime.toolChoice, "auto");
+    assert.ok(runtime.activeTools?.includes("web_open"));
     assert.ok(runtime.activeTools?.includes("runtime_snapshot"));
     assert.ok(runtime.activeTools?.includes("cron"));
   });

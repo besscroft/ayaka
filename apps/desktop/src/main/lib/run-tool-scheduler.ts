@@ -6,6 +6,7 @@ const READ_ONLY_TOOLS = new Set([
   "conversation_search",
   "current_time",
   "web_search",
+  "web_open",
   "google_search",
   "sandbox_read_file",
   "sandbox_list_files",

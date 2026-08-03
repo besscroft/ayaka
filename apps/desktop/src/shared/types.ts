@@ -889,6 +889,7 @@ export interface ChatMessageMetadata {
 
 export const CHAT_TOOL_IDS = [
   "web_search",
+  "web_open",
   "file_search",
   "code_interpreter",
   "tool_search",

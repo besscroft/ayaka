@@ -55,6 +55,7 @@ interface ToolSelectorProps {
 
 const ICONS: Record<ChatToolId, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   web_search: IconGlobe,
+  web_open: IconGlobe,
   file_search: IconDatabase,
   code_interpreter: IconCpu,
   tool_search: IconList,

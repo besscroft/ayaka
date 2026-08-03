@@ -1727,7 +1727,7 @@ function selectedBaseToolIds(
   const selection = normalizeChatToolSelection(applyAgentToolPolicy(rawSelection, policy));
   if (selection.mode === "off") return [];
   if (selection.mode === "manual") return selection.selectedToolIds.filter(isBaseChatTool);
-  return ["web_search", "current_time", "runtime_snapshot", "model_capabilities"];
+  return ["web_search", "web_open", "current_time", "runtime_snapshot", "model_capabilities"];
 }
 
 function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy): ChatToolId[] {
