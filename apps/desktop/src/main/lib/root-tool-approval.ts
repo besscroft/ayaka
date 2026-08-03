@@ -1,4 +1,4 @@
-import { isSilentRootMemoryTool, MEDIA_GENERATION_TOOL_NAME } from "../../shared/types";
+import { MEDIA_GENERATION_TOOL_NAME } from "../../shared/types";
 
 export interface RootToolApprovalInput {
   toolName: string;
@@ -9,7 +9,24 @@ export interface RootToolApprovalInput {
 }
 
 export function builtinChatToolRequiresApproval(toolName: string, input?: unknown): boolean {
+  if (
+    toolName === "memory_search" ||
+    toolName === "current_time" ||
+    toolName === "runtime_snapshot"
+  ) {
+    return false;
+  }
   if (toolName === "conversation_search") return true;
+  if (
+    toolName === "memory_save" ||
+    toolName === "memory_update" ||
+    toolName === "memory_delete" ||
+    toolName === MEDIA_GENERATION_TOOL_NAME ||
+    toolName === "agent_create" ||
+    toolName === "agent_update"
+  ) {
+    return true;
+  }
   if (toolName !== "cron") return false;
   const action = readStringProperty(input, "action");
   return action !== "list" && action !== "get";
@@ -17,10 +34,9 @@ export function builtinChatToolRequiresApproval(toolName: string, input?: unknow
 
 export function rootToolRequiresApproval(input: RootToolApprovalInput): boolean {
   if (
-    isSilentRootMemoryTool(input.toolName) ||
-    input.toolName === MEDIA_GENERATION_TOOL_NAME ||
-    input.toolName === "agent_create" ||
-    input.toolName === "agent_update"
+    input.toolName === "memory_search" ||
+    input.toolName === "current_time" ||
+    input.toolName === "runtime_snapshot"
   ) {
     return false;
   }

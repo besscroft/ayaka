@@ -169,6 +169,33 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     defaultAuto: true,
     requiresApproval: false,
   },
+  file_search: {
+    id: "file_search",
+    label: "File search",
+    description: "Search configured OpenAI vector stores for relevant file content.",
+    kind: "provider",
+    category: "conversation",
+    defaultAuto: false,
+    requiresApproval: false,
+  },
+  code_interpreter: {
+    id: "code_interpreter",
+    label: "Code interpreter",
+    description: "Run Python code in the selected OpenAI hosted analysis environment.",
+    kind: "provider",
+    category: "sandbox",
+    defaultAuto: false,
+    requiresApproval: false,
+  },
+  tool_search: {
+    id: "tool_search",
+    label: "Tool search",
+    description: "Search and load deferred tools when the model needs them.",
+    kind: "provider",
+    category: "model",
+    defaultAuto: false,
+    requiresApproval: false,
+  },
   current_time: {
     id: "current_time",
     label: "Current time",
@@ -341,25 +368,37 @@ export function createChatToolDescriptors(model: ChatToolModelContext): ChatTool
 
   const builtInDescriptors = CHAT_TOOL_IDS.map((id) => {
     const base = TOOL_DEFINITIONS[id];
-    const available = supportsTools && (id !== "web_search" || !!webSearchExecution);
+    const nativeTool = model.nativeTools.find((item) => item.id === id);
+    const isNativeOnly = base.kind === "provider" && id !== "web_search";
+    const overridden = model.capabilities.toolCapabilities?.[id];
+    const available =
+      supportsTools &&
+      overridden !== false &&
+      (id === "web_search" ? !!webSearchExecution : isNativeOnly ? !!nativeTool : true);
     const unavailableReason = available
       ? undefined
       : !supportsTools
         ? "Selected model does not advertise tool calling."
         : id === "web_search"
           ? webSearchUnavailableReason(model)
-          : "Tool calling is unavailable for the selected model.";
+          : isNativeOnly && overridden === false
+            ? "This tool is disabled for the selected model."
+            : isNativeOnly
+              ? "This provider has not registered the hosted tool for the selected model."
+              : "Tool calling is unavailable for the selected model.";
 
     return {
       ...base,
-      ...(id === "web_search" && webSearchExecution
+      ...((id === "web_search" && webSearchExecution) || (isNativeOnly && nativeTool)
         ? {
-            kind: webSearchExecution,
-            execution: webSearchExecution,
+            kind: id === "web_search" ? webSearchExecution : "provider",
+            execution: id === "web_search" ? webSearchExecution : "provider",
             description:
-              webSearchExecution === "provider"
-                ? "Search the live web with the selected model provider."
-                : "Search the live web through the app when native provider search is unavailable.",
+              id === "web_search"
+                ? webSearchExecution === "provider"
+                  ? "Search the live web with the selected model provider."
+                  : "Search the live web through the app when native provider search is unavailable."
+                : base.description,
           }
         : {}),
       available,
@@ -430,18 +469,19 @@ export function buildChatToolRuntime({
   const approvalToolNames: string[] = [];
 
   for (const id of selectedIds.filter(isChatToolId)) {
+    const nativeTool = model.nativeTools.find((item) => item.id === id);
+    if (nativeTool) {
+      assignTool(toolSet, nativeTool.toolName, nativeTool.tool);
+      activeTools.push(nativeTool.toolName);
+      providerExecutedToolNames.add(nativeTool.toolName);
+      continue;
+    }
+
     if (id === "web_search") {
-      const nativeTool = model.nativeTools.find((item) => item.id === "web_search");
-      if (nativeTool) {
-        assignTool(toolSet, nativeTool.toolName, nativeTool.tool);
-        activeTools.push(nativeTool.toolName);
-        providerExecutedToolNames.add(nativeTool.toolName);
-      } else {
-        const hostTool = hostTools.web_search;
-        if (!hostTool) continue;
-        assignTool(toolSet, "web_search", hostTool);
-        activeTools.push("web_search");
-      }
+      const hostTool = hostTools.web_search;
+      if (!hostTool) continue;
+      assignTool(toolSet, "web_search", hostTool);
+      activeTools.push("web_search");
       continue;
     }
 
@@ -471,6 +511,13 @@ export function buildChatToolRuntime({
     }
     activeTools.push(...runtime.activeTools);
     approvalToolNames.push(...runtime.approvalToolNames);
+  }
+
+  if (model.providerKind === "openai" && activeTools.includes("tool_search")) {
+    for (const [toolName, value] of Object.entries(toolSet)) {
+      if (toolName === "tool_search") continue;
+      toolSet[toolName] = markOpenAIToolAsDeferred(value);
+    }
   }
 
   if (activeTools.length === 0) return { descriptors, toolChoice: "none" };
@@ -517,6 +564,10 @@ export async function executeChatHostTool({
     conversationId,
     async () => {
       switch (toolId) {
+        case "file_search":
+        case "code_interpreter":
+        case "tool_search":
+          throw new Error(toolId + " is only available through the provider-native runtime.");
         case "current_time":
           return getCurrentSystemTime();
         case "web_search":
@@ -1733,6 +1784,29 @@ function webSearchUnavailableReason(model: ChatToolModelContext): string {
 
 function assignTool(toolSet: ToolSet, name: string, value: unknown): void {
   (toolSet as Record<string, ToolSet[string]>)[name] = value as ToolSet[string];
+}
+
+function markOpenAIToolAsDeferred(value: ToolSet[string]): ToolSet[string] {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    typeof (value as { execute?: unknown }).execute !== "function"
+  ) {
+    return value;
+  }
+  const tool = value as ToolSet[string] & {
+    providerOptions?: Record<string, Record<string, unknown>>;
+  };
+  return {
+    ...tool,
+    providerOptions: {
+      ...tool.providerOptions,
+      openai: {
+        ...tool.providerOptions?.openai,
+        deferLoading: true,
+      },
+    },
+  };
 }
 
 function normalizeQuery(raw: string): string {

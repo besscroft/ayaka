@@ -34,6 +34,27 @@ const TOOL_METADATA: Record<
     category: "web",
     requiresApproval: false,
   },
+  file_search: {
+    label: "File search",
+    description: "Search configured OpenAI vector stores for relevant file content.",
+    kind: "provider",
+    category: "conversation",
+    requiresApproval: false,
+  },
+  code_interpreter: {
+    label: "Code interpreter",
+    description: "Run Python code in the selected OpenAI hosted analysis environment.",
+    kind: "provider",
+    category: "sandbox",
+    requiresApproval: false,
+  },
+  tool_search: {
+    label: "Tool search",
+    description: "Search and load deferred tools when the model needs them.",
+    kind: "provider",
+    category: "model",
+    requiresApproval: false,
+  },
   current_time: {
     label: "Current time",
     description: "Read the current system date, time, and timezone from the host device.",
@@ -190,7 +211,7 @@ export function createClientChatToolDescriptors({
     const meta = TOOL_METADATA[id];
     const webSearchExecution =
       id === "web_search" && selected ? getWebSearchExecution(selected.provider.kind) : undefined;
-    const available = !!selected && supportsToolCalling;
+    const available = !!selected && supportsToolCalling && isClientToolAvailable(id, selected);
 
     return {
       id,
@@ -273,31 +294,32 @@ function createtoolChatToolDescriptors(
         unavailableReason: available
           ? undefined
           : supportsToolCalling
-            ? "MCP server or tool is disabled."
-            : "Selected model does not advertise tool calling.",
+            ? "chatTools.unavailable.mcpDisabled"
+            : "chatTools.unavailable.toolCalling",
         sourceId: serverId || undefined,
         sourceName: server?.name,
       } satisfies ChatToolDescriptor;
     });
 
   const skillDescriptors = tools.skills.map((skill) => {
-    const enabled = skill.enabled !== 0;
-    const available = supportsToolCalling && enabled;
+    const available = false;
     return {
       id: `skill:${skill.id}`,
       label: skill.name,
-      description: skill.description || "Agent skill",
+      description: skill.description || "",
       kind: "host",
       execution: "host",
       category: "skill",
-      defaultAuto: supportsToolCalling && enabled && skill.auto_use !== 0,
+      defaultAuto: false,
       requiresApproval: skill.requires_approval !== 0,
       available,
       unavailableReason: available
         ? undefined
-        : supportsToolCalling
-          ? "Skill is disabled."
-          : "Selected model does not advertise tool calling.",
+        : skill.enabled === 0
+          ? "chatTools.unavailable.skillDisabled"
+          : supportsToolCalling
+            ? "chatTools.unavailable.skillInstructionsOnly"
+            : "chatTools.unavailable.toolCalling",
       sourceId: skill.id,
       sourceName: skill.category,
     } satisfies ChatToolDescriptor;
@@ -323,10 +345,60 @@ function getUnavailableReason({
   selected: SelectedChatModelInfo | null;
   supportsToolCalling: boolean;
 }): string {
-  if (!selected) return "Select a model before enabling tools.";
-  if (!supportsToolCalling) return "Selected model does not advertise tool calling.";
+  if (!selected) return "chatTools.unavailable.selectModel";
+  if (!supportsToolCalling) return "chatTools.unavailable.toolCalling";
   if (id === "web_search") {
-    return "Web search requires a tool-calling model.";
+    return "chatTools.unavailable.webSearchToolCalling";
   }
-  return "Tool calling is unavailable for the selected model.";
+  if (id === "file_search") {
+    return "chatTools.unavailable.fileSearchConfig";
+  }
+  if (id === "tool_search") {
+    return "chatTools.unavailable.toolSearchConfig";
+  }
+  if (id === "code_interpreter") {
+    return "chatTools.unavailable.codeInterpreter";
+  }
+  return "chatTools.unavailable.generic";
+}
+
+function isClientToolAvailable(id: ChatToolId, selected: SelectedChatModelInfo): boolean {
+  if (selected.model.capabilities.toolCapabilities?.[id] === false) return false;
+  if (id === "web_search" || !["file_search", "code_interpreter", "tool_search"].includes(id)) {
+    return true;
+  }
+  if (selected.provider.kind !== "openai") return false;
+  const options = readOpenAIHostedToolOptions(selected.model.providerOptions);
+  if (id === "file_search") return options.vectorStoreIds.length > 0;
+  if (id === "tool_search") return options.toolSearch === true;
+  return options.codeInterpreter !== false && isLikelyOpenAIResponsesModel(selected.model.id);
+}
+
+function readOpenAIHostedToolOptions(raw: Record<string, unknown>): {
+  codeInterpreter?: boolean;
+  vectorStoreIds: string[];
+  toolSearch?: boolean;
+} {
+  const source = isPlainObject(raw.openaiTools)
+    ? raw.openaiTools
+    : isPlainObject(raw.openai)
+      ? raw.openai
+      : {};
+  return {
+    codeInterpreter: source.codeInterpreter !== false,
+    vectorStoreIds: Array.isArray(source.vectorStoreIds)
+      ? source.vectorStoreIds.filter(
+          (value): value is string => typeof value === "string" && value.trim() !== "",
+        )
+      : [],
+    toolSearch: source.toolSearch === true,
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isLikelyOpenAIResponsesModel(modelId: string): boolean {
+  return /^(gpt-|o[1-9](?:$|-)|codex)/i.test(modelId);
 }

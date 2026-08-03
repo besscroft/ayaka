@@ -1,5 +1,6 @@
 import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createHash } from "node:crypto";
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type {
   ChatToolDescriptor,
@@ -34,7 +35,9 @@ export function parseMcpToolReference(
 }
 
 export function mcpToolRuntimeName(serverId: string, toolName: string): string {
-  return "mcp_" + toolNamePart(serverId) + "_" + toolNamePart(toolName);
+  const identity = `${serverId}\0${toolName}`;
+  const suffix = createHash("sha256").update(identity).digest("hex").slice(0, 10);
+  return "mcp_" + toolNamePart(serverId) + "_" + toolNamePart(toolName) + "_" + suffix;
 }
 
 export function createMcpToolDescriptors(): ChatToolDescriptor[] {
@@ -62,8 +65,23 @@ export function createMcpToolDescriptors(): ChatToolDescriptor[] {
         } satisfies ChatToolDescriptor,
       ];
     });
-  } catch {
-    return [];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [
+      {
+        id: "mcp:registry:error",
+        label: "MCP registry unavailable",
+        description: "MCP tools could not be loaded from the local registry.",
+        kind: "host",
+        execution: "host",
+        category: "mcp",
+        defaultAuto: false,
+        requiresApproval: false,
+        available: false,
+        unavailableReason: message,
+        sourceName: "MCP",
+      } satisfies ChatToolDescriptor,
+    ];
   }
 }
 
@@ -218,6 +236,7 @@ async function executeMcpTool({
       ),
       server,
       "MCP tool call timed out.",
+      () => closeMcpClient(server.id),
     );
     insertRuntimeEvent({
       kind: "tool",
@@ -240,6 +259,7 @@ async function executeMcpTool({
     return output;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    await closeMcpClient(server.id);
     updateMcpServerStatus(server.id, { status: "error", last_error: message });
     insertRuntimeEvent({
       kind: "error",
@@ -307,11 +327,15 @@ function withServerTimeout<T>(
   promise: Promise<T>,
   server: ToolServer,
   message: string,
+  onTimeout?: () => void | Promise<void>,
 ): Promise<T> {
   const timeoutMs = Math.max(1, server.timeout_seconds || 60) * 1_000;
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    timer = setTimeout(() => {
+      void Promise.resolve(onTimeout?.()).catch(() => undefined);
+      reject(new Error(message));
+    }, timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
@@ -382,7 +406,9 @@ function safeJson(raw: string, fallback: unknown): unknown {
 }
 
 function normalizeToolInput(input: unknown): Record<string, unknown> {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("MCP tool input must be a JSON object.");
+  }
   return input as Record<string, unknown>;
 }
 

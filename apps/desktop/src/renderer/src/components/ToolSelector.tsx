@@ -55,6 +55,9 @@ interface ToolSelectorProps {
 
 const ICONS: Record<ChatToolId, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   web_search: IconGlobe,
+  file_search: IconDatabase,
+  code_interpreter: IconCpu,
+  tool_search: IconList,
   current_time: IconClock,
   memory_search: IconDatabase,
   runtime_snapshot: IconList,
@@ -211,7 +214,7 @@ export function ToolSelector({
 
             {!canUseAnyTool ? (
               <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-xs leading-relaxed text-warning">
-                {descriptors[0]?.unavailableReason ?? t("chatTools.unavailable.toolCalling")}
+                {toolUnavailableReason(t, descriptors[0])}
               </p>
             ) : null}
           </div>
@@ -278,7 +281,7 @@ function ManualToolGroup({
               <span className="mt-0.5 block break-words text-[11px] leading-snug text-foreground/55">
                 {descriptor.available
                   ? toolDescription(t, id, descriptor)
-                  : (descriptor.unavailableReason ?? t("chatTools.unavailable.toolCalling"))}
+                  : toolUnavailableReason(t, descriptor)}
               </span>
             </span>
           </button>
@@ -327,7 +330,7 @@ function AutoToolList({
                   ? descriptor.defaultAuto
                     ? toolDescription(t, id, descriptor)
                     : t("chatTools.auto.manualOnly")
-                  : (descriptor.unavailableReason ?? t("chatTools.unavailable.toolCalling"))}
+                  : toolUnavailableReason(t, descriptor)}
               </p>
             </div>
           </div>
@@ -401,8 +404,22 @@ function toolDescription(
   if (id === "web_search" && descriptor?.execution === "provider") {
     return t("chatTools.web_search.description.provider");
   }
-  if (!isChatToolId(id)) return descriptor?.description ?? "";
+  if (!isChatToolId(id)) {
+    if (descriptor?.description) return descriptor.description;
+    return descriptor?.category === "skill"
+      ? t("tools.skill.noDescription")
+      : t("tools.mcp.noDescription");
+  }
   return t(`chatTools.${id}.description`);
+}
+
+function toolUnavailableReason(
+  t: (key: string) => string,
+  descriptor?: ChatToolDescriptor,
+): string {
+  const reason = descriptor?.unavailableReason;
+  if (!reason) return t("chatTools.unavailable.toolCalling");
+  return reason.startsWith("chatTools.unavailable.") ? t(reason) : reason;
 }
 
 function ToolBadges({

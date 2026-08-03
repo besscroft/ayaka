@@ -369,6 +369,21 @@ const entries = {
   "chatTools.conversation_search.label": { zh: "搜索历史对话", en: "Search conversations" },
   "chatTools.current_time.description": { zh: "获取当前时间", en: "Get the current time" },
   "chatTools.current_time.label": { zh: "当前时间", en: "Current time" },
+  "chatTools.file_search.description": {
+    zh: "在已配置的 OpenAI 文件向量存储中查找相关内容",
+    en: "Search configured OpenAI vector stores for relevant file content.",
+  },
+  "chatTools.file_search.label": { zh: "文件搜索", en: "File search" },
+  "chatTools.code_interpreter.description": {
+    zh: "在选定的 OpenAI 托管分析环境中运行代码",
+    en: "Run Python code in the selected OpenAI hosted analysis environment.",
+  },
+  "chatTools.code_interpreter.label": { zh: "代码解释器", en: "Code interpreter" },
+  "chatTools.tool_search.description": {
+    zh: "在模型需要时搜索并加载延迟加载的工具",
+    en: "Search and load deferred tools when the model needs them.",
+  },
+  "chatTools.tool_search.label": { zh: "工具搜索", en: "Tool search" },
   "chatTools.manual.label": { zh: "手动选择", en: "Manual" },
   "chatTools.manual.none": { zh: "无可用工具", en: "No tools" },
   "chatTools.memory_save.description": {
@@ -448,6 +463,42 @@ const entries = {
   "chatTools.unavailable.toolCalling": {
     zh: "当前模型不支持工具调用",
     en: "Current model doesn't support tool calling",
+  },
+  "chatTools.unavailable.selectModel": {
+    zh: "请先选择模型，再启用工具。",
+    en: "Select a model before enabling tools.",
+  },
+  "chatTools.unavailable.webSearchToolCalling": {
+    zh: "网页搜索需要支持工具调用的模型。",
+    en: "Web search requires a tool-calling model.",
+  },
+  "chatTools.unavailable.fileSearchConfig": {
+    zh: "请先配置 OpenAI 向量存储 ID，再启用文件搜索。",
+    en: "Configure OpenAI vector store IDs before enabling file search.",
+  },
+  "chatTools.unavailable.toolSearchConfig": {
+    zh: "请先在模型服务商选项中启用 OpenAI 工具搜索。",
+    en: "Enable OpenAI tool search in the model provider options before using it.",
+  },
+  "chatTools.unavailable.codeInterpreter": {
+    zh: "当前服务商或模型未提供代码解释器。",
+    en: "The selected provider/model does not expose code interpreter.",
+  },
+  "chatTools.unavailable.generic": {
+    zh: "当前模型无法使用工具调用。",
+    en: "Tool calling is unavailable for the selected model.",
+  },
+  "chatTools.unavailable.mcpDisabled": {
+    zh: "MCP 服务或工具已停用。",
+    en: "The MCP server or tool is disabled.",
+  },
+  "chatTools.unavailable.skillDisabled": {
+    zh: "此技能已停用。",
+    en: "This Skill is disabled.",
+  },
+  "chatTools.unavailable.skillInstructionsOnly": {
+    zh: "技能执行尚未配置；此技能目前仅提供说明。",
+    en: "Skill execution is not configured; this Skill only provides instructions.",
   },
   "chatTools.web_search.description": {
     zh: "使用 {provider} 搜索 {host}",
@@ -1497,6 +1548,12 @@ const zhOverrides: Dict = {
   "chatTools.conversation_search.label": "对话搜索",
   "chatTools.current_time.description": "读取当前日期、时间和时区。",
   "chatTools.current_time.label": "当前时间",
+  "chatTools.file_search.description": "在已配置的 OpenAI 文件向量存储中查找相关内容。",
+  "chatTools.file_search.label": "文件搜索",
+  "chatTools.code_interpreter.description": "在选定的 OpenAI 托管分析环境中运行代码。",
+  "chatTools.code_interpreter.label": "代码解释器",
+  "chatTools.tool_search.description": "在模型需要时搜索并加载延迟加载的工具。",
+  "chatTools.tool_search.label": "工具搜索",
   "chatTools.manual.label": "手动选择工具",
   "chatTools.manual.none": "未选择工具",
   "chatTools.memory_save.description": "将信息写入本地记忆。",
@@ -1538,6 +1595,15 @@ const zhOverrides: Dict = {
   "chatTools.summary.manual": "手动工具 {count}",
   "chatTools.summary.off": "工具关闭",
   "chatTools.unavailable.toolCalling": "当前模型不支持工具调用。",
+  "chatTools.unavailable.selectModel": "请先选择模型，再启用工具。",
+  "chatTools.unavailable.webSearchToolCalling": "网页搜索需要支持工具调用的模型。",
+  "chatTools.unavailable.fileSearchConfig": "请先配置 OpenAI 向量存储 ID，再启用文件搜索。",
+  "chatTools.unavailable.toolSearchConfig": "请先在模型服务商选项中启用 OpenAI 工具搜索。",
+  "chatTools.unavailable.codeInterpreter": "当前服务商或模型未提供代码解释器。",
+  "chatTools.unavailable.generic": "当前模型无法使用工具调用。",
+  "chatTools.unavailable.mcpDisabled": "MCP 服务或工具已停用。",
+  "chatTools.unavailable.skillDisabled": "此技能已停用。",
+  "chatTools.unavailable.skillInstructionsOnly": "技能执行尚未配置；此技能目前仅提供说明。",
   "chatTools.web_search.description": "通过模型服务商或本地工具搜索网页。",
   "chatTools.web_search.description.host": "使用本地搜索工具。",
   "chatTools.web_search.description.provider": "使用模型服务商的原生搜索。",

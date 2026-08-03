@@ -163,6 +163,55 @@ void describe("chat tool runtime", () => {
     assert.deepEqual(google.toolChoice, { type: "tool", toolName: "google_search" });
   });
 
+  void it("exposes configured provider-native hosted tools without host executors", () => {
+    const model = modelContext("openai", "web_search");
+    model.nativeTools.push(
+      {
+        id: "code_interpreter",
+        toolName: "code_interpreter",
+        tool: { type: "provider-defined" },
+        providerExecuted: true,
+      },
+      {
+        id: "file_search",
+        toolName: "file_search",
+        tool: { type: "provider-defined" },
+        providerExecuted: true,
+      },
+    );
+
+    const descriptors = chatTools.createChatToolDescriptors(model);
+    assert.equal(descriptors.find((item) => item.id === "code_interpreter")?.available, true);
+    assert.equal(descriptors.find((item) => item.id === "file_search")?.available, true);
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["code_interpreter", "file_search"] },
+      model,
+    });
+    assert.deepEqual(runtime.activeTools, ["code_interpreter", "file_search"]);
+    assert.equal(typeof runtime.tools?.code_interpreter, "object");
+    assert.equal(typeof runtime.tools?.file_search, "object");
+  });
+
+  void it("marks OpenAI function tools as deferred when tool search is active", () => {
+    const model = modelContext("openai", "web_search");
+    model.nativeTools.push({
+      id: "tool_search",
+      toolName: "tool_search",
+      tool: { type: "provider-defined" },
+      providerExecuted: true,
+    });
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["tool_search", "memory_search"] },
+      model,
+    });
+    const memoryTool = runtime.tools?.memory_search as {
+      providerOptions?: { openai?: { deferLoading?: boolean } };
+    };
+    assert.equal(memoryTool.providerOptions?.openai?.deferLoading, true);
+  });
+
   void it("uses host fallback web search for compatible providers without native search", () => {
     const runtime = chatTools.buildChatToolRuntime({
       selection: { mode: "manual", selectedToolIds: ["web_search"] },

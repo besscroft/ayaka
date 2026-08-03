@@ -176,37 +176,46 @@ void describe("runtime architecture", () => {
     assert.equal(commandLooksDangerous({ command: "node", args: ["--version"] }), false);
   });
 
-  void it("keeps silent root tools hidden and approval-free", () => {
+  void it("keeps read-only root tools approval-free and protects mutations", () => {
     assert.equal((CHAT_TOOL_IDS as readonly string[]).includes(MEDIA_GENERATION_TOOL_NAME), false);
-    for (const toolName of ["memory_search", "memory_save", "memory_update", "memory_delete"]) {
-      assert.equal(
-        rootToolRequiresApproval({
-          toolName,
-          reviewAll: true,
-          dynamicallyRequiresApproval: true,
-          policyRequiresApproval: true,
-        }),
-        false,
-      );
-    }
     assert.equal(
       rootToolRequiresApproval({
-        toolName: MEDIA_GENERATION_TOOL_NAME,
+        toolName: "memory_search",
         reviewAll: true,
         dynamicallyRequiresApproval: true,
         policyRequiresApproval: true,
       }),
       false,
     );
+    for (const toolName of ["memory_save", "memory_update", "memory_delete"]) {
+      assert.equal(
+        rootToolRequiresApproval({
+          toolName,
+          reviewAll: false,
+          dynamicallyRequiresApproval: false,
+          policyRequiresApproval: false,
+        }),
+        true,
+      );
+    }
+    assert.equal(
+      rootToolRequiresApproval({
+        toolName: MEDIA_GENERATION_TOOL_NAME,
+        reviewAll: false,
+        dynamicallyRequiresApproval: false,
+        policyRequiresApproval: false,
+      }),
+      true,
+    );
     for (const toolName of ["agent_create", "agent_update"]) {
       assert.equal(
         rootToolRequiresApproval({
           toolName,
-          reviewAll: true,
-          dynamicallyRequiresApproval: true,
-          policyRequiresApproval: true,
+          reviewAll: false,
+          dynamicallyRequiresApproval: false,
+          policyRequiresApproval: false,
         }),
-        false,
+        true,
       );
     }
     assert.equal(

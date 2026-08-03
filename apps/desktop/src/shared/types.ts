@@ -889,6 +889,9 @@ export interface ChatMessageMetadata {
 
 export const CHAT_TOOL_IDS = [
   "web_search",
+  "file_search",
+  "code_interpreter",
+  "tool_search",
   "current_time",
   "memory_search",
   "runtime_snapshot",
@@ -1541,6 +1544,8 @@ export interface ModelCapabilities {
   toolCalling: boolean;
   reasoning: boolean;
   embedding: boolean;
+  /** Per-tool overrides for providers whose model catalog cannot describe tools precisely. */
+  toolCapabilities?: Partial<Record<ChatToolId, boolean>>;
 }
 
 export interface ModelOption {

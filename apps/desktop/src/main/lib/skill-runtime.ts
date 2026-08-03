@@ -25,10 +25,14 @@ export function createSkillToolDescriptors(): ChatToolDescriptor[] {
       kind: "host",
       execution: "host",
       category: "skill",
-      defaultAuto: skill.enabled !== 0 && skill.auto_use !== 0,
+      // Skills currently provide instructions only. Do not expose them as executable tools.
+      defaultAuto: false,
       requiresApproval: skill.requires_approval !== 0,
-      available: skill.enabled !== 0,
-      unavailableReason: skill.enabled ? undefined : "Skill is disabled.",
+      available: false,
+      unavailableReason:
+        skill.enabled === 0
+          ? "Skill is disabled."
+          : "Skill execution is not configured; this Skill only provides instructions.",
       sourceId: skill.id,
       sourceName: skill.category,
     }));
@@ -92,6 +96,10 @@ export async function runToolSkill({
     const result = {
       skillId: skill.id,
       name: skill.name,
+      execution: "instructions_only" as const,
+      executed: false,
+      warning:
+        "This Skill is registered as an instruction bundle. No scripts, files, or shell commands were executed.",
       instructions: readSkillInstructions(skill),
       input: normalizeInput(input),
       config: safeJson(skill.config_json, {}) as JsonObject,
@@ -100,7 +108,7 @@ export async function runToolSkill({
     markSkillToolRun(skill.id);
     insertRuntimeEvent({
       kind: "skill",
-      title: "Skill ready: " + skill.name,
+      title: "Skill instructions loaded: " + skill.name,
       status: "succeeded",
       tool_id: skill.id,
       detail: { skillId: skill.id, durationMs: Date.now() - started, conversationId, agentId },

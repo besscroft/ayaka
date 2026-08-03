@@ -114,6 +114,42 @@ void describe("sandbox agents", () => {
 
     assert.equal(timedOut.timedOut, true);
   });
+
+  void it("builds a real container command for Docker sessions", () => {
+    const session = { ...makeSession("docker"), isolation_mode: "docker" as const };
+    const args = sandbox.buildSandboxDockerArgs(
+      session,
+      { env: { TEMP: "sandbox-temp", SECRET_TOKEN: "hidden" } },
+      "node",
+      ["--version"],
+      "work",
+      "void-ai-test-container",
+    );
+
+    assert.deepEqual(args.slice(0, 12), [
+      "run",
+      "--rm",
+      "--name",
+      "void-ai-test-container",
+      "--network",
+      "none",
+      "--cpus",
+      "1",
+      "--memory",
+      "512m",
+      "--pids-limit",
+      "128",
+    ]);
+    assert.ok(args.includes("--cap-drop"));
+    assert.ok(args.some((value) => value.includes("target=/workspace")));
+    assert.ok(args.includes("TEMP=sandbox-temp"));
+    assert.equal(
+      args.some((value) => value.includes("SECRET_TOKEN")),
+      false,
+    );
+    assert.equal(args.at(-2), "node");
+    assert.equal(args.at(-1), "--version");
+  });
 });
 
 function makeSession(id: string): SandboxSession {

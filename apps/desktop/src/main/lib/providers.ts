@@ -393,6 +393,13 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
   const speechOutput = value.speechOutput === true;
   const transcription = value.transcription === true;
   const videoOutput = value.videoOutput === true;
+  const toolCapabilities = isPlainJsonObject(value.toolCapabilities)
+    ? Object.fromEntries(
+        Object.entries(value.toolCapabilities).filter(
+          (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+        ),
+      )
+    : undefined;
   const textGeneration =
     typeof value.textGeneration === "boolean"
       ? value.textGeneration
@@ -407,6 +414,7 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
     toolCalling: textGeneration && value.toolCalling !== false,
     reasoning: value.reasoning === true,
     embedding,
+    toolCapabilities,
   };
 }
 
@@ -1238,7 +1246,7 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     maxOutputTokens: model.maxOutputTokens,
     contextWindow: model.contextWindow,
     providerOptions: model.providerOptions as ProviderOptions,
-    nativeTools: createNativeChatTools(config, apiKey),
+    nativeTools: createNativeChatTools(config, apiKey, modelId, model.providerOptions),
     countInputTokens:
       config.kind === "openai"
         ? (input) => countOpenAIInputTokens(config.baseUrl, apiKey, modelId, input)
@@ -1293,11 +1301,16 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
   }
 }
 
-function createNativeChatTools(config: ProviderInfo, apiKey: string): NativeChatTool[] {
+function createNativeChatTools(
+  config: ProviderInfo,
+  apiKey: string,
+  modelId: string,
+  providerOptions: JsonObject,
+): NativeChatTool[] {
   switch (config.kind) {
     case "openai": {
       const provider = createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id });
-      return [
+      const tools: NativeChatTool[] = [
         {
           id: "web_search",
           toolName: "web_search",
@@ -1308,6 +1321,35 @@ function createNativeChatTools(config: ProviderInfo, apiKey: string): NativeChat
           providerExecuted: true,
         },
       ];
+      const hosted = readOpenAIHostedToolOptions(providerOptions);
+      if (hosted.codeInterpreter !== false && isLikelyOpenAIResponsesModel(modelId)) {
+        tools.push({
+          id: "code_interpreter",
+          toolName: "code_interpreter",
+          tool: provider.tools.codeInterpreter(hosted.codeInterpreterOptions),
+          providerExecuted: true,
+        });
+      }
+      if (hosted.vectorStoreIds.length > 0) {
+        tools.push({
+          id: "file_search",
+          toolName: "file_search",
+          tool: provider.tools.fileSearch({
+            vectorStoreIds: hosted.vectorStoreIds,
+            maxNumResults: hosted.maxNumResults,
+          }),
+          providerExecuted: true,
+        });
+      }
+      if (hosted.toolSearch === true) {
+        tools.push({
+          id: "tool_search",
+          toolName: "tool_search",
+          tool: provider.tools.toolSearch(),
+          providerExecuted: true,
+        });
+      }
+      return tools;
     }
     case "anthropic": {
       const provider = createAnthropic({ apiKey });
@@ -1334,4 +1376,44 @@ function createNativeChatTools(config: ProviderInfo, apiKey: string): NativeChat
     case "openai-compatible":
       return [];
   }
+}
+
+interface OpenAIHostedToolOptions {
+  codeInterpreter?: boolean;
+  codeInterpreterOptions?: { container?: string | { fileIds?: string[] } };
+  vectorStoreIds: string[];
+  maxNumResults?: number;
+  toolSearch?: boolean;
+}
+
+function readOpenAIHostedToolOptions(raw: JsonObject): OpenAIHostedToolOptions {
+  const source = isPlainJsonObject(raw.openaiTools)
+    ? raw.openaiTools
+    : isPlainJsonObject(raw.openai)
+      ? raw.openai
+      : {};
+  const vectorStoreIds = Array.isArray(source.vectorStoreIds)
+    ? source.vectorStoreIds.filter(
+        (value): value is string => typeof value === "string" && value.trim() !== "",
+      )
+    : [];
+  const codeInterpreterOptions = isPlainJsonObject(source.codeInterpreterOptions)
+    ? source.codeInterpreterOptions
+    : undefined;
+  const maxNumResults =
+    typeof source.maxNumResults === "number" && Number.isFinite(source.maxNumResults)
+      ? Math.max(1, Math.min(50, Math.floor(source.maxNumResults)))
+      : undefined;
+  return {
+    codeInterpreter: source.codeInterpreter !== false,
+    codeInterpreterOptions:
+      codeInterpreterOptions as OpenAIHostedToolOptions["codeInterpreterOptions"],
+    vectorStoreIds,
+    maxNumResults,
+    toolSearch: source.toolSearch === true,
+  };
+}
+
+function isLikelyOpenAIResponsesModel(modelId: string): boolean {
+  return /^(gpt-|o[1-9](?:$|-)|codex)/i.test(modelId);
 }

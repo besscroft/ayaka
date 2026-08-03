@@ -8,6 +8,21 @@ void describe("messages", () => {
     assert.deepEqual(Object.keys(en).sort(), Object.keys(zhCN).sort());
   });
 
+  void it("localizes hosted tool labels and availability reasons", () => {
+    assert.equal(translate("en", "chatTools.file_search.label"), "File search");
+    assert.equal(translate("en", "chatTools.code_interpreter.label"), "Code interpreter");
+    assert.equal(translate("en", "chatTools.tool_search.label"), "Tool search");
+    assert.equal(translate("zh-CN", "chatTools.file_search.label"), "文件搜索");
+    assert.equal(
+      translate("zh-CN", "chatTools.unavailable.fileSearchConfig"),
+      "请先配置 OpenAI 向量存储 ID，再启用文件搜索。",
+    );
+    assert.notEqual(
+      translate("zh-CN", "chatTools.unavailable.skillInstructionsOnly"),
+      "chatTools.unavailable.skillInstructionsOnly",
+    );
+  });
+
   void it("keeps primary Chinese navigation and management surfaces localized", () => {
     assert.equal(translate("zh-CN", "shell.nav.conversations"), "对话");
     assert.equal(translate("zh-CN", "main.title.agents"), "智能体");

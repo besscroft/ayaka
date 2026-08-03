@@ -87,6 +87,44 @@ void describe("chat tool UI helpers", () => {
     );
   });
 
+  void it("only exposes hosted tools when their OpenAI configuration is present", () => {
+    const configured = provider("openai", "openai");
+    configured.models[0].providerOptions = {
+      openaiTools: { vectorStoreIds: ["vs-test"], toolSearch: true },
+    };
+    const configuredDescriptors = createClientChatToolDescriptors({
+      selectedModel: "openai/gpt-test",
+      providers: [configured],
+    });
+    assert.equal(configuredDescriptors.find((item) => item.id === "file_search")?.available, true);
+    assert.equal(configuredDescriptors.find((item) => item.id === "tool_search")?.available, true);
+    assert.equal(
+      configuredDescriptors.find((item) => item.id === "code_interpreter")?.available,
+      true,
+    );
+
+    const unconfiguredDescriptors = createClientChatToolDescriptors({
+      selectedModel: "openai/gpt-test",
+      providers: [provider("openai", "openai")],
+    });
+    assert.equal(
+      unconfiguredDescriptors.find((item) => item.id === "file_search")?.available,
+      false,
+    );
+    assert.equal(
+      unconfiguredDescriptors.find((item) => item.id === "tool_search")?.available,
+      false,
+    );
+    assert.equal(
+      unconfiguredDescriptors.find((item) => item.id === "file_search")?.unavailableReason,
+      "chatTools.unavailable.fileSearchConfig",
+    );
+    assert.equal(
+      unconfiguredDescriptors.find((item) => item.id === "tool_search")?.unavailableReason,
+      "chatTools.unavailable.toolSearchConfig",
+    );
+  });
+
   void it("disables every tool when the selected model cannot call tools", () => {
     const providers = [provider("openai", "openai", { ...capabilities, toolCalling: false })];
     const descriptors = createClientChatToolDescriptors({
@@ -119,14 +157,15 @@ void describe("chat tool UI helpers", () => {
     assert.equal(mcp?.available, true);
     assert.equal(mcp?.defaultAuto, true);
     assert.equal(mcp?.requiresApproval, true);
-    assert.equal(skill?.available, true);
-    assert.equal(skill?.defaultAuto, true);
+    assert.equal(skill?.available, false);
+    assert.equal(skill?.defaultAuto, false);
+    assert.equal(skill?.unavailableReason, "chatTools.unavailable.skillInstructionsOnly");
     assert.deepEqual(
       getActiveChatToolIds(
         { mode: "manual", selectedToolIds: ["memory_search", mcp!.id, skill!.id] },
         descriptors,
       ),
-      ["memory_search", "mcp:srv-1:search", "skill:skill-1"],
+      ["memory_search", "mcp:srv-1:search"],
     );
     assert.equal(
       getActiveChatToolIds({ mode: "auto", selectedToolIds: [] }, descriptors).includes(

@@ -17,6 +17,8 @@ const DATA_DIRNAME = "data";
 const SANDBOX_DIRNAME = "sandboxes";
 const SNAPSHOT_DIRNAME = ".snapshots";
 const DEFAULT_COMMAND_TIMEOUT_MS = 20_000;
+const DEFAULT_DOCKER_IMAGE = "node:22-bookworm-slim";
+const DOCKER_WORKSPACE_PATH = "/workspace";
 const MAX_FILE_READ_BYTES = 512_000;
 const ENV_ALLOWLIST = new Set([
   "PATH",
@@ -153,24 +155,149 @@ export async function runSandboxCommand(
   const cwdStat = await stat(cwd);
   if (!cwdStat.isDirectory()) throw new Error("cwd is not a directory.");
   const timeoutMs = clampNumber(input.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS, 1_000, 60_000);
+  if (session.isolation_mode === "docker") {
+    return runDockerSandboxCommand(session, input, command, args, cwd, timeoutMs);
+  }
+
+  return runLocalSandboxCommand(session, input, command, args, cwd, timeoutMs);
+}
+
+async function runLocalSandboxCommand(
+  session: SandboxSession,
+  input: SandboxRunCommandInput,
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<Awaited<ReturnType<typeof createSandboxCommandResult>>> {
   const env = buildCommandEnv(input.env);
   const started = Date.now();
 
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+  return collectSandboxCommand(
+    spawn(command, args, {
       cwd,
       env,
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
-    });
+    }),
+    {
+      command,
+      args,
+      cwd: toSandboxRelativePath(session.root_path, cwd),
+      timeoutMs,
+      started,
+    },
+  );
+}
+
+async function runDockerSandboxCommand(
+  session: SandboxSession,
+  input: SandboxRunCommandInput,
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<Awaited<ReturnType<typeof createSandboxCommandResult>>> {
+  const relativeCwd = toSandboxRelativePath(session.root_path, cwd);
+  const containerName = `void-ai-${safeId(session.id)}-${randomUUID().slice(0, 8)}`;
+  const dockerArgs = buildSandboxDockerArgs(
+    session,
+    input,
+    command,
+    args,
+    relativeCwd,
+    containerName,
+  );
+  const started = Date.now();
+  return collectSandboxCommand(
+    spawn("docker", dockerArgs, {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    }),
+    {
+      command,
+      args,
+      cwd: relativeCwd,
+      timeoutMs,
+      started,
+      onTimeout: () => {
+        const cleanup = spawn("docker", ["rm", "-f", containerName], {
+          windowsHide: true,
+          stdio: "ignore",
+        });
+        cleanup.on("error", () => undefined);
+      },
+    },
+  );
+}
+
+export function buildSandboxDockerArgs(
+  session: SandboxSession,
+  input: Pick<SandboxRunCommandInput, "env">,
+  command: string,
+  args: string[],
+  relativeCwd: string,
+  containerName = "void-ai-sandbox",
+): string[] {
+  const image = process.env.VOID_AI_SANDBOX_DOCKER_IMAGE?.trim() || DEFAULT_DOCKER_IMAGE;
+  const containerCwd =
+    relativeCwd === "."
+      ? DOCKER_WORKSPACE_PATH
+      : `${DOCKER_WORKSPACE_PATH}/${relativeCwd.replace(/\\/g, "/")}`;
+  const env = buildContainerEnv(input.env);
+  const environmentArgs = Object.entries(env).flatMap(([key, value]) => [
+    "--env",
+    `${key}=${value}`,
+  ]);
+  return [
+    "run",
+    "--rm",
+    "--name",
+    containerName,
+    "--network",
+    "none",
+    "--cpus",
+    "1",
+    "--memory",
+    "512m",
+    "--pids-limit",
+    "128",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--mount",
+    `type=bind,source=${session.root_path},target=${DOCKER_WORKSPACE_PATH}`,
+    "--workdir",
+    containerCwd,
+    ...environmentArgs,
+    image,
+    command,
+    ...args,
+  ];
+}
+
+function collectSandboxCommand(
+  child: ReturnType<typeof spawn>,
+  meta: {
+    command: string;
+    args: string[];
+    cwd: string;
+    timeoutMs: number;
+    started: number;
+    onTimeout?: () => void;
+  },
+): Promise<Awaited<ReturnType<typeof createSandboxCommandResult>>> {
+  return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
+      meta.onTimeout?.();
       child.kill("SIGTERM");
-    }, timeoutMs);
+    }, meta.timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout = truncateOutput(stdout + chunk.toString("utf8"));
@@ -184,19 +311,52 @@ export async function runSandboxCommand(
     });
     child.on("close", (exitCode, signal) => {
       clearTimeout(timeout);
-      resolve({
-        command,
-        args,
-        cwd: toSandboxRelativePath(session.root_path, cwd),
-        exitCode,
-        signal,
-        timedOut,
-        stdout,
-        stderr,
-        durationMs: Date.now() - started,
-      });
+      resolve(
+        createSandboxCommandResult({
+          ...meta,
+          exitCode,
+          signal,
+          timedOut,
+          stdout,
+          stderr,
+        }),
+      );
     });
   });
+}
+
+function createSandboxCommandResult(input: {
+  command: string;
+  args: string[];
+  cwd: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+  started: number;
+}): {
+  command: string;
+  args: string[];
+  cwd: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+} {
+  return {
+    command: input.command,
+    args: input.args,
+    cwd: input.cwd,
+    exitCode: input.exitCode,
+    signal: input.signal,
+    timedOut: input.timedOut,
+    stdout: input.stdout,
+    stderr: input.stderr,
+    durationMs: Date.now() - input.started,
+  };
 }
 
 export async function createSandboxSnapshot(
@@ -328,6 +488,17 @@ function buildCommandEnv(extraEnv: Record<string, string> | undefined): NodeJS.P
     }
   }
   return env;
+}
+
+function buildContainerEnv(extraEnv: Record<string, string> | undefined): Record<string, string> {
+  const hostEnv = buildCommandEnv(extraEnv);
+  return Object.fromEntries(
+    Object.entries(hostEnv).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === "string" &&
+        !["PATH", "Path", "SystemRoot", "COMSPEC"].includes(entry[0]),
+    ),
+  );
 }
 
 function safeId(value: string): string {
