@@ -88,7 +88,7 @@ export function createBuiltinToolDescriptors(model: ChatToolModelContext): ChatT
       execution,
       category: seed.category,
       defaultAuto: DEFAULT_AUTO_TOOL_IDS.has(id),
-      requiresApproval: seed.requiresApproval === 1,
+      requiresApproval: seed.requiresApproval !== 0,
       available,
       unavailableReason: available
         ? undefined

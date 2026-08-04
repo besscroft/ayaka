@@ -2603,7 +2603,16 @@ function seedDefaults(): void {
 function seedBuiltinTools(now: number): void {
   for (const seed of DEFAULT_BUILTIN_TOOL_SEEDS) {
     const existing = getDb().select().from(tools).where(eq(tools.id, seed.id)).get();
-    if (existing) continue;
+    if (existing) {
+      if (existing.requires_approval !== seed.requiresApproval) {
+        getDb()
+          .update(tools)
+          .set({ requires_approval: seed.requiresApproval, updated_at: now })
+          .where(eq(tools.id, seed.id))
+          .run();
+      }
+      continue;
+    }
     getDb()
       .insert(tools)
       .values({

@@ -93,10 +93,10 @@ const TOOL_METADATA: Record<
   },
   conversation_search: {
     label: "Conversation search",
-    description: "Search messages in this conversation after approval.",
+    description: "Search messages in this conversation.",
     kind: "host",
     category: "conversation",
-    requiresApproval: true,
+    requiresApproval: false,
   },
   memory_save: {
     label: "Save memory",
@@ -135,17 +135,17 @@ const TOOL_METADATA: Record<
   },
   sandbox_write_file: {
     label: "Write sandbox file",
-    description: "Write or overwrite a file inside the current sandbox session after approval.",
+    description: "Write or overwrite a file inside the current sandbox session.",
     kind: "host",
     category: "sandbox",
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_run_command: {
     label: "Run sandbox command",
-    description: "Run a command in the current sandbox session after approval.",
+    description: "Run a command in the current sandbox session.",
     kind: "host",
     category: "sandbox",
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_snapshot: {
     label: "Create sandbox snapshot",
@@ -156,10 +156,10 @@ const TOOL_METADATA: Record<
   },
   sandbox_restore: {
     label: "Restore sandbox snapshot",
-    description: "Restore a sandbox snapshot after approval.",
+    description: "Restore a sandbox snapshot.",
     kind: "host",
     category: "sandbox",
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_list_artifacts: {
     label: "Sandbox artifacts",
@@ -170,17 +170,17 @@ const TOOL_METADATA: Record<
   },
   sandbox_preview_port: {
     label: "Sandbox preview port",
-    description: "Register a local preview port for the sandbox after approval.",
+    description: "Register a local preview port for the sandbox.",
     kind: "host",
     category: "sandbox",
-    requiresApproval: true,
+    requiresApproval: false,
   },
   cron: {
     label: "Automation",
     description: "List or manage scheduled isolated agent turns.",
     kind: "host",
     category: "automation",
-    requiresApproval: true,
+    requiresApproval: false,
   },
 };
 

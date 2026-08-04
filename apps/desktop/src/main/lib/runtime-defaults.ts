@@ -117,7 +117,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Conversation search",
     description: "Search local conversation history.",
     category: "conversation",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 0,
   },
   {
@@ -165,7 +165,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Write sandbox file",
     description: "Write a file in the active sandbox.",
     category: "sandbox",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 0,
   },
   {
@@ -173,7 +173,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Run sandbox command",
     description: "Run a command in the active sandbox.",
     category: "sandbox",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 0,
   },
   {
@@ -189,7 +189,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Restore sandbox snapshot",
     description: "Restore a sandbox snapshot.",
     category: "sandbox",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 0,
   },
   {
@@ -205,7 +205,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Preview sandbox port",
     description: "Expose a local sandbox preview port.",
     category: "sandbox",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 0,
   },
   {
@@ -213,7 +213,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     title: "Automation",
     description: "Create and manage scheduled isolated agent turns.",
     category: "automation",
-    requiresApproval: 1,
+    requiresApproval: 0,
     defaultAuto: 1,
   },
 ] as const;

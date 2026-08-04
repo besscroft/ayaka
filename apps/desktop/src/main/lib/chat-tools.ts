@@ -35,7 +35,6 @@ import {
   updateCronJob,
 } from "./cron-store";
 import { getCronScheduler } from "./cron-scheduler";
-import { builtinChatToolRequiresApproval } from "./root-tool-approval";
 import type { CronJobInput } from "../../shared/types";
 import { readWebPage } from "./web-page-reader";
 
@@ -249,11 +248,11 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   conversation_search: {
     id: "conversation_search",
     label: "Conversation search",
-    description: "Search messages in this conversation after approval.",
+    description: "Search messages in this conversation.",
     kind: "host",
     category: "conversation",
     defaultAuto: false,
-    requiresApproval: true,
+    requiresApproval: false,
   },
   memory_save: {
     id: "memory_save",
@@ -303,20 +302,20 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   sandbox_write_file: {
     id: "sandbox_write_file",
     label: "Write sandbox file",
-    description: "Write or overwrite a file inside the current sandbox session after approval.",
+    description: "Write or overwrite a file inside the current sandbox session.",
     kind: "host",
     category: "sandbox",
     defaultAuto: false,
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_run_command: {
     id: "sandbox_run_command",
     label: "Run sandbox command",
-    description: "Run a command in the current sandbox session after approval.",
+    description: "Run a command in the current sandbox session.",
     kind: "host",
     category: "sandbox",
     defaultAuto: false,
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_snapshot: {
     id: "sandbox_snapshot",
@@ -330,11 +329,11 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   sandbox_restore: {
     id: "sandbox_restore",
     label: "Restore sandbox snapshot",
-    description: "Restore a sandbox snapshot after approval.",
+    description: "Restore a sandbox snapshot.",
     kind: "host",
     category: "sandbox",
     defaultAuto: false,
-    requiresApproval: true,
+    requiresApproval: false,
   },
   sandbox_list_artifacts: {
     id: "sandbox_list_artifacts",
@@ -348,11 +347,11 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   sandbox_preview_port: {
     id: "sandbox_preview_port",
     label: "Sandbox preview port",
-    description: "Register a local preview port for the sandbox after approval.",
+    description: "Register a local preview port for the sandbox.",
     kind: "host",
     category: "sandbox",
     defaultAuto: false,
-    requiresApproval: true,
+    requiresApproval: false,
   },
   cron: {
     id: "cron",
@@ -363,7 +362,7 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     kind: "host",
     category: "automation",
     defaultAuto: true,
-    requiresApproval: true,
+    requiresApproval: false,
   },
 };
 
@@ -1111,27 +1110,7 @@ function createToolApproval(
   model: ChatToolModelContext,
   dynamicToolNames: string[] = [],
 ): ToolApprovalConfiguration<ToolSet, unknown> {
-  const approvals: Record<string, (input: unknown) => "user-approval" | undefined> = {
-    conversation_search: () => {
-      recordRuntimeEvent({
-        kind: "approval",
-        title: "Approval requested: conversation_search",
-        status: "queued",
-        detail: baseAuditDetail(model, conversationId, { agentId }),
-      });
-      return "user-approval";
-    },
-    cron: (input) => {
-      if (!builtinChatToolRequiresApproval("cron", input)) return undefined;
-      recordRuntimeEvent({
-        kind: "approval",
-        title: "Approval requested: cron",
-        status: "queued",
-        detail: baseAuditDetail(model, conversationId, { agentId, input }),
-      });
-      return "user-approval";
-    },
-  };
+  const approvals: Record<string, (input: unknown) => "user-approval" | undefined> = {};
 
   for (const toolName of dynamicToolNames) {
     approvals[toolName] = () => {

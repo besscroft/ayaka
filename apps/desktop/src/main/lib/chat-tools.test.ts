@@ -2,7 +2,12 @@ import { afterEach, before, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import Module, { createRequire } from "node:module";
 import type { ChatToolModelContext } from "./chat-tools";
-import type { MemoryRecord, ModelCapabilities, ModelProviderKind } from "../../shared/types";
+import {
+  CHAT_TOOL_IDS,
+  type MemoryRecord,
+  type ModelCapabilities,
+  type ModelProviderKind,
+} from "../../shared/types";
 
 const require = createRequire(import.meta.url);
 const electronPath = require.resolve("electron");
@@ -460,6 +465,13 @@ void describe("chat tool runtime", () => {
     assert.equal(typeof runtime.tools?.memory_delete, "undefined");
   });
 
+  void it("marks every built-in chat tool as approval-free", () => {
+    const descriptors = chatTools.createChatToolDescriptors(modelContext("openai-compatible"));
+    for (const id of CHAT_TOOL_IDS) {
+      assert.equal(descriptors.find((descriptor) => descriptor.id === id)?.requiresApproval, false);
+    }
+  });
+
   void it("includes memory tools in manual mode", () => {
     const runtime = chatTools.buildChatToolRuntime({
       selection: {
@@ -474,7 +486,7 @@ void describe("chat tool runtime", () => {
     assert.equal(typeof runtime.tools?.memory_delete, "object");
   });
 
-  void it("exposes cron creation with a structured schema and mutation approval", async () => {
+  void it("exposes cron creation with a structured schema without approval", async () => {
     const runtime = chatTools.buildChatToolRuntime({
       selection: { mode: "manual", selectedToolIds: ["cron"] },
       model: modelContext("openai-compatible"),
@@ -493,8 +505,8 @@ void describe("chat tool runtime", () => {
       string,
       (input: unknown) => Promise<string | undefined> | string | undefined
     >;
-    assert.equal(await approvals.cron({ action: "list" }), undefined);
-    assert.equal(await approvals.cron({ action: "create" }), "user-approval");
+    assert.equal(approvals.cron, undefined);
+    assert.equal(approvals.conversation_search, undefined);
   });
 
   void it("merges all silent memory tools into an off-mode root runtime", () => {

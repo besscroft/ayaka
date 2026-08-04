@@ -56,7 +56,7 @@ import {
   type ChatToolRuntimeConfig,
 } from "./chat-tools";
 import { commandLooksDangerous, inputHasPathEscape } from "./approval-policy";
-import { rootToolRequiresApproval } from "./root-tool-approval";
+import { isBuiltinToolName, rootToolRequiresApproval } from "./root-tool-approval";
 import { loadAgentGraph } from "./agent-graph";
 import type { AgentGraph } from "./agent-graph";
 import { AgentCoordinator } from "./agent-coordinator";
@@ -1379,6 +1379,9 @@ function evaluateToolGuardrail(
   }
   if (toolName.startsWith("sandbox_") && inputHasPathEscape(input)) {
     return { decision: "deny", risk: "high", reason: "Sandbox path escapes the session root." };
+  }
+  if (isBuiltinToolName(toolName)) {
+    return { decision: "allow", risk: "low", reason: "Built-in tool approval is disabled." };
   }
   if (toolName === "sandbox_run_command" && commandLooksDangerous(input)) {
     return {

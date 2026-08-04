@@ -431,26 +431,28 @@ export function AgentsPanel({
           {visibleAgents.length === 0 ? (
             <EmptyState title={t("agents.empty")} />
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1 grid gap-3 md:grid-cols-2">
-              {visibleAgents.map((agent) => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  selected={agent.id === selected?.id}
-                  runtime={runtimeByAgent.get(agent.id)}
-                  onSelect={() => {
-                    setSelectedId(agent.id);
-                    setDetailTab("overview");
-                    setDetailOpen(true);
-                  }}
-                  onEdit={() => openEdit(agent)}
-                  onDuplicate={() => duplicateAgent(agent)}
-                  onPublish={() => publishAgent(agent)}
-                  onArchive={() => requestArchiveAgent(agent)}
-                  pendingAction={pendingAgentActions.get(agent.id)}
-                  busy={busy}
-                />
-              ))}
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid min-w-0 auto-rows-max gap-3 md:grid-cols-2">
+                {visibleAgents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    selected={agent.id === selected?.id}
+                    runtime={runtimeByAgent.get(agent.id)}
+                    onSelect={() => {
+                      setSelectedId(agent.id);
+                      setDetailTab("overview");
+                      setDetailOpen(true);
+                    }}
+                    onEdit={() => openEdit(agent)}
+                    onDuplicate={() => duplicateAgent(agent)}
+                    onPublish={() => publishAgent(agent)}
+                    onArchive={() => requestArchiveAgent(agent)}
+                    pendingAction={pendingAgentActions.get(agent.id)}
+                    busy={busy}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </Card.Content>
@@ -534,12 +536,7 @@ function AgentCard({
   const runtimeBusy = isAgentRuntimeBusy(runtime?.status);
   const cardBusy = pendingAction !== undefined;
   return (
-    <Card
-      className={cn(
-        "flex h-full min-h-0 flex-col",
-        selected && "border-accent/45 bg-accent/[0.035]",
-      )}
-    >
+    <Card className={cn("flex min-w-0 flex-col", selected && "border-accent/45 bg-accent/[0.035]")}>
       <Card.Header>
         <div className="flex items-start justify-between gap-3">
           <button

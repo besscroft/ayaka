@@ -94,10 +94,9 @@ void describe("runtime architecture", () => {
     );
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "runtime_snapshot"));
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "sandbox_run_command"));
+    assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.every((tool) => tool.requiresApproval === 0));
     assert.ok(
-      DEFAULT_BUILTIN_TOOL_SEEDS.some(
-        (tool) => tool.id === "cron" && tool.defaultAuto === 1 && tool.requiresApproval === 1,
-      ),
+      DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "cron" && tool.defaultAuto === 1),
     );
   });
 
@@ -177,76 +176,42 @@ void describe("runtime architecture", () => {
     assert.equal(commandLooksDangerous({ command: "node", args: ["--version"] }), false);
   });
 
-  void it("keeps read-only root tools approval-free and protects mutations", () => {
+  void it("keeps built-in root tools approval-free and preserves dynamic approvals", () => {
     assert.equal((CHAT_TOOL_IDS as readonly string[]).includes(MEDIA_GENERATION_TOOL_NAME), false);
+    for (const toolName of [
+      ...CHAT_TOOL_IDS,
+      MEDIA_GENERATION_TOOL_NAME,
+      "agent_create",
+      "agent_update",
+    ]) {
+      assert.equal(
+        rootToolRequiresApproval({
+          toolName,
+          toolInput: { action: "create" },
+          reviewAll: true,
+          dynamicallyRequiresApproval: true,
+          policyRequiresApproval: true,
+        }),
+        false,
+      );
+    }
     assert.equal(
       rootToolRequiresApproval({
-        toolName: "memory_search",
-        reviewAll: true,
+        toolName: "mcp:server:tool",
+        reviewAll: false,
         dynamicallyRequiresApproval: true,
-        policyRequiresApproval: true,
-      }),
-      false,
-    );
-    for (const toolName of ["memory_save", "memory_update", "memory_delete"]) {
-      assert.equal(
-        rootToolRequiresApproval({
-          toolName,
-          reviewAll: false,
-          dynamicallyRequiresApproval: false,
-          policyRequiresApproval: false,
-        }),
-        true,
-      );
-    }
-    assert.equal(
-      rootToolRequiresApproval({
-        toolName: MEDIA_GENERATION_TOOL_NAME,
-        reviewAll: false,
-        dynamicallyRequiresApproval: false,
-        policyRequiresApproval: false,
-      }),
-      true,
-    );
-    for (const toolName of ["agent_create", "agent_update"]) {
-      assert.equal(
-        rootToolRequiresApproval({
-          toolName,
-          reviewAll: false,
-          dynamicallyRequiresApproval: false,
-          policyRequiresApproval: false,
-        }),
-        true,
-      );
-    }
-    assert.equal(
-      rootToolRequiresApproval({
-        toolName: "conversation_search",
-        reviewAll: false,
-        dynamicallyRequiresApproval: false,
         policyRequiresApproval: false,
       }),
       true,
     );
     assert.equal(
       rootToolRequiresApproval({
-        toolName: "cron",
-        toolInput: { action: "create" },
+        toolName: "skill:custom",
         reviewAll: false,
-        dynamicallyRequiresApproval: false,
+        dynamicallyRequiresApproval: true,
         policyRequiresApproval: false,
       }),
       true,
-    );
-    assert.equal(
-      rootToolRequiresApproval({
-        toolName: "cron",
-        toolInput: { action: "list" },
-        reviewAll: false,
-        dynamicallyRequiresApproval: false,
-        policyRequiresApproval: false,
-      }),
-      false,
     );
   });
 
