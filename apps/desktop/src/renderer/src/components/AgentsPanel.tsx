@@ -26,6 +26,7 @@ import {
   normalizeMaxConcurrentSubagents,
   normalizeAgentRuntimeConfig,
   normalizeAgentToolPolicy,
+  isChatToolId,
   type AgentHandoffConfig,
   type AgentContextCheckpoint,
   type AgentInput,
@@ -926,6 +927,7 @@ function AgentEditorModal({
     patch({ handoffConfig: { ...form.handoffConfig, ...value } });
   const patchTools = (value: Partial<AgentToolPolicy>): void =>
     patch({ toolPolicy: { ...form.toolPolicy, ...value } });
+  const approvalTools = tools.filter((tool) => !isChatToolId(tool.id));
 
   return (
     <div
@@ -1348,7 +1350,7 @@ function AgentEditorModal({
                 />
                 <ToolChecklist
                   title={t("agents.field.approvalTools")}
-                  tools={tools}
+                  tools={approvalTools}
                   selected={form.toolPolicy.requireApprovalToolIds}
                   onChange={(requireApprovalToolIds) => patchTools({ requireApprovalToolIds })}
                 />

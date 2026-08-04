@@ -51,6 +51,19 @@ void describe("agent config normalization", () => {
     );
   });
 
+  void it("removes built-in tool ids from approval policy while preserving external refs", () => {
+    const policy = normalizeAgentToolPolicy({
+      requireApprovalToolIds: [
+        "conversation_search",
+        "sandbox_run_command",
+        "mcp:server-1:search",
+        "skill:research",
+      ],
+    });
+
+    assert.deepEqual(policy.requireApprovalToolIds, ["mcp:server-1:search", "skill:research"]);
+  });
+
   void it("repairs invalid handoff and runtime fields", () => {
     const handoff = normalizeAgentHandoffConfig({
       mode: "invalid",

@@ -28,7 +28,15 @@ void describe("ToolsPanel data helpers", () => {
     );
     assert.deepEqual(
       filterToolRecords(records, { status: "approval" }).map((tool) => tool.id),
-      ["mcp-search", "sandbox-command", "skill-research"],
+      ["mcp-search", "skill-research"],
+    );
+
+    assert.deepEqual(
+      filterToolRecords(
+        [toolRecord("legacy-builtin", "builtin", "sandbox_run_command", "sandbox", 1, 1)],
+        { status: "approval" },
+      ),
+      [],
     );
     assert.deepEqual(
       filterToolRecords(records, { query: "command" }).map((tool) => tool.id),

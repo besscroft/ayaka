@@ -59,6 +59,7 @@ export interface ChatToolRuntimeConfig {
   descriptors: ChatToolDescriptor[];
   tools?: ToolSet;
   activeTools?: string[];
+  builtinToolNames?: string[];
   approvalToolNames?: string[];
   toolChoice?: ToolChoice<ToolSet>;
   toolApproval?: ToolApprovalConfiguration<ToolSet, unknown>;
@@ -477,6 +478,7 @@ export function buildChatToolRuntime({
 
   const toolSet: ToolSet = {};
   const activeTools: string[] = [];
+  const builtinToolNames: string[] = [];
   const providerExecutedToolNames = new Set<string>();
   const hostTools = createHostTools({ model, descriptors, conversationId, agentId });
   const approvalToolNames: string[] = [];
@@ -486,6 +488,7 @@ export function buildChatToolRuntime({
     if (nativeTool) {
       assignTool(toolSet, nativeTool.toolName, nativeTool.tool);
       activeTools.push(nativeTool.toolName);
+      builtinToolNames.push(nativeTool.toolName);
       providerExecutedToolNames.add(nativeTool.toolName);
       continue;
     }
@@ -495,6 +498,7 @@ export function buildChatToolRuntime({
       if (!hostTool) continue;
       assignTool(toolSet, "web_search", hostTool);
       activeTools.push("web_search");
+      builtinToolNames.push("web_search");
       continue;
     }
 
@@ -502,6 +506,7 @@ export function buildChatToolRuntime({
     if (!hostTool) continue;
     assignTool(toolSet, id, hostTool);
     activeTools.push(id);
+    builtinToolNames.push(id);
   }
 
   const dynamicRuntimes = [
@@ -541,6 +546,7 @@ export function buildChatToolRuntime({
     descriptors,
     tools: toolSet,
     activeTools,
+    builtinToolNames,
     approvalToolNames,
     toolChoice,
     toolApproval: createToolApproval(conversationId, agentId, model, approvalToolNames),
@@ -1033,16 +1039,18 @@ export function createMemoryHostTools({
 export function mergeSilentRootMemoryTools(
   base: ChatToolRuntimeConfig,
   memoryTools: Partial<Record<ChatToolId, ToolSet[string]>>,
-): { tools: ToolSet; activeTools: string[] } {
+): { tools: ToolSet; activeTools: string[]; builtinToolNames: string[] } {
   const tools: ToolSet = { ...base.tools };
   const activeTools = new Set(base.activeTools ?? []);
+  const builtinToolNames = new Set(base.builtinToolNames ?? []);
   for (const id of SILENT_ROOT_MEMORY_TOOL_IDS) {
     const memoryTool = memoryTools[id];
     if (!memoryTool) continue;
     assignTool(tools, id, memoryTool);
     activeTools.add(id);
+    builtinToolNames.add(id);
   }
-  return { tools, activeTools: [...activeTools] };
+  return { tools, activeTools: [...activeTools], builtinToolNames: [...builtinToolNames] };
 }
 
 async function executeCronTool(input: CronToolInput): Promise<unknown> {

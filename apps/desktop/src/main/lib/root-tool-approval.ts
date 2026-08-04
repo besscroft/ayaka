@@ -6,6 +6,7 @@ export interface RootToolApprovalInput {
   reviewAll: boolean;
   dynamicallyRequiresApproval: boolean;
   policyRequiresApproval: boolean;
+  builtinToolNames?: ReadonlySet<string>;
 }
 
 const BUILTIN_TOOL_NAMES = new Set<string>([
@@ -20,6 +21,8 @@ export function isBuiltinToolName(toolName: string): boolean {
 }
 
 export function rootToolRequiresApproval(input: RootToolApprovalInput): boolean {
-  if (isBuiltinToolName(input.toolName)) return false;
+  if (isBuiltinToolName(input.toolName) || input.builtinToolNames?.has(input.toolName)) {
+    return false;
+  }
   return input.reviewAll || input.dynamicallyRequiresApproval || input.policyRequiresApproval;
 }

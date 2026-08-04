@@ -9,6 +9,10 @@ export interface ToolRecordFilters {
   status?: ToolStatusFilter;
 }
 
+export function isToolRecordApprovalEligible(tool: ToolRecord): boolean {
+  return tool.kind !== "builtin" && tool.kind !== "sandbox";
+}
+
 export function filterToolRecords(
   records: ToolRecord[],
   { query = "", kind = "all", status = "all" }: ToolRecordFilters,
@@ -18,7 +22,9 @@ export function filterToolRecords(
     .filter((tool) => kind === "all" || tool.kind === kind)
     .filter((tool) => {
       if (status === "enabled") return tool.enabled !== 0;
-      if (status === "approval") return tool.requires_approval !== 0;
+      if (status === "approval") {
+        return isToolRecordApprovalEligible(tool) && tool.requires_approval !== 0;
+      }
       return true;
     })
     .filter((tool) => {

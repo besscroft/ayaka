@@ -996,13 +996,7 @@ export const DEFAULT_CHAT_TOOL_SELECTION: ChatToolSelectionRequest = {
 export const DEFAULT_AGENT_TOOL_POLICY: AgentToolPolicy = {
   mode: "inherit",
   allowedToolIds: [],
-  requireApprovalToolIds: [
-    "conversation_search",
-    "sandbox_write_file",
-    "sandbox_run_command",
-    "sandbox_restore",
-    "sandbox_preview_port",
-  ],
+  requireApprovalToolIds: [],
 };
 
 export const DEFAULT_AGENT_HANDOFF_CONFIG: AgentHandoffConfig = {
@@ -1053,13 +1047,14 @@ export function normalizeAgentToolPolicy(
   fallback: AgentToolPolicy = DEFAULT_AGENT_TOOL_POLICY,
 ): AgentToolPolicy {
   const value = readAgentConfigObject(raw);
+  const requireApprovalToolIds = normalizeToolIdList(
+    value?.requireApprovalToolIds,
+    fallback.requireApprovalToolIds,
+  ).filter((id) => !isChatToolId(id));
   return {
     mode: value?.mode === "custom" ? "custom" : fallback.mode === "custom" ? "custom" : "inherit",
     allowedToolIds: normalizeToolIdList(value?.allowedToolIds, fallback.allowedToolIds),
-    requireApprovalToolIds: normalizeToolIdList(
-      value?.requireApprovalToolIds,
-      fallback.requireApprovalToolIds,
-    ),
+    requireApprovalToolIds,
   };
 }
 

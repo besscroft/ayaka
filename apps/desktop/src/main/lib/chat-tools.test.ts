@@ -167,6 +167,7 @@ void describe("chat tool runtime", () => {
     });
     assert.deepEqual(google.activeTools, ["google_search"]);
     assert.deepEqual(google.toolChoice, { type: "tool", toolName: "google_search" });
+    assert.deepEqual(google.builtinToolNames, ["google_search"]);
   });
 
   void it("reads a user-provided public page through the host tool", async () => {

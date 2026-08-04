@@ -611,13 +611,17 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   const silentMemoryRuntime = mergeSilentRootMemoryTools(base, memoryHostTools);
   const tools = silentMemoryRuntime.tools;
   const activeTools = new Set<string>(silentMemoryRuntime.activeTools);
+  const builtinToolNames = new Set<string>(silentMemoryRuntime.builtinToolNames ?? []);
   assignTool(tools, MEDIA_GENERATION_TOOL_NAME, createMediaGenerationTool(context));
   activeTools.add(MEDIA_GENERATION_TOOL_NAME);
+  builtinToolNames.add(MEDIA_GENERATION_TOOL_NAME);
   addAgentManagementTools(tools, activeTools, {
     actorAgentId: DEFAULT_AGENT_ID,
     runId: context.runId,
     conversationId: context.conversationId,
   });
+  builtinToolNames.add("agent_create");
+  builtinToolNames.add("agent_update");
 
   // The remaining orchestration tools follow the user's selection as before.
   // When the user turns chat tools off, only the silently-enabled memory tools
@@ -643,6 +647,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
       for (const [toolName, value] of Object.entries(createSandboxTools(context, sandboxToolIds))) {
         assignTool(tools, toolName, value);
         activeTools.add(toolName);
+        builtinToolNames.add(toolName);
       }
     }
 
@@ -668,7 +673,12 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     tools,
     activeTools: names,
     toolChoice: names.length ? "auto" : "none",
-    toolApproval: createGuardrailApproval(context, new Set(base.approvalToolNames ?? [])),
+    builtinToolNames: [...builtinToolNames],
+    toolApproval: createGuardrailApproval(
+      context,
+      new Set(base.approvalToolNames ?? []),
+      builtinToolNames,
+    ),
     stopWhen: ROOT_AGENT_STOP_WHEN,
     onStepEnd: (event) => {
       base.onStepEnd?.(event);
@@ -1029,9 +1039,7 @@ function buildSafeChildToolRuntime(
     return { descriptors: [], toolChoice: "none" };
   }
   const policy = readToolPolicy(child.tool_policy_json);
-  const allowed = selectedBaseToolIds(context.toolSelection, policy).filter(
-    (id) => id !== "cron" && !policy.requireApprovalToolIds.includes(id),
-  );
+  const allowed = selectedBaseToolIds(context.toolSelection, policy).filter((id) => id !== "cron");
   const base = buildChatToolRuntime({
     selection: { mode: allowed.length ? "manual" : "off", selectedToolIds: allowed },
     model,
@@ -1309,11 +1317,18 @@ async function runSandboxStep<T>(
 function createGuardrailApproval(
   context: RuntimeContext,
   toolApprovalToolNames = new Set<string>(),
+  builtinToolNames = new Set<string>(),
 ): ToolApprovalConfiguration<ToolSet, unknown> {
   return ({ toolCall }) => {
     const toolName = String(toolCall.toolName);
     const input = (toolCall as { input?: unknown }).input;
-    const decision = evaluateToolGuardrail(context, toolName, input, toolApprovalToolNames);
+    const decision = evaluateToolGuardrail(
+      context,
+      toolName,
+      input,
+      toolApprovalToolNames,
+      builtinToolNames,
+    );
     const step = createRuntimeStep({
       run_id: context.runId,
       agent_id: DEFAULT_AGENT_ID,
@@ -1369,6 +1384,7 @@ function evaluateToolGuardrail(
   toolName: string,
   input: unknown,
   toolApprovalToolNames = new Set<string>(),
+  builtinToolNames = new Set<string>(),
 ): {
   decision: "allow" | "deny" | "require_review";
   risk: "low" | "medium" | "high";
@@ -1380,7 +1396,7 @@ function evaluateToolGuardrail(
   if (toolName.startsWith("sandbox_") && inputHasPathEscape(input)) {
     return { decision: "deny", risk: "high", reason: "Sandbox path escapes the session root." };
   }
-  if (isBuiltinToolName(toolName)) {
+  if (isBuiltinToolName(toolName) || builtinToolNames.has(toolName)) {
     return { decision: "allow", risk: "low", reason: "Built-in tool approval is disabled." };
   }
   if (toolName === "sandbox_run_command" && commandLooksDangerous(input)) {
@@ -1401,6 +1417,7 @@ function evaluateToolGuardrail(
       reviewAll,
       dynamicallyRequiresApproval: toolApprovalToolNames.has(toolName),
       policyRequiresApproval: !!mappedTool && policy.requireApprovalToolIds.includes(mappedTool),
+      builtinToolNames,
     })
   ) {
     return {
@@ -1796,7 +1813,7 @@ function readToolPolicy(raw: string): AgentToolPolicy {
       ? value.allowedToolIds.filter(isChatToolReference)
       : [],
     requireApprovalToolIds: Array.isArray(value.requireApprovalToolIds)
-      ? value.requireApprovalToolIds.filter(isChatToolReference)
+      ? value.requireApprovalToolIds.filter((id) => isChatToolReference(id) && !isChatToolId(id))
       : DEFAULT_AGENT_TOOL_POLICY.requireApprovalToolIds,
   }));
 }

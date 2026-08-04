@@ -213,6 +213,26 @@ void describe("runtime architecture", () => {
       }),
       true,
     );
+    assert.equal(
+      rootToolRequiresApproval({
+        toolName: "google_search",
+        reviewAll: true,
+        dynamicallyRequiresApproval: true,
+        policyRequiresApproval: true,
+        builtinToolNames: new Set(["google_search"]),
+      }),
+      false,
+    );
+    assert.equal(
+      rootToolRequiresApproval({
+        toolName: "sandbox_run_command",
+        toolInput: { command: "npm", args: ["install"] },
+        reviewAll: true,
+        dynamicallyRequiresApproval: true,
+        policyRequiresApproval: true,
+      }),
+      false,
+    );
   });
 
   void it("guards sandbox runtime access before a session exists", () => {

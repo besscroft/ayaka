@@ -24,7 +24,12 @@ import {
   parseSkillMarkdown,
   type SkillPackageDraft,
 } from "../lib/tools-form";
-import { filterToolRecords, type ToolKindFilter, type ToolStatusFilter } from "../lib/tools-filter";
+import {
+  filterToolRecords,
+  isToolRecordApprovalEligible,
+  type ToolKindFilter,
+  type ToolStatusFilter,
+} from "../lib/tools-filter";
 import { cn } from "../lib/utils";
 import { isChatToolId } from "@shared/types";
 import type {
@@ -311,7 +316,9 @@ function RegistrySection({ rows }: { rows: ToolRecord[] }): React.JSX.Element {
               </div>
               <div className="flex flex-wrap items-start gap-2 md:justify-end">
                 {tool.auto_use ? <Chip size="sm">{t("tools.autoUse")}</Chip> : null}
-                {tool.requires_approval ? <Chip size="sm">{t("tools.approval")}</Chip> : null}
+                {isToolRecordApprovalEligible(tool) && tool.requires_approval ? (
+                  <Chip size="sm">{t("tools.approval")}</Chip>
+                ) : null}
               </div>
             </div>
           ))}
