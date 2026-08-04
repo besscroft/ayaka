@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { UIMessage } from "ai";
-import { getMessageActivityStatus, getReasoningDisplay, readMediaToolResult } from "./MessageList";
+import {
+  getMessageActivityStatus,
+  getReasoningDisplay,
+  getToolDefaultOpen,
+  readMediaToolResult,
+} from "./MessageList";
+import { normalizeToolState } from "../lib/generated-tool-ui";
 
 function assistant(parts: UIMessage["parts"]): UIMessage[] {
   return [{ id: "assistant", role: "assistant", parts }];
@@ -112,5 +118,16 @@ void describe("media tool output", () => {
     assert.equal(result?.kind, "image");
     assert.equal(result?.files[0]?.url, "void-media://asset/image-1.png");
     assert.equal(readMediaToolResult({ type: "tool-web_search", output: result }), null);
+  });
+});
+
+void describe("generated tool disclosure", () => {
+  void it("collapses completed tool output but keeps active and failure states open", () => {
+    assert.equal(getToolDefaultOpen(normalizeToolState("output-available")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("approval-responded")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("input-available")), true);
+    assert.equal(getToolDefaultOpen(normalizeToolState("approval-requested")), true);
+    assert.equal(getToolDefaultOpen(normalizeToolState("output-error")), true);
+    assert.equal(getToolDefaultOpen(normalizeToolState("output-denied")), true);
   });
 });

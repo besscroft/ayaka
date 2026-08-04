@@ -42,11 +42,17 @@ import {
   ToolOutput,
   type ConversationStatusKind,
   type FilePartLike,
-  type ToolState,
 } from "./ai-elements";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { readChatMessageMetadata } from "../lib/chat-messages";
+import { GeneratedToolResult } from "./GeneratedToolResult";
+import {
+  getToolPartName,
+  getToolSummary,
+  normalizeToolState,
+  type RenderableToolPart,
+} from "../lib/generated-tool-ui";
 import { IconBrain, IconCircleDashed, IconCopy, IconKey, IconMessage, IconWrench } from "./icons";
 
 interface MessageListProps {
@@ -75,20 +81,6 @@ interface MessageListProps {
 type MessagePart = UIMessage["parts"][number];
 type ReasoningPart = Extract<MessagePart, { type: "reasoning" }>;
 type SourcePart = Extract<MessagePart, { type: "source-url" | "source-document" }>;
-
-interface RenderableToolPart {
-  type: string;
-  toolName?: string;
-  title?: string;
-  state?: string;
-  input?: unknown;
-  output?: unknown;
-  errorText?: string;
-  approval?: {
-    id: string;
-    isAutomatic?: boolean;
-  };
-}
 
 export function MessageList({
   messages,
@@ -619,14 +611,20 @@ function MessageItem({
             const state = normalizeToolState(part.state);
             const approval = part.approval;
             const mediaResult = state === "output-available" ? readMediaToolResult(part) : null;
+            const generatedResult =
+              state === "output-available" && !mediaResult ? (
+                <GeneratedToolResult part={part} />
+              ) : null;
+            const summary = getToolSummary(part);
             return (
               <Fragment key={key}>
-                <Tool active={isActiveToolState(state)} defaultOpen={isActiveToolState(state)}>
+                <Tool active={isActiveToolState(state)} defaultOpen={getToolDefaultOpen(state)}>
                   <ToolHeader
                     type={part.type}
                     toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
                     title={part.title}
                     state={state}
+                    summary={summary ? t(summary.key, summary.params) : undefined}
                   />
                   <ToolContent>
                     <ToolInput input={part.input} />
@@ -640,7 +638,8 @@ function MessageItem({
                       output={
                         mediaResult
                           ? undefined
-                          : renderToolOutput(part.output, t("tool.unserializable"))
+                          : (generatedResult ??
+                            renderToolOutput(part.output, t("tool.unserializable")))
                       }
                       errorText={part.errorText}
                     />
@@ -801,7 +800,7 @@ function MediaToolResult({ response }: { response: MediaGenerationResponse }): R
 }
 
 export function readMediaToolResult(part: RenderableToolPart): MediaGenerationResponse | null {
-  const toolName = part.type === "dynamic-tool" ? part.toolName : part.type.slice("tool-".length);
+  const toolName = getToolPartName(part);
   if (toolName !== MEDIA_GENERATION_TOOL_NAME) return null;
   const output = part.output;
   if (!output || typeof output !== "object" || Array.isArray(output)) return null;
@@ -833,23 +832,14 @@ export function readMediaToolResult(part: RenderableToolPart): MediaGenerationRe
   };
 }
 
-function normalizeToolState(raw: string | undefined): ToolState {
-  const known: ToolState[] = [
-    "input-streaming",
-    "input-available",
-    "approval-requested",
-    "approval-responded",
-    "output-available",
-    "output-error",
-    "output-denied",
-  ];
-  return known.includes(raw as ToolState) ? (raw as ToolState) : "input-available";
-}
-
-function isActiveToolState(state: ToolState): boolean {
+function isActiveToolState(state: ReturnType<typeof normalizeToolState>): boolean {
   return (
     state === "input-streaming" || state === "input-available" || state === "approval-requested"
   );
+}
+
+export function getToolDefaultOpen(state: ReturnType<typeof normalizeToolState>): boolean {
+  return state !== "output-available" && state !== "approval-responded";
 }
 
 function renderToolOutput(output: unknown, unserializableLabel: string): ReactNode {

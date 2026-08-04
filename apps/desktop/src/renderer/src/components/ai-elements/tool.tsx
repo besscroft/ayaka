@@ -119,6 +119,7 @@ interface ToolHeaderProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   state: ToolState;
   title?: string;
   toolName?: string;
+  summary?: ReactNode;
 }
 
 export function ToolHeader({
@@ -126,6 +127,7 @@ export function ToolHeader({
   state,
   title,
   toolName,
+  summary,
   className,
   children,
   ...rest
@@ -150,6 +152,11 @@ export function ToolHeader({
     >
       <IconWrench className="size-3.5 shrink-0 text-foreground/65" />
       <span className="min-w-0 flex-1 truncate text-foreground/85">{displayName}</span>
+      {summary ? (
+        <span className="min-w-0 max-w-[32%] truncate text-[10px] font-normal text-foreground/45">
+          {summary}
+        </span>
+      ) : null}
       <span
         data-slot="tool-status"
         className={cn(
