@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { strToU8, zipSync } from "fflate";
-import { parseModelScopeSkillsData, searchSkillsShSkills } from "./catalog-adapters";
+import {
+  downloadSkillsShPackage,
+  parseModelScopeSkillsData,
+  parseSkillsShLeaderboardHtml,
+  searchSkillsShSkills,
+} from "./catalog-adapters";
 import { inspectSkillArchive, inspectSkillFiles, validateArchivePath } from "./catalog-safety";
 
 void describe("catalog adapters", () => {
@@ -88,6 +93,91 @@ void describe("catalog adapters", () => {
       );
       assert.equal(result.items[0]?.detail.provider, "skills.sh");
       assert.equal(result.hasMore, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  void it("parses the current skills.sh RSC leaderboard and legacy page data", () => {
+    const rscHtml = String.raw`<script>self.__next_f.push([1,"50:[\"$\",\"$L57\",null,{\"initialSkills\":[{\"source\":\"vercel-labs/skills\",\"skillId\":\"find-skills\",\"name\":\"find-skills\",\"installs\":2809917},{\"source\":\"anthropics/skills\",\"skillId\":\"frontend-design\",\"name\":\"frontend-design\",\"installs\":738903},{\"source\":\"vercel-labs/skills\",\"skillId\":\"find-skills\",\"name\":\"duplicate\",\"installs\":1}]}]"])</script>`;
+    const rscItems = parseSkillsShLeaderboardHtml(rscHtml);
+    assert.deepEqual(
+      rscItems.map((item) => item.externalId),
+      ["vercel-labs/skills/find-skills", "anthropics/skills/frontend-design"],
+    );
+    assert.equal(rscItems[0]?.detail.installs, 2809917);
+
+    const legacyHtml = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+      props: {
+        pageProps: {
+          initialSkills: [
+            {
+              source: "openai/skills",
+              skill_id: "playwright",
+              name: "playwright",
+              installs: 2,
+            },
+          ],
+        },
+      },
+    })}</script>`;
+    const legacyItems = parseSkillsShLeaderboardHtml(legacyHtml);
+    assert.equal(legacyItems[0]?.externalId, "openai/skills/playwright");
+  });
+
+  void it("loads the skills.sh homepage for an empty query and supports array search responses", async () => {
+    const originalFetch = globalThis.fetch;
+    const homepage = String.raw`<script>self.__next_f.push([1,"50:[{\"source\":\"owner/repo\",\"skillId\":\"one\",\"name\":\"one\",\"installs\":3},{\"source\":\"owner/repo\",\"skillId\":\"two\",\"name\":\"two\",\"installs\":2}]"])</script>`;
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url === "https://skills.sh/") return new Response(homepage);
+      return new Response(
+        JSON.stringify([
+          {
+            source: "owner/repo",
+            skillId: "one",
+            name: "one",
+            installs: 3,
+          },
+          {
+            source: "owner/repo",
+            skillId: "two",
+            name: "two",
+            installs: 2,
+          },
+        ]),
+      );
+    }) as typeof fetch;
+    try {
+      const homepageResult = await searchSkillsShSkills({ page: 2, pageSize: 1 });
+      assert.equal(requestedUrls[0], "https://skills.sh/");
+      assert.equal(homepageResult.items[0]?.externalId, "owner/repo/two");
+      assert.equal(homepageResult.hasMore, false);
+
+      const searchResult = await searchSkillsShSkills({ query: "two", pageSize: 1 });
+      assert.equal(searchResult.items[0]?.externalId, "owner/repo/one");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  void it("downloads a skills.sh JSON file tree through the existing install endpoint", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input) => {
+      assert.equal(String(input), "https://skills.sh/api/download/owner/repo/my-skill");
+      return new Response(
+        JSON.stringify({
+          hash: "fixture-hash",
+          files: [{ path: "skill/SKILL.md", contents: "---\nname: fixture\n---\n" }],
+        }),
+      );
+    }) as typeof fetch;
+    try {
+      const result = await downloadSkillsShPackage("owner/repo/my-skill");
+      assert.equal(result.hash, "fixture-hash");
+      assert.equal(result.files[0]?.path, "skill/SKILL.md");
     } finally {
       globalThis.fetch = originalFetch;
     }

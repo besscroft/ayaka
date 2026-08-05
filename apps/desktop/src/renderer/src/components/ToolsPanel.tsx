@@ -1045,7 +1045,7 @@ export function CatalogDiscover(): React.JSX.Element {
         </div>
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>
-            {query.trim().length < 2 && source !== "skills-sh"
+            {source === "modelscope-skills"
               ? t("catalog.modelscopeDescription")
               : t("catalog.multiSourceDescription")}
           </span>
@@ -1071,16 +1071,8 @@ export function CatalogDiscover(): React.JSX.Element {
         ) : items.length === 0 ? (
           <Card>
             <Card.Header>
-              <Card.Title>
-                {source === "skills-sh" && query.trim().length < 2
-                  ? t("catalog.skillsShSearchRequired")
-                  : t("catalog.empty")}
-              </Card.Title>
-              <Card.Description>
-                {source === "skills-sh" && query.trim().length < 2
-                  ? t("catalog.skillsShSearchRequiredDescription")
-                  : t("catalog.emptyDescription")}
-              </Card.Description>
+              <Card.Title>{t("catalog.empty")}</Card.Title>
+              <Card.Description>{t("catalog.emptyDescription")}</Card.Description>
             </Card.Header>
           </Card>
         ) : (

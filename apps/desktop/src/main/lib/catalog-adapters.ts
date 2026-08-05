@@ -38,7 +38,9 @@ export interface ModelScopeSkillsResult {
 const MODELSCOPE_ORIGIN = "https://www.modelscope.cn";
 const MODELSCOPE_SKILLS_API = `${MODELSCOPE_ORIGIN}/api/v1/dolphin/skills`;
 const SKILLS_SH_ORIGIN = "https://skills.sh";
+const SKILLS_SH_HOME_URL = `${SKILLS_SH_ORIGIN}/`;
 const SKILLS_SH_SEARCH_API = `${SKILLS_SH_ORIGIN}/api/search`;
+const SKILLS_SH_PAGE_ORIGINS = new Set(["https://skills.sh", "https://www.skills.sh"]);
 
 export const SKILLS_SH_SOURCE_ID = "catalog-skills-sh";
 export const MODELSCOPE_SOURCE_ID = "catalog-modelscope-skills";
@@ -86,9 +88,29 @@ export async function searchSkillsShSkills(
   input: CatalogSearchInput = {},
 ): Promise<SkillsShSearchResult> {
   const query = input.query?.trim() ?? "";
-  if (query.length < 2) return { items: [], hasMore: false, source: "skills-sh" };
   const page = clampInteger(input.page, 1, 1, 1_000);
   const pageSize = clampInteger(input.pageSize, 40, 1, 100);
+
+  if (query.length === 0) {
+    const response = await fetch(SKILLS_SH_HOME_URL, {
+      headers: { Accept: "text/html,application/xhtml+xml" },
+      redirect: "follow",
+    });
+    const resolved = new URL(response.url || SKILLS_SH_HOME_URL);
+    if (resolved.protocol !== "https:" || !SKILLS_SH_PAGE_ORIGINS.has(resolved.origin)) {
+      throw new Error(`skills.sh catalogue redirected to an untrusted origin: ${resolved.origin}`);
+    }
+    if (!response.ok) throw new Error(`skills.sh catalogue returned HTTP ${response.status}.`);
+    const items = parseSkillsShLeaderboardHtml(await response.text());
+    const offset = (page - 1) * pageSize;
+    return {
+      items: items.slice(offset, offset + pageSize),
+      hasMore: page * pageSize < items.length,
+      source: "skills-sh",
+    };
+  }
+  if (query.length < 2) return { items: [], hasMore: false, source: "skills-sh" };
+
   const limit = Math.min(200, page * pageSize);
   const url = new URL(SKILLS_SH_SEARCH_API);
   url.searchParams.set("q", query);
@@ -101,15 +123,45 @@ export async function searchSkillsShSkills(
   if (!response.ok) throw new Error(`skills.sh search returned HTTP ${response.status}.`);
   const payload = (await response.json()) as unknown;
   const root = asRecord(payload);
-  const rawItems = firstArray(root.skills, root.items);
-  const items = rawItems
-    .map((value) => skillsShItem(asRecord(value)))
-    .filter((item): item is CatalogAdapterItem => item !== null);
+  const rawItems = Array.isArray(payload) ? payload : firstArray(root.skills, root.items);
+  const items = parseSkillsShItems(rawItems);
   return {
     items: items.slice((page - 1) * pageSize, page * pageSize),
     hasMore: items.length >= limit && limit < 200,
     source: "skills-sh",
   };
+}
+
+export function parseSkillsShLeaderboardHtml(html: string): CatalogAdapterItem[] {
+  const arrays: unknown[][] = [];
+  const nextData = extractNextData(html);
+  if (nextData) arrays.push(nextData);
+
+  for (const script of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const content = script[1] ?? "";
+    let searchFrom = 0;
+    while (true) {
+      const pushStart = content.indexOf("self.__next_f.push(", searchFrom);
+      if (pushStart < 0) break;
+      const arrayStart = content.indexOf("[", pushStart);
+      if (arrayStart < 0) break;
+      const encodedCall = extractBalancedJson(content, arrayStart);
+      searchFrom = encodedCall ? encodedCall.end : arrayStart + 1;
+      if (!encodedCall) continue;
+
+      try {
+        const call = JSON.parse(encodedCall.value) as unknown;
+        const flightChunk = Array.isArray(call) && typeof call[1] === "string" ? call[1] : "";
+        const initialSkills = extractJsonArrayAfterMarker(flightChunk, '"initialSkills"');
+        if (initialSkills) arrays.push(initialSkills);
+      } catch {
+        // A malformed RSC chunk should not prevent the remaining page from loading.
+      }
+    }
+  }
+
+  const parsed = parseSkillsShItems(arrays.flatMap((items) => items));
+  return parsed.length > 0 ? parsed : parseEmbeddedSkills(html);
 }
 
 export async function downloadSkillsShPackage(externalId: string): Promise<SkillPackage> {
@@ -229,12 +281,15 @@ function modelScopeSkillItem(item: Record<string, unknown>): CatalogAdapterItem 
 }
 
 function skillsShItem(item: Record<string, unknown>): CatalogAdapterItem | null {
-  const id = stringValue(item.id);
-  const name = stringValue(item.name) || stringValue(item.skillId);
   const source = stringValue(item.source);
-  if (!id || !name || !source || !id.startsWith(`${source}/`)) return null;
-  const slug = id.slice(source.length + 1);
-  if (!slug) return null;
+  const skillId = stringValue(item.skillId ?? item.skill_id);
+  const suppliedId = stringValue(item.id);
+  const prefix = source ? `${source}/` : "";
+  if (suppliedId && (!prefix || !suppliedId.startsWith(prefix))) return null;
+  const slug = suppliedId ? suppliedId.slice(prefix.length) : skillId;
+  const id = source && slug ? `${source}/${slug}` : "";
+  const name = stringValue(item.name) || skillId || slug;
+  if (!id || !name || !source || !slug) return null;
   const encoded = id.split("/").map(encodeURIComponent).join("/");
   return {
     externalId: id,
@@ -253,6 +308,98 @@ function skillsShItem(item: Record<string, unknown>): CatalogAdapterItem | null 
       canonicalKey: `github:${source.toLowerCase()}#${slug.toLowerCase()}`,
     },
   };
+}
+
+function parseSkillsShItems(values: unknown[]): CatalogAdapterItem[] {
+  const seen = new Set<string>();
+  const items: CatalogAdapterItem[] = [];
+  for (const value of values) {
+    const item = skillsShItem(asRecord(value));
+    if (!item || seen.has(item.externalId)) continue;
+    seen.add(item.externalId);
+    items.push(item);
+  }
+  return items;
+}
+
+function extractNextData(html: string): unknown[] | null {
+  const match = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match?.[1]) return null;
+  try {
+    const root = asRecord(JSON.parse(match[1]));
+    const pageProps = asRecord(asRecord(root.props).pageProps);
+    return firstArray(pageProps.initialSkills, pageProps.skills, pageProps.items);
+  } catch {
+    return null;
+  }
+}
+
+function extractJsonArrayAfterMarker(text: string, marker: string): unknown[] | null {
+  const markerStart = text.indexOf(marker);
+  if (markerStart < 0) return null;
+  const arrayStart = text.indexOf("[", markerStart + marker.length);
+  if (arrayStart < 0) return null;
+  const extracted = extractBalancedJson(text, arrayStart);
+  if (!extracted) return null;
+  try {
+    const value = JSON.parse(extracted.value) as unknown;
+    return Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractBalancedJson(text: string, start: number): { value: string; end: number } | null {
+  const opening = text[start];
+  if (opening !== "[") return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index++) {
+    const character = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+    if (character === "[") depth++;
+    else if (character === "]") {
+      depth--;
+      if (depth === 0) return { value: text.slice(start, index + 1), end: index + 1 };
+    }
+  }
+  return null;
+}
+
+function parseEmbeddedSkills(html: string): CatalogAdapterItem[] {
+  const items: CatalogAdapterItem[] = [];
+  const patterns = [
+    /"source"\s*:\s*"([^"]+)"[\s\S]{0,400}?"(?:skillId|skill_id)"\s*:\s*"([^"]+)"[\s\S]{0,300}?"name"\s*:\s*"([^"]*)"[\s\S]{0,200}?"installs"\s*:\s*(\d+)/g,
+    /\\"source\\"\s*:\s*\\"([^"\\]+)\\"[\s\S]{0,400}?\\"(?:skillId|skill_id)\\"\s*:\s*\\"([^"\\]+)\\"[\s\S]{0,300}?\\"name\\"\s*:\s*\\"([^"\\]*)\\"[\s\S]{0,200}?\\"installs\\"\s*:\s*(\d+)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of html.matchAll(pattern)) {
+      const item = skillsShItem({
+        source: match[1],
+        skillId: match[2],
+        name: match[3],
+        installs: Number(match[4]),
+      });
+      if (item) items.push(item);
+    }
+    if (items.length > 0) break;
+  }
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.externalId)) return false;
+    seen.add(item.externalId);
+    return true;
+  });
 }
 
 function canonicalGithubKey(sourceUrl: string, skill: string): string | null {

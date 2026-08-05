@@ -105,9 +105,9 @@ export async function searchCatalogSkills(
   const query = input.query?.trim() ?? "";
   const requested: CatalogSourceKind[] =
     source === "all"
-      ? query.length >= 2
-        ? ["skills-sh", "modelscope-skills"]
-        : ["modelscope-skills"]
+      ? query.length === 1
+        ? ["modelscope-skills"]
+        : ["skills-sh", "modelscope-skills"]
       : [source];
   const settled = await Promise.allSettled(
     requested.map(async (kind) => {
