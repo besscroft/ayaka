@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { ToolRecord } from "@shared/types";
+import type { ArtifactInstallation, CatalogItem, ToolRecord } from "@shared/types";
+import { applyCatalogInstallation } from "./ToolsPanel";
 import { filterToolRecords } from "../lib/tools-filter";
 import {
   buildMcpInput,
@@ -10,6 +11,30 @@ import {
 } from "../lib/tools-form";
 
 void describe("ToolsPanel data helpers", () => {
+  void it("updates only the installed catalog item", () => {
+    const items = [catalogItem("one"), catalogItem("two")];
+    const installation = catalogInstallation("two");
+
+    assert.deepEqual(applyCatalogInstallation(items, installation), [
+      catalogItem("one"),
+      { ...catalogItem("two"), installed: true, updateAvailable: false },
+    ]);
+  });
+
+  void it("clears update state when reinstalling an existing catalog item", () => {
+    const item = { ...catalogItem("one"), installed: true, updateAvailable: true };
+
+    assert.deepEqual(applyCatalogInstallation([item], catalogInstallation("one")), [
+      { ...item, installed: true, updateAvailable: false },
+    ]);
+  });
+
+  void it("preserves the original list when the installation has no matching item", () => {
+    const items = [catalogItem("one"), catalogItem("two")];
+
+    assert.strictEqual(applyCatalogInstallation(items, catalogInstallation("missing")), items);
+  });
+
   void it("filters tools by kind, approval state, enabled state, and search query", () => {
     const records = [
       toolRecord("builtin-time", "builtin", "current_time", "system", 1, 0),
@@ -205,6 +230,50 @@ void describe("ToolsPanel data helpers", () => {
     );
   });
 });
+
+function catalogItem(id: string): CatalogItem {
+  return {
+    id,
+    sourceId: "source-1",
+    sourceKind: "skills-sh",
+    sourceLabel: "skills.sh",
+    artifactType: "skill",
+    externalId: id,
+    canonicalKey: null,
+    name: id,
+    description: "",
+    version: "1.0.0",
+    installUrl: null,
+    catalogUrl: null,
+    metrics: {},
+    detail: {},
+    contentHash: "hash-1",
+    cachedAt: 1,
+    installed: false,
+    updateAvailable: false,
+  };
+}
+
+function catalogInstallation(itemId: string): ArtifactInstallation {
+  return {
+    id: `installation-${itemId}`,
+    itemId,
+    sourceId: "source-1",
+    artifactType: "skill",
+    name: itemId,
+    version: "1.0.0",
+    contentHash: "hash-1",
+    installPath: null,
+    status: "disabled",
+    safety: {},
+    config: {},
+    toolServerId: null,
+    skillId: `skill-${itemId}`,
+    lastError: null,
+    installedAt: 1,
+    updatedAt: 1,
+  };
+}
 
 function toolRecord(
   id: string,

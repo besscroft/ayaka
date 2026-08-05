@@ -33,6 +33,7 @@ import {
 import { cn } from "../lib/utils";
 import { isChatToolId } from "@shared/types";
 import type {
+  ArtifactInstallation,
   CatalogItem,
   CatalogItemDetail,
   CatalogSnapshot,
@@ -55,6 +56,21 @@ import {
   IconTrash,
 } from "./icons";
 import { RichContent } from "./ai-elements/rich-content";
+
+export function applyCatalogInstallation(
+  items: CatalogItem[],
+  installation: ArtifactInstallation,
+): CatalogItem[] {
+  if (!installation.itemId) return items;
+
+  let changed = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== installation.itemId) return item;
+    changed = true;
+    return { ...item, installed: true, updateAvailable: false };
+  });
+  return changed ? nextItems : items;
+}
 
 export function ToolsPanel(): React.JSX.Element {
   const { t, locale } = useT();
@@ -997,8 +1013,8 @@ export function CatalogDiscover(): React.JSX.Element {
   const install = async (item: CatalogItem): Promise<void> => {
     setBusyId(item.id);
     try {
-      await api.catalog.install({ itemId: item.id, enable: false });
-      await loadPage(1, false);
+      const installation = await api.catalog.install({ itemId: item.id, enable: false });
+      setItems((current) => applyCatalogInstallation(current, installation));
       setDetailItem(null);
       notify.success(
         item.installed ? t("catalog.updatedDisabled") : t("catalog.installedDisabled"),
