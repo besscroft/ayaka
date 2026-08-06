@@ -224,9 +224,9 @@ export function InstalledSkillsPanel(): React.JSX.Element {
           </Button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
         {loading && !snapshot ? (
-          <EmptyTools message={t("main.loading")} />
+          <InstalledSkillsListSkeleton />
         ) : (
           <SkillsSection
             skills={snapshot?.skills ?? []}
@@ -286,6 +286,48 @@ export function InstalledSkillsPanel(): React.JSX.Element {
         onClose={() => setDeleteTarget(null)}
       />
     </div>
+  );
+}
+
+function InstalledSkillsListSkeleton(): React.JSX.Element {
+  return (
+    <section className="grid animate-pulse gap-3 xl:grid-cols-2" aria-hidden="true">
+      {[0, 1, 2, 3].map((id) => (
+        <Card key={id}>
+          <Card.Header>
+            <div className="space-y-2">
+              <div className="h-4 w-2/5 rounded bg-foreground/10" />
+              <div className="h-3 w-4/5 rounded bg-foreground/[0.07]" />
+              <div className="h-3 w-3/5 rounded bg-foreground/[0.07]" />
+            </div>
+          </Card.Header>
+          <Card.Content className="space-y-3 p-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[0, 1, 2].map((statId) => (
+                <div key={statId} className="space-y-1.5">
+                  <div className="h-3 w-1/3 rounded bg-foreground/[0.06]" />
+                  <div className="h-3 w-2/3 rounded bg-foreground/[0.09]" />
+                </div>
+              ))}
+            </div>
+            <div className="h-16 rounded-md bg-foreground/[0.05]" />
+          </Card.Content>
+          <Card.Footer>
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-4">
+                <div className="h-5 w-16 rounded-md bg-foreground/[0.08]" />
+                <div className="h-5 w-20 rounded-md bg-foreground/[0.08]" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
+                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
+                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
+              </div>
+            </div>
+          </Card.Footer>
+        </Card>
+      ))}
+    </section>
   );
 }
 
@@ -1081,9 +1123,9 @@ export function CatalogDiscover(): React.JSX.Element {
           {t("catalog.sourceWarning")} {warnings.join(" ")}
         </p>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{t("catalog.loading")}</p>
+      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
+        {loading && items.length === 0 ? (
+          <CatalogListSkeleton />
         ) : items.length === 0 ? (
           <Card>
             <Card.Header>
@@ -1127,6 +1169,34 @@ export function CatalogDiscover(): React.JSX.Element {
         onRetry={() => (detailItem ? openDetail(detailItem) : undefined)}
         onInstall={(item) => void install(item)}
       />
+    </div>
+  );
+}
+
+function CatalogListSkeleton(): React.JSX.Element {
+  return (
+    <div className="grid animate-pulse gap-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map((id) => (
+        <Card key={id} className="overflow-hidden rounded-md">
+          <Card.Header className="p-3">
+            <div className="flex min-h-12 items-center gap-3">
+              <div className="size-9 shrink-0 rounded-full bg-foreground/10" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-4 w-3/5 rounded bg-foreground/10" />
+                <div className="h-3 w-4/5 rounded bg-foreground/[0.07]" />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <div className="size-8 rounded-md bg-foreground/[0.08]" />
+                <div className="size-8 rounded-md bg-foreground/[0.1]" />
+              </div>
+            </div>
+          </Card.Header>
+          <Card.Content className="flex items-center gap-2 px-3 pb-3">
+            <div className="h-5 w-16 rounded-full bg-foreground/[0.08]" />
+            <div className="h-5 w-12 rounded-full bg-foreground/[0.08]" />
+          </Card.Content>
+        </Card>
+      ))}
     </div>
   );
 }

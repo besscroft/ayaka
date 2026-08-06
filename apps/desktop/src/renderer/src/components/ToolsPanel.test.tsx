@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ArtifactInstallation, CatalogItem, ToolRecord } from "@shared/types";
-import { applyCatalogInstallation } from "./ToolsPanel";
+import { CatalogDiscover, InstalledSkillsPanel, applyCatalogInstallation } from "./ToolsPanel";
 import { filterToolRecords } from "../lib/tools-filter";
 import {
   buildMcpInput,
@@ -11,6 +12,22 @@ import {
 } from "../lib/tools-form";
 
 void describe("ToolsPanel data helpers", () => {
+  void it("renders the marketplace skeleton while the first catalog request is pending", () => {
+    const html = renderToStaticMarkup(<CatalogDiscover />);
+
+    assert.match(html, /aria-busy="true"/);
+    assert.match(html, /animate-pulse/);
+    assert.equal((html.match(/bg-card/g) ?? []).length, 6);
+  });
+
+  void it("renders the installed skills skeleton while the first snapshot is pending", () => {
+    const html = renderToStaticMarkup(<InstalledSkillsPanel />);
+
+    assert.match(html, /aria-busy="true"/);
+    assert.match(html, /animate-pulse/);
+    assert.equal((html.match(/class="rounded-lg border border-border bg-card/g) ?? []).length, 4);
+  });
+
   void it("updates only the installed catalog item", () => {
     const items = [catalogItem("one"), catalogItem("two")];
     const installation = catalogInstallation("two");
