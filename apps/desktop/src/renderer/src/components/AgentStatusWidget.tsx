@@ -87,7 +87,7 @@ export function AgentStatusWidget({
   return (
     <aside
       className={cn(
-        "relative w-full min-w-0 rounded-md border border-border/70 bg-background/90",
+        "relative w-full min-w-0 rounded-md border border-border/70 bg-background/90 transition-transform duration-150 ease-out hover:-translate-y-px motion-reduce:transition-none",
         active && "border-accent/25",
       )}
       role="status"
@@ -95,7 +95,7 @@ export function AgentStatusWidget({
     >
       <button
         type="button"
-        className="flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left hover:bg-foreground/5"
+        className="flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
       >
@@ -110,7 +110,7 @@ export function AgentStatusWidget({
         />
       </button>
       {expanded ? (
-        <div className="absolute top-[calc(100%-1px)] right-[-1px] z-50 max-h-[min(460px,60vh)] w-[calc(100%+2px)] overflow-y-auto rounded-b-md border border-border/70 bg-background/98 p-2 shadow-lg">
+        <div className="absolute inset-x-0 top-[calc(100%-1px)] z-50 max-h-[min(460px,60vh)] w-full overflow-y-auto rounded-b-md border border-border/70 bg-background/98 p-2">
           <AgentRow
             name="Paimon"
             path="/root"

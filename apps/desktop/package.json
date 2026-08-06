@@ -1,6 +1,6 @@
 {
-  "name": "desktop",
-  "version": "0.1.0",
+  "name": "paimon",
+  "version": "0.1.1",
   "description": "An Electron application with React and TypeScript",
   "homepage": "https://electron-vite.org",
   "author": "example.com",

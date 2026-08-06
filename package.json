@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run -r test && vp run -r build",
-    "dev:desktop": "vp run desktop#dev",
-    "build:desktop": "vp run desktop#build",
-    "build:desktop:win": "vp run desktop#build:win",
-    "build:desktop:mac": "vp run desktop#build:mac",
-    "build:desktop:linux": "vp run desktop#build:linux",
+    "dev:desktop": "vp run paimon#dev",
+    "build:desktop": "vp run paimon#build",
+    "build:desktop:win": "vp run paimon#build:win",
+    "build:desktop:mac": "vp run paimon#build:mac",
+    "build:desktop:linux": "vp run paimon#build:linux",
     "prepare": "vp config"
   },
   "devDependencies": {
