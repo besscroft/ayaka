@@ -106,12 +106,17 @@ function getOrCreateMainWindow(): BrowserWindow {
   return mainWindowRef;
 }
 
-/** 通过主窗口 IPC 通知渲染层打开设置面板（settingsDialog 已经在 App.tsx 管理） */
-function openMainSettings(): void {
+function showMainWindow(): BrowserWindow {
   const main = getOrCreateMainWindow();
   if (main.isMinimized()) main.restore();
   main.show();
   main.focus();
+  return main;
+}
+
+/** 通过主窗口 IPC 通知渲染层打开设置面板（settingsDialog 已经在 App.tsx 管理） */
+function openMainSettings(): void {
+  const main = showMainWindow();
   // 触发主窗口的 openSettings：复用已有的 desktopPet:openSettings channel 风格
   if (!main.webContents.isLoading()) {
     main.webContents.send("desktopPet:openSettings");
@@ -123,10 +128,7 @@ function openMainSettings(): void {
 }
 
 function openAbout(): void {
-  const main = getOrCreateMainWindow();
-  if (main.isMinimized()) main.restore();
-  main.show();
-  main.focus();
+  const main = showMainWindow();
   if (!main.webContents.isLoading()) {
     main.webContents.send("desktopPet:openAbout");
   } else {
@@ -190,6 +192,7 @@ void app.whenReady().then(async () => {
         : undefined,
     onContextMenu: (win) => {
       showDesktopPetContextMenu(win, {
+        onOpenMainWindow: showMainWindow,
         onOpenSettings: openMainSettings,
         onOpenAbout: openAbout,
         onHide: () => {

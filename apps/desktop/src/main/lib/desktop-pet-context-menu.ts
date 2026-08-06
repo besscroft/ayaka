@@ -12,6 +12,7 @@ import { BrowserWindow, Menu, type MenuItemConstructorOptions } from "electron";
 export function showDesktopPetContextMenu(
   win: BrowserWindow,
   options: {
+    onOpenMainWindow: () => void;
     onOpenSettings: () => void;
     onOpenAbout: () => void;
     onHide: () => void;
@@ -21,6 +22,10 @@ export function showDesktopPetContextMenu(
 ): void {
   const isMac = process.platform === "darwin";
   const items: MenuItemConstructorOptions[] = [
+    {
+      label: "打开主窗口",
+      click: () => options.onOpenMainWindow(),
+    },
     {
       label: "设置…",
       click: () => options.onOpenSettings(),
