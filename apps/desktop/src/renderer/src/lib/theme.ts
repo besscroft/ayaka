@@ -1,51 +1,66 @@
 import {
   FONT_SIZE_PX,
-  STYLE_PRESETS,
+  SKIN_DEFINITIONS,
   type AppSettings,
-  type ThemeMode,
+  type DiffMark,
   type FontSizeLevel,
   type LayoutDensity,
-  type ThemePresetId,
-  type StylePresetId,
   type ReduceMotion,
-  type DiffMark,
+  type SkinId,
+  type SkinTokenValues,
 } from "@shared/types";
 
-export type ResolvedTheme = "light" | "dark";
+const SKIN_TOKEN_CSS_VARS: Record<keyof SkinTokenValues, string> = {
+  background: "--skin-background",
+  foreground: "--skin-foreground",
+  surface: "--skin-surface",
+  surfaceForeground: "--skin-surface-foreground",
+  overlay: "--skin-overlay",
+  overlayForeground: "--skin-overlay-foreground",
+  fieldBackground: "--skin-field-background",
+  fieldForeground: "--skin-field-foreground",
+  border: "--skin-border",
+  separator: "--skin-separator",
+  accent: "--skin-accent",
+  accentForeground: "--skin-accent-foreground",
+  focus: "--skin-focus",
+  link: "--skin-link",
+  success: "--skin-success",
+  successForeground: "--skin-success-foreground",
+  warning: "--skin-warning",
+  warningForeground: "--skin-warning-foreground",
+  danger: "--skin-danger",
+  dangerForeground: "--skin-danger-foreground",
+};
 
-export type { ThemeMode };
-
-export function resolveSystemTheme(): ResolvedTheme {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+export function getSkin(skin: SkinId) {
+  return SKIN_DEFINITIONS.find((definition) => definition.id === skin) ?? SKIN_DEFINITIONS[0];
 }
 
-export function resolveTheme(mode: ThemeMode): ResolvedTheme {
-  return mode === "system" ? resolveSystemTheme() : mode;
-}
-
-export function applyResolvedTheme(theme: ResolvedTheme): void {
+export function applySkin(skin: SkinId): SkinId {
   const root = document.documentElement;
-  root.setAttribute("data-theme", theme);
-  root.classList.toggle("light", theme === "light");
-  root.classList.toggle("dark", theme === "dark");
+  const definition = getSkin(skin);
+
+  root.setAttribute("data-skin", definition.id);
+  root.style.setProperty("color-scheme", definition.colorScheme);
+  root.classList.toggle("light", definition.colorScheme === "light");
+  root.classList.toggle("dark", definition.colorScheme === "dark");
+  root.removeAttribute("data-theme");
+
+  for (const key of Object.keys(SKIN_TOKEN_CSS_VARS) as Array<keyof SkinTokenValues>) {
+    root.style.setProperty(SKIN_TOKEN_CSS_VARS[key], definition.tokens[key]);
+  }
+  root.style.setProperty("--skin-radius", `${definition.radius}px`);
+  root.style.setProperty("--skin-font-stack", definition.fontStack);
+  root.style.setProperty("--skin-mono-font-stack", definition.monoFontStack);
+  for (const [name, value] of Object.entries(definition.extensions ?? {})) {
+    root.style.setProperty(name, value);
+  }
+
+  return definition.id;
 }
 
-export function applyThemePreset(preset: ThemePresetId): void {
-  document.documentElement.setAttribute("data-theme-preset", preset);
-}
-
-/** 应用视觉风格：注入字体栈与全局圆角。
- * 注入 --style-radius 和 --style-font-stack，由 main.css 桥接到 --radius / --app-font-sans。
- * 用户在"字体"选择器里设的值会 inline 写到 --app-font-sans，CSS 级联下用户值优先。*/
-export function applyStyle(style: StylePresetId): void {
-  const root = document.documentElement;
-  const preset = STYLE_PRESETS.find((p) => p.id === style) ?? STYLE_PRESETS[0];
-  root.setAttribute("data-style", preset.id);
-  root.style.setProperty("--style-radius", `${preset.radius}px`);
-  root.style.setProperty("--style-font-stack", preset.fontStack);
-}
-
-/** 应用 UI 字体与等宽字体；空字符串清除自定义。 */
+/** 应用 UI 字体与等宽字体；空字符串清除自定义并回退到当前皮肤。 */
 export function applyFonts(family: string, mono: string): void {
   const root = document.documentElement;
   if (family) {
@@ -100,9 +115,7 @@ export function applyDensity(density: LayoutDensity): void {
 export function applyTheme(
   settings: Pick<
     AppSettings,
-    | "theme"
-    | "themePreset"
-    | "style"
+    | "skin"
     | "fontFamily"
     | "monoFontFamily"
     | "translucentSidebar"
@@ -113,11 +126,8 @@ export function applyTheme(
     | "fontSize"
     | "density"
   >,
-): ResolvedTheme {
-  const resolved = resolveTheme(settings.theme);
-  applyResolvedTheme(resolved);
-  applyThemePreset(settings.themePreset);
-  applyStyle(settings.style);
+): SkinId {
+  const appliedSkin = applySkin(settings.skin);
   applyFonts(settings.fontFamily, settings.monoFontFamily);
   applyCodeFontSize(settings.codeFontSizePx);
   applyTranslucentSidebar(settings.translucentSidebar);
@@ -126,5 +136,5 @@ export function applyTheme(
   applyDiffMark(settings.diffMark);
   applyFontSize(settings.fontSize);
   applyDensity(settings.density);
-  return resolved;
+  return appliedSkin;
 }

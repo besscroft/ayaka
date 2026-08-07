@@ -48,8 +48,7 @@ import {
   type AgentProfile,
   FONT_PRESETS,
   MONO_FONT_PRESETS,
-  STYLE_PRESETS,
-  THEME_PRESETS,
+  SKIN_DEFINITIONS,
   type Conversation,
   type CustomProviderInput,
   type FontPreset,
@@ -58,8 +57,7 @@ import {
   type ModelOption,
   type ProviderInfo,
   type RuntimeEvent,
-  type ThemeMode,
-  type ThemePresetId,
+  type SkinId,
   type FontSizeLevel,
   type LayoutDensity,
   type LanguageMode,
@@ -380,20 +378,23 @@ function ResettableTabHeader({
  *  - 涓婂崐閮ㄥ垎浣跨敤 50/50 宸﹀彸鍒嗗睆鐨?绐楀彛"棰勮
  *  - 杈规棰滆壊闅忛€変腑鐘舵€佸彉鍖栵紙accent / 榛樿锛?
  */
-function ThemeModePreviewCard({
+function SkinPreviewCard({
   value,
   label,
   active,
   onSelect,
-  swatchLight,
-  swatchDark,
+  preview,
 }: {
-  value: ThemeMode;
+  value: SkinId;
   label: string;
   active: boolean;
-  onSelect: (value: ThemeMode) => void;
-  swatchLight: string;
-  swatchDark: string;
+  onSelect: (value: SkinId) => void;
+  preview: {
+    background: string;
+    surface: string;
+    accent: string;
+    foreground: string;
+  };
 }): React.JSX.Element {
   return (
     <button
@@ -407,13 +408,27 @@ function ThemeModePreviewCard({
           : "border-foreground/10 hover:border-foreground/25",
       ].join(" ")}
     >
-      <div className="flex h-20 w-full overflow-hidden rounded-md border border-foreground/10">
-        <div className="flex-1 p-2" style={{ backgroundColor: swatchLight }} aria-hidden="true">
-          <PreviewSkeleton tone="light" />
-        </div>
-        <div className="flex-1 p-2" style={{ backgroundColor: swatchDark }} aria-hidden="true">
-          <PreviewSkeleton tone="dark" />
-        </div>
+      <div
+        className="flex h-20 w-full flex-col gap-2 rounded-md border border-foreground/10 p-2"
+        style={{ backgroundColor: preview.background }}
+        aria-hidden="true"
+      >
+        <span
+          className="block h-1.5 w-2/5 rounded-full"
+          style={{ backgroundColor: preview.accent }}
+        />
+        <span
+          className="block h-1 w-4/5 rounded-full"
+          style={{ backgroundColor: preview.foreground, opacity: 0.22 }}
+        />
+        <span
+          className="block h-1 w-3/5 rounded-full"
+          style={{ backgroundColor: preview.foreground, opacity: 0.16 }}
+        />
+        <span
+          className="mt-auto block h-6 w-full rounded"
+          style={{ backgroundColor: preview.surface, opacity: 0.92 }}
+        />
       </div>
       <div className="flex items-center justify-between px-1 pb-1">
         <span
@@ -429,24 +444,6 @@ function ThemeModePreviewCard({
   );
 }
 
-/** 涓婚妯″紡棰勮楠ㄦ灦鍥撅紙涓庡浘涓被浼肩殑鍑犳潯鍐呭绀烘剰绾匡級 */
-function PreviewSkeleton({ tone }: { tone: "light" | "dark" }): React.JSX.Element {
-  const base = tone === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.22)";
-  const accent = tone === "light" ? "rgba(15,23,42,0.3)" : "rgba(255,255,255,0.45)";
-  return (
-    <div className="flex h-full flex-col gap-1.5">
-      <span className="block h-1.5 w-3/5 rounded-full" style={{ backgroundColor: accent }} />
-      <span className="block h-1 w-full rounded-full" style={{ backgroundColor: base }} />
-      <span className="block h-1 w-4/5 rounded-full" style={{ backgroundColor: base }} />
-      <span className="block h-1 w-2/3 rounded-full" style={{ backgroundColor: base }} />
-      <span className="mt-auto flex gap-1">
-        <span className="block h-2 w-8 rounded" style={{ backgroundColor: accent }} />
-        <span className="block h-2 w-8 rounded" style={{ backgroundColor: base }} />
-      </span>
-    </div>
-  );
-}
-
 function AppearanceTab({
   settings,
   update,
@@ -459,15 +456,6 @@ function AppearanceTab({
   resetDone: boolean;
 }): React.JSX.Element {
   const { t } = useT();
-  const presetBundle = THEME_PRESETS.find((p) => p.id === settings.themePreset);
-
-  // 涓婚妯″紡棰勮鍗＄墖锛氬乏鍙充袱鑹茬敱"褰撳墠涓婚鍖?+ 娴?娣?鍐冲畾
-  const systemSwatchLight = presetBundle?.swatches.light ?? "#f7f7f8";
-  const systemSwatchDark = presetBundle?.swatches.dark ?? "#1f1f23";
-
-  const handleThemeMode = (value: ThemeMode): void => {
-    void update({ theme: value });
-  };
 
   return (
     <section className="select-none flex flex-col min-h-0 flex-1 -mx-5 -my-4">
@@ -480,116 +468,27 @@ function AppearanceTab({
       </div>
 
       <div className="space-y-5 overflow-y-auto min-h-0 flex-1 px-5 pb-4">
-        {/* 鈥斺€?涓婚妯″紡棰勮鍗?鈥斺€?*/}
         <SettingSection
-          title={t("appearance.mode")}
-          desc={t("appearance.mode.desc")}
+          title={t("appearance.skin")}
+          desc={t("appearance.skin.desc")}
           icon={<IconPalette className="size-3.5" />}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <ThemeModePreviewCard
-              value="system"
-              label={t("shell.theme.system")}
-              active={settings.theme === "system"}
-              onSelect={handleThemeMode}
-              swatchLight={systemSwatchLight}
-              swatchDark={systemSwatchDark}
-            />
-            <ThemeModePreviewCard
-              value="light"
-              label={t("shell.theme.light")}
-              active={settings.theme === "light"}
-              onSelect={handleThemeMode}
-              swatchLight={systemSwatchLight}
-              swatchDark={systemSwatchLight}
-            />
-            <ThemeModePreviewCard
-              value="dark"
-              label={t("shell.theme.dark")}
-              active={settings.theme === "dark"}
-              onSelect={handleThemeMode}
-              swatchLight={systemSwatchDark}
-              swatchDark={systemSwatchDark}
-            />
+            {SKIN_DEFINITIONS.map((skin) => (
+              <SkinPreviewCard
+                key={skin.id}
+                value={skin.id}
+                label={t(skin.labelKey)}
+                active={settings.skin === skin.id}
+                onSelect={(value) => void update({ skin: value })}
+                preview={skin.preview}
+              />
+            ))}
           </div>
         </SettingSection>
 
+        {/* 鈥斺€?涓婚妯″紡棰勮鍗?鈥斺€?*/}
         {/* 鈥斺€?涓婚鍖?+ 寮鸿皟鑹?骞跺垪 鈥斺€?*/}
-        <div className="space-y-4">
-          <SettingSection title={t("appearance.bundle")} desc={t("appearance.bundle.desc")}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {THEME_PRESETS.map((p) => {
-                const active = settings.themePreset === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => void update({ themePreset: p.id as ThemePresetId })}
-                    aria-pressed={active}
-                    className={[
-                      "flex min-h-20 flex-col justify-between rounded-md border p-2.5 text-left text-sm transition",
-                      active
-                        ? "border-accent bg-accent/10 text-accent"
-                        : "border-foreground/15 text-foreground/75 hover:bg-foreground/5",
-                    ].join(" ")}
-                  >
-                    <span className="font-medium">{t(p.labelKey)}</span>
-                    <span className="mt-2 flex gap-1">
-                      <span
-                        className="h-4 flex-1 rounded border border-foreground/10"
-                        style={{ backgroundColor: p.swatches.light }}
-                      />
-                      <span
-                        className="h-4 flex-1 rounded border border-foreground/10"
-                        style={{ backgroundColor: p.swatches.dark }}
-                      />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </SettingSection>
-
-          <SettingSection title={t("appearance.style")} desc={t("appearance.style.desc")}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {STYLE_PRESETS.map((p) => {
-                const selected = settings.style === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => void update({ style: p.id })}
-                    aria-pressed={selected}
-                    className={[
-                      "group flex flex-col items-start gap-2 rounded-md border bg-background p-3 text-left transition",
-                      selected
-                        ? "border-foreground/40 ring-1 ring-foreground/15"
-                        : "border-foreground/10 hover:border-foreground/25",
-                    ].join(" ")}
-                  >
-                    <div className="flex w-full items-center justify-between">
-                      <span className="text-sm font-medium">{t(p.labelKey)}</span>
-                      <span
-                        className="size-4 shrink-0 border border-foreground/15"
-                        style={{ borderRadius: Math.min(p.radius, 8) }}
-                      />
-                    </div>
-                    <div
-                      className="flex w-full items-center justify-center bg-foreground/[0.03] py-3 text-2xl text-foreground/70"
-                      style={{ fontFamily: p.fontStack, borderRadius: p.radius }}
-                    >
-                      Aa
-                    </div>
-                    <span className="text-xs leading-relaxed text-foreground/55">
-                      {t(p.descKey)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </SettingSection>
-        </div>
-
         {/* 鈥斺€?瀛椾綋 鈥斺€?*/}
         {/* 字体与排版（合并卡片）：一行四列，字号 tabs 横向 */}
         <SettingSection

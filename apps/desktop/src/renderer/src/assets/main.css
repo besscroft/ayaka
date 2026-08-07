@@ -40,50 +40,46 @@
 
 :root {
   --spacing: 0.25rem;
-  /* 视觉风格 token：被 applyStyle(settings.style) 注入；未注入时回退到默认值。
-   * 桥接 --style-radius → --radius → --radius-{sm,md,lg,xl,2xl}，
-   * 让 Mira/Vega/Nova/Maia/Lyra 的圆角风格真正影响 Tailwind 的 rounded-* utility。
-   * （shadcn tailwind.css 模板只在 @layer theme 内把 --radius-md 等硬编码为固定值，
-   *  在 unlayered 这里重新桥接到 --radius 才能被 inline style 的 --style-radius 驱动。）*/
-  --style-radius: 0.5rem;
-  --radius: var(--style-radius);
+  /* Skin metrics feed Tailwind's named radius utilities. */
+  --skin-radius: 0.5rem;
+  --radius: var(--skin-radius);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --style-font-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --skin-font-stack: "Inter", "PingFang SC", system-ui, sans-serif;
+  --skin-mono-font-stack: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
   --white: oklch(1 0 0);
   --snow: oklch(0.985 0.003 247);
   --eclipse: oklch(0.145 0.01 260);
 
-  /* 字体优先用 applyFonts 注入的 inline 值（用户自选），未注入时回退到风格字体。
-   * 这样 applyFonts("") 清空时不会再回退到写死的 JetBrains Mono。*/
-  --app-font-sans: var(--style-font-stack);
-  --app-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  /* User font overrides are inline; empty overrides fall back to the active skin. */
+  --app-font-sans: var(--skin-font-stack);
+  --app-font-mono: var(--skin-mono-font-stack);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
 
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
-  --surface: var(--white);
-  --surface-foreground: var(--foreground);
-  --overlay: var(--white);
-  --overlay-foreground: var(--foreground);
-  --field-background: var(--white);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.88 0 0);
-  --separator: oklch(0.92 0 0);
-  --accent: oklch(0.55 0.22 264);
-  --accent-foreground: oklch(0.98 0.01 264);
-  --focus: var(--accent);
-  --link: var(--accent);
-  --success: oklch(0.62 0.17 155);
-  --success-foreground: oklch(0.98 0.01 155);
-  --warning: oklch(0.72 0.18 70);
-  --warning-foreground: oklch(0.2 0.02 70);
-  --danger: oklch(0.58 0.2 25);
-  --danger-foreground: oklch(0.98 0.01 25);
+  --background: var(--skin-background);
+  --foreground: var(--skin-foreground);
+  --surface: var(--skin-surface);
+  --surface-foreground: var(--skin-surface-foreground);
+  --overlay: var(--skin-overlay);
+  --overlay-foreground: var(--skin-overlay-foreground);
+  --field-background: var(--skin-field-background);
+  --field-foreground: var(--skin-field-foreground);
+  --border: var(--skin-border);
+  --separator: var(--skin-separator);
+  --accent: var(--skin-accent);
+  --accent-foreground: var(--skin-accent-foreground);
+  --focus: var(--skin-focus);
+  --link: var(--skin-link);
+  --success: var(--skin-success);
+  --success-foreground: var(--skin-success-foreground);
+  --warning: var(--skin-warning);
+  --warning-foreground: var(--skin-warning-foreground);
+  --danger: var(--skin-danger);
+  --danger-foreground: var(--skin-danger-foreground);
 
   --card: var(--surface);
   --card-foreground: var(--surface-foreground);
@@ -109,143 +105,7 @@
   --color-warning: var(--warning);
 }
 
-/*
- * 主题预设与深浅色 token 覆盖。
- * 这里必须保持 unlayered（与上面的 :root 同层），否则按 CSS Cascade Layer
- * 规则 unlayered > @layer base，深色覆盖永远输，表现为暗黑模式不生效。
- * 同一层级内通过 [data-theme-preset][data-theme] 的属性选择器特异性
- * (0,2,0) 高于 :root (0,1,0)，因此暗色 / 各预设值会正确胜出。
- */
-[data-theme-preset="default"][data-theme="light"] {
-  color-scheme: light;
-}
-
-[data-theme-preset="default"][data-theme="dark"] {
-  color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: var(--snow);
-  --surface: oklch(0.205 0 0);
-  --surface-foreground: var(--foreground);
-  --overlay: oklch(0.23 0 0);
-  --overlay-foreground: var(--foreground);
-  --field-background: oklch(0.255 0 0);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.34 0 0);
-  --separator: oklch(0.28 0 0);
-  --accent: oklch(0.72 0.17 264);
-  --accent-foreground: var(--eclipse);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="ocean"][data-theme="light"] {
-  color-scheme: light;
-  --background: oklch(0.985 0.015 225);
-  --foreground: var(--eclipse);
-  --surface: var(--white);
-  --surface-foreground: var(--foreground);
-  --overlay: var(--white);
-  --overlay-foreground: var(--foreground);
-  --field-background: var(--white);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.72 0.06 230 / 32%);
-  --separator: oklch(0.9 0.025 230);
-  --accent: oklch(0.46 0.15 230);
-  --accent-foreground: var(--snow);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="ocean"][data-theme="dark"] {
-  color-scheme: dark;
-  --background: oklch(0.14 0.025 230);
-  --foreground: var(--snow);
-  --surface: oklch(0.21 0.015 230);
-  --surface-foreground: var(--foreground);
-  --overlay: oklch(0.24 0.015 230);
-  --overlay-foreground: var(--foreground);
-  --field-background: oklch(0.25 0.012 230);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.34 0.035 230);
-  --separator: oklch(0.28 0.02 230);
-  --accent: oklch(0.78 0.11 220);
-  --accent-foreground: var(--eclipse);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="forest"][data-theme="light"] {
-  color-scheme: light;
-  --background: oklch(0.982 0.018 145);
-  --foreground: oklch(0.22 0.02 145);
-  --surface: var(--white);
-  --surface-foreground: var(--foreground);
-  --overlay: var(--white);
-  --overlay-foreground: var(--foreground);
-  --field-background: var(--white);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.72 0.065 145 / 30%);
-  --separator: oklch(0.9 0.025 145);
-  --accent: oklch(0.48 0.14 150);
-  --accent-foreground: var(--snow);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="forest"][data-theme="dark"] {
-  color-scheme: dark;
-  --background: oklch(0.15 0.025 145);
-  --foreground: var(--snow);
-  --surface: oklch(0.22 0.018 145);
-  --surface-foreground: var(--foreground);
-  --overlay: oklch(0.25 0.018 145);
-  --overlay-foreground: var(--foreground);
-  --field-background: oklch(0.27 0.016 145);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.35 0.035 145);
-  --separator: oklch(0.29 0.02 145);
-  --accent: oklch(0.76 0.13 150);
-  --accent-foreground: var(--eclipse);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="rose"][data-theme="light"] {
-  color-scheme: light;
-  --background: oklch(0.986 0.014 15);
-  --foreground: oklch(0.23 0.018 15);
-  --surface: var(--white);
-  --surface-foreground: var(--foreground);
-  --overlay: var(--white);
-  --overlay-foreground: var(--foreground);
-  --field-background: var(--white);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.75 0.075 15 / 30%);
-  --separator: oklch(0.91 0.028 15);
-  --accent: oklch(0.58 0.18 15);
-  --accent-foreground: var(--snow);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
-[data-theme-preset="rose"][data-theme="dark"] {
-  color-scheme: dark;
-  --background: oklch(0.15 0.025 15);
-  --foreground: var(--snow);
-  --surface: oklch(0.22 0.02 15);
-  --surface-foreground: var(--foreground);
-  --overlay: oklch(0.25 0.02 15);
-  --overlay-foreground: var(--foreground);
-  --field-background: oklch(0.27 0.018 15);
-  --field-foreground: var(--foreground);
-  --border: oklch(0.36 0.04 15);
-  --separator: oklch(0.3 0.025 15);
-  --accent: oklch(0.76 0.13 18);
-  --accent-foreground: var(--eclipse);
-  --focus: var(--accent);
-  --link: var(--accent);
-}
-
+/* Semantic aliases below keep shadcn and application components skin-agnostic. */
 html {
   transition:
     background-color 0.2s ease,

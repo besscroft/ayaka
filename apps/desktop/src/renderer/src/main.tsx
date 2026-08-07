@@ -4,6 +4,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App, { AppProviders } from "./App";
 import { DesktopPetApp } from "./components/DesktopPetApp";
+import { applySkin } from "./lib/theme";
+
+applySkin("nova-light");
 
 const surface = new URLSearchParams(window.location.search).get("surface");
 document.documentElement.dataset.surface = surface === "pet" ? "pet" : "main";

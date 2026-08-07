@@ -2,7 +2,7 @@ import { beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { DEFAULT_SETTINGS, type AppSettings } from "@shared/types";
+import { DEFAULT_SETTINGS, SKIN_DEFINITIONS, type AppSettings } from "@shared/types";
 import { applyTheme } from "./theme";
 
 class FakeStyle {
@@ -45,16 +45,12 @@ class FakeDocumentElement {
   readonly classList = new FakeClassList();
 
   setAttribute(name: string, value: string): void {
-    if (name === "data-theme") this.dataset.theme = value;
-    if (name === "data-theme-preset") this.dataset.themePreset = value;
-    if (name === "data-style") this.dataset.style = value;
+    if (name === "data-skin") this.dataset.skin = value;
     if (name === "data-density") this.dataset.density = value;
   }
 
   removeAttribute(name: string): void {
-    if (name === "data-theme") delete this.dataset.theme;
-    if (name === "data-theme-preset") delete this.dataset.themePreset;
-    if (name === "data-style") delete this.dataset.style;
+    if (name === "data-skin") delete this.dataset.skin;
     if (name === "data-density") delete this.dataset.density;
   }
 }
@@ -82,57 +78,82 @@ void describe("applyTheme", () => {
   });
 
   void it("syncs app theme attributes and appearance settings", () => {
-    const resolved = applyTheme(
+    const applied = applyTheme(
       themeSettings({
-        theme: "dark",
-        themePreset: "ocean",
-        style: "mira",
+        skin: "nova-dark",
         fontSize: "lg",
         density: "compact",
       }),
     );
 
-    assert.equal(resolved, "dark");
-    assert.equal(root.dataset.theme, "dark");
-    assert.equal(root.dataset.themePreset, "ocean");
-    assert.equal(root.dataset.style, "mira");
+    assert.equal(applied, "nova-dark");
+    assert.equal(root.dataset.skin, "nova-dark");
+    assert.equal(root.style.getPropertyValue("color-scheme"), "dark");
     assert.equal(root.classList.contains("dark"), true);
     assert.equal(root.classList.contains("light"), false);
     assert.equal(root.dataset.density, "compact");
-    assert.equal(root.style.getPropertyValue("--style-radius"), "12px");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "6px");
+    assert.equal(root.style.getPropertyValue("--skin-accent"), "oklch(0.72 0.17 264)");
     assert.equal(root.style.fontSize, "16px");
   });
 
-  void it("updates style radius when switching visual styles", () => {
+  void it("updates skin radius and color mode when switching skins", () => {
     applyTheme(
       themeSettings({
-        theme: "light",
-        themePreset: "forest",
-        style: "vega",
+        skin: "ocean-light",
         fontSize: "base",
         density: "comfortable",
       }),
     );
-    assert.equal(root.style.getPropertyValue("--style-radius"), "10px");
-    assert.equal(root.dataset.style, "vega");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "4px");
+    assert.equal(root.dataset.skin, "ocean-light");
+    assert.equal(root.classList.contains("light"), true);
+    assert.equal(root.classList.contains("dark"), false);
 
     applyTheme(
       themeSettings({
-        theme: "light",
-        themePreset: "forest",
-        style: "mira",
+        skin: "nova-light",
         fontSize: "base",
         density: "comfortable",
       }),
     );
-    assert.equal(root.style.getPropertyValue("--style-radius"), "12px");
-    assert.equal(root.dataset.style, "mira");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "6px");
+    assert.equal(root.dataset.skin, "nova-light");
+  });
+
+  void it("defines every required semantic token for every built-in skin", () => {
+    const required = [
+      "background",
+      "foreground",
+      "surface",
+      "surfaceForeground",
+      "overlay",
+      "overlayForeground",
+      "fieldBackground",
+      "fieldForeground",
+      "border",
+      "separator",
+      "accent",
+      "accentForeground",
+      "focus",
+      "link",
+      "success",
+      "successForeground",
+      "warning",
+      "warningForeground",
+      "danger",
+      "dangerForeground",
+    ] as const;
+
+    for (const skin of SKIN_DEFINITIONS) {
+      for (const token of required) assert.ok(skin.tokens[token], `${skin.id}.${token}`);
+    }
   });
 
   // 回归测试：Tailwind v4 编译的 rounded-md/lg/xl/2xl 引用的是具名变量 --radius-md/lg/xl/2xl，
   // 而 shadcn 的 tailwind.css 只在 @layer theme 内把它们硬编码为固定值。
   // main.css 必须在 unlayered :root 里把这些变量桥接到 var(--radius)，
-  // 否则切换风格时 --style-radius 改了但所有 rounded-* 元素不变。
+  // 否则切换皮肤时 --skin-radius 改了但所有 rounded-* 元素不变。
   void it("main.css 在 :root 中把 --radius-{sm,md,lg,xl,2xl} 桥接到 var(--radius)", () => {
     const css = readFileSync(resolve(import.meta.dirname, "../assets/main.css"), "utf8");
     const rootBlock = css.match(/:root\s*\{[\s\S]*?\n\}/);

@@ -13,11 +13,9 @@ import {
   SettingKey,
   DEFAULT_SETTINGS,
   CHAT_REASONING_LEVELS,
-  STYLE_PRESETS,
+  SKIN_DEFINITIONS,
   type AppSettings,
-  type ThemeMode,
-  type ThemePresetId,
-  type StylePresetId,
+  type SkinId,
   type FontSizeLevel,
   type LayoutDensity,
   type LanguageMode,
@@ -26,12 +24,10 @@ import {
   type DiffMark,
   type ChatReasoningLevel,
 } from "@shared/types";
-import { applyTheme, resolveSystemTheme, type ResolvedTheme } from "./theme";
+import { applyTheme } from "./theme";
 
 const APP_SETTING_KEYS: string[] = [
-  SettingKey.Theme,
-  SettingKey.ThemePreset,
-  SettingKey.Style,
+  SettingKey.Skin,
   SettingKey.FontFamily,
   SettingKey.MonoFontFamily,
   SettingKey.TranslucentSidebar,
@@ -55,9 +51,7 @@ export type SettingsResetScope = "appearance";
 
 const RESET_PATCHES: Record<SettingsResetScope, Partial<AppSettings>> = {
   appearance: {
-    theme: DEFAULT_SETTINGS.theme,
-    themePreset: DEFAULT_SETTINGS.themePreset,
-    style: DEFAULT_SETTINGS.style,
+    skin: DEFAULT_SETTINGS.skin,
     fontFamily: DEFAULT_SETTINGS.fontFamily,
     monoFontFamily: DEFAULT_SETTINGS.monoFontFamily,
     translucentSidebar: DEFAULT_SETTINGS.translucentSidebar,
@@ -94,21 +88,10 @@ function getBrowserLocale(): string {
 }
 
 export function parseSettings(map: Record<string, string | null>): AppSettings {
-  const theme = parseEnum<ThemeMode>(
-    map[SettingKey.Theme],
-    ["light", "dark", "system"],
-    DEFAULT_SETTINGS.theme,
-  );
-  const themePreset = parseEnum<ThemePresetId>(
-    map[SettingKey.ThemePreset],
-    ["default", "ocean", "forest", "rose"],
-    DEFAULT_SETTINGS.themePreset,
-  );
-  const allowedStyles = STYLE_PRESETS.map((s) => s.id) as readonly StylePresetId[];
-  const style = parseEnum<StylePresetId>(
-    map[SettingKey.Style],
-    allowedStyles,
-    DEFAULT_SETTINGS.style,
+  const skin = parseEnum<SkinId>(
+    map[SettingKey.Skin],
+    SKIN_DEFINITIONS.map((definition) => definition.id),
+    DEFAULT_SETTINGS.skin,
   );
   const fontFamily = (map[SettingKey.FontFamily] ?? "").slice(0, 500);
   const monoFontFamily = (map[SettingKey.MonoFontFamily] ?? "").slice(0, 500);
@@ -157,9 +140,7 @@ export function parseSettings(map: Record<string, string | null>): AppSettings {
     DEFAULT_SETTINGS.chatReasoningLevel,
   );
   return {
-    theme,
-    themePreset,
-    style,
+    skin,
     fontFamily,
     monoFontFamily,
     translucentSidebar,
@@ -193,14 +174,13 @@ interface SettingsContextValue {
   settings: AppSettings;
   systemLocale: string;
   resolvedLanguage: AppLanguage;
-  resolvedTheme: ResolvedTheme;
   update: (patch: Partial<AppSettings>) => Promise<void>;
   reset: (scope: SettingsResetScope) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-function applyAppearance(s: AppSettings): ResolvedTheme {
+function applyAppearance(s: AppSettings): SkinId {
   return applyTheme(s);
 }
 
@@ -212,8 +192,6 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
   const [resolvedLanguage, setResolvedLanguage] = useState<AppLanguage>(() =>
     resolveLanguage(DEFAULT_SETTINGS.language, initialLocale),
   );
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveSystemTheme());
-
   useEffect(() => {
     void (async () => {
       const [map, locale] = await Promise.all([
@@ -225,35 +203,22 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
       setSystemLocale(nextLocale);
       setSettings(parsed);
       setResolvedLanguage(resolveLanguage(parsed.language, nextLocale));
+      applyAppearance(parsed);
       setReady(true);
     })();
   }, []);
 
   useEffect(() => {
-    setResolvedTheme(applyAppearance(settings));
+    applyAppearance(settings);
   }, [settings]);
 
   useEffect(() => {
     setResolvedLanguage(resolveLanguage(settings.language, systemLocale));
   }, [settings.language, systemLocale]);
 
-  useEffect(() => {
-    if (!ready || settings.theme !== "system") return;
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (): void => {
-      const next = applyAppearance(settings);
-      setResolvedTheme(next);
-    };
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, [settings, ready]);
-
   const persist = useCallback(async (patch: Partial<AppSettings>): Promise<void> => {
     const writes: Promise<unknown>[] = [];
-    if (patch.theme !== undefined) writes.push(api.settings.set(SettingKey.Theme, patch.theme));
-    if (patch.themePreset !== undefined)
-      writes.push(api.settings.set(SettingKey.ThemePreset, patch.themePreset));
-    if (patch.style !== undefined) writes.push(api.settings.set(SettingKey.Style, patch.style));
+    if (patch.skin !== undefined) writes.push(api.settings.set(SettingKey.Skin, patch.skin));
     if (patch.fontFamily !== undefined)
       writes.push(api.settings.set(SettingKey.FontFamily, patch.fontFamily));
     if (patch.monoFontFamily !== undefined)
@@ -312,11 +277,10 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
       settings,
       systemLocale,
       resolvedLanguage,
-      resolvedTheme,
       update,
       reset,
     }),
-    [ready, settings, systemLocale, resolvedLanguage, resolvedTheme, update, reset],
+    [ready, settings, systemLocale, resolvedLanguage, update, reset],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

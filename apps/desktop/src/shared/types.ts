@@ -1870,10 +1870,8 @@ export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
 export const SettingKey = {
   // 鈥斺€?涓婚 / 澶栬 鈥斺€?
   /** 涓婚妯″紡锛?light' | 'dark' | 'system' */
-  Theme: "theme",
-  ThemePreset: "theme_preset",
+  Skin: "skin",
   /** 璇嗗埆鏍峰紡棰勮id */
-  Style: "theme_style",
   /** UI 瀛椾綋 CSS font-family锛涚┖瀛楃涓茶〃绀烘部鐢ㄤ富棰橀粯璁?*/
   FontFamily: "font_family",
   /** 绛夊瀛椾綋 CSS font-family锛涚┖瀛楃涓茶〃绀烘部鐢ㄤ富棰橀粯璁?*/
@@ -1927,9 +1925,158 @@ export type SettingKeyType = (typeof SettingKey)[keyof typeof SettingKey];
 // ============================================================
 
 /** 涓婚妯″紡 */
-export type ThemeMode = "light" | "dark" | "system";
+export type SkinId = "nova-light" | "nova-dark" | "ocean-light";
 
-export type ThemePresetId = "default" | "ocean" | "forest" | "rose";
+export interface SkinTokenValues {
+  background: string;
+  foreground: string;
+  surface: string;
+  surfaceForeground: string;
+  overlay: string;
+  overlayForeground: string;
+  fieldBackground: string;
+  fieldForeground: string;
+  border: string;
+  separator: string;
+  accent: string;
+  accentForeground: string;
+  focus: string;
+  link: string;
+  success: string;
+  successForeground: string;
+  warning: string;
+  warningForeground: string;
+  danger: string;
+  dangerForeground: string;
+}
+
+export interface SkinDefinition {
+  id: SkinId;
+  labelKey: string;
+  descKey: string;
+  colorScheme: "light" | "dark";
+  preview: {
+    background: string;
+    surface: string;
+    accent: string;
+    foreground: string;
+  };
+  tokens: SkinTokenValues;
+  radius: number;
+  fontStack: string;
+  monoFontStack: string;
+  extensions?: Record<`--skin-${string}`, string>;
+}
+
+const NOVA_FONT_STACK = "'Inter', 'PingFang SC', system-ui, sans-serif";
+const NOVA_MONO_FONT_STACK = "'JetBrains Mono', 'Fira Code', ui-monospace, monospace";
+
+const NOVA_LIGHT_TOKENS: SkinTokenValues = {
+  background: "oklch(0.985 0 0)",
+  foreground: "oklch(0.145 0 0)",
+  surface: "oklch(1 0 0)",
+  surfaceForeground: "oklch(0.145 0 0)",
+  overlay: "oklch(1 0 0)",
+  overlayForeground: "oklch(0.145 0 0)",
+  fieldBackground: "oklch(1 0 0)",
+  fieldForeground: "oklch(0.145 0 0)",
+  border: "oklch(0.88 0 0)",
+  separator: "oklch(0.92 0 0)",
+  accent: "oklch(0.55 0.22 264)",
+  accentForeground: "oklch(0.98 0.01 264)",
+  focus: "oklch(0.55 0.22 264)",
+  link: "oklch(0.55 0.22 264)",
+  success: "oklch(0.62 0.17 155)",
+  successForeground: "oklch(0.98 0.01 155)",
+  warning: "oklch(0.72 0.18 70)",
+  warningForeground: "oklch(0.2 0.02 70)",
+  danger: "oklch(0.58 0.2 25)",
+  dangerForeground: "oklch(0.98 0.01 25)",
+};
+
+const NOVA_DARK_TOKENS: SkinTokenValues = {
+  ...NOVA_LIGHT_TOKENS,
+  background: "oklch(0.145 0 0)",
+  foreground: "oklch(0.985 0.003 247)",
+  surface: "oklch(0.205 0 0)",
+  surfaceForeground: "oklch(0.985 0.003 247)",
+  overlay: "oklch(0.23 0 0)",
+  overlayForeground: "oklch(0.985 0.003 247)",
+  fieldBackground: "oklch(0.255 0 0)",
+  fieldForeground: "oklch(0.985 0.003 247)",
+  border: "oklch(0.34 0 0)",
+  separator: "oklch(0.28 0 0)",
+  accent: "oklch(0.72 0.17 264)",
+  accentForeground: "oklch(0.145 0.01 260)",
+  focus: "oklch(0.72 0.17 264)",
+  link: "oklch(0.72 0.17 264)",
+};
+
+const OCEAN_LIGHT_TOKENS: SkinTokenValues = {
+  ...NOVA_LIGHT_TOKENS,
+  background: "oklch(0.985 0.015 225)",
+  foreground: "oklch(0.145 0.01 260)",
+  surfaceForeground: "oklch(0.145 0.01 260)",
+  overlayForeground: "oklch(0.145 0.01 260)",
+  fieldForeground: "oklch(0.145 0.01 260)",
+  border: "oklch(0.72 0.06 230 / 32%)",
+  separator: "oklch(0.9 0.025 230)",
+  accent: "oklch(0.46 0.15 230)",
+  accentForeground: "oklch(0.985 0.003 247)",
+  focus: "oklch(0.46 0.15 230)",
+  link: "oklch(0.46 0.15 230)",
+};
+
+export const SKIN_DEFINITIONS: SkinDefinition[] = [
+  {
+    id: "nova-light",
+    labelKey: "skin.nova.light",
+    descKey: "skin.nova.light.desc",
+    colorScheme: "light",
+    preview: {
+      background: "#f7f7f8",
+      surface: "#ffffff",
+      accent: "#4f46e5",
+      foreground: "#252525",
+    },
+    tokens: NOVA_LIGHT_TOKENS,
+    radius: 6,
+    fontStack: NOVA_FONT_STACK,
+    monoFontStack: NOVA_MONO_FONT_STACK,
+  },
+  {
+    id: "nova-dark",
+    labelKey: "skin.nova.dark",
+    descKey: "skin.nova.dark.desc",
+    colorScheme: "dark",
+    preview: {
+      background: "#252525",
+      surface: "#363636",
+      accent: "#a5b4fc",
+      foreground: "#f8fafc",
+    },
+    tokens: NOVA_DARK_TOKENS,
+    radius: 6,
+    fontStack: NOVA_FONT_STACK,
+    monoFontStack: NOVA_MONO_FONT_STACK,
+  },
+  {
+    id: "ocean-light",
+    labelKey: "skin.ocean.light",
+    descKey: "skin.ocean.light.desc",
+    colorScheme: "light",
+    preview: {
+      background: "#dff3fb",
+      surface: "#ffffff",
+      accent: "#237a9b",
+      foreground: "#17313d",
+    },
+    tokens: OCEAN_LIGHT_TOKENS,
+    radius: 4,
+    fontStack: "'Inter', system-ui, sans-serif",
+    monoFontStack: NOVA_MONO_FONT_STACK,
+  },
+];
 
 /** 瀛楀彿绾у埆 */
 export type FontSizeLevel = "xs" | "sm" | "base" | "lg" | "xl";
@@ -1947,97 +2094,6 @@ export type DiffMark = "color" | "symbol";
 export type AppLanguage = "zh-CN" | "en";
 
 export type LanguageMode = "system" | AppLanguage;
-
-export interface ThemePreset {
-  id: ThemePresetId;
-  labelKey: string;
-  swatches: {
-    light: string;
-    dark: string;
-  };
-}
-
-export const THEME_PRESETS: ThemePreset[] = [
-  {
-    id: "default",
-    labelKey: "theme.preset.default",
-    swatches: { light: "#f7f7f8", dark: "#1f1f23" },
-  },
-  {
-    id: "ocean",
-    labelKey: "theme.preset.ocean",
-    swatches: { light: "#dff3fb", dark: "#0b2d3a" },
-  },
-  {
-    id: "forest",
-    labelKey: "theme.preset.forest",
-    swatches: { light: "#e7f4e6", dark: "#142a1d" },
-  },
-  {
-    id: "rose",
-    labelKey: "theme.preset.rose",
-    swatches: { light: "#fff0f4", dark: "#321820" },
-  },
-];
-
-/** 视觉风格预设（参考 shadcn v4 的 Mira / Vega / Nova / Maia / Lyra）。
- *  - Mira：高圆角、圆润、舒适（默认）
- *  - Vega：方正、现代、较大圆角
- *  - Nova：紧凑、锐利、小圆角
- *  - Maia：柔和、衬线
- *  - Lyra：扁平、低对比、小圆角
- */
-export type StylePresetId = "mira" | "vega" | "nova" | "maia" | "lyra";
-
-export interface StylePreset {
-  id: StylePresetId;
-  /** i18n 键，渲染时通过 useT() 解析 */
-  labelKey: string;
-  /** 描述 i18n 键 */
-  descKey: string;
-  /** 风格字体栈（CSS font-family） */
-  fontStack: string;
-  /** 圆角像素值（影响 swatch 预览与全局 --radius） */
-  radius: number;
-}
-
-export const STYLE_PRESETS: StylePreset[] = [
-  {
-    id: "mira",
-    labelKey: "theme.style.mira",
-    descKey: "theme.style.mira.desc",
-    fontStack: "'Inter', 'PingFang SC', system-ui, sans-serif",
-    radius: 12,
-  },
-  {
-    id: "vega",
-    labelKey: "theme.style.vega",
-    descKey: "theme.style.vega.desc",
-    fontStack: "'Inter', system-ui, sans-serif",
-    radius: 10,
-  },
-  {
-    id: "nova",
-    labelKey: "theme.style.nova",
-    descKey: "theme.style.nova.desc",
-    fontStack: "'Inter', system-ui, sans-serif",
-    radius: 6,
-  },
-  {
-    id: "maia",
-    labelKey: "theme.style.maia",
-    descKey: "theme.style.maia.desc",
-    fontStack: "'Source Serif Pro', 'Noto Serif SC', Georgia, serif",
-    radius: 8,
-  },
-  {
-    id: "lyra",
-    labelKey: "theme.style.lyra",
-    descKey: "theme.style.lyra.desc",
-    fontStack: "'Inter', system-ui, sans-serif",
-    radius: 4,
-  },
-];
 
 /** 瀛楀彿绾у埆鍒板儚绱犲€肩殑鏄犲皠锛堝簲鐢ㄤ簬鏍?font-size锛?*/
 export const FONT_SIZE_PX: Record<FontSizeLevel, number> = {
@@ -2113,9 +2169,7 @@ export interface RuntimeSnapshot {
  * 姣忎釜瀛楁閮藉彲鐙珛鎸佷箙鍖栵紝鑱氬悎鍚庝究浜庡湪 UI 涓粺涓€娑堣垂涓庡疄鏃跺簲鐢ㄣ€?
  */
 export interface AppSettings {
-  theme: ThemeMode;
-  themePreset: ThemePresetId;
-  style: StylePresetId;
+  skin: SkinId;
   fontFamily: string;
   monoFontFamily: string;
   translucentSidebar: boolean;
@@ -2139,9 +2193,7 @@ export interface AppSettings {
  * "鎭㈠榛樿璁剧疆" 涓€閿噸缃埌姝ゅ璞°€?
  */
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: "system",
-  themePreset: "default",
-  style: "mira",
+  skin: "nova-light",
   fontFamily: "",
   monoFontFamily: "",
   translucentSidebar: true,
