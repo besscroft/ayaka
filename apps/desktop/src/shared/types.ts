@@ -91,8 +91,10 @@ export interface CronJobInput {
 }
 
 export type CatalogArtifactType = "skill" | "mcp";
-export type CatalogSourceKind = "modelscope-skills" | "skills-sh";
+export type CatalogSourceKind = "modelscope-skills" | "skills-sh" | "mcp-so";
 export type CatalogSourceFilter = "all" | CatalogSourceKind;
+export type CatalogSort = "featured" | "latest" | "name";
+export type CatalogTagFilter = "featured" | "verified";
 
 export interface CatalogMetric {
   installs?: number;
@@ -122,11 +124,54 @@ export interface CatalogItem {
 
 export interface CatalogItemDetail {
   itemId: string;
+  artifactType: CatalogArtifactType;
   markdown: string;
   files: Array<{ path: string; size: number }>;
   totalBytes: number;
   contentHash: string;
   safetyChecks: string[];
+  mcp?: CatalogMcpDetail;
+}
+
+export interface CatalogMcpConfig {
+  transport: "stdio" | "http" | "sse";
+  command: string | null;
+  args: string[];
+  url: string | null;
+  headers: Record<string, string>;
+  env: Record<string, string>;
+  secretKeys: string[];
+}
+
+export interface CatalogMcpToolSummary {
+  name: string;
+  description: string;
+}
+
+export interface CatalogMcpDetail {
+  author: string;
+  repositoryUrl: string | null;
+  homepageUrl: string | null;
+  docsUrl: string | null;
+  tags: string[];
+  category: string | null;
+  featured: boolean;
+  verified: boolean;
+  config: CatalogMcpConfig;
+  tools: CatalogMcpToolSummary[];
+  parseStatus: "ready" | "partial" | "unsupported";
+  warnings: string[];
+}
+
+export interface CatalogFacet {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface CatalogFacets {
+  categories: CatalogFacet[];
+  tags: Array<{ id: CatalogTagFilter; count: number }>;
 }
 
 export interface ArtifactInstallation {
@@ -164,6 +209,10 @@ export interface CatalogSearchInput {
   page?: number;
   pageSize?: number;
   source?: CatalogSourceFilter;
+  artifactType?: CatalogArtifactType;
+  sort?: CatalogSort;
+  tag?: CatalogTagFilter;
+  category?: string;
 }
 
 export interface CatalogSourceState {
@@ -179,6 +228,7 @@ export interface CatalogSearchResult {
   pageSize: number;
   hasMore: boolean;
   sources: CatalogSourceState[];
+  facets?: CatalogFacets;
 }
 
 export type AgentStatus = "active" | "draft" | "archived";

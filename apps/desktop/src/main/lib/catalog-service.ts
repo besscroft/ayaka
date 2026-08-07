@@ -5,9 +5,12 @@ import { dirname, join, relative, resolve } from "node:path";
 import { eq } from "drizzle-orm";
 import type {
   ArtifactInstallation,
+  CatalogArtifactType,
   CatalogInstallInput,
   CatalogItem,
   CatalogItemDetail,
+  CatalogFacets,
+  CatalogMcpDetail,
   CatalogSearchInput,
   CatalogSearchResult,
   CatalogSnapshot,
@@ -18,11 +21,14 @@ import type {
 import {
   createSkillTool,
   deleteSkillTool,
-  deleteToolServer,
   getDb,
   setSkillToolEnabled,
   setToolServerEnabled,
   updateSkillTool,
+  createToolServer,
+  setToolSecret,
+  updateToolServer,
+  permanentlyDeleteToolServer,
 } from "./db";
 import { artifactInstallations, catalogItems, catalogSources } from "./schema";
 import {
@@ -34,6 +40,13 @@ import {
   type CatalogAdapterItem,
 } from "./catalog-adapters";
 import { discoverMcpServer } from "./mcp-manager";
+import { closeMcpClient } from "./mcp-manager";
+import {
+  getMcpSoServerDetail,
+  MCP_SO_ORIGIN,
+  MCP_SO_SOURCE_ID,
+  searchMcpSoServers,
+} from "./mcp-so-adapter";
 import {
   inspectSkillArchive,
   inspectSkillFiles,
@@ -66,11 +79,24 @@ const SKILLS_SH_SOURCE: typeof catalogSources.$inferInsert = {
   created_at: 0,
   updated_at: 0,
 };
+const MCP_SO_SOURCE: typeof catalogSources.$inferInsert = {
+  id: MCP_SO_SOURCE_ID,
+  name: "MCP.so",
+  kind: "mcp-so",
+  url: `${MCP_SO_ORIGIN}/zh/servers`,
+  enabled: 1,
+  builtin: 1,
+  config_json: "{}",
+  last_synced_at: null,
+  last_error: null,
+  created_at: 0,
+  updated_at: 0,
+};
 
 export function ensureBuiltinCatalogSources(now = Date.now()): void {
   const db = getDb();
   db.transaction((tx) => {
-    for (const source of [MODELSCOPE_SKILLS_SOURCE, SKILLS_SH_SOURCE]) {
+    for (const source of [MODELSCOPE_SKILLS_SOURCE, SKILLS_SH_SOURCE, MCP_SO_SOURCE]) {
       tx.insert(catalogSources)
         .values({ ...source, created_at: now, updated_at: now })
         .onConflictDoUpdate({
@@ -97,6 +123,7 @@ export function getCatalogSnapshot(): CatalogSnapshot {
 export async function searchCatalogSkills(
   input: CatalogSearchInput = {},
 ): Promise<CatalogSearchResult> {
+  if (input.artifactType === "mcp") throw new Error("Use the MCP catalog search for MCP items.");
   ensureBuiltinCatalogSources();
   const page = normalizeInteger(input.page, 1, 1, 1_000);
   const pageSize = normalizeInteger(input.pageSize, 48, 1, 100);
@@ -174,11 +201,59 @@ export async function searchCatalogSkills(
   };
 }
 
+export async function searchCatalogMcp(
+  input: CatalogSearchInput = {},
+): Promise<CatalogSearchResult> {
+  ensureBuiltinCatalogSources();
+  const page = normalizeInteger(input.page, 1, 1, 1_000);
+  const pageSize = normalizeInteger(input.pageSize, 24, 1, 60);
+  const query = input.query?.trim() ?? "";
+  try {
+    const result = await searchMcpSoServers({ ...input, artifactType: "mcp", page, pageSize });
+    cacheSourceItems(MCP_SO_SOURCE_ID, result.items, "mcp");
+    setSourceSuccess(MCP_SO_SOURCE_ID);
+    const onlineItems = catalogItemsInOrder(
+      MCP_SO_SOURCE_ID,
+      result.items.map((item) => item.externalId),
+    );
+    const cachedMatches = query
+      ? searchCachedCatalogItems(MCP_SO_SOURCE_ID, query, 1, 60, input).filter(
+          (item) => !onlineItems.some((onlineItem) => onlineItem.id === item.id),
+        )
+      : [];
+    const items = [...onlineItems, ...cachedMatches].slice(0, pageSize);
+    return {
+      items,
+      page,
+      pageSize,
+      hasMore: result.hasMore,
+      sources: [{ source: "mcp-so", status: "online", hasMore: result.hasMore }],
+      facets: result.facets,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setSourceError(MCP_SO_SOURCE_ID, message);
+    const cached = searchCachedCatalogItems(MCP_SO_SOURCE_ID, query, page, pageSize, input);
+    if (cached.length === 0) throw error;
+    return {
+      items: cached,
+      page,
+      pageSize,
+      hasMore: cached.length === pageSize,
+      sources: [
+        { source: "mcp-so", status: "cache", hasMore: cached.length === pageSize, error: message },
+      ],
+      facets: cachedMcpFacets(),
+    };
+  }
+}
+
 function searchCachedCatalogItems(
   sourceId: string,
   query: string,
   page: number,
   pageSize: number,
+  input: CatalogSearchInput = {},
 ): CatalogItem[] {
   const normalizedQuery = query.toLowerCase();
   const rows = getDb()
@@ -186,6 +261,8 @@ function searchCachedCatalogItems(
     .from(catalogItems)
     .all()
     .filter((row) => row.source_id === sourceId)
+    .filter((row) => !input.category || parseJson(row.detail_json).category === input.category)
+    .filter((row) => !input.tag || Boolean(parseJson(row.detail_json)[input.tag]))
     .filter(
       (row) =>
         !normalizedQuery ||
@@ -204,19 +281,50 @@ export async function installCatalogItem(
 ): Promise<ArtifactInstallation> {
   const item = getDb().select().from(catalogItems).where(eq(catalogItems.id, input.itemId)).get();
   if (!item) throw new Error("Catalog item does not exist. Sync its source and try again.");
-  if (item.artifact_type !== "skill") {
-    throw new Error("The marketplace only installs Skills. Configure MCP servers manually.");
-  }
+  if (item.artifact_type === "mcp") return await installMcpItem(item, input);
   return await installSkillItem(item, input);
 }
 
 export async function getCatalogItemDetail(itemId: string): Promise<CatalogItemDetail> {
   const item = getDb().select().from(catalogItems).where(eq(catalogItems.id, itemId)).get();
   if (!item) throw new Error("Catalog item does not exist.");
+  if (item.artifact_type === "mcp") {
+    try {
+      const result = await getMcpSoServerDetail(item.external_id);
+      cacheSourceItems(MCP_SO_SOURCE_ID, [result.item], "mcp");
+      const hash = result.item.contentHash ?? item.content_hash ?? "";
+      return {
+        itemId,
+        artifactType: "mcp",
+        markdown: "",
+        files: [],
+        totalBytes: 0,
+        contentHash: hash,
+        safetyChecks: ["mcp-so-origin", "configuration-shape", "secret-redaction"],
+        mcp: result.detail,
+      };
+    } catch (error) {
+      const cached = catalogMcpDetail(parseJson(item.detail_json));
+      if (cached) {
+        return {
+          itemId,
+          artifactType: "mcp",
+          markdown: "",
+          files: [],
+          totalBytes: 0,
+          contentHash: item.content_hash ?? "",
+          safetyChecks: ["cached-mcp-so-detail", "configuration-shape", "secret-redaction"],
+          mcp: cached,
+        };
+      }
+      throw error;
+    }
+  }
   const inspected = await loadSkillPackage(item);
   const contentHash = skillPackageHash(inspected);
   return {
     itemId,
+    artifactType: "skill",
     markdown: inspected.markdown,
     files: Object.entries(inspected.files).map(([path, data]) => ({ path, size: data.byteLength })),
     totalBytes: inspected.totalBytes,
@@ -230,13 +338,25 @@ export async function setArtifactInstallationEnabled(
   enabled: boolean,
 ): Promise<ArtifactInstallation> {
   const row = requireInstallation(id);
-  if (row.artifact_type === "skill") {
-    if (!row.skill_id) throw new Error("Installed skill record is missing.");
-    setSkillToolEnabled(row.skill_id, enabled);
-  } else {
-    if (!row.tool_server_id) throw new Error("Installed MCP server record is missing.");
-    if (enabled) await discoverMcpServer(row.tool_server_id);
-    setToolServerEnabled(row.tool_server_id, enabled);
+  try {
+    if (row.artifact_type === "skill") {
+      if (!row.skill_id) throw new Error("Installed skill record is missing.");
+      setSkillToolEnabled(row.skill_id, enabled);
+    } else {
+      if (!row.tool_server_id) throw new Error("Installed MCP server record is missing.");
+      if (enabled) {
+        const discovery = await discoverMcpServer(row.tool_server_id);
+        if (discovery.server.status === "error") throw new Error(discovery.message);
+      }
+      setToolServerEnabled(row.tool_server_id, enabled);
+    }
+  } catch (error) {
+    getDb()
+      .update(artifactInstallations)
+      .set({ status: "error", last_error: String(error).slice(0, 2_000), updated_at: Date.now() })
+      .where(eq(artifactInstallations.id, id))
+      .run();
+    throw error;
   }
   getDb()
     .update(artifactInstallations)
@@ -257,7 +377,7 @@ export async function setArtifactInstallationEnabled(
 export function uninstallArtifact(id: string): boolean {
   const row = requireInstallation(id);
   if (row.skill_id) deleteSkillTool(row.skill_id);
-  if (row.tool_server_id) deleteToolServer(row.tool_server_id);
+  if (row.tool_server_id) permanentlyDeleteToolServer(row.tool_server_id);
   if (row.install_path && existsSync(row.install_path))
     rmSync(row.install_path, { recursive: true, force: true });
   return (
@@ -341,6 +461,76 @@ async function installSkillItem(
   upsertInstallation(row);
   if (input.enable) return await setArtifactInstallationEnabled(installationId, true);
   return toInstallation(requireInstallation(installationId));
+}
+
+async function installMcpItem(
+  item: typeof catalogItems.$inferSelect,
+  input: CatalogInstallInput,
+): Promise<ArtifactInstallation> {
+  const detail = catalogMcpDetail(parseJson(item.detail_json));
+  if (!detail || detail.parseStatus === "unsupported") {
+    throw new Error("This MCP item does not provide a supported standard configuration.");
+  }
+  const existingId = existingInstallationId(item.id);
+  const existing = existingId
+    ? getDb()
+        .select()
+        .from(artifactInstallations)
+        .where(eq(artifactInstallations.id, existingId))
+        .get()
+    : null;
+  const serverInput = {
+    name: item.name,
+    description: item.description,
+    transport: detail.config.transport,
+    enabled: false,
+    auto_use: false,
+    requires_approval: true,
+    command: detail.config.command,
+    args: detail.config.args,
+    url: detail.config.url,
+    headers: detail.config.headers,
+    env: detail.config.env,
+    timeout_seconds: 60,
+  } as const;
+  let server;
+  if (existing?.tool_server_id) {
+    await closeMcpClient(existing.tool_server_id);
+    server = updateToolServer(existing.tool_server_id, serverInput);
+  } else {
+    server = createToolServer(serverInput);
+  }
+  for (const [key, value] of Object.entries(input.secrets ?? {})) {
+    setToolSecret({ ownerType: "server", ownerId: server.id, key, label: key, value });
+  }
+  const now = Date.now();
+  const row: typeof artifactInstallations.$inferInsert = {
+    id: existingId ?? randomUUID(),
+    item_id: item.id,
+    source_id: item.source_id,
+    artifact_type: "mcp",
+    name: item.name,
+    version: item.version,
+    content_hash: item.content_hash,
+    install_path: null,
+    status: "disabled",
+    safety_json: JSON.stringify({
+      reviewed: false,
+      source: "mcp.so",
+      parseStatus: detail.parseStatus,
+      warnings: detail.warnings,
+      secretKeys: detail.config.secretKeys,
+    }),
+    config_json: JSON.stringify(input.config ?? {}),
+    tool_server_id: server.id,
+    skill_id: null,
+    last_error: null,
+    installed_at: existing?.installed_at ?? now,
+    updated_at: now,
+  };
+  upsertInstallation(row);
+  if (input.enable) return await setArtifactInstallationEnabled(row.id, true);
+  return toInstallation(requireInstallation(row.id));
 }
 
 async function loadSkillPackage(
@@ -482,7 +672,8 @@ function toCatalogItem(
     id: row.id,
     sourceId: row.source_id,
     sourceKind,
-    sourceLabel: sourceKind === "skills-sh" ? "skills.sh" : "ModelScope",
+    sourceLabel:
+      sourceKind === "skills-sh" ? "skills.sh" : sourceKind === "mcp-so" ? "MCP.so" : "ModelScope",
     artifactType: row.artifact_type,
     externalId: row.external_id,
     canonicalKey,
@@ -566,7 +757,11 @@ function catalogItemsInOrder(sourceId: string, externalIds: string[]): CatalogIt
   });
 }
 
-function cacheSourceItems(sourceId: string, items: CatalogAdapterItem[]): void {
+function cacheSourceItems(
+  sourceId: string,
+  items: CatalogAdapterItem[],
+  artifactType: CatalogArtifactType = "skill",
+): void {
   const now = Date.now();
   getDb().transaction((tx) => {
     for (const item of items) {
@@ -574,7 +769,7 @@ function cacheSourceItems(sourceId: string, items: CatalogAdapterItem[]): void {
         .values({
           id: catalogItemId(sourceId, item.externalId),
           source_id: sourceId,
-          artifact_type: "skill",
+          artifact_type: artifactType,
           external_id: item.externalId,
           name: item.name.slice(0, 200),
           description: item.description.slice(0, 2_000),
@@ -588,6 +783,7 @@ function cacheSourceItems(sourceId: string, items: CatalogAdapterItem[]): void {
         .onConflictDoUpdate({
           target: catalogItems.id,
           set: {
+            artifact_type: artifactType,
             name: item.name.slice(0, 200),
             description: item.description.slice(0, 2_000),
             version: item.version ?? null,
@@ -645,11 +841,60 @@ export function mergeCatalogItems(lists: CatalogItem[][]): CatalogItem[] {
 }
 
 function sourceIdForKind(kind: CatalogSourceKind): string {
-  return kind === "skills-sh" ? SKILLS_SH_SOURCE_ID : MODELSCOPE_SOURCE_ID;
+  if (kind === "skills-sh") return SKILLS_SH_SOURCE_ID;
+  if (kind === "mcp-so") return MCP_SO_SOURCE_ID;
+  return MODELSCOPE_SOURCE_ID;
 }
 
 function sourceKindForId(sourceId: string): CatalogSourceKind {
-  return sourceId === SKILLS_SH_SOURCE_ID ? "skills-sh" : "modelscope-skills";
+  if (sourceId === SKILLS_SH_SOURCE_ID) return "skills-sh";
+  if (sourceId === MCP_SO_SOURCE_ID) return "mcp-so";
+  return "modelscope-skills";
+}
+
+function cachedMcpFacets(): CatalogFacets {
+  const categories = new Map<string, { id: string; label: string; count: number }>();
+  getDb()
+    .select()
+    .from(catalogItems)
+    .all()
+    .filter((row) => row.source_id === MCP_SO_SOURCE_ID)
+    .forEach((row) => {
+      const detail = parseJson(row.detail_json);
+      const category = typeof detail.category === "string" ? detail.category : "";
+      if (!category) return;
+      const current = categories.get(category);
+      categories.set(category, { id: category, label: category, count: (current?.count ?? 0) + 1 });
+    });
+  return {
+    categories: [...categories.values()].sort((a, b) => b.count - a.count).slice(0, 40),
+    tags: [
+      { id: "featured", count: countCachedMcpTag("featured") },
+      { id: "verified", count: countCachedMcpTag("verified") },
+    ],
+  };
+}
+
+function countCachedMcpTag(tag: "featured" | "verified"): number {
+  return getDb()
+    .select()
+    .from(catalogItems)
+    .all()
+    .filter((row) => row.source_id === MCP_SO_SOURCE_ID && Boolean(parseJson(row.detail_json)[tag]))
+    .length;
+}
+
+function catalogMcpDetail(value: JsonObject): CatalogMcpDetail | null {
+  const raw = value.mcp;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const detail = raw as Partial<CatalogMcpDetail>;
+  const config = detail.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) return null;
+  if (config.transport !== "stdio" && config.transport !== "http" && config.transport !== "sse") {
+    return null;
+  }
+  if (!Array.isArray(config.args) || !config.headers || !config.env) return null;
+  return detail as CatalogMcpDetail;
 }
 
 function normalizeInteger(

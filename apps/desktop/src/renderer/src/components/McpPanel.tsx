@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, Modal, Switch, TextArea } from "./ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Card, Input, Modal, Switch, Tabs, TabsList, TabsTrigger, TextArea } from "./ui";
 import { api, type ToolsSnapshot } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { buildMcpInput, type McpFormState } from "../lib/tools-form";
 import { cn } from "../lib/utils";
-import type { McpTransportKind, ToolRecord, ToolServer } from "@shared/types";
+import type {
+  ArtifactInstallation,
+  CatalogItem,
+  CatalogSnapshot,
+  McpTransportKind,
+  ToolRecord,
+  ToolServer,
+} from "@shared/types";
+import { McpMarketplacePanel } from "./McpMarketplacePanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import {
   IconCheck,
@@ -14,6 +22,7 @@ import {
   IconGlobe,
   IconPlus,
   IconRotateCcw,
+  IconSearch,
   IconTrash,
 } from "./icons";
 import {
@@ -48,20 +57,32 @@ const EMPTY_MCP_FORM: McpFormState = {
 export function McpPanel(): React.JSX.Element {
   const { t, locale } = useT();
   const [snapshot, setSnapshot] = useState<ToolsSnapshot | null>(null);
+  const [catalogSnapshot, setCatalogSnapshot] = useState<CatalogSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [tab, setTab] = useState<"installed" | "marketplace">("installed");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "enabled" | "disabled" | "error">("all");
+  const [transport, setTransport] = useState<"all" | McpTransportKind>("all");
   const [deleteTarget, setDeleteTarget] = useState<ToolServer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Extract<DetailTarget, { type: "mcp" }> | null>(
     null,
   );
+  const [reviewTarget, setReviewTarget] = useState<{
+    installation: ArtifactInstallation;
+    item: CatalogItem;
+    savedSecretKeys: string[];
+  } | null>(null);
 
   const refresh = (): void => {
     setRefreshing(true);
-    void api.tools
-      .snapshot()
-      .then(setSnapshot)
+    void Promise.all([api.tools.snapshot(), api.catalog.snapshot()])
+      .then(([nextSnapshot, nextCatalogSnapshot]) => {
+        setSnapshot(nextSnapshot);
+        setCatalogSnapshot(nextCatalogSnapshot);
+      })
       .catch((error) => notify.error(t("tools.toast.failed"), error, locale))
       .finally(() => {
         setLoading(false);
@@ -74,6 +95,25 @@ export function McpPanel(): React.JSX.Element {
   const mcpServers = useMemo(
     () => (snapshot?.toolServers ?? []).filter((server) => server.kind === "mcp"),
     [snapshot],
+  );
+  const filteredServers = useMemo(
+    () =>
+      mcpServers.filter((server) => {
+        const normalized = query.trim().toLowerCase();
+        const matchesQuery =
+          !normalized ||
+          `${server.name} ${server.description} ${server.url ?? ""}`
+            .toLowerCase()
+            .includes(normalized);
+        const effectiveStatus =
+          server.status === "error" ? "error" : server.enabled ? "enabled" : "disabled";
+        return (
+          matchesQuery &&
+          (status === "all" || effectiveStatus === status) &&
+          (transport === "all" || server.transport === transport)
+        );
+      }),
+    [mcpServers, query, status, transport],
   );
   const mcpToolsByServer = useMemo(
     () => groupByServer((snapshot?.toolRecords ?? []).filter((tool) => tool.kind === "mcp")),
@@ -97,13 +137,21 @@ export function McpPanel(): React.JSX.Element {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleteTarget(null);
-    void runAction(() => api.mcp.delete(target.id), t("tools.toast.deleted"));
+    const installation = catalogSnapshot?.installations.find(
+      (value) => value.toolServerId === target.id,
+    );
+    void runAction(
+      () => (installation ? api.catalog.uninstall(installation.id) : api.mcp.delete(target.id)),
+      t("tools.toast.deleted"),
+    );
   };
 
   return (
     <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">{t("main.title.mcp")}</h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight">{t("main.title.mcp")}</h1>
+        </div>
         <div className="flex items-center gap-3">
           <MetricCard
             label={t("tools.metric.mcp")}
@@ -123,24 +171,78 @@ export function McpPanel(): React.JSX.Element {
         </div>
       </div>
 
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value === "marketplace" ? "marketplace" : "installed")}
+        >
+          <TabsList aria-label={t("catalog.mcp.tabsLabel")}>
+            <TabsTrigger value="installed">{t("catalog.mcp.installedTab")}</TabsTrigger>
+            <TabsTrigger value="marketplace">{t("catalog.mcp.marketplaceTab")}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading && !snapshot ? (
+        {tab === "marketplace" ? (
+          <McpMarketplacePanel
+            onInstalled={(installation, item, savedSecretKeys) => {
+              setTab("installed");
+              setReviewTarget({ installation, item, savedSecretKeys });
+              refresh();
+            }}
+          />
+        ) : null}
+        {tab === "installed" && loading && !snapshot ? (
           <div className="rounded-md border border-dashed border-foreground/15 px-4 py-16 text-center text-sm text-foreground/45">
             {t("main.loading")}
           </div>
         ) : null}
 
-        {snapshot ? (
-          <McpSection
-            servers={mcpServers}
-            toolsByServer={mcpToolsByServer}
-            busy={busy}
-            onDelete={setDeleteTarget}
-            onToggle={(server, enabled) =>
-              runAction(() => api.mcp.setEnabled(server.id, enabled), t("tools.toast.saved"))
-            }
-            onDetail={(server, tools) => setDetailTarget({ type: "mcp", item: server, tools })}
-          />
+        {tab === "installed" && snapshot ? (
+          <div className="space-y-4">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px]">
+              <label className="relative min-w-0">
+                <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
+                <Input
+                  className="pl-9"
+                  value={query}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
+                  placeholder={t("tools.search.placeholder")}
+                />
+              </label>
+              <select
+                className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+                value={status}
+                onChange={(event) => setStatus(event.currentTarget.value as typeof status)}
+              >
+                <option value="all">{t("tools.filter.allStatus")}</option>
+                <option value="enabled">{t("catalog.enabled")}</option>
+                <option value="disabled">{t("catalog.disabled")}</option>
+                <option value="error">{t("tools.filter.error")}</option>
+              </select>
+              <select
+                className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+                value={transport}
+                onChange={(event) => setTransport(event.currentTarget.value as typeof transport)}
+              >
+                <option value="all">{t("catalog.mcp.allTransports")}</option>
+                <option value="stdio">STDIO</option>
+                <option value="http">HTTP</option>
+                <option value="sse">SSE</option>
+              </select>
+            </div>
+            <McpSection
+              servers={filteredServers}
+              toolsByServer={mcpToolsByServer}
+              busy={busy}
+              onDelete={setDeleteTarget}
+              onToggle={(server, enabled) =>
+                runAction(() => api.mcp.setEnabled(server.id, enabled), t("tools.toast.saved"))
+              }
+              onDetail={(server, tools) => setDetailTarget({ type: "mcp", item: server, tools })}
+            />
+          </div>
         ) : null}
       </div>
 
@@ -160,6 +262,23 @@ export function McpPanel(): React.JSX.Element {
 
       <ToolDetailModal detail={detailTarget} onClose={() => setDetailTarget(null)} />
 
+      <McpReviewModal
+        target={reviewTarget}
+        server={
+          reviewTarget?.installation.toolServerId
+            ? (snapshot?.toolServers.find(
+                (server) => server.id === reviewTarget.installation.toolServerId,
+              ) ?? null)
+            : null
+        }
+        busy={busy}
+        onClose={() => setReviewTarget(null)}
+        onEnabled={() => {
+          setReviewTarget(null);
+          refresh();
+        }}
+      />
+
       <ConfirmDialog
         open={!!deleteTarget}
         danger
@@ -171,6 +290,206 @@ export function McpPanel(): React.JSX.Element {
       />
     </div>
   );
+}
+
+function McpReviewModal({
+  target,
+  server,
+  busy,
+  onClose,
+  onEnabled,
+}: {
+  target: {
+    installation: ArtifactInstallation;
+    item: CatalogItem;
+    savedSecretKeys: string[];
+  } | null;
+  server: ToolServer | null;
+  busy: boolean;
+  onClose: () => void;
+  onEnabled: () => void;
+}): React.JSX.Element {
+  const { t, locale } = useT();
+  const secretRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [savedKeys, setSavedKeys] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const mcp = target?.item.detail.mcp as unknown as
+    | {
+        config?: {
+          transport?: string;
+          command?: string | null;
+          args?: string[];
+          url?: string | null;
+          headers?: Record<string, string>;
+          env?: Record<string, string>;
+        };
+        tools?: Array<{ name: string; description: string }>;
+        warnings?: string[];
+      }
+    | undefined;
+  const secretKeys = target ? installationSecretKeys(target.installation) : [];
+
+  useEffect(() => {
+    secretRefs.current = {};
+    setSavedKeys(target?.savedSecretKeys ?? []);
+    setError(null);
+    setPending(false);
+  }, [target?.installation.id]);
+
+  const enable = async (): Promise<void> => {
+    if (!target || !server) return;
+    const missing = secretKeys.filter(
+      (key) => !savedKeys.includes(key) && !secretRefs.current[key]?.value.trim(),
+    );
+    if (missing.length > 0) {
+      setError(t("catalog.mcp.missingSecrets", { keys: missing.join(", ") }));
+      return;
+    }
+    try {
+      setPending(true);
+      setError(null);
+      await Promise.all(
+        secretKeys
+          .map((key) => [key, secretRefs.current[key]?.value.trim() ?? ""] as const)
+          .filter(([, value]) => value)
+          .map(([key, value]) =>
+            api.mcp.setSecret({ ownerType: "server", ownerId: server.id, key, label: key, value }),
+          ),
+      );
+      setSavedKeys((current) => [
+        ...new Set([
+          ...current,
+          ...secretKeys.filter((key) => secretRefs.current[key]?.value.trim()),
+        ]),
+      ]);
+      await api.catalog.enable(target.installation.id, true);
+      notify.success(t("catalog.mcp.enabledToast"));
+      onEnabled();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      notify.error(t("catalog.mcp.enableFailed"), reason, locale);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={target !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <Modal.Backdrop isDismissable>
+        <Modal.Container>
+          <Modal.Dialog className="max-h-[90vh] w-[min(760px,calc(100vw-24px))]">
+            <Modal.Header>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Modal.Heading>{t("catalog.mcp.reviewTitle")}</Modal.Heading>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">{target?.item.name}</p>
+                </div>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="tertiary"
+                  onPress={onClose}
+                  aria-label={t("common.close")}
+                >
+                  <IconClose className="size-4" />
+                </Button>
+              </div>
+            </Modal.Header>
+            <Modal.Body className="space-y-4">
+              <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+                {t("catalog.mcp.reviewWarning")}
+              </div>
+              {target ? (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <ReadStat label={t("catalog.source")} value={target.item.sourceLabel} />
+                  <ReadStat
+                    label={t("catalog.transport")}
+                    value={server?.transport ?? mcp?.config?.transport ?? "-"}
+                  />
+                  <ReadStat
+                    label={t("catalog.mcp.tools")}
+                    value={String(mcp?.tools?.length ?? 0)}
+                  />
+                </div>
+              ) : null}
+              {error ? (
+                <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                  {error}
+                </p>
+              ) : null}
+              {mcp?.warnings && mcp.warnings.length > 0 ? (
+                <div className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">{t("catalog.mcp.warnings")}</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4">
+                    {mcp.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{t("catalog.safetyDetails")}</p>
+                <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] text-muted-foreground">
+                  {JSON.stringify(
+                    {
+                      transport: server?.transport,
+                      command: server?.command,
+                      args: server?.args_json,
+                      url: server?.url,
+                      headers: server?.headers_json,
+                      env: server?.env_json,
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
+              {secretKeys.length > 0 ? (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <p className="text-sm font-medium">{t("catalog.secrets")}</p>
+                  {secretKeys.map((key) => (
+                    <label key={key} className="grid gap-1.5 text-xs font-medium">
+                      <span>
+                        {key}
+                        {savedKeys.includes(key) ? ` · ${t("catalog.mcp.secretSaved")}` : ""}
+                      </span>
+                      <Input
+                        type="password"
+                        placeholder="$secret:{key}"
+                        ref={(node) => {
+                          secretRefs.current[key] = node;
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </Modal.Body>
+            <Modal.Footer className="flex justify-end gap-2">
+              <Button variant="tertiary" onPress={onClose}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                isPending={pending || busy}
+                isDisabled={!server}
+                onPress={() => void enable()}
+              >
+                <IconCheck className="size-4" />
+                {t("catalog.reviewEnable")}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
+function installationSecretKeys(installation: ArtifactInstallation): string[] {
+  const value = installation.safety.secretKeys;
+  return Array.isArray(value) ? value.filter((key): key is string => typeof key === "string") : [];
 }
 
 function McpSection({

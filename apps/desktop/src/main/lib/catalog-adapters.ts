@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import type { CatalogSearchInput, JsonObject } from "../../shared/types";
+import type { CatalogArtifactType, CatalogSearchInput, JsonObject } from "../../shared/types";
 
 export interface CatalogAdapterItem {
   externalId: string;
-  artifactType: "skill";
+  artifactType: CatalogArtifactType;
   name: string;
   description: string;
   version?: string;

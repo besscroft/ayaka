@@ -1514,6 +1514,68 @@ const entries = {
   "zh-CN": { zh: "简体中文", en: "Simplified Chinese" },
 
   // 工作流悬浮状态框（chat 页面右上角）
+  "catalog.mcp.subtitle": {
+    zh: "浏览 mcp.so 服务器，先安装并审查，再启用连接。",
+    en: "Browse mcp.so servers, install for review, then enable connections.",
+  },
+  "catalog.mcp.tabsLabel": { zh: "MCP 页面", en: "MCP views" },
+  "catalog.mcp.installedTab": { zh: "已安装", en: "Installed" },
+  "catalog.mcp.marketplaceTab": { zh: "MCP 商店", en: "MCP marketplace" },
+  "catalog.mcp.search": { zh: "搜索 MCP 服务器", en: "Search MCP servers" },
+  "catalog.mcp.tag": { zh: "标签筛选", en: "Tag filter" },
+  "catalog.mcp.allTags": { zh: "全部标签", en: "All tags" },
+  "catalog.mcp.featured": { zh: "精选", en: "Featured" },
+  "catalog.mcp.verified": { zh: "已验证", en: "Verified" },
+  "catalog.mcp.sort": { zh: "排序", en: "Sort" },
+  "catalog.mcp.sortFeatured": { zh: "精选优先", en: "Featured first" },
+  "catalog.mcp.sortLatest": { zh: "最新", en: "Latest" },
+  "catalog.mcp.sortName": { zh: "名称", en: "Name" },
+  "catalog.mcp.category": { zh: "分类", en: "Category" },
+  "catalog.mcp.allCategories": { zh: "全部分类", en: "All categories" },
+  "catalog.mcp.cacheState": {
+    zh: "当前显示本地缓存 · 来源暂不可用",
+    en: "Showing local cache · source unavailable",
+  },
+  "catalog.mcp.sourceState": {
+    zh: "来源：mcp.so · 按需加载",
+    en: "Source: mcp.so · loaded on demand",
+  },
+  "catalog.mcp.cacheWarning": {
+    zh: "网络请求失败，已回退缓存：",
+    en: "Network request failed; using cache: ",
+  },
+  "catalog.mcp.loadFailed": { zh: "MCP 商店加载失败", en: "MCP marketplace failed to load" },
+  "catalog.mcp.loadingMore": { zh: "正在加载更多 MCP", en: "Loading more MCP servers" },
+  "catalog.mcp.empty": { zh: "没有找到匹配的 MCP 服务器", en: "No matching MCP servers found" },
+  "catalog.mcp.author": { zh: "作者", en: "Author" },
+  "catalog.mcp.tools": { zh: "工具数量", en: "Tools" },
+  "catalog.mcp.allTransports": { zh: "全部传输方式", en: "All transports" },
+  "catalog.mcp.warnings": { zh: "解析警告", en: "Parser warnings" },
+  "catalog.mcp.configuration": { zh: "标准配置", en: "Standard configuration" },
+  "catalog.mcp.toolSummary": { zh: "工具摘要", en: "Tool summary" },
+  "catalog.mcp.repository": { zh: "打开仓库", en: "Open repository" },
+  "catalog.mcp.secretsHint": {
+    zh: "敏感值只通过加密 IPC 保存，不会写入普通配置。",
+    en: "Secret values are saved only through encrypted IPC and never written to regular config.",
+  },
+  "catalog.mcp.reviewInstall": { zh: "查看并安装", en: "Review and install" },
+  "catalog.mcp.installReview": { zh: "安装并进入审查", en: "Install for review" },
+  "catalog.mcp.installedDisabled": { zh: "已安装并保持禁用", en: "Installed and left disabled" },
+  "catalog.mcp.reviewTitle": { zh: "审查 MCP 配置", en: "Review MCP configuration" },
+  "catalog.mcp.reviewWarning": {
+    zh: "服务器仍处于禁用状态。确认来源、配置和权限后才会连接。",
+    en: "The server remains disabled. Confirm its source, configuration, and permissions before connecting.",
+  },
+  "catalog.mcp.missingSecrets": {
+    zh: "请填写敏感值：{keys}",
+    en: "Enter the required secrets: {keys}",
+  },
+  "catalog.mcp.secretSaved": { zh: "本次已保存", en: "saved this review" },
+  "catalog.mcp.enabledToast": { zh: "MCP 已审查并启用", en: "MCP reviewed and enabled" },
+  "catalog.mcp.enableFailed": {
+    zh: "MCP 启用失败，服务器仍保持禁用",
+    en: "MCP enable failed; the server remains disabled",
+  },
 } as const;
 
 const zhOverrides: Dict = {

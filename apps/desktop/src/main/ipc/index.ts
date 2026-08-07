@@ -123,6 +123,7 @@ import {
   getCatalogSnapshot,
   getCatalogItemDetail,
   installCatalogItem,
+  searchCatalogMcp,
   searchCatalogSkills,
   setArtifactInstallationEnabled,
   uninstallArtifact,
@@ -227,7 +228,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("cron:runs", (_e, id: string, limit?: number) => listCronRuns(id, limit));
 
   ipcMain.handle("catalog:snapshot", () => getCatalogSnapshot());
-  ipcMain.handle("catalog:search", (_e, input?: CatalogSearchInput) => searchCatalogSkills(input));
+  ipcMain.handle("catalog:search", (_e, input?: CatalogSearchInput) =>
+    input?.artifactType === "mcp" ? searchCatalogMcp(input) : searchCatalogSkills(input),
+  );
   ipcMain.handle("catalog:detail", (_e, itemId: string) => getCatalogItemDetail(itemId));
   ipcMain.handle("catalog:install", (_e, input: CatalogInstallInput) => installCatalogItem(input));
   ipcMain.handle("catalog:enable", (_e, id: string, enabled: boolean) =>
