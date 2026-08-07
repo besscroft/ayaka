@@ -1,16 +1,16 @@
-# 桌宠商店筛选栏固定设计
+# Desktop Pet Store Fixed Filters
 
-## 目标
+## Goal
 
-在设置页的桌宠商店中，让截图红框内的搜索与筛选区域在商品列表滚动时固定在内容区顶部，不参与商品列表的页内滚动。
+Keep the search and filter area in the desktop pet store fixed while the store results scroll independently below it.
 
-## 方案
+## Design
 
-保留 `DesktopPetsSettings` 现有的单一滚动容器，将 `StorePets` 的筛选栏设为该容器内的 sticky 首项。筛选栏使用顶部定位和层级，配合与页面一致的不透明背景及水平/顶部内边距，确保商品卡片滚动到筛选栏下方时不会穿透显示。
+Keep the settings section as a flex column with a bounded content area. The store view renders the filter area as a `shrink-0` sibling above a separate `min-h-0 flex-1 overflow-y-auto` results area. The results area owns scrolling for product cards, loading state, empty state, errors, and pagination.
 
-搜索输入继续允许选择文本；筛选栏中的其他展示内容保持不可选。现有搜索、筛选、加载、错误、空状态和分页行为不变。
+The installed-pets view keeps its existing single scroll area. The store filter area is explicitly `select-none`, while the search input remains `select-text`. Search, filter, loading, error, empty, and pagination behavior is unchanged.
 
-## 验证
+## Verification
 
-- 类型检查和格式/lint 检查通过。
-- 代码审查确认 sticky 元素位于现有滚动容器内，且没有改变可滚动区域的职责。
+- Pass the desktop renderer TypeScript check.
+- Confirm the fixed filter and independent result scroll containers are separate in the component hierarchy.
