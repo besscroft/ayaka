@@ -35,6 +35,8 @@ import {
   Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Palette,
   Pencil,
   Pin,
@@ -76,6 +78,8 @@ export const IconMaximize = fromLucide(Square);
 export const IconRestore = fromLucide(Copy);
 export const IconSidebarCollapse = fromLucide(PanelLeftClose);
 export const IconSidebarExpand = fromLucide(PanelLeftOpen);
+export const IconPanelRightClose = fromLucide(PanelRightClose);
+export const IconPanelRightOpen = fromLucide(PanelRightOpen);
 export const IconSend = fromLucide(Send);
 export const IconArrowUp = fromLucide(ArrowUp);
 export const IconArrowDown = fromLucide(ArrowDown);

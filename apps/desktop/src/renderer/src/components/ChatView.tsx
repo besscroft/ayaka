@@ -11,7 +11,7 @@
  *  - 鏍囬鑷姩鐢熸垚锛氶娆?user + assistant 瀹屾暣鍑虹幇鍚庤皟鐢?/api/title
  *  - 娑堟伅鍔ㄤ綔锛圗dit / Resend / Delete锛夌敱鏈粍浠跺疄鐜帮紝浼犻€掔粰 MessageList
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -119,6 +119,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatErrorRetryable, setChatErrorRetryable] = useState(false);
   const [isStopped, setIsStopped] = useState(false);
+  const [runtimePanelOpen, setRuntimePanelOpen] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<Pick<
     RuntimeSnapshot,
@@ -843,60 +844,63 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <ChatHeader
-        status={statusKind}
-        runtimeSummary={formatRuntimeSummary(runtimeSnapshot, conversationId, t)}
-        runtimePanel={
-          <AgentStatusWidget
-            conversationId={conversationId}
-            snapshot={runtimeSnapshot}
-            chatStatus={statusKind}
-            isChatActive={isChatLoading}
+      <ChatHeader status={statusKind} />
+
+      <div className="relative flex min-h-0 flex-1">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          {isEmpty ? (
+            <EmptyState
+              title={t("chat.empty.title")}
+              subtitle={t("chat.empty.subtitle")}
+              suggestions={starterSuggestions}
+              loading={starterLoading}
+              onSuggestion={handleSuggestion}
+            />
+          ) : (
+            <MessageList
+              messages={chat.messages}
+              isLoading={isLoading}
+              status={statusKind}
+              error={chat.error}
+              errorDetail={chatError}
+              emptySuggestions={starterSuggestions}
+              followupSuggestions={followupSuggestions}
+              onRetry={chatErrorRetryable ? handleRetry : undefined}
+              onDismissError={handleDismissError}
+              onEditMessage={handleEditMessage}
+              onResendMessage={handleResendMessage}
+              onDeleteMessage={handleDeleteMessage}
+              onToolApprovalResponse={chat.addToolApprovalResponse}
+              onSuggestion={handleSuggestion}
+            />
+          )}
+
+          <MessageInput
+            isLoading={isLoading}
+            isRunActive={isAgentRunActive}
+            onSend={handleSend}
+            onStop={isAgentRunActive ? handleStop : undefined}
+            selectedModel={selectedModel}
+            reasoningLevel={reasoningLevel}
+            onModelChange={setSelectedModel}
+            onReasoningLevelChange={setReasoningLevel}
+            toolSelection={toolSelection}
+            onToolSelectionChange={handleToolSelectionChange}
+            providers={providers}
+            contextMetrics={contextMetrics}
           />
-        }
-      />
+        </main>
 
-      {isEmpty ? (
-        <EmptyState
-          title={t("chat.empty.title")}
-          subtitle={t("chat.empty.subtitle")}
-          suggestions={starterSuggestions}
-          loading={starterLoading}
-          onSuggestion={handleSuggestion}
+        <AgentStatusWidget
+          conversationId={conversationId}
+          snapshot={runtimeSnapshot}
+          chatStatus={statusKind}
+          isChatActive={isChatLoading}
+          open={runtimePanelOpen}
+          onOpenChange={setRuntimePanelOpen}
+          onStop={handleStop}
         />
-      ) : (
-        <MessageList
-          messages={chat.messages}
-          isLoading={isLoading}
-          status={statusKind}
-          error={chat.error}
-          errorDetail={chatError}
-          emptySuggestions={starterSuggestions}
-          followupSuggestions={followupSuggestions}
-          onRetry={chatErrorRetryable ? handleRetry : undefined}
-          onDismissError={handleDismissError}
-          onEditMessage={handleEditMessage}
-          onResendMessage={handleResendMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onToolApprovalResponse={chat.addToolApprovalResponse}
-          onSuggestion={handleSuggestion}
-        />
-      )}
-
-      <MessageInput
-        isLoading={isLoading}
-        isRunActive={isAgentRunActive}
-        onSend={handleSend}
-        onStop={isAgentRunActive ? handleStop : undefined}
-        selectedModel={selectedModel}
-        reasoningLevel={reasoningLevel}
-        onModelChange={setSelectedModel}
-        onReasoningLevelChange={setReasoningLevel}
-        toolSelection={toolSelection}
-        onToolSelectionChange={handleToolSelectionChange}
-        providers={providers}
-        contextMetrics={contextMetrics}
-      />
+      </div>
     </div>
   );
 }
@@ -905,18 +909,16 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
 interface ChatHeaderProps {
   status: ConversationStatusKind;
-  runtimeSummary?: string;
-  runtimePanel?: ReactNode;
 }
 
 /**
  * 澶撮儴鍙睍绀?瀵硅瘽鍚?+ 鐘舵€佸窘绔?锛涗笂涓嬫枃鐢ㄩ噺宸茶縼鑷宠緭鍏ユ鐨?ContextPopover銆?
  */
-function ChatHeader({ status, runtimeSummary, runtimePanel }: ChatHeaderProps): React.JSX.Element {
+function ChatHeader({ status }: ChatHeaderProps): React.JSX.Element {
   const { t } = useT();
   return (
     <header
-      className="relative z-30 grid shrink-0 grid-cols-1 select-none items-start gap-2 border-b border-foreground/10 px-4 py-2.5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,34rem)] lg:items-center lg:gap-4"
+      className="relative z-30 flex shrink-0 select-none items-center border-b border-foreground/10 px-4 py-2.5 sm:px-6"
       data-streaming={status === "streaming" || status === "submitted"}
     >
       <div className="flex min-w-0 items-center gap-2.5 lg:min-h-9">
@@ -928,64 +930,12 @@ function ChatHeader({ status, runtimeSummary, runtimePanel }: ChatHeaderProps): 
           {t("chat.header.title")}
         </h1>
         <ConversationStatus status={status} />
-        {runtimeSummary ? (
-          <span className="hidden min-w-0 truncate text-xs text-foreground/50 sm:inline">
-            {runtimeSummary}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex min-w-0 items-start gap-2 lg:justify-end">
-        <div className="min-w-0 flex-1">{runtimePanel}</div>
       </div>
     </header>
   );
 }
 
 /* ---------- 鎸佷箙鍖?---------- */
-
-function formatRuntimeSummary(
-  snapshot: Pick<
-    RuntimeSnapshot,
-    | "runtimeRuns"
-    | "runtimeSteps"
-    | "agentRuntimeStates"
-    | "conversationAgentStates"
-    | "sandboxSessions"
-    | "sandboxSnapshots"
-    | "sandboxArtifacts"
-  > | null,
-  conversationId: string,
-  t: ReturnType<typeof useT>["t"],
-): string | undefined {
-  if (!snapshot) return undefined;
-  const conversationState = snapshot.conversationAgentStates.find(
-    (state) => state.conversation_id === conversationId,
-  );
-  if (conversationState?.status === "reviewing") {
-    return conversationState.summary || t("chat.runtime.waitingApproval");
-  }
-  if (conversationState?.summary) return conversationState.summary;
-
-  const run =
-    snapshot.runtimeRuns.find(
-      (item) => item.conversation_id === conversationId && item.status === "running",
-    ) ??
-    snapshot.runtimeRuns.find(
-      (item) => item.conversation_id === conversationId && item.status === "queued",
-    );
-  if (!run) return undefined;
-
-  const currentStep = conversationState?.current_step_id
-    ? snapshot.runtimeSteps.find((step) => step.id === conversationState.current_step_id)
-    : undefined;
-  if (currentStep) return currentStep.title;
-
-  const latestStep = snapshot.runtimeSteps
-    .filter((step) => step.run_id === run.id)
-    .sort((a, b) => b.started_at - a.started_at)[0];
-  if (latestStep) return latestStep.title;
-  return t("chat.runtime.preparing");
-}
 
 /* ---------- 鑷姩鏍囬鐢熸垚 ---------- */
 

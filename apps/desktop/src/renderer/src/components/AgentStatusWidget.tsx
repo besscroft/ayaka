@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AgentInstanceRecord, RuntimeSnapshot } from "@shared/types";
-import { api } from "../lib/api";
+import type { AgentInstanceRecord, RuntimeRun, RuntimeSnapshot, RuntimeStep } from "@shared/types";
+import { motion, useReducedMotion } from "motion/react";
 import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
 import { Button } from "./ui";
 import {
   IconBrain,
-  IconChevronDown,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
+  IconPanelRightClose,
+  IconPanelRightOpen,
 } from "./icons";
 
 type RuntimeSnapshotSubset = Pick<
   RuntimeSnapshot,
-  "runtimeRuns" | "runtimeSteps" | "runtimeEvents" | "agentInstances" | "agentRunInputs"
+  | "runtimeRuns"
+  | "runtimeSteps"
+  | "runtimeEvents"
+  | "agentInstances"
+  | "agentRunInputs"
+  | "conversationAgentStates"
 >;
 
 interface AgentStatusWidgetProps {
@@ -22,40 +28,114 @@ interface AgentStatusWidgetProps {
   snapshot: RuntimeSnapshotSubset | null;
   chatStatus: "submitted" | "streaming" | "ready" | "stopped" | "error";
   isChatActive: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onStop: () => void;
 }
 
-const ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_handoff"]);
+const ACTIVE_RUN_STATUSES = new Set(["queued", "running", "waiting_approval", "waiting_handoff"]);
+const ACTIVE_INSTANCE_STATUSES = new Set([
+  "queued",
+  "running",
+  "reviewing",
+  "handoff",
+  "tool_calling",
+  "sandbox",
+  "learning",
+]);
+
+export function selectLatestConversationRun(
+  runs: RuntimeRun[],
+  conversationId: string,
+): RuntimeRun | undefined {
+  return runs
+    .filter((item) => item.conversation_id === conversationId)
+    .sort((a, b) => b.started_at - a.started_at)[0];
+}
+
+export function getRecentRuntimeSteps(
+  steps: RuntimeStep[],
+  runId: string | undefined,
+  limit = 6,
+): RuntimeStep[] {
+  return steps
+    .filter((item) => item.run_id === runId)
+    .sort((a, b) => b.started_at - a.started_at)
+    .slice(0, limit);
+}
+
+export function resolveAgentPanelStatus({
+  chatStatus,
+  isChatActive,
+  runStatus,
+  conversationStatus,
+}: {
+  chatStatus: AgentStatusWidgetProps["chatStatus"];
+  isChatActive: boolean;
+  runStatus?: string;
+  conversationStatus?: string;
+}): string {
+  if (runStatus === "waiting_approval" || conversationStatus === "reviewing") {
+    return "waiting_approval";
+  }
+  if (runStatus === "waiting_handoff") return "waiting_handoff";
+  if (chatStatus === "error" || runStatus === "failed") return "failed";
+  if (isChatActive || (runStatus ? ACTIVE_RUN_STATUSES.has(runStatus) : false)) return "running";
+  return runStatus ?? "idle";
+}
 
 export function AgentStatusWidget({
   conversationId,
   snapshot,
   chatStatus,
   isChatActive,
-}: AgentStatusWidgetProps): React.JSX.Element | null {
+  open,
+  onOpenChange,
+  onStop,
+}: AgentStatusWidgetProps): React.JSX.Element {
   const { t } = useT();
-  const [expanded, setExpanded] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [, setClock] = useState(0);
   const run = useMemo(
-    () =>
-      (snapshot?.runtimeRuns ?? [])
-        .filter((item) => item.conversation_id === conversationId)
-        .sort((a, b) => b.started_at - a.started_at)[0],
+    () => selectLatestConversationRun(snapshot?.runtimeRuns ?? [], conversationId),
     [conversationId, snapshot],
   );
-  const active = isChatActive || (run ? ACTIVE.has(run.status) : false);
-  const inputs = (snapshot?.agentRunInputs ?? []).filter((item) => item.run_id === run?.id);
-  const children = (snapshot?.agentInstances ?? [])
-    .filter((item) => item.run_id === run?.id)
-    .sort((a, b) => a.created_at - b.created_at);
-  const turns = (snapshot?.runtimeSteps ?? []).filter(
-    (item) => item.run_id === run?.id && item.kind === "model",
+  const conversationState = snapshot?.conversationAgentStates.find(
+    (state) => state.conversation_id === conversationId,
   );
-  const toolCalls = (snapshot?.runtimeSteps ?? []).filter(
-    (item) => item.run_id === run?.id && item.kind === "tool",
+  const children = useMemo(
+    () =>
+      (snapshot?.agentInstances ?? [])
+        .filter((item) => item.run_id === run?.id)
+        .sort((a, b) => a.created_at - b.created_at),
+    [run?.id, snapshot?.agentInstances],
   );
-  const budget = (snapshot?.runtimeEvents ?? []).find(
-    (item) => item.run_id === run?.id && item.kind === "budget",
+  const steps = useMemo(
+    () => getRecentRuntimeSteps(snapshot?.runtimeSteps ?? [], run?.id, Number.MAX_SAFE_INTEGER),
+    [run?.id, snapshot?.runtimeSteps],
   );
+  const turns = steps.filter((item) => item.kind === "model");
+  const toolCalls = steps.filter((item) => item.kind === "tool");
+  const queuedInputs = (snapshot?.agentRunInputs ?? []).filter(
+    (item) => item.run_id === run?.id && item.status === "queued",
+  );
+  const active = isChatActive || (run ? ACTIVE_RUN_STATUSES.has(run.status) : false);
+  const waiting = run?.status === "waiting_approval" || conversationState?.status === "reviewing";
+  const waitingHandoff = run?.status === "waiting_handoff";
+  const failed = chatStatus === "error" || run?.status === "failed";
+  const status = resolveAgentPanelStatus({
+    chatStatus,
+    isChatActive,
+    runStatus: run?.status,
+    conversationStatus: conversationState?.status,
+  });
+  const summary = conversationState?.summary || run?.output_summary || run?.input_summary;
+  const currentStep = conversationState?.current_step_id
+    ? snapshot?.runtimeSteps.find((step) => step.id === conversationState.current_step_id)
+    : undefined;
+  const elapsed = run?.started_at
+    ? formatElapsed((run.finished_at ?? Date.now()) - run.started_at)
+    : null;
 
   useEffect(() => {
     if (!active) return;
@@ -63,104 +143,185 @@ export function AgentStatusWidget({
     return () => window.clearInterval(timer);
   }, [active]);
 
-  if (!run && !isChatActive) return null;
-  const failed = chatStatus === "error" || run?.status === "failed";
-  const waiting = run?.status === "waiting_approval";
-  const status = waiting
-    ? "waiting_approval"
-    : active
-      ? "running"
-      : failed
-        ? "failed"
-        : (run?.status ?? "queued");
-  const elapsed = formatElapsed((run?.finished_at ?? Date.now()) - (run?.started_at ?? Date.now()));
   const title = waiting
     ? t("agentStatus.waitingApproval")
-    : active
-      ? t("agentStatus.running", {
-          count: children.filter((item) => item.status === "running").length + 1,
-        })
-      : failed
-        ? t("agentStatus.failed")
-        : t("agentStatus.completed");
+    : waitingHandoff
+      ? t("agentStatus.status.waitingHandoff")
+      : active
+        ? t("agentStatus.running", {
+            count: children.filter((item) => ACTIVE_INSTANCE_STATUSES.has(item.status)).length + 1,
+          })
+        : failed
+          ? t("agentStatus.failed")
+          : run
+            ? t(
+                run.status === "cancelled" || run.status === "interrupted"
+                  ? "agentStatus.interrupted"
+                  : "agentStatus.completed",
+              )
+            : t("agentStatus.ready");
 
   return (
-    <aside
+    <motion.aside
+      initial={false}
+      animate={{ width: open ? 320 : 40 }}
+      transition={
+        reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34, mass: 0.8 }
+      }
       className={cn(
-        "relative w-full min-w-0 rounded-md border border-border/70 bg-background/90 transition-transform duration-150 ease-out hover:-translate-y-px motion-reduce:transition-none",
-        active && "border-accent/25",
+        "absolute inset-y-0 right-0 z-40 flex max-w-[calc(100vw-2.5rem)] shrink-0 overflow-hidden border-l border-foreground/10 bg-background",
+        "lg:relative lg:z-10",
+        open && "shadow-[-12px_0_24px_-24px_rgba(0,0,0,0.5)]",
       )}
-      role="status"
-      aria-live="polite"
+      data-open={open}
+      role="complementary"
+      aria-label={t("agentStatus.panel")}
     >
-      <button
-        type="button"
-        className="flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left"
-        onClick={() => setExpanded((value) => !value)}
-        aria-expanded={expanded}
-      >
-        <StatusIcon status={status} />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
-        <span className="shrink-0 text-xs tabular-nums text-foreground/50">{elapsed}</span>
-        <IconChevronDown
-          className={cn(
-            "size-3.5 shrink-0 text-foreground/45 transition-transform",
-            expanded && "rotate-180",
-          )}
-        />
-      </button>
-      {expanded ? (
-        <div className="absolute inset-x-0 top-[calc(100%-1px)] z-50 max-h-[min(460px,60vh)] w-full overflow-y-auto rounded-b-md border border-border/70 bg-background/98 p-2">
-          <AgentRow
-            name="Paimon"
-            path="/root"
-            status={status}
-            summary={run?.output_summary ?? null}
-            error={run?.error ?? null}
-          />
-          {children.map((item) => (
-            <InstanceRow key={item.id} instance={item} />
-          ))}
-          <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border/50 pt-2 text-xs text-foreground/60">
-            <span>{t("agentStatus.turns", { count: turns.length })}</span>
-            <span>{t("agentStatus.inputs", { count: inputs.length })}</span>
-            <span>
-              {t("agentStatus.budget")}:{" "}
-              {budget ? t("agentStatus.exhausted") : `${turns.length}/8 · ${toolCalls.length}/50`}
-            </span>
-            <span>
-              {t("agentStatus.queue")}: {inputs.filter((item) => item.status === "queued").length}
-            </span>
-          </div>
-          {inputs.length ? (
-            <div className="mt-2 space-y-1 border-t border-border/50 pt-2">
-              {inputs.map((input) => (
-                <div
-                  key={input.id}
-                  className="flex justify-between gap-2 px-2 py-1 text-[11px] text-foreground/55"
-                >
-                  <span>
-                    {input.kind} · {input.source}
-                  </span>
-                  <span>{input.status}</span>
-                </div>
-              ))}
+      {open ? (
+        <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-foreground/10 px-3 py-3">
+            <IconBrain className="size-4 shrink-0 text-accent" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground/85">
+                {t("agentStatus.panel")}
+              </p>
+              <p className="truncate text-[11px] text-foreground/45">{title}</p>
             </div>
-          ) : null}
-          {active ? (
-            <div className="flex justify-end px-2 pt-2">
-              <Button
-                size="sm"
-                variant="tertiary"
-                onPress={() => run && void api.runtime.cancelRun(run.id)}
+            <button
+              type="button"
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              onClick={() => onOpenChange(false)}
+              aria-label={t("agentStatus.close")}
+              title={t("agentStatus.close")}
+            >
+              <IconPanelRightClose className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <section
+              className="border-b border-foreground/10 pb-3"
+              aria-labelledby="agent-status-current"
+            >
+              <p
+                id="agent-status-current"
+                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
               >
+                {t("agentStatus.current")}
+              </p>
+              <div className="mt-2 flex items-start gap-2">
+                <StatusIcon status={status} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground/85">{title}</p>
+                  {currentStep ? (
+                    <p className="mt-1 truncate text-xs text-foreground/60">{currentStep.title}</p>
+                  ) : null}
+                  {summary ? (
+                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-foreground/50">
+                      {summary}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-foreground/45">
+                  {elapsed ?? t("agentStatus.ready")}
+                </span>
+              </div>
+            </section>
+
+            <section
+              className="border-b border-foreground/10 py-3"
+              aria-labelledby="agent-status-agents"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p
+                  id="agent-status-agents"
+                  className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
+                >
+                  {t("agentStatus.agents")}
+                </p>
+                <span className="text-[10px] tabular-nums text-foreground/40">
+                  {children.length + 1}
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                <AgentRow
+                  name={t("agentStatus.rootAgent")}
+                  path="/root"
+                  status={status}
+                  summary={summary ?? null}
+                  error={run?.error ?? null}
+                />
+                {children.map((item) => (
+                  <InstanceRow key={item.id} instance={item} />
+                ))}
+              </div>
+            </section>
+
+            <section
+              className="border-b border-foreground/10 py-3"
+              aria-labelledby="agent-status-activity"
+            >
+              <p
+                id="agent-status-activity"
+                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
+              >
+                {t("agentStatus.activity")}
+              </p>
+              {steps.length === 0 ? (
+                <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
+              ) : (
+                <div className="mt-2 space-y-1">
+                  {steps.slice(0, 6).map((step) => (
+                    <ActivityRow key={step.id} step={step} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="py-3" aria-labelledby="agent-status-metrics">
+              <p
+                id="agent-status-metrics"
+                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
+              >
+                {t("agentStatus.metrics")}
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
+                <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
+                <Metric label={t("agentStatus.metric.pendingInputs")} value={queuedInputs.length} />
+              </div>
+            </section>
+
+            {!run ? (
+              <p className="border-t border-foreground/10 pt-3 text-xs text-foreground/45">
+                {t("agentStatus.noRun")}
+              </p>
+            ) : null}
+          </div>
+
+          {active && run ? (
+            <div className="shrink-0 border-t border-foreground/10 px-3 py-3">
+              <Button size="sm" variant="tertiary" className="w-full" onPress={onStop}>
                 {t("input.stop")}
               </Button>
             </div>
           ) : null}
         </div>
-      ) : null}
-    </aside>
+      ) : (
+        <button
+          type="button"
+          className="flex h-full w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+          onClick={() => onOpenChange(true)}
+          aria-label={t("agentStatus.open")}
+          aria-expanded={false}
+          title={t("agentStatus.open")}
+        >
+          <StatusIcon status={status} />
+          <IconPanelRightOpen className="size-4" aria-hidden="true" />
+          <span className="sr-only">{title}</span>
+        </button>
+      )}
+    </motion.aside>
   );
 }
 
@@ -179,19 +340,19 @@ function AgentRow({
 }): React.JSX.Element {
   const { t } = useT();
   return (
-    <div className="flex items-start gap-2 rounded-md px-2 py-2">
+    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-2 hover:bg-foreground/[0.035]">
       <StatusIcon status={status} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-xs font-medium">{name}</span>
-          <span className="font-mono text-[10px] text-foreground/40">{path}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-xs font-medium text-foreground/80">{name}</span>
+          <span className="truncate font-mono text-[10px] text-foreground/35">{path}</span>
         </div>
         {summary ? (
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-foreground/55">{summary}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-foreground/50">{summary}</p>
         ) : null}
-        {error ? <p className="mt-0.5 text-[11px] text-danger">{error}</p> : null}
+        {error ? <p className="mt-0.5 line-clamp-2 text-[11px] text-danger">{error}</p> : null}
       </div>
-      <span className="text-[10px] text-foreground/45">{statusLabel(status, t)}</span>
+      <span className="shrink-0 text-[10px] text-foreground/40">{statusLabel(status, t)}</span>
     </div>
   );
 }
@@ -208,32 +369,69 @@ function InstanceRow({ instance }: { instance: AgentInstanceRecord }): React.JSX
   );
 }
 
+function ActivityRow({ step }: { step: RuntimeStep }): React.JSX.Element {
+  const { t } = useT();
+  const duration = step.finished_at
+    ? step.finished_at - step.started_at
+    : Date.now() - step.started_at;
+  return (
+    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-foreground/[0.035]">
+      <StatusIcon status={step.status} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs text-foreground/75">{step.title}</p>
+        <p className="mt-0.5 truncate text-[10px] text-foreground/40">
+          {t(`runtime.kind.${step.kind}`)} · {formatElapsed(duration)}
+        </p>
+      </div>
+      <span className="shrink-0 text-[10px] text-foreground/40">{statusLabel(step.status, t)}</span>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }): React.JSX.Element {
+  return (
+    <div className="min-w-0 rounded-md border border-foreground/10 px-2 py-2">
+      <p className="truncate text-[10px] text-foreground/40">{label}</p>
+      <p className="mt-1 text-sm font-medium tabular-nums text-foreground/75">{value}</p>
+    </div>
+  );
+}
+
 function StatusIcon({ status }: { status: string }): React.JSX.Element {
-  if (status === "succeeded" || status === "completed")
+  if (status === "succeeded" || status === "completed") {
     return <IconCircleCheck className="mt-0.5 size-4 shrink-0 text-success" />;
+  }
   if (status === "failed") return <IconCircleX className="mt-0.5 size-4 shrink-0 text-danger" />;
-  if (status === "cancelled" || status === "interrupted")
-    return <IconCircleDashed className="mt-0.5 size-4 shrink-0 text-foreground/45" />;
-  if (status === "waiting_approval")
+  if (status === "cancelled" || status === "interrupted" || status === "idle") {
+    return <IconCircleDashed className="mt-0.5 size-4 shrink-0 text-foreground/40" />;
+  }
+  if (status === "waiting_approval" || status === "waiting_handoff" || status === "reviewing") {
     return <IconBrain className="mt-0.5 size-4 shrink-0 animate-pulse text-warning" />;
+  }
   return (
     <span className="relative mt-0.5 inline-flex size-4 shrink-0 items-center justify-center">
-      <span className="absolute inset-0 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
+      <span className="absolute inset-0 animate-spin rounded-full border-2 border-accent/25 border-t-accent motion-reduce:animate-none" />
     </span>
   );
 }
 
 function statusLabel(status: string, t: ReturnType<typeof useT>["t"]): string {
   const key =
-    status === "waiting_approval"
+    status === "waiting_approval" || status === "reviewing"
       ? "waitingApproval"
-      : status === "running"
-        ? "running"
-        : status === "failed"
-          ? "failed"
-          : status === "succeeded"
-            ? "completed"
-            : "interrupted";
+      : status === "waiting_handoff"
+        ? "waitingHandoff"
+        : status === "running"
+          ? "running"
+          : status === "queued"
+            ? "queued"
+            : status === "failed"
+              ? "failed"
+              : status === "succeeded" || status === "completed"
+                ? "completed"
+                : status === "idle"
+                  ? "idle"
+                  : "interrupted";
   return t(`agentStatus.status.${key}`);
 }
 
