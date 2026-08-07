@@ -37,7 +37,7 @@ type ConfirmAction =
 const EMPTY_STORE: StorePetPage = { pets: [], page: 1, pageSize: 30, total: 0, totalPages: 1 };
 
 export function DesktopPetsSettings(): React.JSX.Element {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [view, setView] = useState<PageView>("installed");
   const [snapshot, setSnapshot] = useState<DesktopPetSnapshot | null>(null);
   const [pets, setPets] = useState<InstalledPet[]>([]);
@@ -52,13 +52,14 @@ export function DesktopPetsSettings(): React.JSX.Element {
   const [searchDraft, setSearchDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [storeLoading, setStoreLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [storeError, setStoreError] = useState<string | null>(null);
+  const [localLoadError, setLocalLoadError] = useState(false);
+  const [storeError, setStoreError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const displayedLocalErrors = useRef(new Map<string, string>());
 
   const refreshLocal = useCallback(async (): Promise<void> => {
-    setError(null);
+    setLocalLoadError(false);
     try {
       const [nextSnapshot, nextPets] = await Promise.all([
         api.desktopPet.getSnapshot(),
@@ -66,24 +67,27 @@ export function DesktopPetsSettings(): React.JSX.Element {
       ]);
       setSnapshot(nextSnapshot);
       setPets(nextPets);
+      notifyChangedLocalErrors(nextSnapshot, nextPets, displayedLocalErrors.current);
     } catch (reason) {
-      setError(errorMessage(reason));
+      setLocalLoadError(true);
+      notify.error(userFacingErrorMessage(reason, t), undefined, locale);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [locale, t]);
 
   const refreshStore = useCallback(async (): Promise<void> => {
     setStoreLoading(true);
-    setStoreError(null);
+    setStoreError(false);
     try {
       setStore(await api.desktopPet.listStore(query));
     } catch (reason) {
-      setStoreError(storeErrorMessage(reason, t));
+      setStoreError(true);
+      notify.error(storeErrorMessage(reason, t) ?? errorMessage(reason), undefined, locale);
     } finally {
       setStoreLoading(false);
     }
-  }, [query, t]);
+  }, [locale, query, t]);
 
   useEffect(() => {
     void refreshLocal();
@@ -101,12 +105,11 @@ export function DesktopPetsSettings(): React.JSX.Element {
 
   const perform = async (id: string, action: () => Promise<unknown>): Promise<void> => {
     setBusyId(id);
-    setError(null);
     try {
       await action();
       await refreshLocal();
     } catch (reason) {
-      setError(userFacingErrorMessage(reason, t));
+      notify.error(userFacingErrorMessage(reason, t), undefined, locale);
     } finally {
       setBusyId(null);
     }
@@ -187,110 +190,98 @@ export function DesktopPetsSettings(): React.JSX.Element {
 
   return (
     <section className="-mx-5 -my-4 flex min-h-0 flex-1 select-none flex-col overflow-hidden [&_input]:select-text [&_textarea]:select-text">
-      <header className="shrink-0 border-b border-foreground/10 px-6 pb-5 pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 flex items-center gap-2 text-accent">
-              <IconSparkles className="size-4" />
-              <span className="text-xs font-medium">{t("pets.eyebrow")}</span>
+      <header className="shrink-0 border-b border-foreground/10 px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs value={view} onValueChange={(next) => setView(next as PageView)} className="py-3">
+            <TabsList aria-label={t("pets.title")}>
+              <TabsTrigger value="installed">{t("pets.tab.installed")}</TabsTrigger>
+              <TabsTrigger value="store">{t("pets.tab.store")}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {view === "installed" ? (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onPress={() => beginImport("zip")}>
+                <IconPlus className="mr-1 size-3.5" />
+                {t("pets.import.zip")}
+              </Button>
+              <Button size="sm" variant="tertiary" onPress={() => beginImport("folder")}>
+                {t("pets.import.folder")}
+              </Button>
             </div>
-            <h3 className="text-xl font-semibold tracking-tight">{t("pets.title")}</h3>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-foreground/55">
-              {t("pets.description")}
-            </p>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg bg-foreground/[0.045] px-3 py-2">
-            <div className="text-right">
-              <p className="text-sm font-medium">
-                {snapshot?.enabled ? t("pets.awake") : t("pets.tucked")}
-              </p>
-              <p className="text-xs text-foreground/50">{t("pets.mainAgentOnly")}</p>
-            </div>
-            <Switch
-              isSelected={snapshot?.enabled ?? false}
-              isDisabled={busyId === "enabled"}
-              onChange={setEnabled}
-              aria-label={t("pets.wakeToggle")}
-            />
-          </div>
+          ) : null}
         </div>
 
-        <div className="mt-5 grid gap-4 rounded-xl bg-foreground/[0.035] p-4 sm:grid-cols-[9rem_1fr_auto]">
-          <div className="flex min-h-32 items-center justify-center rounded-lg bg-background/75">
-            {selectedPet?.available ? (
-              <PetSprite pet={selectedPet} size="large" animate />
-            ) : (
-              <IconSparkles className="size-8 text-foreground/20" />
-            )}
-          </div>
-          <div className="min-w-0 self-center">
-            <p className="truncate text-base font-semibold">
-              {selectedPet?.displayName ?? t("pets.noneSelected")}
-            </p>
-            <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-foreground/55">
-              {selectedPet?.description ?? t("pets.chooseOne")}
-            </p>
-            {snapshot?.activity.kind && snapshot.activity.kind !== "idle" ? (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-md bg-background px-2.5 py-1 text-xs">
-                <span className={`pet-activity-dot pet-activity-${snapshot.activity.kind}`} />
-                {activityLabel(snapshot.activity.kind, t)}
+        {view === "installed" ? (
+          <div className="border-t border-foreground/10 pb-3 pt-3">
+            <div className="grid gap-3 rounded-lg bg-foreground/[0.035] p-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-center">
+              <div className="flex h-20 items-center justify-center rounded-md bg-background/75">
+                {selectedPet?.available ? (
+                  <PetSprite pet={selectedPet} animate />
+                ) : (
+                  <IconSparkles className="size-6 text-foreground/20" />
+                )}
               </div>
-            ) : null}
-            {snapshot?.assetError ? (
-              <p className="mt-2 text-xs text-danger">{snapshot.assetError}</p>
-            ) : null}
-          </div>
-          <div className="flex flex-col justify-center gap-2">
-            <label className="flex items-center justify-between gap-3 text-sm">
-              <span>{t("pets.alwaysOnTop")}</span>
-              <Switch
-                size="sm"
-                isSelected={snapshot?.config.window.alwaysOnTop ?? false}
-                onChange={(alwaysOnTop) =>
-                  void perform("always-on-top", async () => {
-                    setSnapshot(await api.desktopPet.updateWindow({ alwaysOnTop }));
-                  })
-                }
-                aria-label={t("pets.alwaysOnTop")}
-              />
-            </label>
-            <Button
-              size="sm"
-              variant="secondary"
-              onPress={() =>
-                void perform("reset", async () => {
-                  setSnapshot(await api.desktopPet.resetPosition());
-                })
-              }
-            >
-              <IconRotateCcw className="mr-1 size-3.5" />
-              {t("pets.resetPosition")}
-            </Button>
-          </div>
-        </div>
-
-        {error ? (
-          <div
-            role="alert"
-            className="mt-3 flex items-center justify-between gap-3 rounded-md bg-danger/8 px-3 py-2 text-sm text-danger"
-          >
-            <span>{error}</span>
-            <button
-              type="button"
-              className="font-medium underline"
-              onClick={() => void refreshLocal()}
-            >
-              {t("common.retry")}
-            </button>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs text-accent">
+                  <IconSparkles className="size-3.5 shrink-0" />
+                  <span>{t("pets.title")}</span>
+                  <span className="text-foreground/25">/</span>
+                  <span className="truncate text-foreground/55">
+                    {snapshot?.enabled ? t("pets.awake") : t("pets.tucked")}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold">
+                  {selectedPet?.displayName ?? t("pets.noneSelected")}
+                </p>
+                <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-foreground/55">
+                  {selectedPet?.description ?? t("pets.chooseOne")}
+                </p>
+                {snapshot?.activity.kind && snapshot.activity.kind !== "idle" ? (
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-0.5 text-[11px]">
+                    <span className={`pet-activity-dot pet-activity-${snapshot.activity.kind}`} />
+                    {activityLabel(snapshot.activity.kind, t)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:max-w-[19rem]">
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="text-foreground/60">{t("pets.mainAgentOnly")}</span>
+                  <Switch
+                    isSelected={snapshot?.enabled ?? false}
+                    isDisabled={busyId === "enabled"}
+                    onChange={setEnabled}
+                    aria-label={t("pets.wakeToggle")}
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="text-foreground/60">{t("pets.alwaysOnTop")}</span>
+                  <Switch
+                    size="sm"
+                    isSelected={snapshot?.config.window.alwaysOnTop ?? false}
+                    onChange={(alwaysOnTop) =>
+                      void perform("always-on-top", async () => {
+                        setSnapshot(await api.desktopPet.updateWindow({ alwaysOnTop }));
+                      })
+                    }
+                    aria-label={t("pets.alwaysOnTop")}
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  onPress={() =>
+                    void perform("reset", async () => {
+                      setSnapshot(await api.desktopPet.resetPosition());
+                    })
+                  }
+                >
+                  <IconRotateCcw className="mr-1 size-3.5" />
+                  {t("pets.resetPosition")}
+                </Button>
+              </div>
+            </div>
           </div>
         ) : null}
-
-        <Tabs value={view} onValueChange={(next) => setView(next as PageView)} className="mt-5">
-          <TabsList aria-label={t("pets.title")}>
-            <TabsTrigger value="installed">{t("pets.tab.installed")}</TabsTrigger>
-            <TabsTrigger value="store">{t("pets.tab.store")}</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
@@ -299,9 +290,10 @@ export function DesktopPetsSettings(): React.JSX.Element {
             pets={pets}
             selected={snapshot?.config.selectedPet ?? null}
             busyId={busyId}
+            loadError={localLoadError}
             onSelect={selectPet}
             onDelete={(pet) => setConfirmAction({ kind: "delete", pet })}
-            onImport={beginImport}
+            onRetry={() => void refreshLocal()}
           />
         ) : (
           <StorePets
@@ -343,35 +335,32 @@ function InstalledPets({
   pets,
   selected,
   busyId,
+  loadError,
   onSelect,
   onDelete,
-  onImport,
+  onRetry,
 }: {
   pets: InstalledPet[];
   selected: DesktopPetSelector | null;
   busyId: string | null;
+  loadError: boolean;
   onSelect: (pet: InstalledPet) => void;
   onDelete: (pet: InstalledPet) => void;
-  onImport: (mode: "zip" | "folder") => void;
+  onRetry: () => void;
 }): React.JSX.Element {
   const { t } = useT();
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 className="text-sm font-semibold">{t("pets.library.title")}</h4>
-          <p className="mt-0.5 text-xs text-foreground/50">{t("pets.library.description")}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onPress={() => onImport("zip")}>
-            <IconPlus className="mr-1 size-3.5" />
-            {t("pets.import.zip")}
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={() => onImport("folder")}>
-            {t("pets.import.folder")}
+      {loadError ? (
+        <div className="mb-5 rounded-xl bg-foreground/[0.035] px-5 py-8 text-center">
+          <IconRefresh className="mx-auto size-7 text-foreground/25" />
+          <p className="mt-3 text-sm font-medium">{t("pets.library.title")}</p>
+          <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
+            <IconRefresh className="mr-1 size-3.5" />
+            {t("common.retry")}
           </Button>
         </div>
-      </div>
+      ) : null}
       <div
         className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4"
         role="radiogroup"
@@ -411,9 +400,6 @@ function InstalledPets({
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-foreground/50">
                 {pet.description}
               </p>
-              {pet.error ? (
-                <p className="mt-2 line-clamp-2 text-xs text-danger">{pet.error}</p>
-              ) : null}
             </button>
             {pet.removable ? (
               <button
@@ -451,7 +437,7 @@ function StorePets({
   query: StorePetQuery;
   draft: string;
   loading: boolean;
-  error: string | null;
+  error: boolean;
   busyId: string | null;
   selected: DesktopPetSelector | null;
   onDraft: (value: string) => void;
@@ -528,7 +514,6 @@ function StorePets({
         <div className="mt-5 rounded-xl bg-foreground/[0.035] px-5 py-10 text-center">
           <IconGlobe className="mx-auto size-7 text-foreground/25" />
           <p className="mt-3 text-sm font-medium">{t("pets.store.unavailable")}</p>
-          <p className="mt-1 text-xs text-foreground/45">{error}</p>
           <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
             <IconRefresh className="mr-1 size-3.5" />
             {t("common.retry")}
@@ -725,6 +710,25 @@ function StoreSkeleton(): React.JSX.Element {
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
+}
+
+function notifyChangedLocalErrors(
+  snapshot: DesktopPetSnapshot,
+  pets: InstalledPet[],
+  displayedErrors: Map<string, string>,
+): void {
+  const nextErrors = new Map<string, string>();
+  if (snapshot.assetError) nextErrors.set("snapshot", snapshot.assetError);
+  for (const pet of pets) {
+    if (pet.error) nextErrors.set(pet.selector, pet.error);
+  }
+
+  for (const [key, message] of nextErrors) {
+    if (displayedErrors.get(key) !== message) notify.error(message);
+  }
+
+  displayedErrors.clear();
+  for (const [key, message] of nextErrors) displayedErrors.set(key, message);
 }
 
 function userFacingErrorMessage(

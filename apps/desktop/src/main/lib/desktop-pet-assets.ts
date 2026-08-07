@@ -373,7 +373,12 @@ export function resolveDesktopPetAssetPath(url: string): string | null {
 
 export function resolveStoreDownloadUrl(id: string, value: string): URL {
   if (!PET_ID_PATTERN.test(id)) throw new Error("Invalid store pet id.");
-  const url = new URL(value, STORE_ORIGIN);
+  let url: URL;
+  try {
+    url = new URL(value, STORE_ORIGIN);
+  } catch {
+    throw createStorePetError("invalid-response");
+  }
   if (url.protocol !== "https:" || url.origin !== STORE_ORIGIN) {
     throw new Error("Pet store returned an unsafe download URL.");
   }
@@ -768,7 +773,7 @@ async function fetchBytes(
   }
   const response = await fetchStoreResource(parsed.toString());
   if (!response.ok) throw createStorePetError("http", response.status);
-  const finalUrl = new URL(response.url);
+  const finalUrl = resolveStoreResponseUrl(response.url, parsed);
   if (finalUrl.protocol !== "https:" || !allowedHosts.has(finalUrl.hostname)) {
     throw new Error("Pet download redirected to an untrusted host.");
   }
@@ -800,6 +805,15 @@ async function fetchBytes(
   return bytes;
 }
 
+export function resolveStoreResponseUrl(responseUrl: string, requestUrl: URL): URL {
+  const value = responseUrl.trim() ? responseUrl : requestUrl.href;
+  try {
+    return new URL(value);
+  } catch {
+    throw createStorePetError("invalid-response");
+  }
+}
+
 export async function fetchStoreResource(
   url: string,
   fetcher: StoreFetcher = fetchWithChromiumStack,
@@ -828,11 +842,20 @@ export async function fetchStoreJson<T>(
   }
 }
 
-function fetchWithChromiumStack(url: string, init: RequestInit): Promise<Response> {
-  if (typeof net?.fetch !== "function") {
-    throw new Error("Electron Chromium network stack is unavailable.");
+async function fetchWithChromiumStack(url: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("User-Agent", "VoidAI/1.0 (+https://github.com/void-ai)");
+  const requestInit = { ...init, headers };
+
+  if (typeof net?.fetch !== "function") return fetch(url, requestInit);
+
+  try {
+    return (await net.fetch(url, requestInit)) as Response;
+  } catch (error) {
+    if (requestInit.signal?.aborted) throw error;
+    console.warn("[desktop-pet] Chromium fetch failed; retrying with runtime fetch", error);
+    return fetch(url, requestInit);
   }
-  return net.fetch(url, init) as Promise<Response>;
 }
 
 export class DesktopPetStoreError extends Error {

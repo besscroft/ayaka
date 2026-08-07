@@ -24,6 +24,7 @@ import {
   fetchStoreJson,
   readPackageArchive,
   resolveStoreDownloadUrl,
+  resolveStoreResponseUrl,
   validateManifest,
   validateSpritesheet,
 } from "./desktop-pet-assets";
@@ -151,6 +152,27 @@ void describe("desktop pet config", () => {
     assert.throws(
       () => resolveStoreDownloadUrl("tiny-duck", "/api/pets/tiny-duck/download-backup"),
       /unsafe download URL/,
+    );
+  });
+
+  void it("falls back to the request URL when a download response omits its URL", () => {
+    const requestUrl = resolveStoreDownloadUrl("tiny-duck", "/api/pets/tiny-duck/download?v=2");
+
+    assert.equal(resolveStoreResponseUrl("", requestUrl).href, requestUrl.href);
+    assert.equal(
+      resolveStoreResponseUrl("https://codex-pets.net/api/pets/tiny-duck/download?v=3", requestUrl)
+        .href,
+      "https://codex-pets.net/api/pets/tiny-duck/download?v=3",
+    );
+    assert.throws(
+      () => resolveStoreResponseUrl("not a URL", requestUrl),
+      (error: unknown) =>
+        error instanceof DesktopPetStoreError && error.code === "invalid-response",
+    );
+    assert.throws(
+      () => resolveStoreDownloadUrl("tiny-duck", "https://"),
+      (error: unknown) =>
+        error instanceof DesktopPetStoreError && error.code === "invalid-response",
     );
   });
 
