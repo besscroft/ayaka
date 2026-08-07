@@ -9,6 +9,7 @@ import type {
   StorePetPage,
   StorePetQuery,
 } from "@shared/types";
+import { DESKTOP_PET_STORE_ERROR_PREFIX } from "@shared/types";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
@@ -78,11 +79,11 @@ export function DesktopPetsSettings(): React.JSX.Element {
     try {
       setStore(await api.desktopPet.listStore(query));
     } catch (reason) {
-      setStoreError(errorMessage(reason));
+      setStoreError(storeErrorMessage(reason, t));
     } finally {
       setStoreLoading(false);
     }
-  }, [query]);
+  }, [query, t]);
 
   useEffect(() => {
     void refreshLocal();
@@ -105,7 +106,7 @@ export function DesktopPetsSettings(): React.JSX.Element {
       await action();
       await refreshLocal();
     } catch (reason) {
-      setError(errorMessage(reason));
+      setError(userFacingErrorMessage(reason, t));
     } finally {
       setBusyId(null);
     }
@@ -724,6 +725,32 @@ function StoreSkeleton(): React.JSX.Element {
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
+}
+
+function userFacingErrorMessage(
+  reason: unknown,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  return storeErrorMessage(reason, t) ?? errorMessage(reason);
+}
+
+function storeErrorMessage(
+  reason: unknown,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string | null {
+  const message = errorMessage(reason);
+  if (!message.startsWith(`${DESKTOP_PET_STORE_ERROR_PREFIX}:`)) return null;
+  const [, code, status] = message.split(":");
+  if (code === "network") return t("pets.store.error.network");
+  if (code === "timeout") return t("pets.store.error.timeout");
+  if (code === "invalid-response") return t("pets.store.error.invalidResponse");
+  if (code === "http") {
+    const parsedStatus = Number(status);
+    return t("pets.store.error.http", {
+      status: Number.isInteger(parsedStatus) ? parsedStatus : "",
+    });
+  }
+  return t("pets.store.error.generic");
 }
 
 function sourceLabel(

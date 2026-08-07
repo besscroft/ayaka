@@ -1424,6 +1424,9 @@ export interface StorePet {
   updateAvailable: boolean;
 }
 
+export const DESKTOP_PET_STORE_ERROR_PREFIX = "desktop-pet-store";
+export type DesktopPetStoreErrorCode = "network" | "timeout" | "http" | "invalid-response";
+
 export interface StorePetQuery {
   query?: string;
   page?: number;

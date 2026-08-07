@@ -20,6 +20,8 @@ import {
 } from "./desktop-pet-activity";
 import {
   buildStorePetsUrl,
+  DesktopPetStoreError,
+  fetchStoreJson,
   readPackageArchive,
   resolveStoreDownloadUrl,
   validateManifest,
@@ -165,6 +167,58 @@ void describe("desktop pet config", () => {
     assert.equal(url.searchParams.get("content"), "safe");
     assert.equal(url.searchParams.get("q"), "duck");
     assert.equal(url.searchParams.get("format"), "v2");
+  });
+});
+
+void describe("desktop pet store requests", () => {
+  void it("uses Electron's Chromium network stack for JSON responses", async () => {
+    const fetcher = async (input: string, init: RequestInit) => {
+      assert.equal(input, "https://codex-pets.net/api/pets?page=1");
+      assert.equal(
+        new Headers(init?.headers).get("accept"),
+        "application/json, application/zip, image/webp",
+      );
+      assert.ok(init?.signal);
+      return new Response(JSON.stringify({ pets: [], total: 0 }), { status: 200 });
+    };
+
+    const body = await fetchStoreJson<{ pets: unknown[]; total: number }>(
+      "https://codex-pets.net/api/pets?page=1",
+      fetcher,
+    );
+
+    assert.deepEqual(body, { pets: [], total: 0 });
+  });
+
+  void it("classifies HTTP failures without leaking raw fetch errors", async () => {
+    const fetcher = async () => new Response("offline", { status: 503 });
+
+    await assert.rejects(
+      fetchStoreJson("https://codex-pets.net/api/pets?page=1", fetcher),
+      (error: unknown) =>
+        error instanceof DesktopPetStoreError && error.message === "desktop-pet-store:http:503",
+    );
+  });
+
+  void it("classifies invalid JSON and connection timeouts", async () => {
+    const invalidJsonFetcher = async () => new Response("not-json", { status: 200 });
+    await assert.rejects(
+      fetchStoreJson("https://codex-pets.net/api/pets?page=1", invalidJsonFetcher),
+      (error: unknown) =>
+        error instanceof DesktopPetStoreError &&
+        error.message === "desktop-pet-store:invalid-response",
+    );
+
+    const timeoutFetcher = async () => {
+      throw Object.assign(new Error("Connect Timeout Error"), {
+        cause: { code: "UND_ERR_CONNECT_TIMEOUT" },
+      });
+    };
+    await assert.rejects(
+      fetchStoreJson("https://codex-pets.net/api/pets?page=1", timeoutFetcher),
+      (error: unknown) =>
+        error instanceof DesktopPetStoreError && error.message === "desktop-pet-store:timeout",
+    );
   });
 });
 

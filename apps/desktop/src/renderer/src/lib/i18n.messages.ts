@@ -619,6 +619,26 @@ const entries = {
   "pets.store.sort": { zh: "排序", en: "Sort" },
   "pets.store.total": { zh: "{count} 只桌宠", en: "{count} pets" },
   "pets.store.unavailable": { zh: "商店暂时不可用", en: "The store is unavailable" },
+  "pets.store.error.network": {
+    zh: "无法连接桌宠商店，请检查网络或代理设置后重试。",
+    en: "Unable to reach the pet store. Check your network or proxy settings and retry.",
+  },
+  "pets.store.error.timeout": {
+    zh: "连接桌宠商店超时，请检查网络或代理设置后重试。",
+    en: "The pet store connection timed out. Check your network or proxy settings and retry.",
+  },
+  "pets.store.error.http": {
+    zh: "桌宠商店返回了 HTTP {status}，请稍后重试。",
+    en: "The pet store returned HTTP {status}. Please retry later.",
+  },
+  "pets.store.error.invalidResponse": {
+    zh: "桌宠商店返回了无效数据，请稍后重试。",
+    en: "The pet store returned invalid data. Please retry later.",
+  },
+  "pets.store.error.generic": {
+    zh: "桌宠商店暂时不可用，请稍后重试。",
+    en: "The pet store is temporarily unavailable. Please retry later.",
+  },
   "pets.store.empty": { zh: "没有找到匹配的桌宠。", en: "No matching pets found." },
   "pets.store.by": { zh: "作者 {name}", en: "by {name}" },
   "pets.store.downloading": { zh: "下载中…", en: "Downloading…" },

@@ -11,8 +11,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { app, dialog, protocol } from "electron";
+import { app, dialog, net, protocol } from "electron";
 import { unzipSync } from "fflate";
+import { DESKTOP_PET_STORE_ERROR_PREFIX } from "../../shared/types";
 import type {
   DesktopPetAnimationSpec,
   DesktopPetFormatVersion,
@@ -21,6 +22,7 @@ import type {
   DesktopPetSelector,
   InstalledPet,
   PetImportCandidate,
+  DesktopPetStoreErrorCode,
   StorePet,
   StorePetPage,
   StorePetQuery,
@@ -35,6 +37,8 @@ const MAX_ARCHIVE_BYTES = 8 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 const IMPORT_TOKEN_TTL_MS = 5 * 60_000;
 const PET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+type StoreFetcher = (url: string, init: RequestInit) => Promise<Response>;
 
 interface BuiltinPetDefinition {
   id: string;
@@ -152,9 +156,10 @@ export async function listStorePets(query: StorePetQuery): Promise<StorePetPage>
   const requestUrl = buildStorePetsUrl(query);
   const page = Number(requestUrl.searchParams.get("page"));
   const pageSize = Number(requestUrl.searchParams.get("pageSize"));
-  const response = await fetchWithTimeout(requestUrl.toString());
-  if (!response.ok) throw new Error(`Pet store request failed (${response.status}).`);
-  const body = (await response.json()) as Record<string, unknown>;
+  const body = await fetchStoreJson<Record<string, unknown>>(requestUrl.toString());
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw createStorePetError("invalid-response");
+  }
   const installedById = new Map(
     listDesktopPets()
       .filter((pet) => pet.source !== "builtin")
@@ -190,11 +195,14 @@ export function buildStorePetsUrl(query: StorePetQuery): URL {
 export async function installStorePet(id: string, replace = false): Promise<InstalledPet> {
   if (!PET_ID_PATTERN.test(id)) throw new Error("Invalid store pet id.");
   if (BUILTIN_PET_IDS.has(id)) throw new Error("This pet id is reserved by the built-in Paimon.");
-  const response = await fetchWithTimeout(`${STORE_ORIGIN}/api/pets/${encodeURIComponent(id)}`);
-  if (!response.ok) throw new Error(`Pet store detail request failed (${response.status}).`);
-  const body = (await response.json()) as { pet?: RawStorePet };
+  const body = await fetchStoreJson<{ pet?: RawStorePet }>(
+    `${STORE_ORIGIN}/api/pets/${encodeURIComponent(id)}`,
+  );
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw createStorePetError("invalid-response");
+  }
   const raw = body.pet;
-  if (!raw) throw new Error("Pet store returned an invalid pet.");
+  if (!raw) throw createStorePetError("invalid-response");
   const downloadPath = requiredString(raw.downloadUrl, "downloadUrl");
   const downloadUrl = resolveStoreDownloadUrl(id, downloadPath);
   const archive = await fetchBytes(
@@ -758,8 +766,8 @@ async function fetchBytes(
   if (parsed.protocol !== "https:" || !allowedHosts.has(parsed.hostname)) {
     throw new Error("Pet download URL is not allowed.");
   }
-  const response = await fetchWithTimeout(parsed.toString());
-  if (!response.ok) throw new Error(`Pet download failed (${response.status}).`);
+  const response = await fetchStoreResource(parsed.toString());
+  if (!response.ok) throw createStorePetError("http", response.status);
   const finalUrl = new URL(response.url);
   if (finalUrl.protocol !== "https:" || !allowedHosts.has(finalUrl.hostname)) {
     throw new Error("Pet download redirected to an untrusted host.");
@@ -792,11 +800,78 @@ async function fetchBytes(
   return bytes;
 }
 
-function fetchWithTimeout(url: string): Promise<Response> {
-  return fetch(url, {
-    headers: { Accept: "application/json, application/zip, image/webp" },
-    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-  });
+export async function fetchStoreResource(
+  url: string,
+  fetcher: StoreFetcher = fetchWithChromiumStack,
+): Promise<Response> {
+  try {
+    return await fetcher(url, {
+      headers: { Accept: "application/json, application/zip, image/webp" },
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const code = isStoreRequestTimeout(error) ? "timeout" : "network";
+    throw createStorePetError(code, undefined, error);
+  }
+}
+
+export async function fetchStoreJson<T>(
+  url: string,
+  fetcher: StoreFetcher = fetchWithChromiumStack,
+): Promise<T> {
+  const response = await fetchStoreResource(url, fetcher);
+  if (!response.ok) throw createStorePetError("http", response.status);
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    throw createStorePetError("invalid-response", undefined, error);
+  }
+}
+
+function fetchWithChromiumStack(url: string, init: RequestInit): Promise<Response> {
+  if (typeof net?.fetch !== "function") {
+    throw new Error("Electron Chromium network stack is unavailable.");
+  }
+  return net.fetch(url, init) as Promise<Response>;
+}
+
+export class DesktopPetStoreError extends Error {
+  readonly code: DesktopPetStoreErrorCode;
+  readonly status: number | undefined;
+
+  constructor(code: DesktopPetStoreErrorCode, status?: number) {
+    super(`${DESKTOP_PET_STORE_ERROR_PREFIX}:${code}${status === undefined ? "" : `:${status}`}`);
+    this.name = "DesktopPetStoreError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function createStorePetError(
+  code: DesktopPetStoreErrorCode,
+  status?: number,
+  cause?: unknown,
+): DesktopPetStoreError {
+  const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : cause;
+  console.warn(
+    `[desktop-pet] store request ${code}${status === undefined ? "" : ` (${status})`}`,
+    detail ?? "",
+  );
+  return new DesktopPetStoreError(code, status);
+}
+
+function isStoreRequestTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const cause = (error as Error & { cause?: unknown }).cause;
+  const causeText =
+    typeof cause === "string" || typeof cause === "number" || typeof cause === "boolean"
+      ? String(cause)
+      : cause && typeof cause === "object"
+        ? (JSON.stringify(cause) ?? "")
+        : "";
+  return /timeout|timed out|timed_out|ERR_TIMED_OUT|UND_ERR_CONNECT_TIMEOUT/i.test(
+    `${error.name} ${error.message} ${causeText}`,
+  );
 }
 
 function remoteVersionFromUrl(url: URL): string {
