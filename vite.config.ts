@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite-plus";
 
+const generatedIgnorePatterns = ["**/worker-configuration.d.ts"];
 const skillIgnorePatterns = [".agents/skills/**", ".codex/skills/**", "skills/**"];
 
 export default defineConfig({
@@ -14,10 +15,10 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: skillIgnorePatterns,
+    ignorePatterns: [...skillIgnorePatterns, ...generatedIgnorePatterns],
   },
   lint: {
-    ignorePatterns: skillIgnorePatterns,
+    ignorePatterns: [...skillIgnorePatterns, ...generatedIgnorePatterns],
     options: { typeAware: true, typeCheck: true },
   },
   run: {

@@ -1539,7 +1539,7 @@ function createExecutionTracker({
   let stepCount = 0;
   let toolCallCount = 0;
   const buildExecution = (
-    finishReason: FinishReason | string,
+    finishReason: FinishReason,
     usage: unknown,
   ): NonNullable<ChatMessageMetadata["execution"]> => {
     const finishedAt = Date.now();

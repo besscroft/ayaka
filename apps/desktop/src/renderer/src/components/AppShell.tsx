@@ -190,7 +190,7 @@ export function AppShell({
           inert={!sidebarExpanded}
         >
           <div className="flex h-full w-[280px] flex-col border-r border-foreground/10">
-            <nav className="space-y-1 px-2 py-3" aria-label={t("shell.nav.primary")}>
+            <nav className="select-none space-y-1 px-2 py-3" aria-label={t("shell.nav.primary")}>
               {primaryNav.map(({ id, labelKey, Icon }) => {
                 const active = activeView === id;
                 const label = t(labelKey);
@@ -260,7 +260,7 @@ export function AppShell({
               )}
 
               <nav
-                className="min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+                className="min-h-0 flex-1 select-none overflow-y-auto px-2 pb-2"
                 aria-label={t("shell.nav.conversations")}
               >
                 {groupedConversations.length === 0 ? (

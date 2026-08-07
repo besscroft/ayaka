@@ -95,7 +95,7 @@ function preferredPort() {
     try {
       const p = Number(fs.readFileSync(PORT_FILE, "utf-8").trim());
       if (Number.isInteger(p) && p > 1023 && p < 65536) return p;
-    } catch (e) {
+    } catch {
       /* no prior port recorded */
     }
   }
@@ -136,7 +136,7 @@ function generateToken() {
 function chmodOwnerOnly(file) {
   try {
     fs.chmodSync(file, 0o600);
-  } catch (e) {
+  } catch {
     /* best effort */
   }
 }
@@ -152,7 +152,7 @@ function initialToken() {
         chmodOwnerOnly(TOKEN_FILE);
         return { value: t, source: "file" };
       }
-    } catch (e) {
+    } catch {
       /* no prior token recorded */
     }
   }
@@ -233,7 +233,7 @@ function readSuperpowersVersion() {
     try {
       const data = JSON.parse(fs.readFileSync(manifest, "utf-8"));
       if (data.version) return String(data.version);
-    } catch (e) {
+    } catch {
       // Packaged Codex plugins omit package.json; try the next manifest.
     }
   }
@@ -337,7 +337,7 @@ function isRegularFileInsideContentDir(filePath) {
     if (stat.nlink !== 1) return false;
     realContentDir = fs.realpathSync(CONTENT_DIR);
     realFilePath = fs.realpathSync(filePath);
-  } catch (e) {
+  } catch {
     return false;
   }
   return realFilePath.startsWith(realContentDir + path.sep);
@@ -505,7 +505,7 @@ function handleUpgrade(req, socket) {
       let result;
       try {
         result = decodeFrame(buffer);
-      } catch (e) {
+      } catch {
         socket.end(encodeFrame(OPCODES.CLOSE, Buffer.alloc(0)));
         clients.delete(socket);
         return;
@@ -562,7 +562,7 @@ function broadcast(msg) {
   for (const socket of clients) {
     try {
       socket.write(frame);
-    } catch (e) {
+    } catch {
       clients.delete(socket);
     }
   }
@@ -584,7 +584,7 @@ function maybeOpenBrowser() {
   if (process.env.BRAINSTORM_OPEN_CMD) {
     try {
       cp.exec(process.env.BRAINSTORM_OPEN_CMD + " " + JSON.stringify(url), () => {});
-    } catch (e) {
+    } catch {
       /* best effort */
     }
     return;
@@ -595,7 +595,7 @@ function maybeOpenBrowser() {
   if (!launcher) return; // headless: nothing to open
   try {
     cp.execFile(launcher.bin, launcher.args, () => {});
-  } catch (e) {
+  } catch {
     /* best effort */
   }
 }
@@ -684,7 +684,7 @@ function startServer() {
     for (const socket of clients) {
       try {
         socket.destroy();
-      } catch (e) {
+      } catch {
         /* already gone */
       }
     }
@@ -740,14 +740,14 @@ function startServer() {
     if (PORT_FILE && !triedFallback) {
       try {
         fs.writeFileSync(PORT_FILE, String(PORT));
-      } catch (e) {
+      } catch {
         /* best effort */
       }
       if (TOKEN_FILE) {
         try {
           fs.writeFileSync(TOKEN_FILE, TOKEN, { mode: 0o600 });
           chmodOwnerOnly(TOKEN_FILE);
-        } catch (e) {
+        } catch {
           /* best effort */
         }
       }

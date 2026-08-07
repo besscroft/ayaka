@@ -360,7 +360,7 @@ export class AgentLoopSessionManager {
   }
 
   interruptAll(): void {
-    for (const session of [...this.sessions.values()]) session.interrupt();
+    for (const session of this.sessions.values()) session.interrupt();
   }
 }
 

@@ -25,7 +25,7 @@
   function sessionKey() {
     try {
       return window.sessionStorage && window.sessionStorage.getItem("brainstorm-session-key");
-    } catch (e) {}
+    } catch {}
     return null;
   }
 
@@ -103,7 +103,7 @@
       let data;
       try {
         data = JSON.parse(msg.data);
-      } catch (e) {
+      } catch {
         return;
       }
       if (data.type === "reload") window.location.reload();
@@ -126,7 +126,7 @@
     ws.onerror = () => {
       try {
         ws.close();
-      } catch (e) {}
+      } catch {}
     };
   }
 

@@ -284,17 +284,19 @@ export function DesktopPetsSettings(): React.JSX.Element {
         ) : null}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+      <div className="flex min-h-0 flex-1 flex-col">
         {view === "installed" ? (
-          <InstalledPets
-            pets={pets}
-            selected={snapshot?.config.selectedPet ?? null}
-            busyId={busyId}
-            loadError={localLoadError}
-            onSelect={selectPet}
-            onDelete={(pet) => setConfirmAction({ kind: "delete", pet })}
-            onRetry={() => void refreshLocal()}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <InstalledPets
+              pets={pets}
+              selected={snapshot?.config.selectedPet ?? null}
+              busyId={busyId}
+              loadError={localLoadError}
+              onSelect={selectPet}
+              onDelete={(pet) => setConfirmAction({ kind: "delete", pet })}
+              onRetry={() => void refreshLocal()}
+            />
+          </div>
         ) : (
           <StorePets
             page={store}
@@ -449,165 +451,171 @@ function StorePets({
 }): React.JSX.Element {
   const { t } = useT();
   return (
-    <>
-      <div className="flex flex-col gap-3 rounded-xl bg-foreground/[0.035] p-3">
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSearch();
-          }}
-        >
-          <label className="relative flex-1">
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
-            <input
-              value={draft}
-              onChange={(event) => onDraft(event.target.value)}
-              placeholder={t("pets.store.search")}
-              className="h-9 w-full select-text rounded-md border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none transition focus:border-accent/55 focus:ring-2 focus:ring-accent/15"
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 select-none px-6 pb-5 pt-5">
+        <div className="flex flex-col gap-3 rounded-xl bg-foreground/[0.035] p-3">
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSearch();
+            }}
+          >
+            <label className="relative flex-1">
+              <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
+              <input
+                value={draft}
+                onChange={(event) => onDraft(event.target.value)}
+                placeholder={t("pets.store.search")}
+                className="h-9 w-full select-text rounded-md border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none transition focus:border-accent/55 focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
+            <Button type="submit" size="sm" variant="primary">
+              {t("common.search")}
+            </Button>
+          </form>
+          <div className="flex flex-wrap gap-2">
+            <FilterSelect
+              label={t("pets.store.format")}
+              value={query.format ?? "all"}
+              options={[
+                ["all", t("common.all")],
+                ["v2", "V2"],
+                ["v1", "V1"],
+              ]}
+              onChange={(format) => onQuery({ format: format as StorePetQuery["format"], page: 1 })}
             />
-          </label>
-          <Button type="submit" size="sm" variant="primary">
-            {t("common.search")}
-          </Button>
-        </form>
-        <div className="flex flex-wrap gap-2">
-          <FilterSelect
-            label={t("pets.store.format")}
-            value={query.format ?? "all"}
-            options={[
-              ["all", t("common.all")],
-              ["v2", "V2"],
-              ["v1", "V1"],
-            ]}
-            onChange={(format) => onQuery({ format: format as StorePetQuery["format"], page: 1 })}
-          />
-          <FilterSelect
-            label={t("pets.store.kind")}
-            value={query.kind ?? "all"}
-            options={[
-              ["all", t("common.all")],
-              ["animal", t("pets.kind.animal")],
-              ["person", t("pets.kind.person")],
-              ["creature", t("pets.kind.creature")],
-              ["object", t("pets.kind.object")],
-            ]}
-            onChange={(kind) => onQuery({ kind: kind as StorePetQuery["kind"], page: 1 })}
-          />
-          <FilterSelect
-            label={t("pets.store.sort")}
-            value={query.sort ?? "new"}
-            options={[
-              ["new", t("pets.sort.new")],
-              ["popular", t("pets.sort.popular")],
-              ["views", t("pets.sort.views")],
-            ]}
-            onChange={(sort) => onQuery({ sort: sort as StorePetQuery["sort"], page: 1 })}
-          />
-          <span className="ml-auto self-center text-xs tabular-nums text-foreground/45">
-            {t("pets.store.total", { count: page.total })}
-          </span>
+            <FilterSelect
+              label={t("pets.store.kind")}
+              value={query.kind ?? "all"}
+              options={[
+                ["all", t("common.all")],
+                ["animal", t("pets.kind.animal")],
+                ["person", t("pets.kind.person")],
+                ["creature", t("pets.kind.creature")],
+                ["object", t("pets.kind.object")],
+              ]}
+              onChange={(kind) => onQuery({ kind: kind as StorePetQuery["kind"], page: 1 })}
+            />
+            <FilterSelect
+              label={t("pets.store.sort")}
+              value={query.sort ?? "new"}
+              options={[
+                ["new", t("pets.sort.new")],
+                ["popular", t("pets.sort.popular")],
+                ["views", t("pets.sort.views")],
+              ]}
+              onChange={(sort) => onQuery({ sort: sort as StorePetQuery["sort"], page: 1 })}
+            />
+            <span className="ml-auto self-center text-xs tabular-nums text-foreground/45">
+              {t("pets.store.total", { count: page.total })}
+            </span>
+          </div>
         </div>
       </div>
 
-      {error ? (
-        <div className="mt-5 rounded-xl bg-foreground/[0.035] px-5 py-10 text-center">
-          <IconGlobe className="mx-auto size-7 text-foreground/25" />
-          <p className="mt-3 text-sm font-medium">{t("pets.store.unavailable")}</p>
-          <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
-            <IconRefresh className="mr-1 size-3.5" />
-            {t("common.retry")}
-          </Button>
-        </div>
-      ) : loading ? (
-        <StoreSkeleton />
-      ) : page.pets.length === 0 ? (
-        <div className="mt-5 rounded-xl bg-foreground/[0.035] px-5 py-12 text-center text-sm text-foreground/50">
-          {t("pets.store.empty")}
-        </div>
-      ) : (
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {page.pets.map((pet) => (
-            <article
-              key={pet.id}
-              className="flex min-h-72 flex-col overflow-hidden rounded-xl bg-foreground/[0.035] transition hover:bg-foreground/[0.06]"
-            >
-              <div className="relative flex h-36 items-center justify-center overflow-hidden bg-background/70">
-                <img
-                  src={pet.posterUrl}
-                  alt={pet.displayName}
-                  className="h-[104px] w-24 object-none [image-rendering:pixelated]"
-                />
-                <span className="absolute left-2 top-2 rounded-sm bg-background/85 px-1.5 py-0.5 text-[10px] font-medium">
-                  V{pet.formatVersion}
-                </span>
-              </div>
-              <div className="flex flex-1 flex-col p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h5 className="truncate text-sm font-semibold">{pet.displayName}</h5>
-                    <p className="truncate text-xs text-foreground/40">
-                      {t("pets.store.by", { name: pet.author })}
-                    </p>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        {error ? (
+          <div className="rounded-xl bg-foreground/[0.035] px-5 py-10 text-center">
+            <IconGlobe className="mx-auto size-7 text-foreground/25" />
+            <p className="mt-3 text-sm font-medium">{t("pets.store.unavailable")}</p>
+            <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
+              <IconRefresh className="mr-1 size-3.5" />
+              {t("common.retry")}
+            </Button>
+          </div>
+        ) : loading ? (
+          <StoreSkeleton />
+        ) : page.pets.length === 0 ? (
+          <div className="rounded-xl bg-foreground/[0.035] px-5 py-12 text-center text-sm text-foreground/50">
+            {t("pets.store.empty")}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {page.pets.map((pet) => (
+              <article
+                key={pet.id}
+                className="flex min-h-72 flex-col overflow-hidden rounded-xl bg-foreground/[0.035] transition hover:bg-foreground/[0.06]"
+              >
+                <div className="relative flex h-36 items-center justify-center overflow-hidden bg-background/70">
+                  <img
+                    src={pet.posterUrl}
+                    alt={pet.displayName}
+                    className="h-[104px] w-24 object-none [image-rendering:pixelated]"
+                  />
+                  <span className="absolute left-2 top-2 rounded-sm bg-background/85 px-1.5 py-0.5 text-[10px] font-medium">
+                    V{pet.formatVersion}
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-col p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h5 className="truncate text-sm font-semibold">{pet.displayName}</h5>
+                      <p className="truncate text-xs text-foreground/40">
+                        {t("pets.store.by", { name: pet.author })}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-foreground/50">
+                    {pet.description}
+                  </p>
+                  <div className="mt-auto pt-4">
+                    <Button
+                      size="sm"
+                      variant={pet.installed ? "secondary" : "primary"}
+                      className="w-full"
+                      isDisabled={
+                        busyId === `store-${pet.id}` ||
+                        (pet.installed &&
+                          !pet.updateAvailable &&
+                          selected === `installed:${pet.id}`)
+                      }
+                      onPress={() =>
+                        pet.installed && !pet.updateAvailable ? onUse(pet) : onInstall(pet)
+                      }
+                    >
+                      {busyId === `store-${pet.id}`
+                        ? t("pets.store.downloading")
+                        : pet.updateAvailable
+                          ? t("pets.store.update")
+                          : pet.installed && selected === `installed:${pet.id}`
+                            ? t("pets.store.inUse")
+                            : pet.installed
+                              ? t("pets.store.use")
+                              : t("pets.store.download")}
+                    </Button>
                   </div>
                 </div>
-                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-foreground/50">
-                  {pet.description}
-                </p>
-                <div className="mt-auto pt-4">
-                  <Button
-                    size="sm"
-                    variant={pet.installed ? "secondary" : "primary"}
-                    className="w-full"
-                    isDisabled={
-                      busyId === `store-${pet.id}` ||
-                      (pet.installed && !pet.updateAvailable && selected === `installed:${pet.id}`)
-                    }
-                    onPress={() =>
-                      pet.installed && !pet.updateAvailable ? onUse(pet) : onInstall(pet)
-                    }
-                  >
-                    {busyId === `store-${pet.id}`
-                      ? t("pets.store.downloading")
-                      : pet.updateAvailable
-                        ? t("pets.store.update")
-                        : pet.installed && selected === `installed:${pet.id}`
-                          ? t("pets.store.inUse")
-                          : pet.installed
-                            ? t("pets.store.use")
-                            : t("pets.store.download")}
-                  </Button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+              </article>
+            ))}
+          </div>
+        )}
 
-      {page.totalPages > 1 ? (
-        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={page.page <= 1}
-            onPress={() => onQuery({ page: page.page - 1 })}
-          >
-            {t("common.previous")}
-          </Button>
-          <span className="tabular-nums text-foreground/50">
-            {page.page} / {page.totalPages}
-          </span>
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={page.page >= page.totalPages}
-            onPress={() => onQuery({ page: page.page + 1 })}
-          >
-            {t("common.next")}
-          </Button>
-        </div>
-      ) : null}
-    </>
+        {page.totalPages > 1 ? (
+          <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+            <Button
+              size="sm"
+              variant="tertiary"
+              isDisabled={page.page <= 1}
+              onPress={() => onQuery({ page: page.page - 1 })}
+            >
+              {t("common.previous")}
+            </Button>
+            <span className="tabular-nums text-foreground/50">
+              {page.page} / {page.totalPages}
+            </span>
+            <Button
+              size="sm"
+              variant="tertiary"
+              isDisabled={page.page >= page.totalPages}
+              onPress={() => onQuery({ page: page.page + 1 })}
+            >
+              {t("common.next")}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -700,7 +708,7 @@ function PetsSkeleton(): React.JSX.Element {
 
 function StoreSkeleton(): React.JSX.Element {
   return (
-    <div className="mt-5 grid animate-pulse grid-cols-2 gap-3 lg:grid-cols-3">
+    <div className="grid animate-pulse grid-cols-2 gap-3 lg:grid-cols-3">
       {[0, 1, 2, 3, 4, 5].map((id) => (
         <div key={id} className="h-72 rounded-xl bg-foreground/[0.055]" />
       ))}
