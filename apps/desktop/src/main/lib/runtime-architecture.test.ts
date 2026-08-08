@@ -84,13 +84,9 @@ void describe("runtime architecture", () => {
           agent.description === "Ⅲ型总序式集成泛用人工智能，开发代号Fairy",
       ),
     );
-    assert.ok(
-      DEFAULT_CHILD_AGENT_SEEDS.some(
-        (agent) =>
-          agent.id === "agent-operator" &&
-          agent.name === "火种" &&
-          agent.description === "通用人工智能引擎",
-      ),
+    assert.equal(
+      DEFAULT_CHILD_AGENT_SEEDS.some((agent) => agent.id === "agent-operator"),
+      false,
     );
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "runtime_snapshot"));
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "sandbox_run_command"));

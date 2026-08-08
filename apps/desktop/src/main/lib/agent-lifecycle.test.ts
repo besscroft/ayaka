@@ -4,11 +4,13 @@ import Module, { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, before, beforeEach, describe, it } from "node:test";
+import { eq } from "drizzle-orm";
 import {
   DEFAULT_AGENT_ID,
   isAgentRuntimeBusy,
   type AgentInput,
   type AgentRuntimeStatus,
+  type ToolSkillInput,
 } from "../../shared/types";
 
 const require = createRequire(import.meta.url);
@@ -47,6 +49,49 @@ afterEach(async () => {
 });
 
 void describe("agent lifecycle persistence", () => {
+  void it("keeps installed Skills ordered by creation time after updates", () => {
+    const older = db.createSkillTool(makeSkillInput("Older skill"));
+    const newer = db.createSkillTool(makeSkillInput("Newer skill"));
+
+    db.getDb()
+      .update(db.schema.tools)
+      .set({ discovered_at: 100, updated_at: 100 })
+      .where(eq(db.schema.tools.id, older.id))
+      .run();
+    db.getDb()
+      .update(db.schema.tools)
+      .set({ discovered_at: 200, updated_at: 200 })
+      .where(eq(db.schema.tools.id, newer.id))
+      .run();
+
+    assert.deepEqual(
+      db.listSkillTools().map((skill) => skill.id),
+      [newer.id, older.id],
+    );
+
+    db.updateSkillTool(older.id, { description: "Updated description" });
+    assert.deepEqual(
+      db.listSkillTools().map((skill) => skill.id),
+      [newer.id, older.id],
+    );
+
+    db.getDb()
+      .update(db.schema.tools)
+      .set({ discovered_at: 300 })
+      .where(eq(db.schema.tools.id, older.id))
+      .run();
+    db.getDb()
+      .update(db.schema.tools)
+      .set({ discovered_at: 300 })
+      .where(eq(db.schema.tools.id, newer.id))
+      .run();
+
+    assert.deepEqual(
+      db.listSkillTools().map((skill) => skill.id),
+      [older.id, newer.id].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+    );
+  });
+
   void it("classifies only active runtime work as busy", () => {
     const busyStatuses = [
       "queued",
@@ -186,5 +231,14 @@ function makeAgentInput(name: string): AgentInput {
     avatar: "T",
     status: "active",
     enabled: true,
+  };
+}
+
+function makeSkillInput(name: string): ToolSkillInput {
+  return {
+    name,
+    description: "Skill lifecycle test fixture",
+    instructions: "Follow the test instructions.",
+    category: "test",
   };
 }

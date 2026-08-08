@@ -25,18 +25,6 @@ export const DEFAULT_CHILD_AGENT_SEEDS: Array<AgentInput & { id: string }> = [
     status: "active",
     enabled: 1,
   },
-  {
-    id: "agent-operator",
-    name: "火种",
-    role: "Browser, computer, and secure sandbox operations",
-    description: "通用人工智能引擎",
-    personality: "Practical, careful, security-conscious, and execution-focused.",
-    soul_prompt:
-      "Operate browsers, computers, and secure sandboxes to complete tasks. Prefer small verified steps, respect approval boundaries, and report concrete outcomes and errors.",
-    avatar: "火",
-    status: "active",
-    enabled: 1,
-  },
 ];
 
 export const DEFAULT_BUILTIN_TOOL_SEEDS = [

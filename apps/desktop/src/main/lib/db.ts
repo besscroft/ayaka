@@ -2119,7 +2119,7 @@ export function listSkillTools(): ToolSkill[] {
     .select()
     .from(tools)
     .where(and(eq(tools.kind, "skill"), isNull(tools.deleted_at)))
-    .orderBy(desc(tools.updated_at))
+    .orderBy(desc(tools.discovered_at), asc(tools.id))
     .all()
     .map(toToolSkill);
 }
