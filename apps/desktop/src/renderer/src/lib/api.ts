@@ -52,6 +52,7 @@ import type {
   AgentRunInputKind,
   AgentRunInputSource,
   RuntimeSnapshot,
+  UpdateState,
 } from "@shared/types";
 import type { UIMessage } from "ai";
 
@@ -352,6 +353,14 @@ export const api = {
     onPetOpenAbout: (handler: () => void): (() => void) =>
       assertApi().system.onPetOpenAbout(handler),
   },
+  updates: {
+    getState: (): Promise<UpdateState> => assertApi().updates.getState(),
+    check: (): Promise<UpdateState> => assertApi().updates.check(),
+    download: (): Promise<UpdateState> => assertApi().updates.download(),
+    install: (): Promise<UpdateState> => assertApi().updates.install(),
+    onStateChanged: (handler: (state: UpdateState) => void): (() => void) =>
+      assertApi().updates.onStateChanged(handler),
+  },
 };
 
 export type {
@@ -385,4 +394,5 @@ export type {
   ProviderTestResult,
   SyncState,
   RuntimeSnapshot,
+  UpdateState,
 };

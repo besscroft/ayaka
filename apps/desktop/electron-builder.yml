@@ -48,6 +48,6 @@ appImage:
 npmRebuild: false
 publish:
   provider: generic
-  url: https://example.com/auto-updates
+  url: https://ai.zzzvoid.com/api/updates/win32/x64/
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

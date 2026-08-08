@@ -16,6 +16,7 @@ import { showDesktopPetContextMenu } from "./lib/desktop-pet-context-menu";
 import { startCronScheduler, stopCronScheduler } from "./lib/cron-scheduler";
 import { ensureBuiltinCatalogSources } from "./lib/catalog-service";
 import { agentLoopSessions } from "./lib/agent-loop-session";
+import { sendUpdateState, updateManager } from "./lib/update-manager";
 
 const WINDOWS_APP_ID = "com.zzzvoid.ai";
 
@@ -181,7 +182,10 @@ void app.whenReady().then(async () => {
 
   // 3. 注册 IPC handlers
   createWindow();
+  updateManager.setEmitter((state) => sendUpdateState(mainWindowRef, state));
+  updateManager.setInstallGuard(() => !agentLoopSessions.hasActiveSessions());
   registerIpcHandlers();
+  updateManager.start();
 
   const desktopPetController = new DesktopPetWindowController({
     preloadPath: getPreloadPath(),

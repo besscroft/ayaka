@@ -4,6 +4,17 @@
   "main": "./workers/app.ts",
   "compatibility_date": "2026-08-07",
   "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "RELEASES_BUCKET",
+      "bucket_name": "void-ai-releases",
+    },
+  ],
+  "vars": {
+    "UPDATE_R2_PREFIX": "releases",
+    "UPDATE_CHANNEL": "stable",
+    "UPDATE_DOWNLOAD_ORIGIN": "https://ai-release.zzzvoid.com",
+  },
   "observability": {
     "enabled": true,
   },

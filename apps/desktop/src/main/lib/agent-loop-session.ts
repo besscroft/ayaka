@@ -335,6 +335,13 @@ export class AgentLoopSessionManager {
     return this.sessions.get(runId) ?? null;
   }
 
+  hasActiveSessions(): boolean {
+    for (const session of this.sessions.values()) {
+      if (session.isActive) return true;
+    }
+    return false;
+  }
+
   enqueue(
     runId: string,
     kind: AgentRunInputKind,

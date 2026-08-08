@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { AppShell, type AppView } from "./components/AppShell";
 import { ChatView } from "./components/ChatView";
 import { SettingsDialog, type SettingsTabId } from "./components/SettingsDialog";
@@ -6,8 +6,8 @@ import { MainPanelView } from "./components/MainPanelView";
 import { api } from "./lib/api";
 import { SettingsProvider, useSettings } from "./lib/settings";
 import { AppI18nProvider, useT } from "./lib/i18n";
-import { SettingKey, type LocalServerInfo } from "@shared/types";
-import { Toaster } from "sonner";
+import { SettingKey, type LocalServerInfo, type UpdateState } from "@shared/types";
+import { Toaster, toast } from "sonner";
 import { MotionConfig } from "motion/react";
 
 function App(): React.JSX.Element {
@@ -43,6 +43,7 @@ function AppContent(): React.JSX.Element {
   const [activeView, setActiveView] = useState<AppView>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>("appearance");
+  const announcedUpdateVersion = useRef<string | null>(null);
   // 鏈嶅姟绔彛锛歶seChat 蹇呴』鍦ㄩ娆℃覆鏌撳氨鎷垮埌姝ｇ‘ transport锛?
   // 鍥犳绔彛灏辩华鍓嶄笉鎸傝浇 ChatView銆?
   const [serverInfo, setServerInfo] = useState<LocalServerInfo | null>(null);
@@ -59,6 +60,32 @@ function AppContent(): React.JSX.Element {
     // 鎻愭棭鎷夊彇鏈湴鏈嶅姟绔彛锛岄伩鍏?ChatView 鍐呴儴 useEffect 鎶㈣窇
     void api.server.info().then(setServerInfo);
   }, []);
+
+  useEffect(() => {
+    const announceUpdate = (state: UpdateState): void => {
+      if (
+        state.status !== "available" ||
+        !state.availableVersion ||
+        announcedUpdateVersion.current === state.availableVersion
+      ) {
+        return;
+      }
+      announcedUpdateVersion.current = state.availableVersion;
+      toast.info(t("about.update.toast", { version: state.availableVersion }), {
+        duration: 6_000,
+        action: {
+          label: t("about.update.open"),
+          onClick: () => {
+            setSettingsInitialTab("about");
+            setSettingsOpen(true);
+          },
+        },
+      });
+    };
+    const offUpdates = api.updates.onStateChanged(announceUpdate);
+    void api.updates.getState().then(announceUpdate, () => undefined);
+    return offUpdates;
+  }, [t]);
 
   useEffect(() => {
     void (async () => {

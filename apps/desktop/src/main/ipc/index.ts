@@ -129,6 +129,7 @@ import {
   uninstallArtifact,
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
+import { updateManager } from "../lib/update-manager";
 
 /**
  * IPC handlers 娉ㄥ唽
@@ -160,6 +161,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
+
+  // ---------- Application updates ----------
+  ipcMain.handle("updates:getState", () => updateManager.getState());
+  ipcMain.handle("updates:check", () => updateManager.check());
+  ipcMain.handle("updates:download", () => updateManager.download());
+  ipcMain.handle("updates:install", () => updateManager.install());
 
   // ---------- 浼氳瘽鍘嗗彶 ----------
   ipcMain.handle("conversations:list", () => listConversations());

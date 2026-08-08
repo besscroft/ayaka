@@ -1,5 +1,6 @@
 import { createRequestHandler, RouterContextProvider } from "react-router";
 import { cloudflareContext } from "../app/cloudflare-context";
+import { handleUpdateRequest } from "./update-api";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -7,7 +8,9 @@ const requestHandler = createRequestHandler(
 );
 
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
+    const updateResponse = await handleUpdateRequest(request, env);
+    if (updateResponse) return updateResponse;
     const loadContext = new RouterContextProvider();
     loadContext.set(cloudflareContext, { env, ctx });
     return requestHandler(request, loadContext);

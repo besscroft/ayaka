@@ -3,8 +3,16 @@ import appIcon from "../../../../resources/icon.png";
 import { api } from "../lib/api";
 import { ABOUT_RESOURCES, normalizeAppVersion, type AboutResourceId } from "../lib/about";
 import { useT } from "../lib/i18n";
+import type { UpdateState } from "@shared/types";
 import { Button, Description } from "./ui";
-import { IconBookOpen, IconBug, IconGitFork } from "./icons";
+import {
+  IconArrowDown,
+  IconBookOpen,
+  IconBug,
+  IconGitFork,
+  IconRefresh,
+  IconRotateCcw,
+} from "./icons";
 
 const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
   repository: IconGitFork,
@@ -15,6 +23,7 @@ const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
 export function AboutSettings(): React.JSX.Element {
   const { t } = useT();
   const [version, setVersion] = useState<string | null | undefined>(undefined);
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +39,35 @@ export function AboutSettings(): React.JSX.Element {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const offStateChanged = api.updates.onStateChanged((state) => {
+      if (!cancelled) setUpdateState(state);
+    });
+    void api.updates.getState().then(
+      (state) => {
+        if (!cancelled) setUpdateState(state);
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+      offStateChanged();
+    };
+  }, []);
+
+  const handleCheckForUpdates = async (): Promise<void> => {
+    setUpdateState(await api.updates.check());
+  };
+
+  const handleDownloadUpdate = async (): Promise<void> => {
+    setUpdateState(await api.updates.download());
+  };
+
+  const handleInstallUpdate = async (): Promise<void> => {
+    setUpdateState(await api.updates.install());
+  };
 
   const versionLabel =
     version === undefined
@@ -88,6 +126,86 @@ export function AboutSettings(): React.JSX.Element {
           })}
         </div>
       </div>
+
+      {updateState && updateState.status !== "unsupported" ? (
+        <div className="mt-8 border-t border-border pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h4 className="text-sm font-medium">{t("about.update.title")}</h4>
+              <Description className="mt-1">{t("about.update.description")}</Description>
+            </div>
+            <IconRefresh
+              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {updateState.status === "available" ? (
+              <Description className="text-foreground">
+                {t("about.update.available", { version: updateState.availableVersion ?? "" })}
+              </Description>
+            ) : null}
+            {updateState.status === "downloading" ? (
+              <div className="min-w-48 flex-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{t("about.update.downloading")}</span>
+                  <span>{Math.round(updateState.progress?.percent ?? 0)}%</span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-[width]"
+                    style={{
+                      width: `${Math.max(0, Math.min(100, updateState.progress?.percent ?? 0))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {updateState.status === "downloaded" ? (
+              <Description className="text-foreground">{t("about.update.downloaded")}</Description>
+            ) : null}
+            {updateState.status === "error" && updateState.errorCode === "busy" ? (
+              <Description className="text-danger">{t("about.update.error.busy")}</Description>
+            ) : null}
+            {updateState.status === "not-available" ? (
+              <Description>{t("about.update.notAvailable")}</Description>
+            ) : null}
+            {updateState.status === "error" ? (
+              <Description className="text-danger">
+                {t(`about.update.error.${updateState.errorCode ?? "unknown"}`)}
+              </Description>
+            ) : null}
+
+            {updateState.status === "available" ? (
+              <Button size="sm" variant="primary" onPress={() => void handleDownloadUpdate()}>
+                <IconArrowDown data-icon="inline-start" aria-hidden="true" />
+                {t("about.update.download")}
+              </Button>
+            ) : null}
+            {updateState.status === "downloaded" ||
+            (updateState.status === "error" && updateState.errorCode === "busy") ? (
+              <Button size="sm" variant="primary" onPress={() => void handleInstallUpdate()}>
+                <IconRotateCcw data-icon="inline-start" aria-hidden="true" />
+                {t("about.update.install")}
+              </Button>
+            ) : null}
+            {updateState.status !== "downloading" && updateState.status !== "downloaded" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                isPending={updateState.status === "checking"}
+                onPress={() => void handleCheckForUpdates()}
+              >
+                <IconRefresh data-icon="inline-start" aria-hidden="true" />
+                {updateState.status === "checking"
+                  ? t("about.update.checking")
+                  : t("about.update.check")}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <p className="mt-8 text-xs text-muted-foreground">Copyright (c) 2026 Bess Croft</p>
     </section>

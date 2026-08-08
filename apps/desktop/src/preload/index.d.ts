@@ -53,6 +53,7 @@ import type {
   AgentRunInput,
   AgentRunInputKind,
   AgentRunInputSource,
+  UpdateState,
 } from "../shared/types";
 import type { UIMessage } from "ai";
 
@@ -289,6 +290,13 @@ export interface VoidAIApi {
     version: () => Promise<string>;
     onPetOpenSettings: (handler: () => void) => () => void;
     onPetOpenAbout: (handler: () => void) => () => void;
+  };
+  updates: {
+    getState: () => Promise<UpdateState>;
+    check: () => Promise<UpdateState>;
+    download: () => Promise<UpdateState>;
+    install: () => Promise<UpdateState>;
+    onStateChanged: (handler: (state: UpdateState) => void) => () => void;
   };
 }
 

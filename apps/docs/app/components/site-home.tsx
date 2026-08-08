@@ -1,7 +1,13 @@
+import { useEffect, useState } from "react";
+
 const repositoryUrl = "https://github.com/besscroft/void-ai";
 const releasesUrl = `${repositoryUrl}/releases`;
 const documentationUrl = `${repositoryUrl}/tree/main/docs`;
 const issuesUrl = `${repositoryUrl}/issues`;
+
+interface LatestRelease {
+  downloadUrl: string;
+}
 
 const capabilities = [
   {
@@ -186,7 +192,7 @@ function ProductPreview() {
   );
 }
 
-function Hero() {
+function Hero({ downloadUrl }: { downloadUrl: string }) {
   return (
     <section className="hero-section" id="top">
       <div className="hero-copy">
@@ -205,7 +211,7 @@ function Hero() {
         <div className="hero-actions">
           <a
             className="site-button site-button-primary"
-            href={releasesUrl}
+            href={downloadUrl}
             target="_blank"
             rel="noreferrer"
           >
@@ -387,7 +393,7 @@ function PetSection() {
   );
 }
 
-function DownloadSection() {
+function DownloadSection({ downloadUrl }: { downloadUrl: string }) {
   return (
     <section className="download-section" id="download">
       <div className="download-panel">
@@ -399,7 +405,7 @@ function DownloadSection() {
         <div className="download-actions">
           <a
             className="site-button site-button-primary"
-            href={releasesUrl}
+            href={downloadUrl}
             target="_blank"
             rel="noreferrer"
           >
@@ -452,15 +458,35 @@ function SiteFooter() {
 }
 
 export function SiteHome() {
+  const [downloadUrl, setDownloadUrl] = useState(releasesUrl);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/releases/latest?platform=win32&arch=x64")
+      .then((response) => {
+        if (!response.ok) throw new Error("Latest release unavailable.");
+        return response.json() as Promise<LatestRelease>;
+      })
+      .then((release) => {
+        if (!cancelled && typeof release.downloadUrl === "string") {
+          setDownloadUrl(release.downloadUrl);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="site-page">
       <SiteHeader />
-      <Hero />
+      <Hero downloadUrl={downloadUrl} />
       <CapabilitiesSection />
       <OperationSection />
       <PrivacySection />
       <PetSection />
-      <DownloadSection />
+      <DownloadSection downloadUrl={downloadUrl} />
       <SiteFooter />
     </main>
   );

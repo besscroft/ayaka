@@ -232,6 +232,17 @@ const api = {
       return () => ipcRenderer.removeListener("desktopPet:openAbout", listener);
     },
   },
+  updates: {
+    getState: () => ipcRenderer.invoke("updates:getState"),
+    check: () => ipcRenderer.invoke("updates:check"),
+    download: () => ipcRenderer.invoke("updates:download"),
+    install: () => ipcRenderer.invoke("updates:install"),
+    onStateChanged: (handler: (state: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, state: unknown): void => handler(state);
+      ipcRenderer.on("updates:state-changed", listener);
+      return () => ipcRenderer.removeListener("updates:state-changed", listener);
+    },
+  },
   cache: {
     stats: () => ipcRenderer.invoke("cache:stats"),
     clear: () => ipcRenderer.invoke("cache:clear"),

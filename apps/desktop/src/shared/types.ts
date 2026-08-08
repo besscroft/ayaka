@@ -900,6 +900,33 @@ export interface LocalServerInfo {
   token: string;
 }
 
+export type UpdateStatus =
+  | "unsupported"
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "not-available"
+  | "error";
+
+export type UpdateErrorCode = "network" | "invalid" | "unknown" | "busy";
+
+export interface UpdateProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
+
+export interface UpdateState {
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion: string | null;
+  progress: UpdateProgress | null;
+  errorCode: UpdateErrorCode | null;
+}
+
 export interface ChatExecutionMetadata {
   startedAt: number;
   finishedAt?: number;
