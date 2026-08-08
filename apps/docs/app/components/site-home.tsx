@@ -1,9 +1,4 @@
-import { useEffect, useState } from "react";
-
-const repositoryUrl = "https://github.com/besscroft/void-ai";
-const releasesUrl = `${repositoryUrl}/releases`;
-const documentationUrl = `${repositoryUrl}/tree/main/docs`;
-const issuesUrl = `${repositoryUrl}/issues`;
+import { useEffect, useState, type ReactNode } from "react";
 
 interface LatestRelease {
   downloadUrl: string;
@@ -81,6 +76,33 @@ function ArrowMark() {
   );
 }
 
+function DownloadButton({
+  downloadUrl,
+  children,
+}: {
+  downloadUrl: string | null;
+  children: ReactNode;
+}) {
+  if (!downloadUrl) {
+    return (
+      <button className="site-button site-button-primary" type="button" disabled>
+        暂无可用下载 <ArrowMark />
+      </button>
+    );
+  }
+
+  return (
+    <a
+      className="site-button site-button-primary"
+      href={downloadUrl}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {children} <ArrowMark />
+    </a>
+  );
+}
+
 function SiteHeader() {
   return (
     <header className="site-header">
@@ -97,9 +119,6 @@ function SiteHeader() {
         <a href="#capabilities">能力档案</a>
         <a href="#operation">运行方式</a>
         <a href="#privacy">本地边界</a>
-        <a className="nav-repository" href={repositoryUrl} target="_blank" rel="noreferrer">
-          项目仓库 <ArrowMark />
-        </a>
       </nav>
     </header>
   );
@@ -192,7 +211,7 @@ function ProductPreview() {
   );
 }
 
-function Hero({ downloadUrl }: { downloadUrl: string }) {
+function Hero({ downloadUrl }: { downloadUrl: string | null }) {
   return (
     <section className="hero-section" id="top">
       <div className="hero-copy">
@@ -209,14 +228,7 @@ function Hero({ downloadUrl }: { downloadUrl: string }) {
           桌面工作台。把对话、智能体、记忆和工具放在同一条可追踪的运行链路里。
         </p>
         <div className="hero-actions">
-          <a
-            className="site-button site-button-primary"
-            href={downloadUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            下载 Void AI <ArrowMark />
-          </a>
+          <DownloadButton downloadUrl={downloadUrl}>下载 Void AI</DownloadButton>
           <a className="site-button site-button-quiet" href="#capabilities">
             查看能力档案 <span aria-hidden="true">↓</span>
           </a>
@@ -334,9 +346,6 @@ function PrivacySection() {
             Void AI 的默认姿态是 local-first。桌面端负责文件、数据库、密钥、MCP
             连接和运行记录；渲染层只通过明确的桥接访问它们。
           </p>
-          <a className="text-link" href={documentationUrl} target="_blank" rel="noreferrer">
-            阅读架构说明 <ArrowMark />
-          </a>
         </div>
         <div className="privacy-list">
           <div className="privacy-row">
@@ -393,32 +402,17 @@ function PetSection() {
   );
 }
 
-function DownloadSection({ downloadUrl }: { downloadUrl: string }) {
+function DownloadSection({ downloadUrl }: { downloadUrl: string | null }) {
   return (
     <section className="download-section" id="download">
       <div className="download-panel">
         <div>
           <span className="section-code">06 / BEGIN THE OPERATION</span>
           <h2>准备好，让本地智能体开始行动。</h2>
-          <p>Void AI 仍在持续生长。进入项目，下载最新构建，或者从源码加入这场实验。</p>
+          <p>Void AI 仍在持续生长。下载最新构建，开始你的本地运行。</p>
         </div>
         <div className="download-actions">
-          <a
-            className="site-button site-button-primary"
-            href={downloadUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            前往 Releases <ArrowMark />
-          </a>
-          <a
-            className="site-button site-button-outline"
-            href={repositoryUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            查看项目仓库 <ArrowMark />
-          </a>
+          <DownloadButton downloadUrl={downloadUrl}>下载最新版本</DownloadButton>
         </div>
       </div>
     </section>
@@ -437,17 +431,6 @@ function SiteFooter() {
           <span>本地优先的 AI 桌面工作台</span>
         </div>
       </div>
-      <div className="footer-links">
-        <a href={documentationUrl} target="_blank" rel="noreferrer">
-          文档
-        </a>
-        <a href={issuesUrl} target="_blank" rel="noreferrer">
-          反馈问题
-        </a>
-        <a href={repositoryUrl} target="_blank" rel="noreferrer">
-          GitHub <ArrowMark />
-        </a>
-      </div>
       <div className="footer-meta">
         <span>LOCAL BY DEFAULT</span>
         <span>MIT LICENSE</span>
@@ -458,7 +441,7 @@ function SiteFooter() {
 }
 
 export function SiteHome() {
-  const [downloadUrl, setDownloadUrl] = useState(releasesUrl);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
