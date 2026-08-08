@@ -39,6 +39,7 @@ const DEFAULT_STATE: UpdateState = {
   availableVersion: null,
   progress: null,
   errorCode: null,
+  lastCheckedAt: null,
 };
 
 function isNetworkError(error: unknown): boolean {
@@ -107,7 +108,7 @@ export class UpdateManager {
     const updater = this.getUpdater();
 
     updater.autoDownload = false;
-    updater.autoInstallOnAppQuit = true;
+    updater.autoInstallOnAppQuit = false;
     updater.setFeedURL({ provider: "generic", url: UPDATE_FEED_URL });
     updater.on("checking-for-update", () => this.setStatus("checking"));
     updater.on("update-available", (info: UpdateInfo) => {
@@ -206,6 +207,7 @@ export class UpdateManager {
           availableVersion: null,
           progress: null,
           errorCode: null,
+          lastCheckedAt: Date.now(),
         });
       } else {
         this.setState({
@@ -213,10 +215,16 @@ export class UpdateManager {
           availableVersion: version,
           progress: null,
           errorCode: null,
+          lastCheckedAt: Date.now(),
         });
       }
     } catch (error) {
-      this.setState({ status: "error", progress: null, errorCode: errorCode(error) });
+      this.setState({
+        status: "error",
+        progress: null,
+        errorCode: errorCode(error),
+        lastCheckedAt: Date.now(),
+      });
     }
     return this.getState();
   }

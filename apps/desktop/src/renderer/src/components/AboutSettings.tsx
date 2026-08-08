@@ -21,7 +21,7 @@ const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
 };
 
 export function AboutSettings(): React.JSX.Element {
-  const { t } = useT();
+  const { t, f } = useT();
   const [version, setVersion] = useState<string | null | undefined>(undefined);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
 
@@ -133,6 +133,13 @@ export function AboutSettings(): React.JSX.Element {
             <div className="min-w-0">
               <h4 className="text-sm font-medium">{t("about.update.title")}</h4>
               <Description className="mt-1">{t("about.update.description")}</Description>
+              <Description className="mt-1">
+                {updateState.lastCheckedAt
+                  ? t("about.update.lastChecked", {
+                      time: f.dateTime(updateState.lastCheckedAt),
+                    })
+                  : t("about.update.neverChecked")}
+              </Description>
             </div>
             <IconRefresh
               className="mt-0.5 size-4 shrink-0 text-muted-foreground"
@@ -141,6 +148,12 @@ export function AboutSettings(): React.JSX.Element {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            {updateState.status === "idle" ? (
+              <Description>{t("about.update.ready")}</Description>
+            ) : null}
+            {updateState.status === "checking" ? (
+              <Description>{t("about.update.checking")}</Description>
+            ) : null}
             {updateState.status === "available" ? (
               <Description className="text-foreground">
                 {t("about.update.available", { version: updateState.availableVersion ?? "" })}
@@ -164,9 +177,6 @@ export function AboutSettings(): React.JSX.Element {
             ) : null}
             {updateState.status === "downloaded" ? (
               <Description className="text-foreground">{t("about.update.downloaded")}</Description>
-            ) : null}
-            {updateState.status === "error" && updateState.errorCode === "busy" ? (
-              <Description className="text-danger">{t("about.update.error.busy")}</Description>
             ) : null}
             {updateState.status === "not-available" ? (
               <Description>{t("about.update.notAvailable")}</Description>

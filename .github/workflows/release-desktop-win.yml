@@ -127,3 +127,42 @@ jobs:
           foreach ($key in $objects) {
             aws s3api head-object --bucket $env:R2_BUCKET_NAME --key $key --endpoint-url $env:AWS_ENDPOINT_URL | Out-Null
           }
+
+      - name: Verify public update endpoints
+        shell: pwsh
+        run: |
+          $releaseUri = 'https://ai.zzzvoid.com/api/releases/latest?platform=win32&arch=x64'
+          $expectedDownloadUrl = "https://ai-release.zzzvoid.com/releases/stable/v$env:RELEASE_VERSION/paimon-$env:RELEASE_VERSION-setup.exe"
+          $release = $null
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              $candidate = Invoke-RestMethod -UseBasicParsing -Uri $releaseUri -TimeoutSec 20 -ErrorAction Stop
+              if ([string]$candidate.version -eq $env:RELEASE_VERSION) {
+                $release = $candidate
+                break
+              }
+            } catch {
+              # The Worker or its CDN may take a short time to observe the new R2 objects.
+            }
+            if ($attempt -lt 12) { Start-Sleep -Seconds 10 }
+          }
+          if ($null -eq $release) {
+            throw "Public release endpoint did not expose version $env:RELEASE_VERSION within the retry window."
+          }
+          if ([string]$release.downloadUrl -ne $expectedDownloadUrl) {
+            throw "Public download URL does not match the immutable release artifact."
+          }
+
+          $manifestUri = 'https://ai.zzzvoid.com/api/updates/win32/x64/latest.yml'
+          $manifestResponse = Invoke-WebRequest -UseBasicParsing -Uri $manifestUri -TimeoutSec 20 -ErrorAction Stop
+          if ($manifestResponse.StatusCode -lt 200 -or $manifestResponse.StatusCode -ge 300) {
+            throw "Public update manifest returned HTTP $($manifestResponse.StatusCode)."
+          }
+          if ($manifestResponse.Content -notmatch "(?m)^version:\s*$([regex]::Escape($env:RELEASE_VERSION))\s*$") {
+            throw "Public update manifest does not contain release version $env:RELEASE_VERSION."
+          }
+
+          $artifactResponse = Invoke-WebRequest -UseBasicParsing -Method Head -Uri $expectedDownloadUrl -TimeoutSec 20 -ErrorAction Stop
+          if ($artifactResponse.StatusCode -lt 200 -or $artifactResponse.StatusCode -ge 400) {
+            throw "Public installer returned HTTP $($artifactResponse.StatusCode)."
+          }

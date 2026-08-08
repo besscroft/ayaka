@@ -11,6 +11,7 @@ interface FakeUpdater {
   checkError: Error | null;
   handlers: Map<string, Array<(...args: unknown[]) => void>>;
   downloadCalls: number;
+  checkCalls: number;
   installCalls: number;
   setFeedURL(options: { provider: "generic"; url: string }): void;
   checkForUpdates(): Promise<FakeUpdater["checkResult"]>;
@@ -29,11 +30,13 @@ function createUpdater(): FakeUpdater {
     checkError: null,
     handlers: new Map(),
     downloadCalls: 0,
+    checkCalls: 0,
     installCalls: 0,
     setFeedURL(options) {
       this.feedUrl = options.url;
     },
     async checkForUpdates() {
+      this.checkCalls += 1;
       if (this.checkError) throw this.checkError;
       return this.checkResult;
     },
@@ -84,12 +87,13 @@ void describe("UpdateManager", () => {
 
     manager.initialize();
     assert.equal(updater.autoDownload, false);
-    assert.equal(updater.autoInstallOnAppQuit, true);
+    assert.equal(updater.autoInstallOnAppQuit, false);
     assert.equal(updater.feedUrl, "https://ai.zzzvoid.com/api/updates/win32/x64/");
 
     const available = await manager.check();
     assert.equal(available.status, "available");
     assert.equal(available.availableVersion, "0.1.3");
+    assert.ok(available.lastCheckedAt);
 
     const downloaded = await manager.download();
     assert.equal(downloaded.status, "downloaded");
@@ -108,6 +112,29 @@ void describe("UpdateManager", () => {
     const state = await manager.check();
     assert.equal(state.status, "error");
     assert.equal(state.errorCode, "network");
+    assert.ok(state.lastCheckedAt);
+  });
+
+  void it("shares one in-flight check between concurrent callers", async () => {
+    const updater = createUpdater();
+    let resolveCheck!: (result: FakeUpdater["checkResult"]) => void;
+    updater.checkForUpdates = () => {
+      updater.checkCalls += 1;
+      return new Promise<FakeUpdater["checkResult"]>((resolve) => {
+        resolveCheck = resolve;
+      });
+    };
+    const manager = managerFor(updater);
+
+    const first = manager.check();
+    const second = manager.check();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(updater.checkCalls, 1);
+    resolveCheck(updater.checkResult);
+
+    const [firstState, secondState] = await Promise.all([first, second]);
+    assert.equal(firstState.status, "available");
+    assert.equal(secondState.status, "available");
   });
 
   void it("keeps a downloaded update when an active task blocks installation", async () => {

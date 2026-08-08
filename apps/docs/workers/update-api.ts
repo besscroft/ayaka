@@ -4,6 +4,7 @@ const PLATFORM = "win32";
 const ARCH = "x64";
 const MANIFEST_NAME = "latest.yml";
 const VERSION_PATTERN = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 
 interface ReleaseManifestFile {
   url?: unknown;
@@ -80,7 +81,8 @@ function config(env: UpdateEnvironment): {
     "",
   );
   try {
-    new URL(downloadOrigin);
+    const parsedOrigin = new URL(downloadOrigin);
+    if (parsedOrigin.protocol !== "https:") throw new Error("Update origin must use HTTPS.");
   } catch {
     throw new UpdateApiError(502, "Update download origin is invalid.");
   }
@@ -151,7 +153,7 @@ function readManifest(
   manifest: ReleaseManifest;
   artifactName: string;
   sha512: string;
-  size: number;
+  size: number | undefined;
 } {
   let parsed: unknown;
   try {
@@ -172,10 +174,18 @@ function readManifest(
   if (!artifactName) {
     throw new UpdateApiError(502, "The update manifest does not contain a safe installer path.");
   }
-  const sha512 = typeof manifest.sha512 === "string" ? manifest.sha512 : file?.sha512;
-  const size = typeof file?.size === "number" ? file.size : 0;
-  if (typeof sha512 !== "string" || sha512.length === 0) {
+  const manifestSha512 = typeof manifest.sha512 === "string" ? manifest.sha512 : null;
+  const fileSha512 = typeof file?.sha512 === "string" ? file.sha512 : null;
+  if (manifestSha512 && fileSha512 && manifestSha512 !== fileSha512) {
+    throw new UpdateApiError(502, "The update manifest contains conflicting checksums.");
+  }
+  const sha512 = manifestSha512 ?? fileSha512;
+  if (!sha512 || !SHA512_PATTERN.test(sha512)) {
     throw new UpdateApiError(502, "The update manifest does not contain a checksum.");
+  }
+  const size = typeof file?.size === "number" ? file.size : undefined;
+  if (size !== undefined && (!Number.isInteger(size) || size <= 0)) {
+    throw new UpdateApiError(502, "The update manifest contains an invalid installer size.");
   }
   return { manifest, artifactName, sha512, size };
 }
@@ -199,31 +209,39 @@ async function resolveLatestRelease(
     const manifestKey = `${candidate.prefix}${MANIFEST_NAME}`;
     const manifestObject = await env.RELEASES_BUCKET.get(manifestKey);
     if (!manifestObject) continue;
-    const { manifest, artifactName, sha512, size } = readManifest(
-      await manifestObject.text(),
-      candidate,
-    );
-    const artifactKey = `${candidate.prefix}${artifactName}`;
-    const artifactObject = await env.RELEASES_BUCKET.head(artifactKey);
-    if (!artifactObject) continue;
-    const metadataUrl = new URL("/api/updates/win32/x64/latest.yml", request.url).toString();
-    const downloadUrl = publicUrl(downloadOrigin, artifactKey);
-    const publishedAt =
-      typeof manifest.releaseDate === "string"
-        ? manifest.releaseDate
-        : (manifestObject.uploaded?.toISOString() ?? null);
-    return {
-      metadata: {
-        channel,
-        version: candidate.version,
-        publishedAt,
-        downloadUrl,
-        metadataUrl,
-        size: size || artifactObject.size,
-        sha512,
-      },
-      manifest,
-    };
+    try {
+      const { manifest, artifactName, sha512, size } = readManifest(
+        await manifestObject.text(),
+        candidate,
+      );
+      const artifactKey = `${candidate.prefix}${artifactName}`;
+      const artifactObject = await env.RELEASES_BUCKET.head(artifactKey);
+      if (!artifactObject) continue;
+      const metadataUrl = new URL("/api/updates/win32/x64/latest.yml", request.url).toString();
+      const downloadUrl = publicUrl(downloadOrigin, artifactKey);
+      const publishedAt =
+        typeof manifest.releaseDate === "string"
+          ? manifest.releaseDate
+          : (manifestObject.uploaded?.toISOString() ?? null);
+      return {
+        metadata: {
+          channel,
+          version: candidate.version,
+          publishedAt,
+          downloadUrl,
+          metadataUrl,
+          size: size ?? artifactObject.size,
+          sha512,
+        },
+        manifest,
+      };
+    } catch (error) {
+      if (error instanceof UpdateApiError && error.status === 502) {
+        console.warn(`[updates] skipping invalid release candidate ${candidate.version}`);
+        continue;
+      }
+      throw error;
+    }
   }
   throw new UpdateApiError(404, "No valid Windows release is available.");
 }

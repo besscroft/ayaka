@@ -5,6 +5,8 @@ import {
   type UpdateEnvironment,
 } from "../../apps/docs/workers/update-api.js";
 
+const VALID_SHA512 = `${"A".repeat(86)}==`;
+
 function createBucket(
   manifests: Record<string, string>,
   artifacts: Record<string, number>,
@@ -36,11 +38,11 @@ function manifest(version: string, size: number): string {
   return [
     `version: ${version}`,
     `path: paimon-${version}-setup.exe`,
-    `sha512: checksum-${version}`,
+    `sha512: ${VALID_SHA512}`,
     "releaseDate: 2026-08-08T00:00:00.000Z",
     "files:",
     `  - url: paimon-${version}-setup.exe`,
-    `    sha512: checksum-${version}`,
+    `    sha512: ${VALID_SHA512}`,
     `    size: ${size}`,
     "",
   ].join("\n");
@@ -108,6 +110,27 @@ describe("R2 update API", () => {
     );
   });
 
+  it("skips an invalid highest release and falls back to the next valid one", async () => {
+    const invalidManifest = manifest("0.1.10", 240).replaceAll(VALID_SHA512, "invalid");
+    const env = environment(
+      {
+        "releases/stable/v0.1.2/latest.yml": manifest("0.1.2", 120),
+        "releases/stable/v0.1.10/latest.yml": invalidManifest,
+      },
+      {
+        "releases/stable/v0.1.2/paimon-0.1.2-setup.exe": 120,
+        "releases/stable/v0.1.10/paimon-0.1.10-setup.exe": 240,
+      },
+    );
+    const response = await handleUpdateRequest(
+      new Request("https://ai.zzzvoid.com/api/releases/latest?platform=win32&arch=x64"),
+      env,
+    );
+
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({ version: "0.1.2" });
+  });
+
   it("rejects unsupported platform requests", async () => {
     const response = await handleUpdateRequest(
       new Request("https://ai.zzzvoid.com/api/releases/latest?platform=darwin&arch=arm64"),
@@ -122,5 +145,15 @@ describe("R2 update API", () => {
       environment({ "releases/stable/v0.1.2/latest.yml": manifest("0.1.2", 120) }, {}),
     );
     expect(response?.status).toBe(404);
+  });
+
+  it("rejects state-changing methods for update endpoints", async () => {
+    const response = await handleUpdateRequest(
+      new Request("https://ai.zzzvoid.com/api/releases/latest", {
+        method: "POST",
+      }),
+      environment({}, {}),
+    );
+    expect(response?.status).toBe(405);
   });
 });

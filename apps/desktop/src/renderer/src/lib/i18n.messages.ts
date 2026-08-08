@@ -80,6 +80,18 @@ const entries = {
     zh: "检查并安装最新的 Windows 版本。",
     en: "Check for and install the latest Windows release.",
   },
+  "about.update.lastChecked": {
+    zh: "最近检查：{time}",
+    en: "Last checked: {time}",
+  },
+  "about.update.neverChecked": {
+    zh: "尚未检查更新",
+    en: "Updates have not been checked yet",
+  },
+  "about.update.ready": {
+    zh: "可以检查是否有新版本。",
+    en: "Ready to check for a new version.",
+  },
   "about.update.check": { zh: "检查更新", en: "Check for updates" },
   "about.update.checking": { zh: "正在检查...", en: "Checking..." },
   "about.update.available": { zh: "发现新版本 {version}", en: "Version {version} is available" },

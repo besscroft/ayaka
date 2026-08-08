@@ -925,6 +925,7 @@ export interface UpdateState {
   availableVersion: string | null;
   progress: UpdateProgress | null;
   errorCode: UpdateErrorCode | null;
+  lastCheckedAt: number | null;
 }
 
 export interface ChatExecutionMetadata {
