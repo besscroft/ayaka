@@ -1,9 +1,9 @@
 {
   "name": "paimon",
-  "version": "0.1.1",
-  "description": "An Electron application with React and TypeScript",
-  "homepage": "https://electron-vite.org",
-  "author": "example.com",
+  "version": "0.1.2",
+  "description": "Void AI 是一个本地优先的 AI 桌面工作台",
+  "homepage": "https://ai.zzzvoid.com/",
+  "author": "Bess Croft",
   "main": "./out/main/index.js",
   "scripts": {
     "format": "prettier --write .",
