@@ -208,7 +208,7 @@ export function AboutSettings(): React.JSX.Element {
         </div>
       ) : null}
 
-      <p className="mt-8 text-xs text-muted-foreground">Copyright (c) 2026 Bess Croft</p>
+      <p className="mt-8 text-xs text-muted-foreground">Copyright (c) 2026 ZZZVoid</p>
     </section>
   );
 }
