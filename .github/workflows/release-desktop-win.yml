@@ -1,0 +1,129 @@
+name: Release desktop client
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: Build and upload Windows x64 release
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_VERSION: ${{ github.ref_name }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22.12.0"
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Set package version from tag
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_VERSION.TrimStart('v')
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+            throw "Unsupported release tag: $env:RELEASE_VERSION"
+          }
+          npm pkg set version=$version --prefix apps/desktop
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Windows installer
+        run: vp run build:desktop:win
+
+      - name: Verify release artifacts
+        shell: pwsh
+        run: |
+          $dist = Join-Path $env:GITHUB_WORKSPACE 'apps/desktop/dist'
+          $expected = @(
+            (Join-Path $dist 'latest.yml'),
+            (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe"),
+            (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe.blockmap")
+          )
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Missing release artifact: $path"
+            }
+          }
+          $manifest = Get-Content -Raw (Join-Path $dist 'latest.yml')
+          if ($manifest -notmatch "(?m)^version: $([regex]::Escape($env:RELEASE_VERSION))$") {
+            throw "latest.yml does not contain release version $env:RELEASE_VERSION"
+          }
+
+      - name: Verify AWS CLI
+        run: aws --version
+
+      - name: Configure R2 endpoint
+        shell: pwsh
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) { throw 'Missing CLOUDFLARE_ACCOUNT_ID secret' }
+          if ([string]::IsNullOrWhiteSpace($env:AWS_ACCESS_KEY_ID)) { throw 'Missing R2_ACCESS_KEY_ID secret' }
+          if ([string]::IsNullOrWhiteSpace($env:AWS_SECRET_ACCESS_KEY)) { throw 'Missing R2_SECRET_ACCESS_KEY secret' }
+          if ([string]::IsNullOrWhiteSpace($env:R2_BUCKET_NAME)) { throw 'Missing R2_BUCKET_NAME secret' }
+          "AWS_ENDPOINT_URL=https://$($env:CLOUDFLARE_ACCOUNT_ID).r2.cloudflarestorage.com" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "AWS_DEFAULT_REGION=auto" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload release artifacts to R2
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          $dist = Join-Path $env:GITHUB_WORKSPACE 'apps/desktop/dist'
+          $prefix = "releases/stable/v$env:RELEASE_VERSION"
+          $objects = @(
+            "$prefix/latest.yml",
+            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe",
+            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap"
+          )
+          foreach ($key in $objects) {
+            aws s3api head-object --bucket $env:R2_BUCKET_NAME --key $key --endpoint-url $env:AWS_ENDPOINT_URL 2>$null
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              throw "R2 object already exists and releases are immutable: $key"
+            }
+            if ($exitCode -ne 254) {
+              throw "Could not check R2 object: $key (aws exit code $exitCode)"
+            }
+          }
+          aws s3 cp (Join-Path $dist 'latest.yml') "s3://$env:R2_BUCKET_NAME/$prefix/latest.yml" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'text/yaml; charset=utf-8'
+          aws s3 cp (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe") "s3://$env:R2_BUCKET_NAME/$prefix/paimon-$env:RELEASE_VERSION-setup.exe" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/vnd.microsoft.portable-executable'
+          aws s3 cp (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe.blockmap") "s3://$env:R2_BUCKET_NAME/$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/octet-stream'
+
+      - name: Verify uploaded objects
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          $prefix = "releases/stable/v$env:RELEASE_VERSION"
+          $objects = @(
+            "$prefix/latest.yml",
+            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe",
+            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap"
+          )
+          foreach ($key in $objects) {
+            aws s3api head-object --bucket $env:R2_BUCKET_NAME --key $key --endpoint-url $env:AWS_ENDPOINT_URL | Out-Null
+          }
