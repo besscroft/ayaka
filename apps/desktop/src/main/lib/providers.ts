@@ -31,12 +31,18 @@ import {
   type JsonObject,
   type ManagedModelInfo,
   type MediaGenerationKind,
+  MODEL_CAPABILITY_KEYS,
+  CHAT_REASONING_LEVELS,
+  type ChatReasoningLevel,
+  type ModelCapabilityKey,
+  type ModelCapabilitySources,
   type ModelCapabilities,
   type ModelCatalogSettings,
   type ModelOption,
   type ProviderModelSyncResult,
   type ProviderInfo,
   type ProviderTestResult,
+  isChatReasoningLevel,
 } from "../../shared/types";
 
 type ProviderConfig = Omit<ProviderInfo, "hasApiKey" | "hasProviderApiKey">;
@@ -66,6 +72,10 @@ export interface ResolvedModelConfig {
   providerKind: ProviderInfo["kind"];
   modelId: string;
   capabilities: ModelCapabilities;
+  reasoningDefault?: ChatReasoningLevel;
+  reasoningLevels?: ChatReasoningLevel[];
+  capabilitySources?: ModelCapabilitySources;
+  lastSyncedAt?: number;
   temperature: number;
   topP: number;
   maxOutputTokens: number;
@@ -226,6 +236,10 @@ function customModel(model: ModelCatalogSettings["models"][number], enabled: boo
     contextWindow: model.contextWindow,
     capabilities: model.capabilities,
     providerOptions: model.providerOptions as ProviderOptions,
+    reasoningDefault: model.reasoningDefault,
+    reasoningLevels: model.reasoningLevels,
+    capabilitySources: model.capabilitySources,
+    lastSyncedAt: model.lastSyncedAt,
   };
 }
 
@@ -269,26 +283,46 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
 
   const models = Array.isArray(raw.models)
     ? raw.models
-        .map((model) => ({
-          providerId: normalizeProviderId(model.providerId),
-          id: String(model.id ?? "").trim(),
-          label: normalizeOptionalText(model.label),
-          enabled: (model as { enabled?: boolean }).enabled !== false,
-          temperature: normalizeTemperature((model as { temperature?: unknown }).temperature),
-          topP: normalizeTopP((model as { topP?: unknown }).topP),
-          maxOutputTokens: normalizeMaxOutputTokens(
-            (model as { maxOutputTokens?: unknown }).maxOutputTokens,
-          ),
-          contextWindow: normalizeContextWindow(
-            (model as { contextWindow?: unknown }).contextWindow,
-          ),
-          capabilities: normalizeCapabilities((model as { capabilities?: unknown }).capabilities),
-          providerOptions: normalizeProviderOptions(
-            (model as { providerOptions?: unknown }).providerOptions,
-          ),
-          createdAt: Number(model.createdAt) || Date.now(),
-          updatedAt: Number(model.updatedAt) || Date.now(),
-        }))
+        .map((model) => {
+          const capabilities = normalizeCapabilities(
+            (model as { capabilities?: unknown }).capabilities,
+          );
+          const reasoningLevels = normalizeReasoningLevels(
+            (model as { reasoningLevels?: unknown }).reasoningLevels,
+            capabilities,
+          );
+          return {
+            providerId: normalizeProviderId(model.providerId),
+            id: String(model.id ?? "").trim(),
+            label: normalizeOptionalText(model.label),
+            enabled: (model as { enabled?: boolean }).enabled !== false,
+            temperature: normalizeTemperature((model as { temperature?: unknown }).temperature),
+            topP: normalizeTopP((model as { topP?: unknown }).topP),
+            maxOutputTokens: normalizeMaxOutputTokens(
+              (model as { maxOutputTokens?: unknown }).maxOutputTokens,
+            ),
+            contextWindow: normalizeContextWindow(
+              (model as { contextWindow?: unknown }).contextWindow,
+            ),
+            capabilities,
+            providerOptions: normalizeProviderOptions(
+              (model as { providerOptions?: unknown }).providerOptions,
+            ),
+            reasoningDefault: normalizeReasoningDefault(
+              (model as { reasoningDefault?: unknown }).reasoningDefault,
+              reasoningLevels,
+            ),
+            reasoningLevels,
+            capabilitySources: normalizeCapabilitySources(
+              (model as { capabilitySources?: unknown }).capabilitySources,
+            ),
+            lastSyncedAt: normalizeOptionalTimestamp(
+              (model as { lastSyncedAt?: unknown }).lastSyncedAt,
+            ),
+            createdAt: Number(model.createdAt) || Date.now(),
+            updatedAt: Number(model.updatedAt) || Date.now(),
+          };
+        })
         .filter((model) => providerIds.has(model.providerId) && model.id)
     : [];
 
@@ -416,6 +450,41 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
     embedding,
     toolCapabilities,
   };
+}
+
+function normalizeCapabilitySources(raw: unknown): ModelCapabilitySources {
+  if (!isPlainJsonObject(raw)) return {};
+  const sources: ModelCapabilitySources = {};
+  for (const key of MODEL_CAPABILITY_KEYS) {
+    const source = raw[key];
+    if (source === "provider" || source === "inferred" || source === "manual") {
+      sources[key] = source;
+    }
+  }
+  return sources;
+}
+
+function normalizeReasoningLevels(raw: unknown, capabilitiesRaw?: unknown): ChatReasoningLevel[] {
+  if (Array.isArray(raw)) {
+    const levels = raw.filter((value): value is ChatReasoningLevel => isChatReasoningLevel(value));
+    if (levels.length > 0) return [...new Set(levels)];
+  }
+
+  const capabilities = normalizeCapabilities(capabilitiesRaw);
+  return capabilities.reasoning ? [...CHAT_REASONING_LEVELS] : ["provider-default", "none"];
+}
+
+function normalizeReasoningDefault(
+  raw: unknown,
+  levels: readonly ChatReasoningLevel[] | undefined,
+): ChatReasoningLevel {
+  if (isChatReasoningLevel(raw) && (!levels || levels.includes(raw))) return raw;
+  return "provider-default";
+}
+
+function normalizeOptionalTimestamp(raw: unknown): number | undefined {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
 function isPlainJsonObject(raw: unknown): raw is JsonObject {
@@ -622,6 +691,10 @@ export function listManagedModels(): ManagedModelInfo[] {
       capabilities: model.capabilities,
       providerOptions: model.providerOptions,
       providerOptionsJson: stringifyProviderOptions(model.providerOptions),
+      reasoningDefault: model.reasoningDefault,
+      reasoningLevels: model.reasoningLevels,
+      capabilitySources: model.capabilitySources,
+      lastSyncedAt: model.lastSyncedAt,
     })),
   );
 }
@@ -730,6 +803,9 @@ export interface RemoteModelInfo {
   label?: string;
   contextWindow?: number;
   capabilities?: Partial<ModelCapabilities>;
+  capabilitySources?: ModelCapabilitySources;
+  reasoningLevels?: ChatReasoningLevel[];
+  reasoningDefault?: ChatReasoningLevel;
 }
 
 export function inferModelCapabilities(modelId: string): ModelCapabilities {
@@ -761,6 +837,127 @@ export function inferModelCapabilities(modelId: string): ModelCapabilities {
   };
 }
 
+function readStringList(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.map((value) => primitiveToString(value).toLowerCase()).filter(Boolean)
+    : [];
+}
+
+function readFiniteNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return undefined;
+}
+
+function providerCapabilityMetadata(raw: Record<string, unknown>): {
+  capabilities: Partial<ModelCapabilities>;
+  capabilitySources: ModelCapabilitySources;
+} {
+  const capabilities: Partial<ModelCapabilities> = {};
+  const capabilitySources: ModelCapabilitySources = {};
+  const rawCapabilities = isPlainJsonObject(raw.capabilities) ? raw.capabilities : {};
+  const architecture = isPlainJsonObject(raw.architecture) ? raw.architecture : {};
+  const inputModalities = readStringList(
+    raw.input_modalities ?? raw.inputModalities ?? architecture.input_modalities,
+  );
+  const outputModalities = readStringList(
+    raw.output_modalities ?? raw.outputModalities ?? architecture.output_modalities,
+  );
+  const supportedParameters = readStringList(raw.supported_parameters ?? raw.supportedParameters);
+  const supportedMethods = readStringList(
+    raw.supported_generation_methods ?? raw.supportedGenerationMethods,
+  );
+
+  for (const key of MODEL_CAPABILITY_KEYS) {
+    if (typeof rawCapabilities[key] === "boolean") {
+      capabilities[key] = rawCapabilities[key] as boolean;
+      capabilitySources[key] = "provider";
+    }
+  }
+
+  const setCapability = (key: ModelCapabilityKey, value: boolean): void => {
+    if (capabilities[key] !== undefined) return;
+    capabilities[key] = value;
+    capabilitySources[key] = "provider";
+  };
+
+  if (inputModalities.length > 0) {
+    setCapability(
+      "vision",
+      inputModalities.some((item) => item.includes("image")),
+    );
+  }
+  if (outputModalities.length > 0) {
+    setCapability(
+      "textGeneration",
+      outputModalities.some((item) => item.includes("text")),
+    );
+    setCapability(
+      "imageOutput",
+      outputModalities.some((item) => item.includes("image")),
+    );
+    setCapability(
+      "speechOutput",
+      outputModalities.some((item) => item.includes("audio")),
+    );
+    setCapability(
+      "videoOutput",
+      outputModalities.some((item) => item.includes("video")),
+    );
+  }
+  if (supportedMethods.length > 0) {
+    if (supportedMethods.some((item) => /generatecontent|chat|completion/.test(item))) {
+      setCapability("textGeneration", true);
+    }
+    if (supportedMethods.some((item) => /embed|embedding/.test(item))) {
+      setCapability("embedding", true);
+    }
+    if (supportedMethods.some((item) => /transcrib|speech_to_text/.test(item))) {
+      setCapability("transcription", true);
+    }
+    if (supportedMethods.some((item) => /image|predict/.test(item))) {
+      setCapability("imageOutput", true);
+    }
+    if (supportedMethods.some((item) => /video/.test(item))) {
+      setCapability("videoOutput", true);
+    }
+  }
+  if (supportedParameters.some((item) => /tool|function/.test(item))) {
+    setCapability("toolCalling", true);
+  }
+  if (supportedParameters.some((item) => /reasoning|thinking|include_reasoning/.test(item))) {
+    setCapability("reasoning", true);
+  }
+
+  return { capabilities, capabilitySources };
+}
+
+function reasoningMetadata(raw: Record<string, unknown>): {
+  reasoningLevels?: ChatReasoningLevel[];
+  reasoningDefault?: ChatReasoningLevel;
+} {
+  const nested = isPlainJsonObject(raw.reasoning) ? raw.reasoning : {};
+  const levels =
+    raw.reasoning_levels ??
+    raw.reasoningLevels ??
+    raw.supported_reasoning_levels ??
+    raw.supportedReasoningLevels ??
+    nested.levels;
+  const reasoningLevels = Array.isArray(levels)
+    ? levels.filter((value): value is ChatReasoningLevel => isChatReasoningLevel(value))
+    : undefined;
+  const defaultValue =
+    raw.reasoning_default ??
+    raw.reasoningDefault ??
+    raw.default_reasoning_level ??
+    raw.defaultReasoningLevel ??
+    nested.default;
+  const reasoningDefault = isChatReasoningLevel(defaultValue) ? defaultValue : undefined;
+  return { reasoningLevels, reasoningDefault };
+}
+
 function inferContextWindow(modelId: string): number {
   const lower = modelId.toLowerCase();
   if (lower.includes("gemini-1.5") || lower.includes("gemini-2")) return 1_000_000;
@@ -775,56 +972,98 @@ export function normalizeRemoteModels(models: RemoteModelInfo[]): RemoteModelInf
   for (const model of models) {
     const id = model.id.trim();
     if (!id) continue;
+    const inferredCapabilities = inferModelCapabilities(id);
+    const suppliedCapabilities = model.capabilities ?? {};
+    const capabilities = normalizeCapabilities({
+      ...inferredCapabilities,
+      ...suppliedCapabilities,
+    });
+    const capabilitySources = normalizeCapabilitySources(model.capabilitySources);
+    for (const key of MODEL_CAPABILITY_KEYS) {
+      capabilitySources[key] ??= Object.prototype.hasOwnProperty.call(suppliedCapabilities, key)
+        ? "provider"
+        : "inferred";
+    }
+    const reasoningLevels = normalizeReasoningLevels(model.reasoningLevels, capabilities);
     byId.set(id, {
       ...model,
       id,
       label: normalizeOptionalText(model.label),
       contextWindow: normalizeContextWindow(model.contextWindow ?? inferContextWindow(id)),
-      capabilities: normalizeCapabilities(model.capabilities ?? inferModelCapabilities(id)),
+      capabilities,
+      capabilitySources,
+      reasoningLevels,
+      reasoningDefault: normalizeReasoningDefault(model.reasoningDefault, reasoningLevels),
     });
   }
   return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function parseOpenAIModelListResponse(json: unknown): RemoteModelInfo[] {
-  const data = (json as { data?: Array<{ id?: unknown; name?: unknown; display_name?: unknown }> })
-    .data;
+  const data = (json as { data?: Array<Record<string, unknown>> }).data;
   return normalizeRemoteModels(
-    (Array.isArray(data) ? data : []).map((item) => ({
-      id: primitiveToString(item.id ?? item.name),
-      label: normalizeOptionalText(item.display_name),
-    })),
+    (Array.isArray(data) ? data : []).map((item) => {
+      const id = primitiveToString(item.id ?? item.name);
+      const metadata = providerCapabilityMetadata(item);
+      return {
+        id,
+        label: normalizeOptionalText(item.display_name ?? item.displayName ?? item.name),
+        contextWindow: readFiniteNumber(
+          item.context_length,
+          item.contextWindow,
+          item.context_window,
+          item.max_context_length,
+        ),
+        capabilities: metadata.capabilities,
+        capabilitySources: metadata.capabilitySources,
+        ...reasoningMetadata(item),
+      };
+    }),
   );
 }
 
 export function parseAnthropicModelListResponse(json: unknown): RemoteModelInfo[] {
-  const data = (json as { data?: Array<{ id?: unknown; display_name?: unknown }> }).data;
+  const data = (json as { data?: Array<Record<string, unknown>> }).data;
   return normalizeRemoteModels(
-    (Array.isArray(data) ? data : []).map((item) => ({
-      id: primitiveToString(item.id),
-      label: normalizeOptionalText(item.display_name),
-    })),
+    (Array.isArray(data) ? data : []).map((item) => {
+      const metadata = providerCapabilityMetadata(item);
+      return {
+        id: primitiveToString(item.id),
+        label: normalizeOptionalText(item.display_name ?? item.name),
+        contextWindow: readFiniteNumber(
+          item.context_window,
+          item.contextWindow,
+          item.input_token_limit,
+          item.max_input_tokens,
+          item.maxInputTokens,
+        ),
+        capabilities: metadata.capabilities,
+        capabilitySources: metadata.capabilitySources,
+        ...reasoningMetadata(item),
+      };
+    }),
   );
 }
 
 export function parseGoogleModelListResponse(json: unknown): RemoteModelInfo[] {
   const models = (
     json as {
-      models?: Array<{
-        name?: unknown;
-        displayName?: unknown;
-        supportedGenerationMethods?: unknown;
-      }>;
+      models?: Array<Record<string, unknown>>;
     }
   ).models;
   return normalizeRemoteModels(
     (Array.isArray(models) ? models : [])
       .map((item) => {
         const name = primitiveToString(item.name).replace(/^models\//, "");
+        const metadata = providerCapabilityMetadata(item);
         return {
           id: name,
           label: normalizeOptionalText(item.displayName),
           supportedGenerationMethods: item.supportedGenerationMethods,
+          contextWindow: readFiniteNumber(item.inputTokenLimit, item.input_token_limit),
+          capabilities: metadata.capabilities,
+          capabilitySources: metadata.capabilitySources,
+          ...reasoningMetadata(item),
         };
       })
       .filter((item) => {
@@ -832,7 +1071,10 @@ export function parseGoogleModelListResponse(json: unknown): RemoteModelInfo[] {
         const methods = item.supportedGenerationMethods;
         if (!Array.isArray(methods)) return true;
         const lowerMethods = methods.map((method) => primitiveToString(method).toLowerCase());
-        const capabilities = inferModelCapabilities(item.id);
+        const capabilities = {
+          ...inferModelCapabilities(item.id),
+          ...item.capabilities,
+        };
         return (
           lowerMethods.includes("generatecontent") ||
           capabilities.imageOutput ||
@@ -854,6 +1096,7 @@ export function mergeRemoteModelsIntoCatalog(
   discovered: number;
   added: number;
   updated: number;
+  updatedCapabilities: number;
 } {
   const normalizedRemoteModels = normalizeRemoteModels(remoteModels);
   const nextCatalog: ModelCatalogSettings = {
@@ -867,24 +1110,56 @@ export function mergeRemoteModelsIntoCatalog(
   };
   let added = 0;
   let updated = 0;
+  let updatedCapabilities = 0;
 
   for (const remote of normalizedRemoteModels) {
     const existing = nextCatalog.models.find(
       (model) => model.providerId === providerId && model.id === remote.id,
     );
     if (existing) {
-      const nextLabel = existing.label ?? remote.label;
-      const changed = nextLabel !== existing.label;
+      const nextCapabilities = normalizeCapabilities(remote.capabilities);
+      const nextReasoningLevels = normalizeReasoningLevels(
+        remote.reasoningLevels,
+        nextCapabilities,
+      );
+      const nextReasoningDefault = normalizeReasoningDefault(
+        existing.reasoningDefault ?? remote.reasoningDefault,
+        nextReasoningLevels,
+      );
+      const nextLabel = remote.label ?? existing.label;
+      const capabilitiesChanged =
+        JSON.stringify(existing.capabilities) !== JSON.stringify(nextCapabilities) ||
+        existing.contextWindow !== remote.contextWindow ||
+        JSON.stringify(existing.reasoningLevels ?? []) !== JSON.stringify(nextReasoningLevels) ||
+        JSON.stringify(existing.capabilitySources ?? {}) !==
+          JSON.stringify(remote.capabilitySources ?? {});
+      const changed =
+        nextLabel !== existing.label ||
+        capabilitiesChanged ||
+        nextReasoningDefault !== (existing.reasoningDefault ?? "provider-default");
       if (changed) updated += 1;
+      if (capabilitiesChanged) updatedCapabilities += 1;
       nextCatalog.models = nextCatalog.models.map((model) =>
         model.providerId === providerId && model.id === remote.id
-          ? { ...model, label: nextLabel, updatedAt: changed ? now : model.updatedAt }
+          ? {
+              ...model,
+              label: nextLabel,
+              contextWindow: remote.contextWindow ?? model.contextWindow,
+              capabilities: nextCapabilities,
+              reasoningLevels: nextReasoningLevels,
+              reasoningDefault: nextReasoningDefault,
+              capabilitySources: remote.capabilitySources,
+              lastSyncedAt: now,
+              updatedAt: changed ? now : model.updatedAt,
+            }
           : model,
       );
       continue;
     }
 
     added += 1;
+    updatedCapabilities += 1;
+    const reasoningLevels = normalizeReasoningLevels(remote.reasoningLevels, remote.capabilities);
     nextCatalog.models.push({
       providerId,
       id: remote.id,
@@ -896,6 +1171,10 @@ export function mergeRemoteModelsIntoCatalog(
       contextWindow: normalizeContextWindow(remote.contextWindow),
       capabilities: normalizeCapabilities(remote.capabilities ?? inferModelCapabilities(remote.id)),
       providerOptions: {},
+      reasoningDefault: normalizeReasoningDefault(remote.reasoningDefault, reasoningLevels),
+      reasoningLevels,
+      capabilitySources: remote.capabilitySources,
+      lastSyncedAt: now,
       createdAt: now,
       updatedAt: now,
     });
@@ -907,6 +1186,7 @@ export function mergeRemoteModelsIntoCatalog(
     discovered: normalizedRemoteModels.length,
     added,
     updated,
+    updatedCapabilities,
   };
 }
 
@@ -996,6 +1276,7 @@ export async function syncAvailableModels(providerId: string): Promise<ProviderM
     discovered: result.discovered,
     added: result.added,
     updated: result.updated,
+    updatedCapabilities: result.updatedCapabilities,
   };
 }
 
@@ -1016,6 +1297,21 @@ export function upsertCustomModel(input: CustomModelInput): ProviderInfo {
     (input.providerOptions !== undefined
       ? normalizeProviderOptions(input.providerOptions)
       : existing?.providerOptions);
+  const capabilities = normalizeCapabilities(input.capabilities ?? existing?.capabilities);
+  const reasoningLevels = normalizeReasoningLevels(
+    input.reasoningLevels ?? existing?.reasoningLevels,
+    capabilities,
+  );
+  const capabilitySources = normalizeCapabilitySources(
+    input.capabilitySources ?? existing?.capabilitySources,
+  );
+  if (input.capabilities) {
+    for (const key of MODEL_CAPABILITY_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(input.capabilities, key)) {
+        capabilitySources[key] = input.capabilitySources?.[key] ?? "manual";
+      }
+    }
+  }
   const nextModel = {
     providerId,
     id: modelId,
@@ -1025,8 +1321,15 @@ export function upsertCustomModel(input: CustomModelInput): ProviderInfo {
     topP: normalizeTopP(input.topP ?? existing?.topP),
     maxOutputTokens: normalizeMaxOutputTokens(input.maxOutputTokens ?? existing?.maxOutputTokens),
     contextWindow: normalizeContextWindow(input.contextWindow ?? existing?.contextWindow),
-    capabilities: normalizeCapabilities(input.capabilities ?? existing?.capabilities),
+    capabilities,
     providerOptions: normalizeProviderOptions(providerOptions ?? {}),
+    reasoningDefault: normalizeReasoningDefault(
+      input.reasoningDefault ?? existing?.reasoningDefault,
+      reasoningLevels,
+    ),
+    reasoningLevels,
+    capabilitySources,
+    lastSyncedAt: existing?.lastSyncedAt,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -1241,6 +1544,10 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     providerKind: config.kind,
     modelId,
     capabilities: model.capabilities,
+    reasoningDefault: model.reasoningDefault,
+    reasoningLevels: model.reasoningLevels,
+    capabilitySources: model.capabilitySources,
+    lastSyncedAt: model.lastSyncedAt,
     temperature: model.temperature,
     topP: model.topP,
     maxOutputTokens: model.maxOutputTokens,

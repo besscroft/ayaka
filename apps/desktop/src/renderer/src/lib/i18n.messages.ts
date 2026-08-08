@@ -859,6 +859,11 @@ const entries = {
   "model.capability.embedding": { zh: "向量嵌入", en: "Embedding" },
   "model.capability.imageOutput": { zh: "图片输出", en: "Image output" },
   "model.capability.reasoning": { zh: "推理", en: "Reasoning" },
+  "model.capability.sourceLabel": { zh: "能力来源", en: "Capability source" },
+  "model.capability.sourcesSummary": {
+    zh: "供应商 {provider} / 推断 {inferred} / 手动 {manual}",
+    en: "Provider {provider} / inferred {inferred} / manual {manual}",
+  },
   "model.capability.speechOutput": { zh: "语音输出", en: "Speech output" },
   "model.capability.textGeneration": { zh: "文本生成", en: "Text generation" },
   "model.capability.toolCalling": { zh: "工具调用", en: "Tool calling" },
@@ -930,6 +935,15 @@ const entries = {
   "model.provider.test": { zh: "测试连接", en: "Test connection" },
   "model.providerId": { zh: "提供商 ID", en: "Provider ID" },
   "model.providerName": { zh: "提供商名称", en: "Provider name" },
+  "model.reasoningDefault": { zh: "默认思考程度", en: "Default reasoning level" },
+  "model.reasoningDefault.hint": {
+    zh: "切换到此模型或未指定 reasoning 时使用",
+    en: "Used when this model is selected without an explicit reasoning override",
+  },
+  "model.capability.syncNotice": {
+    zh: "同步时供应商能力会覆盖这里的手动修改",
+    en: "The next sync will replace manual capability edits with provider data",
+  },
   "model.selected": { zh: "已选择", en: "Selected" },
   "model.selector.label": { zh: "选择模型", en: "Select model" },
   "model.status.disabled": { zh: "已禁用", en: "Disabled" },
@@ -1218,8 +1232,8 @@ const entries = {
   "toast.model.providerTestOk": { zh: "连接测试通过", en: "Connection test passed" },
   "toast.model.syncFailed": { zh: "同步失败", en: "Sync failed" },
   "toast.model.syncSummary": {
-    zh: "新增 {added}，更新 {updated}",
-    en: "{added} added, {updated} updated",
+    zh: "发现 {discovered} 个，新增 {added} 个，更新 {updated} 个，能力更新 {updatedCapabilities} 个",
+    en: "{discovered} found, {added} added, {updated} updated, {updatedCapabilities} capability updates",
   },
   "toast.model.synced": { zh: "已同步", en: "Synced" },
   "toast.model.syncing": { zh: "正在同步…", en: "Syncing…" },
@@ -1977,7 +1991,8 @@ const zhOverrides: Dict = {
   "toast.model.providerTestFailed": "服务商测试失败",
   "toast.model.providerTestOk": "服务商可用",
   "toast.model.syncFailed": "同步模型失败",
-  "toast.model.syncSummary": "发现 {discovered} 个，新增 {added} 个，更新 {updated} 个",
+  "toast.model.syncSummary":
+    "发现 {discovered} 个，新增 {added} 个，更新 {updated} 个，能力更新 {updatedCapabilities} 个",
   "toast.model.synced": "模型已同步",
   "toast.model.syncing": "正在同步模型",
   "toast.settings.reset": "设置已重置",

@@ -20,6 +20,7 @@ import {
 } from "ai";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { getModelReasoningDefault } from "./ReasoningSelector";
 import { Button } from "./ui";
 import { api, type RuntimeSnapshot } from "../lib/api";
 import { hasMeaningfulConversationTitle } from "../lib/conversation-title";
@@ -143,6 +144,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const createdAtRef = useRef<Map<string, number>>(new Map());
   const selectedModelRef = useRef<string | null>(null);
   const reasoningLevelRef = useRef<ChatReasoningLevel>(DEFAULT_SETTINGS.chatReasoningLevel);
+  const reasoningModelKeyRef = useRef<string | null>(null);
   const toolSelectionRef = useRef<ChatToolSelectionRequest>(DEFAULT_CHAT_TOOL_SELECTION);
   const runIdRef = useRef<string | null>(null);
   const runModeRef = useRef<"start" | "resume">("start");
@@ -288,7 +290,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       if (model) setSelectedModel(model);
     });
     void api.settings.get(SettingKey.ChatReasoningLevel).then((level) => {
-      if (isChatReasoningLevel(level)) setReasoningLevel(level);
+      if (isChatReasoningLevel(level) && reasoningModelKeyRef.current === null) {
+        setReasoningLevel(level);
+      }
     });
   }, []);
 
@@ -321,20 +325,28 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }, [reasoningLevel]);
 
   useEffect(() => {
-    if (reasoningLevel === "provider-default" || reasoningLevel === "none" || !selectedModel) {
+    if (!selectedModel || providers.length === 0) {
+      if (!selectedModel) reasoningModelKeyRef.current = null;
       return;
     }
     const separator = selectedModel.indexOf("/");
+    if (separator <= 0) return;
     const providerId = selectedModel.slice(0, separator);
     const modelId = selectedModel.slice(separator + 1);
     const model = providers
       .find((provider) => provider.id === providerId)
       ?.models.find((item) => item.id === modelId);
-    if (!model || model.capabilities.reasoning) return;
-    reasoningLevelRef.current = "provider-default";
-    setReasoningLevel("provider-default");
-    void api.settings.set(SettingKey.ChatReasoningLevel, "provider-default");
-  }, [providers, reasoningLevel, selectedModel]);
+    if (!model) {
+      reasoningModelKeyRef.current = null;
+      return;
+    }
+    const modelKey = conversationId + ":" + selectedModel;
+    if (reasoningModelKeyRef.current === modelKey) return;
+    const nextLevel = getModelReasoningDefault(model);
+    reasoningModelKeyRef.current = modelKey;
+    reasoningLevelRef.current = nextLevel;
+    setReasoningLevel(nextLevel);
+  }, [conversationId, providers, selectedModel]);
 
   useEffect(() => {
     toolSelectionRef.current = toolSelection;

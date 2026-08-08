@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
 import { useT, type TranslationKey } from "../lib/i18n";
-import {
-  CHAT_REASONING_LEVELS,
-  SettingKey,
-  type ChatReasoningLevel,
-  type ModelOption,
-} from "@shared/types";
+import { CHAT_REASONING_LEVELS, type ChatReasoningLevel, type ModelOption } from "@shared/types";
 import { IconBrain, IconCheck } from "./icons";
 
 interface ReasoningSelectorProps {
@@ -62,7 +56,6 @@ export function ReasoningSelector({
   const handleChange = (level: ChatReasoningLevel): void => {
     if (!supportsReasoningLevel(model, level)) return;
     onChange(level);
-    void api.settings.set(SettingKey.ChatReasoningLevel, level);
     setOpen(false);
   };
 
@@ -157,8 +150,21 @@ export function supportsReasoningLevel(
   model: ModelOption | undefined,
   level: ChatReasoningLevel,
 ): boolean {
-  if (level === "provider-default" || level === "none" || !model) return true;
-  return model.capabilities.reasoning;
+  if (!model) return true;
+  const supported =
+    model.reasoningLevels ??
+    (model.capabilities.reasoning ? [...CHAT_REASONING_LEVELS] : ["provider-default", "none"]);
+  return supported.includes(level);
+}
+
+export function getModelReasoningDefault(model: ModelOption | undefined): ChatReasoningLevel {
+  if (!model) return "provider-default";
+  const supported =
+    model.reasoningLevels ??
+    (model.capabilities.reasoning ? [...CHAT_REASONING_LEVELS] : ["provider-default", "none"]);
+  return model.reasoningDefault && supported.includes(model.reasoningDefault)
+    ? model.reasoningDefault
+    : "provider-default";
 }
 
 export function hasProviderReasoningOverride(providerOptions: unknown): boolean {

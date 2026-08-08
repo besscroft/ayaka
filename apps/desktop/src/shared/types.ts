@@ -1637,6 +1637,22 @@ export function isChatReasoningLevel(value: unknown): value is ChatReasoningLeve
   return typeof value === "string" && (CHAT_REASONING_LEVELS as readonly string[]).includes(value);
 }
 
+export const MODEL_CAPABILITY_KEYS = [
+  "textGeneration",
+  "vision",
+  "imageOutput",
+  "speechOutput",
+  "transcription",
+  "videoOutput",
+  "toolCalling",
+  "reasoning",
+  "embedding",
+] as const;
+
+export type ModelCapabilityKey = (typeof MODEL_CAPABILITY_KEYS)[number];
+export type ModelCapabilitySource = "provider" | "inferred" | "manual";
+export type ModelCapabilitySources = Partial<Record<ModelCapabilityKey, ModelCapabilitySource>>;
+
 export interface ModelCapabilities {
   textGeneration: boolean;
   vision: boolean;
@@ -1662,6 +1678,14 @@ export interface ModelOption {
   contextWindow: number;
   capabilities: ModelCapabilities;
   providerOptions: JsonObject;
+  /** Model-specific default used when no explicit reasoning override is supplied. */
+  reasoningDefault?: ChatReasoningLevel;
+  /** Reasoning levels advertised or inferred for this model. */
+  reasoningLevels?: ChatReasoningLevel[];
+  /** Source of each synchronized capability field. */
+  capabilitySources?: ModelCapabilitySources;
+  /** Last successful provider catalog sync timestamp. */
+  lastSyncedAt?: number;
 }
 
 /** Provider metadata without API keys. */
@@ -1696,6 +1720,9 @@ export interface CustomModelInput {
   maxOutputTokens?: number;
   contextWindow?: number;
   capabilities?: Partial<ModelCapabilities>;
+  reasoningDefault?: ChatReasoningLevel;
+  reasoningLevels?: ChatReasoningLevel[];
+  capabilitySources?: ModelCapabilitySources;
   providerOptions?: JsonObject;
   providerOptionsJson?: string;
 }
@@ -1721,6 +1748,10 @@ export interface ModelCatalogSettings {
     contextWindow: number;
     capabilities: ModelCapabilities;
     providerOptions: JsonObject;
+    reasoningDefault?: ChatReasoningLevel;
+    reasoningLevels?: ChatReasoningLevel[];
+    capabilitySources?: ModelCapabilitySources;
+    lastSyncedAt?: number;
     createdAt: number;
     updatedAt: number;
   }>;
@@ -1752,6 +1783,10 @@ export interface ManagedModelInfo {
   capabilities: ModelCapabilities;
   providerOptions: JsonObject;
   providerOptionsJson: string;
+  reasoningDefault?: ChatReasoningLevel;
+  reasoningLevels?: ChatReasoningLevel[];
+  capabilitySources?: ModelCapabilitySources;
+  lastSyncedAt?: number;
 }
 
 export interface ProviderTestResult {
@@ -1766,6 +1801,7 @@ export interface ProviderModelSyncResult {
   discovered: number;
   added: number;
   updated: number;
+  updatedCapabilities: number;
 }
 
 export type MediaGenerationKind = "image" | "speech" | "transcription" | "video";

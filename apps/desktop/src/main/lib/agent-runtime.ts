@@ -296,7 +296,9 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     preferredAgentId,
     reasoning: rootRuntimeConfig.reasoning
       ? normalizeRuntimeReasoning(rootRuntimeConfig.reasoning)
-      : options.reasoning,
+      : options.reasoning !== undefined
+        ? options.reasoning
+        : normalizeRuntimeReasoning(resolved.reasoningDefault),
     toolSelection: applyAgentToolPolicy(
       options.toolSelection,
       readToolPolicy(rootAgent.tool_policy_json),
@@ -931,7 +933,10 @@ async function runChildAgent(
         instructions: await createChildInstructions(context, child, mode),
         messages: [],
         runtimeConfig: childConfig,
-        reasoning: normalizeRuntimeReasoning(childConfig.reasoning),
+        reasoning:
+          childConfig.reasoning !== undefined
+            ? normalizeRuntimeReasoning(childConfig.reasoning)
+            : normalizeRuntimeReasoning(childResolved.reasoningDefault),
         toolRuntime: childRuntime,
         contextManager: createContextManager(context, {
           agentPath: runningInstance.agent_path,

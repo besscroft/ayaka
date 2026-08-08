@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import Module, { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -28,10 +29,14 @@ electronModule.exports = {
 require.cache[electronPath] = electronModule;
 
 let db: typeof import("./db");
+let memoryFiles: typeof import("./agent-memory-files");
+let memoryStorage: typeof import("./agent-memory-file-storage");
 let testRoot = "";
 
 before(async () => {
   db = await import("./db");
+  memoryFiles = await import("./agent-memory-files");
+  memoryStorage = await import("./agent-memory-file-storage");
 });
 
 beforeEach(async () => {
@@ -142,6 +147,31 @@ void describe("agent lifecycle persistence", () => {
     assert.throws(() => db.restoreAgent(agent.id), /only archived/i);
   });
 
+  void it("keeps soul files through archive and restore", () => {
+    const agent = db.createAgent(makeAgentInput("Restorable soul agent"));
+    const soul = "# SOUL\n\nPreserve this soul while the agent is archived.";
+    memoryFiles.writeMemoryFile("soul", soul, { source: "user", agentId: agent.id });
+    const paths = memoryStorage.resolveAgentSoulFilePaths(agent.id);
+
+    db.archiveAgent(agent.id);
+    assert.equal(existsSync(paths.primary), true);
+    assert.equal(memoryFiles.readMemoryFile("soul", agent.id), soul);
+
+    db.restoreAgent(agent.id);
+    assert.equal(existsSync(paths.primary), true);
+    assert.equal(memoryFiles.readMemoryFile("soul", agent.id), soul);
+  });
+
+  void it("deletes agents without a soul file", () => {
+    const agent = db.createAgent(makeAgentInput("Agent without soul file"));
+    const paths = memoryStorage.resolveAgentSoulFilePaths(agent.id);
+
+    assert.equal(existsSync(paths.primary), false);
+    assert.equal(existsSync(paths.backup), false);
+    db.deleteAgent(agent.id);
+    assert.equal(db.getAgent(agent.id), null);
+  });
+
   void it("publishes drafts and keeps duplicates disabled drafts", () => {
     const draft = db.createAgent({
       ...makeAgentInput("Draft agent"),
@@ -160,8 +190,18 @@ void describe("agent lifecycle persistence", () => {
     assert.equal(copy.enabled, 0);
   });
 
-  void it("deletes agents atomically, nulls references, and removes runtime state", () => {
+  void it("deletes agents atomically, removes soul files, and clears runtime state", () => {
     const agent = db.createAgent(makeAgentInput("Disposable agent"));
+    const soul = "# SOUL\n\nThis file must be deleted with the agent.";
+    memoryFiles.writeMemoryFile("soul", soul, { source: "user", agentId: agent.id });
+    memoryFiles.writeMemoryFile("soul", `${soul}\nUpdated`, {
+      source: "user",
+      agentId: agent.id,
+    });
+    const soulPaths = memoryStorage.resolveAgentSoulFilePaths(agent.id);
+    assert.equal(existsSync(soulPaths.primary), true);
+    assert.equal(existsSync(soulPaths.backup), true);
+
     const run = db.createRuntimeRun({
       id: "run-delete-agent",
       root_agent_id: agent.id,
@@ -188,6 +228,9 @@ void describe("agent lifecycle persistence", () => {
     db.deleteAgent(agent.id);
 
     assert.equal(db.getAgent(agent.id), null);
+    assert.equal(existsSync(soulPaths.primary), false);
+    assert.equal(existsSync(soulPaths.backup), false);
+    assert.notEqual(memoryFiles.readMemoryFile("soul", agent.id), `${soul}\nUpdated`);
     assert.equal(db.listRuntimeRuns().find((item) => item.id === run.id)?.root_agent_id, null);
     assert.equal(db.listRuntimeRuns().find((item) => item.id === run.id)?.final_agent_id, null);
     assert.equal(db.listRuntimeSteps().find((item) => item.id === step.id)?.agent_id, null);

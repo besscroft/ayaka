@@ -7,62 +7,58 @@ interface LatestRelease {
 const capabilities = [
   {
     index: "01",
-    code: "CHAT / ENTRY",
+    code: "Chat",
     title: "对话是入口",
     description: "从一句自然语言开始，把问题交给一个真正能继续行动的工作台。",
-    tone: "sky",
   },
   {
     index: "02",
-    code: "AGENTS / UNITS",
+    code: "Agents",
     title: "智能体会协作",
     description: "让 Agents 负责身份、模型策略、工具选择与交接，复杂任务也能保持清晰。",
-    tone: "sage",
   },
   {
     index: "03",
-    code: "MEMORY / ARCHIVE",
+    code: "Memory",
     title: "记忆留在上下文",
     description: "事实、偏好、经历和技能被整理成可追踪的本地记忆，而不是一团黑箱。",
-    tone: "peach",
   },
   {
     index: "04",
-    code: "TOOLS / PROTOCOL",
+    code: "Tools",
     title: "工具接入行动",
     description: "Skills、MCP 和本地工具被放进同一条运行链路，按需启用，也随时可审阅。",
-    tone: "violet",
   },
 ];
 
 const operationSteps = [
   {
     number: "01",
-    label: "INPUT",
+    label: "Input",
     title: "说出任务",
     detail: "从一句话开始，Void AI 先确认你要完成什么。",
   },
   {
     number: "02",
-    label: "AGENT LOOP",
+    label: "Agent loop",
     title: "智能体行动",
     detail: "运行被拆成连续步骤，每一步都有来源和状态。",
   },
   {
     number: "03",
-    label: "SKILL / TOOL",
+    label: "Skill + tool",
     title: "调用能力",
     detail: "需要工具时再接入，敏感操作保留清晰的审核边界。",
   },
   {
     number: "04",
-    label: "MEMORY",
+    label: "Memory",
     title: "留下线索",
     detail: "有价值的事实与偏好进入本地记忆，下一次继续接上。",
   },
   {
     number: "05",
-    label: "RESULT",
+    label: "Result",
     title: "回到结果",
     detail: "每次运行都有可读摘要，也可以追溯过程与诊断信息。",
   },
@@ -137,8 +133,8 @@ function ProductPreview() {
             <i />
             <i />
           </span>
-          <span>OPERATION / VOID-001</span>
-          <span className="window-online">LOCAL ONLINE</span>
+          <span>Operation / void-001</span>
+          <span className="window-online">Local online</span>
         </div>
         <div className="preview-window-body">
           <aside className="preview-sidebar" aria-label="工作台导航预览">
@@ -160,10 +156,10 @@ function ProductPreview() {
           <div className="preview-content">
             <div className="preview-content-header">
               <div>
-                <span className="preview-label">AGENT RUN / ACTIVE</span>
+                <span className="preview-label">Agent run / active</span>
                 <h3>把今天的任务交给我</h3>
               </div>
-              <span className="preview-status">SYNC READY</span>
+              <span className="preview-status">Sync ready</span>
             </div>
             <div className="preview-message preview-message-user">
               <span className="preview-avatar avatar-user">你</span>
@@ -174,21 +170,21 @@ function ProductPreview() {
               <div>
                 <p>收到。我会先检索本地记录，再把结果整理成一份可继续执行的摘要。</p>
                 <div className="preview-tool-row">
-                  <span>MEMORY SEARCH</span>
-                  <span>TOOL READY</span>
+                  <span>Memory search</span>
+                  <span>Tool ready</span>
                 </div>
               </div>
             </div>
             <div className="preview-run-card">
               <div className="run-card-heading">
-                <span>RUN TRACE</span>
+                <span>Run trace</span>
                 <strong>03 / 05</strong>
               </div>
               <div className="run-progress">
                 <span />
               </div>
               <div className="run-card-footer">
-                <span>Agent Loop is moving</span>
+                <span>Agent loop is moving</span>
                 <span>12.4s</span>
               </div>
             </div>
@@ -200,9 +196,9 @@ function ProductPreview() {
         </div>
       </div>
       <div className="preview-stamp">
-        FIELD NOTE
+        Field note
         <br />
-        <strong>LOCAL FIRST</strong>
+        <strong>Local first</strong>
       </div>
       <div className="preview-pet" aria-hidden="true">
         <span className="pet-sprite" />
@@ -216,7 +212,7 @@ function Hero({ downloadUrl }: { downloadUrl: string | null }) {
     <section className="hero-section" id="top">
       <div className="hero-copy">
         <div className="mission-label">
-          <span className="mission-dot" /> OPERATION / LOCAL-FIRST
+          <span className="mission-dot" /> Local-first workspace
         </div>
         <h1>
           让你的 AI，
@@ -234,9 +230,9 @@ function Hero({ downloadUrl }: { downloadUrl: string | null }) {
           </a>
         </div>
         <div className="hero-footnote">
-          <span>DESKTOP WORKSPACE</span>
-          <span>MIT LICENSE</span>
-          <span>EN / ZH READY</span>
+          <span>Desktop workspace</span>
+          <span>MIT license</span>
+          <span>EN / ZH ready</span>
         </div>
       </div>
       <ProductPreview />
@@ -272,22 +268,13 @@ function CapabilitiesSection() {
       />
       <div className="capability-grid">
         {capabilities.map((capability) => (
-          <article
-            className={`capability-card capability-${capability.tone}`}
-            key={capability.index}
-          >
+          <article className="capability-card" key={capability.index}>
             <div className="card-topline">
               <span>{capability.index}</span>
               <span>{capability.code}</span>
             </div>
-            <div className="capability-glyph" aria-hidden="true">
-              <span />
-            </div>
             <h3>{capability.title}</h3>
             <p>{capability.description}</p>
-            <span className="card-tail">
-              OPEN FILE <span aria-hidden="true">&gt;</span>
-            </span>
           </article>
         ))}
       </div>
@@ -354,7 +341,7 @@ function PrivacySection() {
               <strong>数据默认留在本机</strong>
               <p>SQLite 和本地文件记录工作上下文，不要求先搭一套云端服务。</p>
             </div>
-            <b>LOCAL</b>
+            <span className="privacy-status">Local</span>
           </div>
           <div className="privacy-row">
             <span>02</span>
@@ -362,7 +349,7 @@ function PrivacySection() {
               <strong>密钥留在主进程</strong>
               <p>Provider、MCP 和 Skill secrets 在受保护的运行边界内解析。</p>
             </div>
-            <b>SEALED</b>
+            <span className="privacy-status">Sealed</span>
           </div>
           <div className="privacy-row">
             <span>03</span>
@@ -370,7 +357,7 @@ function PrivacySection() {
               <strong>每次行动都有记录</strong>
               <p>运行状态、工具调用、审批与诊断都保留在可追踪的本地表里。</p>
             </div>
-            <b>TRACEABLE</b>
+            <span className="privacy-status">Traceable</span>
           </div>
         </div>
       </div>
@@ -434,7 +421,7 @@ function SiteFooter() {
       <div className="footer-meta">
         <span>LOCAL BY DEFAULT</span>
         <span>MIT LICENSE</span>
-        <span>(C) 2026 VOID AI</span>
+        <span>(C) 2026 ZZZVoid</span>
       </div>
     </footer>
   );

@@ -277,19 +277,39 @@ void describe("provider helpers", () => {
 
   void it("parses remote model list responses from supported providers", () => {
     const openaiModels = providerHelpers.parseOpenAIModelListResponse({
-      data: [{ id: "gpt-4o", display_name: "GPT-4o" }, { name: "fallback-model" }, { id: "" }],
+      data: [
+        {
+          id: "gpt-4o",
+          display_name: "GPT-4o",
+          context_length: 256_000,
+          architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
+          supported_parameters: ["tools", "reasoning_effort"],
+          reasoning_levels: ["low", "medium", "high"],
+          reasoning_default: "medium",
+        },
+        { name: "fallback-model" },
+        { id: "" },
+      ],
     });
     assert.deepEqual(
       openaiModels.map((model) => model.id),
       ["fallback-model", "gpt-4o"],
     );
-    assert.equal(openaiModels.find((model) => model.id === "gpt-4o")?.contextWindow, 128_000);
+    const openaiModel = openaiModels.find((model) => model.id === "gpt-4o");
+    assert.equal(openaiModel?.contextWindow, 256_000);
+    assert.equal(openaiModel?.capabilities?.vision, true);
+    assert.equal(openaiModel?.capabilities?.toolCalling, true);
+    assert.equal(openaiModel?.capabilities?.reasoning, true);
+    assert.equal(openaiModel?.capabilitySources?.vision, "provider");
+    assert.equal(openaiModel?.capabilitySources?.reasoning, "provider");
+    assert.deepEqual(openaiModel?.reasoningLevels, ["low", "medium", "high"]);
+    assert.equal(openaiModel?.reasoningDefault, "medium");
 
     const anthropicModels = providerHelpers.parseAnthropicModelListResponse({
-      data: [{ id: "claude-sonnet-4-5", display_name: "Claude Sonnet" }],
+      data: [{ id: "claude-sonnet-4-5", display_name: "Claude Sonnet", max_input_tokens: 180_000 }],
     });
     assert.equal(anthropicModels[0]?.label, "Claude Sonnet");
-    assert.equal(anthropicModels[0]?.contextWindow, 200_000);
+    assert.equal(anthropicModels[0]?.contextWindow, 180_000);
 
     const googleModels = providerHelpers.parseGoogleModelListResponse({
       models: [
@@ -302,12 +322,22 @@ void describe("provider helpers", () => {
           name: "models/text-embedding-004",
           supportedGenerationMethods: ["embedContent"],
         },
+        {
+          name: "models/custom-image-model",
+          supportedGenerationMethods: ["predict"],
+          outputModalities: ["image"],
+        },
       ],
     });
     assert.deepEqual(
       googleModels.map((model) => model.id),
-      ["gemini-2.5-pro"],
+      ["custom-image-model", "gemini-2.5-pro"],
     );
+    const googleTextModel = googleModels.find((model) => model.id === "gemini-2.5-pro");
+    const googleImageModel = googleModels.find((model) => model.id === "custom-image-model");
+    assert.equal(googleTextModel?.capabilities?.textGeneration, true);
+    assert.equal(googleTextModel?.capabilitySources?.textGeneration, "provider");
+    assert.equal(googleImageModel?.capabilities?.imageOutput, true);
   });
 
   void it("infers media capabilities for known provider model families", () => {
@@ -365,7 +395,7 @@ void describe("provider helpers", () => {
     );
   });
 
-  void it("merges remote models into the catalog while keeping local settings", () => {
+  void it("merges remote capabilities while keeping local runtime settings", () => {
     const catalog: ModelCatalogSettings = {
       providers: [],
       models: [
@@ -405,6 +435,9 @@ void describe("provider helpers", () => {
     assert.equal(existing?.temperature, 0.2);
     assert.deepEqual(existing?.providerOptions, { openai: { textVerbosity: "low" } });
     assert.equal(existing?.label, "GPT-4o");
+    assert.equal(existing?.contextWindow, 128_000);
+    assert.equal(existing?.reasoningDefault, "provider-default");
+    assert.equal(existing?.lastSyncedAt, 1234);
 
     const discovered = result.catalog.models.find((model) => model.id === "o3-mini");
     assert.equal(discovered?.enabled, false);
@@ -413,6 +446,54 @@ void describe("provider helpers", () => {
       result.catalog.modelStates.find((state) => state.id === "o3-mini")?.enabled,
       false,
     );
+  });
+
+  void it("replaces manual capability values with the next remote snapshot", () => {
+    const catalog: ModelCatalogSettings = {
+      providers: [],
+      models: [
+        {
+          providerId: "openai",
+          id: "custom-model",
+          enabled: true,
+          temperature: 0.4,
+          topP: 0.8,
+          maxOutputTokens: 1024,
+          contextWindow: 32_000,
+          capabilities: { ...capabilities, vision: true, reasoning: false },
+          providerOptions: { openai: { reasoningEffort: "low" } },
+          reasoningDefault: "high",
+          reasoningLevels: ["provider-default", "none", "high"],
+          capabilitySources: { vision: "manual", reasoning: "manual" },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      modelStates: [{ providerId: "openai", id: "custom-model", enabled: true, updatedAt: 1 }],
+    };
+
+    const result = providerHelpers.mergeRemoteModelsIntoCatalog(
+      catalog,
+      "openai",
+      [
+        {
+          id: "custom-model",
+          capabilities: { vision: false, reasoning: true },
+          reasoningLevels: ["provider-default", "none", "medium"],
+          capabilitySources: { vision: "provider", reasoning: "provider" },
+        },
+      ],
+      4321,
+    );
+    const model = result.catalog.models[0];
+    assert.equal(model.capabilities.vision, false);
+    assert.equal(model.capabilities.reasoning, true);
+    assert.deepEqual(model.reasoningLevels, ["provider-default", "none", "medium"]);
+    assert.equal(model.reasoningDefault, "provider-default");
+    assert.equal(model.capabilitySources?.vision, "provider");
+    assert.equal(model.temperature, 0.4);
+    assert.deepEqual(model.providerOptions, { openai: { reasoningEffort: "low" } });
+    assert.equal(result.updatedCapabilities, 1);
   });
 
   void it("validates provider options JSON", () => {

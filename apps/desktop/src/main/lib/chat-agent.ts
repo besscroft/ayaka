@@ -10,6 +10,7 @@ import type {
 import type {
   ChatMessageMetadata,
   ChatReactionMetadata,
+  ChatReasoningLevel,
   ModelCapabilities,
   ModelProviderKind,
 } from "../../shared/types";
@@ -28,6 +29,8 @@ export interface ResolvedChatModel {
   providerKind?: ModelProviderKind;
   modelId?: string;
   capabilities?: ModelCapabilities;
+  reasoningDefault?: ChatReasoningLevel;
+  reasoningLevels?: ChatReasoningLevel[];
   temperature: number;
   topP: number;
   maxOutputTokens: number;

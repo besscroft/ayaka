@@ -23,7 +23,7 @@ import {
 import { api } from "../lib/api";
 import { notify } from "../lib/toast";
 import { useSettings, type SettingsResetScope } from "../lib/settings";
-import { useT, LANGUAGE_OPTIONS } from "../lib/i18n";
+import { useT, LANGUAGE_OPTIONS, type TranslationKey } from "../lib/i18n";
 import { cn } from "../lib/utils";
 
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -45,7 +45,10 @@ import {
   IconInfo,
 } from "./icons";
 import {
+  CHAT_REASONING_LEVELS,
+  MODEL_CAPABILITY_KEYS,
   type AgentProfile,
+  type ChatReasoningLevel,
   FONT_PRESETS,
   MONO_FONT_PRESETS,
   SKIN_DEFINITIONS,
@@ -54,6 +57,8 @@ import {
   type FontPreset,
   type ManagedModelInfo,
   type ModelCapabilities,
+  type ModelCapabilityKey,
+  type ModelCapabilitySource,
   type ModelOption,
   type ProviderInfo,
   type RuntimeEvent,
@@ -1465,6 +1470,16 @@ const DEFAULT_MODEL_CAPABILITIES: ModelCapabilities = {
   embedding: false,
 };
 
+const REASONING_LEVEL_LABEL_KEYS: Record<ChatReasoningLevel, TranslationKey> = {
+  "provider-default": "reasoning.level.provider-default",
+  none: "reasoning.level.none",
+  minimal: "reasoning.level.minimal",
+  low: "reasoning.level.low",
+  medium: "reasoning.level.medium",
+  high: "reasoning.level.high",
+  xhigh: "reasoning.level.xhigh",
+};
+
 interface ModelOptionsFormState {
   providerId: string;
   id: string;
@@ -1475,6 +1490,9 @@ interface ModelOptionsFormState {
   maxOutputTokens: number;
   contextWindow: number;
   capabilities: ModelCapabilities;
+  capabilitySources: Partial<Record<ModelCapabilityKey, ModelCapabilitySource>>;
+  reasoningDefault: ChatReasoningLevel;
+  reasoningLevels: ChatReasoningLevel[];
   providerOptionsJson: string;
 }
 
@@ -1489,6 +1507,18 @@ function providerModelRef(providerId: string, modelId: string): string {
 function stringifyJsonObject(value: Record<string, unknown> | undefined): string {
   if (!value || Object.keys(value).length === 0) return "{}";
   return JSON.stringify(value, null, 2);
+}
+
+function defaultCapabilitySources(
+  source: ModelCapabilitySource,
+): Partial<Record<ModelCapabilityKey, ModelCapabilitySource>> {
+  return Object.fromEntries(MODEL_CAPABILITY_KEYS.map((key) => [key, source])) as Partial<
+    Record<ModelCapabilityKey, ModelCapabilitySource>
+  >;
+}
+
+function defaultReasoningLevels(capabilities: ModelCapabilities): ChatReasoningLevel[] {
+  return capabilities.reasoning ? [...CHAT_REASONING_LEVELS] : ["provider-default", "none"];
 }
 
 function validateJsonObject(raw: string): string | null {
@@ -1506,6 +1536,16 @@ function validateJsonObject(raw: string): string | null {
 }
 
 function createModelOptionsForm(providerId: string, model?: ModelOption): ModelOptionsFormState {
+  const capabilities = model?.capabilities
+    ? { ...model.capabilities }
+    : { ...DEFAULT_MODEL_CAPABILITIES };
+  const reasoningLevels = model?.reasoningLevels?.length
+    ? [...model.reasoningLevels]
+    : defaultReasoningLevels(capabilities);
+  const reasoningDefault =
+    model?.reasoningDefault && reasoningLevels.includes(model.reasoningDefault)
+      ? model.reasoningDefault
+      : "provider-default";
   return {
     providerId,
     id: model?.id ?? "",
@@ -1515,7 +1555,10 @@ function createModelOptionsForm(providerId: string, model?: ModelOption): ModelO
     topP: model?.topP ?? 1,
     maxOutputTokens: model?.maxOutputTokens ?? 4096,
     contextWindow: model?.contextWindow ?? 32_000,
-    capabilities: model?.capabilities ?? DEFAULT_MODEL_CAPABILITIES,
+    capabilities,
+    capabilitySources: model?.capabilitySources ?? defaultCapabilitySources("inferred"),
+    reasoningDefault,
+    reasoningLevels,
     providerOptionsJson: stringifyJsonObject(model?.providerOptions),
   };
 }
@@ -1658,6 +1701,18 @@ function ProviderModelWorkbench({
     return caps.length > 0 ? caps.join(" / ") : t("common.none");
   };
 
+  const formatCapabilitySources = (model: ModelOption): string => {
+    const counts = MODEL_CAPABILITY_KEYS.reduce(
+      (result, key) => {
+        const source = model.capabilitySources?.[key] ?? "inferred";
+        result[source] += 1;
+        return result;
+      },
+      { provider: 0, inferred: 0, manual: 0 } as Record<ModelCapabilitySource, number>,
+    );
+    return t("model.capability.sourcesSummary", counts);
+  };
+
   const handleToggleModel = (model: ModelOption, enabled: boolean): void => {
     if (!selectedProvider) return;
     void notify
@@ -1770,6 +1825,7 @@ function ProviderModelWorkbench({
             discovered: result.discovered,
             added: result.added,
             updated: result.updated,
+            updatedCapabilities: result.updatedCapabilities,
           }),
         );
         setSelectedProviderId(result.provider.id);
@@ -2167,6 +2223,9 @@ function ProviderModelWorkbench({
                                   })
                                 : ""}
                             </p>
+                            <p className="mt-1 text-xs text-foreground/35">
+                              {t("model.capability.sourceLabel")}: {formatCapabilitySources(model)}
+                            </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 md:justify-end">
                             <Switch
@@ -2443,9 +2502,30 @@ function ModelOptionsDialog({
   const isEditing = state.mode === "edit";
   const canSave =
     form.id.trim().length > 0 && form.maxOutputTokens > 0 && form.contextWindow > 0 && !jsonError;
+  const capabilitySourceCounts = MODEL_CAPABILITY_KEYS.reduce(
+    (result, key) => {
+      const source = form.capabilitySources[key] ?? "inferred";
+      result[source] += 1;
+      return result;
+    },
+    { provider: 0, inferred: 0, manual: 0 } as Record<ModelCapabilitySource, number>,
+  );
 
   const updateCapabilities = (patch: Partial<ModelCapabilities>): void => {
-    setForm((prev) => ({ ...prev, capabilities: { ...prev.capabilities, ...patch } }));
+    setForm((prev) => {
+      const capabilities = { ...prev.capabilities, ...patch };
+      const capabilitySources = { ...prev.capabilitySources };
+      for (const key of MODEL_CAPABILITY_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(patch, key)) capabilitySources[key] = "manual";
+      }
+      const reasoningLevels = Object.prototype.hasOwnProperty.call(patch, "reasoning")
+        ? defaultReasoningLevels(capabilities)
+        : prev.reasoningLevels;
+      const reasoningDefault = reasoningLevels.includes(prev.reasoningDefault)
+        ? prev.reasoningDefault
+        : "provider-default";
+      return { ...prev, capabilities, capabilitySources, reasoningLevels, reasoningDefault };
+    });
   };
 
   const handleJsonChange = (value: string): void => {
@@ -2469,6 +2549,9 @@ function ModelOptionsDialog({
         maxOutputTokens: Math.floor(form.maxOutputTokens),
         contextWindow: Math.floor(form.contextWindow),
         capabilities: form.capabilities,
+        capabilitySources: form.capabilitySources,
+        reasoningDefault: form.reasoningDefault,
+        reasoningLevels: form.reasoningLevels,
         providerOptionsJson: form.providerOptionsJson,
       });
       if (!form.enabled && selectedModel === providerModelRef(form.providerId, modelId)) {
@@ -2559,6 +2642,27 @@ function ModelOptionsDialog({
                   </Switch>
                 </div>
 
+                <TextField className="md:col-span-2">
+                  <Label>{t("model.reasoningDefault")}</Label>
+                  <select
+                    className="h-9 w-full select-text rounded-md border border-foreground/15 bg-background px-3 text-sm outline-none focus:border-accent/50"
+                    value={form.reasoningDefault}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        reasoningDefault: event.target.value as ChatReasoningLevel,
+                      }))
+                    }
+                  >
+                    {form.reasoningLevels.map((level) => (
+                      <option key={level} value={level}>
+                        {t(REASONING_LEVEL_LABEL_KEYS[level])}
+                      </option>
+                    ))}
+                  </select>
+                  <Description className="mt-1">{t("model.reasoningDefault.hint")}</Description>
+                </TextField>
+
                 <div className="space-y-4 md:col-span-2">
                   <p className="text-xs font-medium text-foreground/60">{t("model.params")}</p>
                   <div>
@@ -2644,6 +2748,13 @@ function ModelOptionsDialog({
                 <div className="md:col-span-2">
                   <p className="mb-2 text-xs font-medium text-foreground/60">
                     {t("model.options.capabilities")}
+                  </p>
+                  <p className="mb-2 text-xs text-foreground/45">
+                    {t("model.capability.syncNotice")}
+                  </p>
+                  <p className="mb-2 text-xs text-foreground/45">
+                    {t("model.capability.sourceLabel")}:{" "}
+                    {t("model.capability.sourcesSummary", capabilitySourceCounts)}
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {(

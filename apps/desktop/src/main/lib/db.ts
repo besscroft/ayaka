@@ -128,6 +128,7 @@ import {
 } from "../../shared/types";
 import { resolveDesktopPet } from "./desktop-pet-assets";
 import { applyDesktopPetIdleTimeout, resolveDesktopPetActivity } from "./desktop-pet-activity";
+import { removeAgentSoulFiles } from "./agent-memory-file-storage";
 export type {
   AgentRunInput,
   AgentProfile,
@@ -743,6 +744,32 @@ export function deleteAgent(id: string): void {
     tx.delete(agents).where(eq(agents.id, id)).run();
   });
   agentRuntimeStates.delete(id);
+
+  try {
+    removeAgentSoulFiles(id);
+  } catch (error) {
+    try {
+      insertRuntimeEvent({
+        kind: "diagnostic",
+        title: "Agent soul file cleanup failed",
+        status: "failed",
+        detail: { agentId: id, error: formatAgentDeletionError(error) },
+      });
+    } catch {
+      // Preserve the filesystem error when diagnostic persistence is unavailable.
+    }
+    throw error;
+  }
+}
+
+function formatAgentDeletionError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown agent soul file cleanup error.";
+  }
 }
 
 export function duplicateAgent(id: string): AgentProfile {

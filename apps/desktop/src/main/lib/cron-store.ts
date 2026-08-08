@@ -338,7 +338,9 @@ function normalizeCronPayload(payload: CronPayload): CronPayload {
     prompt: prompt.slice(0, 40_000),
     ...(payload.agentId ? { agentId: payload.agentId } : {}),
     ...(payload.modelRef ? { modelRef: payload.modelRef } : {}),
-    ...(payload.reasoning ? { reasoning: payload.reasoning } : {}),
+    ...(payload.reasoning && payload.reasoning !== "provider-default"
+      ? { reasoning: payload.reasoning }
+      : {}),
     ...(payload.skillIds?.length ? { skillIds: [...new Set(payload.skillIds)].slice(0, 50) } : {}),
     ...(payload.toolSelection ? { toolSelection: payload.toolSelection } : {}),
   };

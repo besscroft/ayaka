@@ -10,7 +10,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { app } from "electron";
 import { generateText } from "ai";
 import { decrypt, encrypt, type EncryptedPayload } from "./crypto";
 import { getSetting, insertRuntimeEvent, listMemories, queueMemoryJob } from "./db";
@@ -22,6 +21,13 @@ import {
   type AgentProfile,
   type MemoryRecord,
 } from "../../shared/types";
+import {
+  ensureAgentSoulDirectory,
+  registerSoulCacheInvalidator,
+  removeAgentSoulFiles,
+  resolveAgentMemoriesRoot,
+  resolveAgentSoulFilePaths,
+} from "./agent-memory-file-storage";
 
 export type MemoryFileKind = "soul" | "user" | "memory";
 export type MemoryFileWriteSource = "system" | "user";
@@ -55,7 +61,6 @@ interface MemoryFileState {
   source: "primary" | "backup" | "default";
 }
 
-const AGENT_MEMORIES_DIRNAME = "agent-memories";
 const FILE_NAMES: Record<MemoryFileKind, string> = {
   soul: "SOUL.md.enc",
   user: "USER.md.enc",
@@ -66,28 +71,31 @@ const MEMORY_FILE_KINDS: MemoryFileKind[] = ["soul", "user", "memory"];
 const cache = new Map<string, MemoryFileState>();
 let consolidationTimer: NodeJS.Timeout | null = null;
 
-function resolveAgentMemoriesRoot(): string {
-  const userDataDir = process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData");
-  const dir = join(userDataDir, "data", AGENT_MEMORIES_DIRNAME);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 function cacheKey(kind: MemoryFileKind, agentId?: string | null): string {
   return kind === "soul" ? `soul:${agentId ?? DEFAULT_AGENT_ID}` : kind;
 }
 
 function filePath(kind: MemoryFileKind, agentId?: string | null): string {
+  if (kind === "soul") {
+    ensureAgentSoulDirectory(agentId ?? DEFAULT_AGENT_ID);
+    const target = resolveAgentSoulFilePaths(agentId ?? DEFAULT_AGENT_ID).primary;
+    const legacy = join(resolveAgentMemoriesRoot(), FILE_NAMES[kind]);
+    if (
+      !existsSync(target) &&
+      existsSync(legacy) &&
+      (agentId ?? DEFAULT_AGENT_ID) === DEFAULT_AGENT_ID
+    ) {
+      copyFileSync(legacy, target);
+    }
+    return target;
+  }
+
   const root = resolveAgentMemoriesRoot();
-  const owner =
-    kind === "soul" ? join("agents", safePathPart(agentId ?? DEFAULT_AGENT_ID)) : "global";
-  const dir = join(root, owner);
+  const dir = join(root, "global");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const target = join(dir, FILE_NAMES[kind]);
   const legacy = join(root, FILE_NAMES[kind]);
-  const canMigrateLegacySoul =
-    kind !== "soul" || (agentId ?? DEFAULT_AGENT_ID) === DEFAULT_AGENT_ID;
-  if (!existsSync(target) && existsSync(legacy) && canMigrateLegacySoul) {
+  if (!existsSync(target) && existsSync(legacy)) {
     copyFileSync(legacy, target);
   }
   return target;
@@ -95,10 +103,6 @@ function filePath(kind: MemoryFileKind, agentId?: string | null): string {
 
 function backupPath(kind: MemoryFileKind, agentId?: string | null): string {
   return `${filePath(kind, agentId)}.bak`;
-}
-
-function safePathPart(value: string): string {
-  return value.replace(/[^A-Za-z0-9_.-]+/g, "-").slice(0, 120) || DEFAULT_AGENT_ID;
 }
 
 function defaultContent(kind: MemoryFileKind): string {
@@ -545,6 +549,12 @@ export function clearMemoryFileConsolidation(): void {
   clearInterval(consolidationTimer);
   consolidationTimer = null;
 }
+
+registerSoulCacheInvalidator((agentId) => {
+  cache.delete(cacheKey("soul", agentId));
+});
+
+export { removeAgentSoulFiles };
 
 function recordMemoryFileDiagnostic(
   kind: MemoryFileKind | null,

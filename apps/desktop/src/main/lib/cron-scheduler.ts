@@ -3,7 +3,6 @@ import { DefaultChatTransport, readUIMessageStream, type UIMessage } from "ai";
 import {
   DEFAULT_AGENT_ID,
   DEFAULT_CHAT_TOOL_SELECTION,
-  DEFAULT_SETTINGS,
   SettingKey,
   normalizeChatToolSelection,
   type ChatToolSelectionRequest,
@@ -146,7 +145,7 @@ async function executeCronAgentTurn(
         resolved: resolveModel(modelRef),
         conversationId: job.conversationId,
         preferredAgentId: job.payload.agentId ?? DEFAULT_AGENT_ID,
-        reasoning: job.payload.reasoning ?? DEFAULT_SETTINGS.chatReasoningLevel,
+        reasoning: job.payload.reasoning,
         toolSelection: cronToolSelection(job),
         disableCronTools: true,
         runId: runtimeRunId,
