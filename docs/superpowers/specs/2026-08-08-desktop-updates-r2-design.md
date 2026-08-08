@@ -41,6 +41,17 @@ Wrangler config uses the `RELEASES_BUCKET` R2 binding and these public variables
 The `bucket_name` in `apps/docs/wrangler.jsonc` is a deploy-time value and must be replaced with
 the actual R2 bucket name before deployment.
 
+## GitHub Actions Release Flow
+
+GitHub Actions runs for tags matching `v<major>.<minor>.<patch>` on a Windows runner. The workflow
+uses the tag version for `apps/desktop/package.json` in the ephemeral checkout, runs the existing
+Windows desktop build, and uploads only the generated `latest.yml`, installer, and `.blockmap`
+files to `releases/stable/v<version>/`. R2 access uses S3-compatible credentials stored as GitHub
+Actions secrets; the workflow verifies all three objects with `head-object` before completing.
+
+Required repository secrets are `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME`.
+
 ## Desktop Flow
 
 The main process owns an `UpdateManager` backed by `electron-updater`. It is enabled only for
