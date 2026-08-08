@@ -62,8 +62,6 @@ const entries = {
   "agentStatus.status.failed": { zh: "失败", en: "Failed" },
   "agentStatus.status.interrupted": { zh: "已中断", en: "Interrupted" },
   "agentStatus.status.idle": { zh: "就绪", en: "Ready" },
-  "about.action.documentation": { zh: "使用文档", en: "Documentation" },
-  "about.action.issues": { zh: "问题反馈", en: "Report an issue" },
   "about.action.repository": { zh: "项目主页", en: "Project repository" },
   "about.description": {
     zh: "在一个桌面空间中组织对话、智能体、工具与自动化，数据默认保留在本机。",

@@ -5,19 +5,10 @@ import { ABOUT_RESOURCES, normalizeAppVersion, type AboutResourceId } from "../l
 import { useT } from "../lib/i18n";
 import type { UpdateState } from "@shared/types";
 import { Button, Description } from "./ui";
-import {
-  IconArrowDown,
-  IconBookOpen,
-  IconBug,
-  IconGitFork,
-  IconRefresh,
-  IconRotateCcw,
-} from "./icons";
+import { IconArrowDown, IconGitFork, IconRefresh, IconRotateCcw } from "./icons";
 
 const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
   repository: IconGitFork,
-  documentation: IconBookOpen,
-  issues: IconBug,
 };
 
 export function AboutSettings(): React.JSX.Element {
