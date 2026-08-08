@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite-plus";
 
-const generatedIgnorePatterns = ["**/worker-configuration.d.ts"];
+const generatedIgnorePatterns = ["**/worker-configuration.d.ts", "**/.wrangler/**"];
 const skillIgnorePatterns = [".agents/skills/**", ".codex/skills/**", "skills/**"];
 
 export default defineConfig({

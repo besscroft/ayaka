@@ -4,13 +4,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { lazyPlugins } from "vite-plus";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: lazyPlugins(() => [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    ...(command === "build" ? [cloudflare({ viteEnvironment: { name: "ssr" } })] : []),
     tailwindcss(),
     reactRouter(),
   ]),
   resolve: {
+    dedupe: ["react", "react-dom"],
     tsconfigPaths: true,
   },
-});
+}));

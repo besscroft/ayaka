@@ -1,0 +1,467 @@
+const repositoryUrl = "https://github.com/besscroft/void-ai";
+const releasesUrl = `${repositoryUrl}/releases`;
+const documentationUrl = `${repositoryUrl}/tree/main/docs`;
+const issuesUrl = `${repositoryUrl}/issues`;
+
+const capabilities = [
+  {
+    index: "01",
+    code: "CHAT / ENTRY",
+    title: "对话是入口",
+    description: "从一句自然语言开始，把问题交给一个真正能继续行动的工作台。",
+    tone: "sky",
+  },
+  {
+    index: "02",
+    code: "AGENTS / UNITS",
+    title: "智能体会协作",
+    description: "让 Agents 负责身份、模型策略、工具选择与交接，复杂任务也能保持清晰。",
+    tone: "sage",
+  },
+  {
+    index: "03",
+    code: "MEMORY / ARCHIVE",
+    title: "记忆留在上下文",
+    description: "事实、偏好、经历和技能被整理成可追踪的本地记忆，而不是一团黑箱。",
+    tone: "peach",
+  },
+  {
+    index: "04",
+    code: "TOOLS / PROTOCOL",
+    title: "工具接入行动",
+    description: "Skills、MCP 和本地工具被放进同一条运行链路，按需启用，也随时可审阅。",
+    tone: "violet",
+  },
+];
+
+const operationSteps = [
+  {
+    number: "01",
+    label: "INPUT",
+    title: "说出任务",
+    detail: "从一句话开始，Void AI 先确认你要完成什么。",
+  },
+  {
+    number: "02",
+    label: "AGENT LOOP",
+    title: "智能体行动",
+    detail: "运行被拆成连续步骤，每一步都有来源和状态。",
+  },
+  {
+    number: "03",
+    label: "SKILL / TOOL",
+    title: "调用能力",
+    detail: "需要工具时再接入，敏感操作保留清晰的审核边界。",
+  },
+  {
+    number: "04",
+    label: "MEMORY",
+    title: "留下线索",
+    detail: "有价值的事实与偏好进入本地记忆，下一次继续接上。",
+  },
+  {
+    number: "05",
+    label: "RESULT",
+    title: "回到结果",
+    detail: "每次运行都有可读摘要，也可以追溯过程与诊断信息。",
+  },
+];
+
+function ArrowMark() {
+  return (
+    <span aria-hidden="true" className="arrow-mark">
+      &gt;
+    </span>
+  );
+}
+
+function SiteHeader() {
+  return (
+    <header className="site-header">
+      <a className="brand-lockup" href="#top" aria-label="Void AI 首页">
+        <span className="brand-seal" aria-hidden="true">
+          V
+        </span>
+        <span>
+          <strong>VOID AI</strong>
+          <small>LOCAL WORKSPACE</small>
+        </span>
+      </a>
+      <nav className="site-nav" aria-label="主导航">
+        <a href="#capabilities">能力档案</a>
+        <a href="#operation">运行方式</a>
+        <a href="#privacy">本地边界</a>
+        <a className="nav-repository" href={repositoryUrl} target="_blank" rel="noreferrer">
+          项目仓库 <ArrowMark />
+        </a>
+      </nav>
+    </header>
+  );
+}
+
+function ProductPreview() {
+  return (
+    <div className="product-preview" aria-label="Void AI 工作台预览">
+      <div className="preview-sky-shape preview-sun" aria-hidden="true" />
+      <div className="preview-sky-shape preview-cloud preview-cloud-one" aria-hidden="true" />
+      <div className="preview-sky-shape preview-cloud preview-cloud-two" aria-hidden="true" />
+      <div className="preview-window">
+        <div className="preview-window-bar">
+          <span className="window-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span>OPERATION / VOID-001</span>
+          <span className="window-online">LOCAL ONLINE</span>
+        </div>
+        <div className="preview-window-body">
+          <aside className="preview-sidebar" aria-label="工作台导航预览">
+            <div className="preview-wordmark">VOID</div>
+            <div className="preview-nav-item preview-nav-active">
+              <span>⌁</span> Chat
+            </div>
+            <div className="preview-nav-item">
+              <span>◇</span> Agents
+            </div>
+            <div className="preview-nav-item">
+              <span>○</span> Memory
+            </div>
+            <div className="preview-nav-item">
+              <span>⊙</span> Server
+            </div>
+            <div className="preview-sidebar-foot">BUILD 0.0.1</div>
+          </aside>
+          <div className="preview-content">
+            <div className="preview-content-header">
+              <div>
+                <span className="preview-label">AGENT RUN / ACTIVE</span>
+                <h3>把今天的任务交给我</h3>
+              </div>
+              <span className="preview-status">SYNC READY</span>
+            </div>
+            <div className="preview-message preview-message-user">
+              <span className="preview-avatar avatar-user">你</span>
+              <p>整理这周的项目线索，并记住我的工作偏好。</p>
+            </div>
+            <div className="preview-message preview-message-agent">
+              <span className="preview-avatar avatar-agent">V</span>
+              <div>
+                <p>收到。我会先检索本地记录，再把结果整理成一份可继续执行的摘要。</p>
+                <div className="preview-tool-row">
+                  <span>MEMORY SEARCH</span>
+                  <span>TOOL READY</span>
+                </div>
+              </div>
+            </div>
+            <div className="preview-run-card">
+              <div className="run-card-heading">
+                <span>RUN TRACE</span>
+                <strong>03 / 05</strong>
+              </div>
+              <div className="run-progress">
+                <span />
+              </div>
+              <div className="run-card-footer">
+                <span>Agent Loop is moving</span>
+                <span>12.4s</span>
+              </div>
+            </div>
+            <div className="preview-input">
+              <span>继续给 Void AI 一个任务...</span>
+              <span className="input-arrow">&gt;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="preview-stamp">
+        FIELD NOTE
+        <br />
+        <strong>LOCAL FIRST</strong>
+      </div>
+      <div className="preview-pet" aria-hidden="true">
+        <span className="pet-sprite" />
+      </div>
+    </div>
+  );
+}
+
+function Hero() {
+  return (
+    <section className="hero-section" id="top">
+      <div className="hero-copy">
+        <div className="mission-label">
+          <span className="mission-dot" /> OPERATION / LOCAL-FIRST
+        </div>
+        <h1>
+          让你的 AI，
+          <br />
+          <em>在本地醒来。</em>
+        </h1>
+        <p className="hero-lede">
+          Void AI 是一个本地优先的 AI
+          桌面工作台。把对话、智能体、记忆和工具放在同一条可追踪的运行链路里。
+        </p>
+        <div className="hero-actions">
+          <a
+            className="site-button site-button-primary"
+            href={releasesUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            下载 Void AI <ArrowMark />
+          </a>
+          <a className="site-button site-button-quiet" href="#capabilities">
+            查看能力档案 <span aria-hidden="true">↓</span>
+          </a>
+        </div>
+        <div className="hero-footnote">
+          <span>DESKTOP WORKSPACE</span>
+          <span>MIT LICENSE</span>
+          <span>EN / ZH READY</span>
+        </div>
+      </div>
+      <ProductPreview />
+    </section>
+  );
+}
+
+function SectionHeading({
+  code,
+  title,
+  description,
+}: {
+  code: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="section-heading">
+      <span className="section-code">{code}</span>
+      <h2>{title}</h2>
+      <p>{description}</p>
+    </div>
+  );
+}
+
+function CapabilitiesSection() {
+  return (
+    <section className="content-section capabilities-section" id="capabilities">
+      <SectionHeading
+        code="02 / CAPABILITY ARCHIVE"
+        title="一座工作台，四种行动方式。"
+        description="从对话开始，向外连接智能体、记忆和工具。每个入口都服务于同一件事：让任务继续向前。"
+      />
+      <div className="capability-grid">
+        {capabilities.map((capability) => (
+          <article
+            className={`capability-card capability-${capability.tone}`}
+            key={capability.index}
+          >
+            <div className="card-topline">
+              <span>{capability.index}</span>
+              <span>{capability.code}</span>
+            </div>
+            <div className="capability-glyph" aria-hidden="true">
+              <span />
+            </div>
+            <h3>{capability.title}</h3>
+            <p>{capability.description}</p>
+            <span className="card-tail">
+              OPEN FILE <span aria-hidden="true">&gt;</span>
+            </span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OperationSection() {
+  return (
+    <section className="content-section operation-section" id="operation">
+      <SectionHeading
+        code="03 / OPERATION TRACE"
+        title="从一句话，到一条完整的运行记录。"
+        description="Void AI 不把过程藏在幕后。每个 Agent Loop 都有自己的轨迹，方便你知道发生了什么，也知道下一步是什么。"
+      />
+      <div className="operation-board">
+        {operationSteps.map((step, index) => (
+          <div className="operation-step" key={step.number}>
+            <div className="operation-step-marker">
+              <span>{step.number}</span>
+              {index < operationSteps.length - 1 && <i aria-hidden="true" />}
+            </div>
+            <div className="operation-step-copy">
+              <span className="operation-label">{step.label}</span>
+              <h3>{step.title}</h3>
+              <p>{step.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="operation-note">
+        <span className="note-sigil" aria-hidden="true">
+          !
+        </span>
+        <p>
+          <strong>运行记录不会消失。</strong>{" "}
+          任务来源、工具调用、交接和错误都会被写入本地运行表，方便复盘，也方便你重新接管。
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PrivacySection() {
+  return (
+    <section className="content-section privacy-section" id="privacy">
+      <div className="privacy-panel">
+        <div className="privacy-copy">
+          <span className="section-code">04 / BOUNDARY PROTOCOL</span>
+          <h2>
+            你的工作空间，
+            <br />
+            <em>不需要先离开你的设备。</em>
+          </h2>
+          <p>
+            Void AI 的默认姿态是 local-first。桌面端负责文件、数据库、密钥、MCP
+            连接和运行记录；渲染层只通过明确的桥接访问它们。
+          </p>
+          <a className="text-link" href={documentationUrl} target="_blank" rel="noreferrer">
+            阅读架构说明 <ArrowMark />
+          </a>
+        </div>
+        <div className="privacy-list">
+          <div className="privacy-row">
+            <span>01</span>
+            <div>
+              <strong>数据默认留在本机</strong>
+              <p>SQLite 和本地文件记录工作上下文，不要求先搭一套云端服务。</p>
+            </div>
+            <b>LOCAL</b>
+          </div>
+          <div className="privacy-row">
+            <span>02</span>
+            <div>
+              <strong>密钥留在主进程</strong>
+              <p>Provider、MCP 和 Skill secrets 在受保护的运行边界内解析。</p>
+            </div>
+            <b>SEALED</b>
+          </div>
+          <div className="privacy-row">
+            <span>03</span>
+            <div>
+              <strong>每次行动都有记录</strong>
+              <p>运行状态、工具调用、审批与诊断都保留在可追踪的本地表里。</p>
+            </div>
+            <b>TRACEABLE</b>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PetSection() {
+  return (
+    <section className="pet-section">
+      <div className="pet-section-art" aria-hidden="true">
+        <div className="pet-orbit orbit-one" />
+        <div className="pet-orbit orbit-two" />
+        <span className="pet-sprite pet-sprite-large" />
+      </div>
+      <div className="pet-section-copy">
+        <span className="section-code">05 / DESKTOP COMPANION</span>
+        <h2>
+          工作很复杂，
+          <br />
+          桌面可以有一点魔法。
+        </h2>
+        <p>
+          Paimon 是 Void AI 的桌面小向导。她不替你做决定，只在你需要的时候，让工作空间多一点回应。
+        </p>
+        <span className="pet-caption">A SMALL GUIDE FOR BIG TASKS</span>
+      </div>
+    </section>
+  );
+}
+
+function DownloadSection() {
+  return (
+    <section className="download-section" id="download">
+      <div className="download-panel">
+        <div>
+          <span className="section-code">06 / BEGIN THE OPERATION</span>
+          <h2>准备好，让本地智能体开始行动。</h2>
+          <p>Void AI 仍在持续生长。进入项目，下载最新构建，或者从源码加入这场实验。</p>
+        </div>
+        <div className="download-actions">
+          <a
+            className="site-button site-button-primary"
+            href={releasesUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            前往 Releases <ArrowMark />
+          </a>
+          <a
+            className="site-button site-button-outline"
+            href={repositoryUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            查看项目仓库 <ArrowMark />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="site-footer">
+      <div className="footer-brand">
+        <span className="brand-seal" aria-hidden="true">
+          V
+        </span>
+        <div>
+          <strong>VOID AI</strong>
+          <span>本地优先的 AI 桌面工作台</span>
+        </div>
+      </div>
+      <div className="footer-links">
+        <a href={documentationUrl} target="_blank" rel="noreferrer">
+          文档
+        </a>
+        <a href={issuesUrl} target="_blank" rel="noreferrer">
+          反馈问题
+        </a>
+        <a href={repositoryUrl} target="_blank" rel="noreferrer">
+          GitHub <ArrowMark />
+        </a>
+      </div>
+      <div className="footer-meta">
+        <span>LOCAL BY DEFAULT</span>
+        <span>MIT LICENSE</span>
+        <span>(C) 2026 VOID AI</span>
+      </div>
+    </footer>
+  );
+}
+
+export function SiteHome() {
+  return (
+    <main className="site-page">
+      <SiteHeader />
+      <Hero />
+      <CapabilitiesSection />
+      <OperationSection />
+      <PrivacySection />
+      <PetSection />
+      <DownloadSection />
+      <SiteFooter />
+    </main>
+  );
+}
