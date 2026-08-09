@@ -282,6 +282,7 @@ void describe("provider helpers", () => {
           id: "gpt-4o",
           display_name: "GPT-4o",
           context_length: 256_000,
+          max_completion_tokens: 16_384,
           architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
           supported_parameters: ["tools", "reasoning_effort"],
           reasoning_levels: ["low", "medium", "high"],
@@ -297,6 +298,7 @@ void describe("provider helpers", () => {
     );
     const openaiModel = openaiModels.find((model) => model.id === "gpt-4o");
     assert.equal(openaiModel?.contextWindow, 256_000);
+    assert.equal(openaiModel?.maxOutputTokens, 16_384);
     assert.equal(openaiModel?.capabilities?.vision, true);
     assert.equal(openaiModel?.capabilities?.toolCalling, true);
     assert.equal(openaiModel?.capabilities?.reasoning, true);
@@ -306,10 +308,18 @@ void describe("provider helpers", () => {
     assert.equal(openaiModel?.reasoningDefault, "medium");
 
     const anthropicModels = providerHelpers.parseAnthropicModelListResponse({
-      data: [{ id: "claude-sonnet-4-5", display_name: "Claude Sonnet", max_input_tokens: 180_000 }],
+      data: [
+        {
+          id: "claude-sonnet-4-5",
+          display_name: "Claude Sonnet",
+          max_input_tokens: 180_000,
+          max_output_tokens: 8_192,
+        },
+      ],
     });
     assert.equal(anthropicModels[0]?.label, "Claude Sonnet");
     assert.equal(anthropicModels[0]?.contextWindow, 180_000);
+    assert.equal(anthropicModels[0]?.maxOutputTokens, 8_192);
 
     const googleModels = providerHelpers.parseGoogleModelListResponse({
       models: [
@@ -317,6 +327,8 @@ void describe("provider helpers", () => {
           name: "models/gemini-2.5-pro",
           displayName: "Gemini Pro",
           supportedGenerationMethods: ["generateContent"],
+          inputTokenLimit: 1_000_000,
+          outputTokenLimit: 65_536,
         },
         {
           name: "models/text-embedding-004",
@@ -337,6 +349,8 @@ void describe("provider helpers", () => {
     const googleImageModel = googleModels.find((model) => model.id === "custom-image-model");
     assert.equal(googleTextModel?.capabilities?.textGeneration, true);
     assert.equal(googleTextModel?.capabilitySources?.textGeneration, "provider");
+    assert.equal(googleTextModel?.contextWindow, 1_000_000);
+    assert.equal(googleTextModel?.maxOutputTokens, 32_768);
     assert.equal(googleImageModel?.capabilities?.imageOutput, true);
   });
 
@@ -420,7 +434,12 @@ void describe("provider helpers", () => {
       catalog,
       "openai",
       [
-        { id: "gpt-4o", label: "GPT-4o" },
+        {
+          id: "gpt-4o",
+          label: "GPT-4o",
+          contextWindow: 128_000,
+          maxOutputTokens: 8_192,
+        },
         { id: "o3-mini", label: "O3 mini", contextWindow: 128_000 },
       ],
       1234,
@@ -436,6 +455,7 @@ void describe("provider helpers", () => {
     assert.deepEqual(existing?.providerOptions, { openai: { textVerbosity: "low" } });
     assert.equal(existing?.label, "GPT-4o");
     assert.equal(existing?.contextWindow, 128_000);
+    assert.equal(existing?.maxOutputTokens, 8_192);
     assert.equal(existing?.reasoningDefault, "provider-default");
     assert.equal(existing?.lastSyncedAt, 1234);
 
@@ -446,6 +466,44 @@ void describe("provider helpers", () => {
       result.catalog.modelStates.find((state) => state.id === "o3-mini")?.enabled,
       false,
     );
+    assert.equal(discovered?.maxOutputTokens, 4_096);
+  });
+
+  void it("keeps local defaults when a provider omits model limits", () => {
+    const catalog: ModelCatalogSettings = {
+      providers: [],
+      models: [
+        {
+          providerId: "openai",
+          id: "local-model",
+          enabled: true,
+          temperature: 0.3,
+          topP: 0.85,
+          maxOutputTokens: 2_048,
+          contextWindow: 64_000,
+          capabilities,
+          providerOptions: {},
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      modelStates: [{ providerId: "openai", id: "local-model", enabled: true, updatedAt: 1 }],
+    };
+
+    const result = providerHelpers.mergeRemoteModelsIntoCatalog(
+      catalog,
+      "openai",
+      [{ id: "local-model", capabilities: { ...capabilities, vision: true } }],
+      5678,
+    );
+
+    const model = result.catalog.models[0];
+    assert.equal(model.contextWindow, 64_000);
+    assert.equal(model.maxOutputTokens, 2_048);
+    assert.equal(model.temperature, 0.3);
+    assert.equal(model.topP, 0.85);
+    assert.equal(model.capabilities.vision, true);
+    assert.equal(result.updated, 1);
   });
 
   void it("replaces manual capability values with the next remote snapshot", () => {

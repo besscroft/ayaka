@@ -802,6 +802,7 @@ export interface RemoteModelInfo {
   id: string;
   label?: string;
   contextWindow?: number;
+  maxOutputTokens?: number;
   capabilities?: Partial<ModelCapabilities>;
   capabilitySources?: ModelCapabilitySources;
   reasoningLevels?: ChatReasoningLevel[];
@@ -985,11 +986,18 @@ export function normalizeRemoteModels(models: RemoteModelInfo[]): RemoteModelInf
         : "inferred";
     }
     const reasoningLevels = normalizeReasoningLevels(model.reasoningLevels, capabilities);
+    const contextWindow =
+      model.contextWindow === undefined ? undefined : normalizeContextWindow(model.contextWindow);
+    const maxOutputTokens =
+      model.maxOutputTokens === undefined
+        ? undefined
+        : normalizeMaxOutputTokens(model.maxOutputTokens);
     byId.set(id, {
       ...model,
       id,
       label: normalizeOptionalText(model.label),
-      contextWindow: normalizeContextWindow(model.contextWindow ?? inferContextWindow(id)),
+      contextWindow,
+      maxOutputTokens,
       capabilities,
       capabilitySources,
       reasoningLevels,
@@ -1014,6 +1022,14 @@ export function parseOpenAIModelListResponse(json: unknown): RemoteModelInfo[] {
           item.context_window,
           item.max_context_length,
         ),
+        maxOutputTokens: readFiniteNumber(
+          item.max_output_tokens,
+          item.maxOutputTokens,
+          item.max_completion_tokens,
+          item.maxCompletionTokens,
+          item.output_token_limit,
+          item.outputTokenLimit,
+        ),
         capabilities: metadata.capabilities,
         capabilitySources: metadata.capabilitySources,
         ...reasoningMetadata(item),
@@ -1036,6 +1052,12 @@ export function parseAnthropicModelListResponse(json: unknown): RemoteModelInfo[
           item.input_token_limit,
           item.max_input_tokens,
           item.maxInputTokens,
+        ),
+        maxOutputTokens: readFiniteNumber(
+          item.max_output_tokens,
+          item.maxOutputTokens,
+          item.output_token_limit,
+          item.outputTokenLimit,
         ),
         capabilities: metadata.capabilities,
         capabilitySources: metadata.capabilitySources,
@@ -1061,6 +1083,12 @@ export function parseGoogleModelListResponse(json: unknown): RemoteModelInfo[] {
           label: normalizeOptionalText(item.displayName),
           supportedGenerationMethods: item.supportedGenerationMethods,
           contextWindow: readFiniteNumber(item.inputTokenLimit, item.input_token_limit),
+          maxOutputTokens: readFiniteNumber(
+            item.outputTokenLimit,
+            item.output_token_limit,
+            item.maxOutputTokens,
+            item.max_output_tokens,
+          ),
           capabilities: metadata.capabilities,
           capabilitySources: metadata.capabilitySources,
           ...reasoningMetadata(item),
@@ -1127,15 +1155,21 @@ export function mergeRemoteModelsIntoCatalog(
         nextReasoningLevels,
       );
       const nextLabel = remote.label ?? existing.label;
+      const nextContextWindow = remote.contextWindow ?? existing.contextWindow;
+      const nextMaxOutputTokens = remote.maxOutputTokens ?? existing.maxOutputTokens;
       const capabilitiesChanged =
         JSON.stringify(existing.capabilities) !== JSON.stringify(nextCapabilities) ||
-        existing.contextWindow !== remote.contextWindow ||
+        existing.contextWindow !== nextContextWindow ||
         JSON.stringify(existing.reasoningLevels ?? []) !== JSON.stringify(nextReasoningLevels) ||
         JSON.stringify(existing.capabilitySources ?? {}) !==
           JSON.stringify(remote.capabilitySources ?? {});
+      const defaultsChanged =
+        existing.contextWindow !== nextContextWindow ||
+        existing.maxOutputTokens !== nextMaxOutputTokens;
       const changed =
         nextLabel !== existing.label ||
         capabilitiesChanged ||
+        defaultsChanged ||
         nextReasoningDefault !== (existing.reasoningDefault ?? "provider-default");
       if (changed) updated += 1;
       if (capabilitiesChanged) updatedCapabilities += 1;
@@ -1144,7 +1178,8 @@ export function mergeRemoteModelsIntoCatalog(
           ? {
               ...model,
               label: nextLabel,
-              contextWindow: remote.contextWindow ?? model.contextWindow,
+              contextWindow: nextContextWindow,
+              maxOutputTokens: nextMaxOutputTokens,
               capabilities: nextCapabilities,
               reasoningLevels: nextReasoningLevels,
               reasoningDefault: nextReasoningDefault,
@@ -1167,8 +1202,8 @@ export function mergeRemoteModelsIntoCatalog(
       enabled: false,
       temperature: DEFAULT_MODEL_TEMPERATURE,
       topP: DEFAULT_MODEL_TOP_P,
-      maxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS,
-      contextWindow: normalizeContextWindow(remote.contextWindow),
+      maxOutputTokens: normalizeMaxOutputTokens(remote.maxOutputTokens),
+      contextWindow: normalizeContextWindow(remote.contextWindow ?? inferContextWindow(remote.id)),
       capabilities: normalizeCapabilities(remote.capabilities ?? inferModelCapabilities(remote.id)),
       providerOptions: {},
       reasoningDefault: normalizeReasoningDefault(remote.reasoningDefault, reasoningLevels),
