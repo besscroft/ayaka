@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { UIMessage } from "ai";
 import {
+  areMessageItemPropsEqual,
   getMessageActivityStatus,
   getReasoningDisplay,
   getToolDefaultOpen,
+  isMessageStreaming,
   readMediaToolResult,
 } from "./MessageList";
 import { normalizeToolState } from "../lib/generated-tool-ui";
@@ -131,3 +133,33 @@ void describe("generated tool disclosure", () => {
     assert.equal(getToolDefaultOpen(normalizeToolState("output-denied")), true);
   });
 });
+
+void describe("message render memoization", () => {
+  void it("marks only the latest message as streaming", () => {
+    assert.equal(isMessageStreaming(true, 0, 1), false);
+    assert.equal(isMessageStreaming(true, 1, 1), true);
+    assert.equal(isMessageStreaming(false, 1, 1), false);
+  });
+
+  void it("skips unchanged message props and rerenders changed message references", () => {
+    const message: UIMessage = userMessage("u1", "Question");
+    const props = {
+      message,
+      isLastMessage: true,
+      isStreaming: false,
+    };
+
+    assert.equal(areMessageItemPropsEqual(props, { ...props }), true);
+    assert.equal(
+      areMessageItemPropsEqual(props, {
+        ...props,
+        message: { ...message, parts: [{ type: "text", text: "Changed" }] },
+      }),
+      false,
+    );
+  });
+});
+
+function userMessage(id: string, text: string): UIMessage {
+  return { id, role: "user", parts: [{ type: "text", text }] };
+}

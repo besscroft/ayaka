@@ -41,6 +41,7 @@ import {
   persistMessagesPatch,
   type MessagePersistenceRequest,
 } from "../lib/chat-persistence";
+import { reconcileChatMessages, shouldReconcileCompletedRun } from "../lib/chat-reconciliation";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import {
@@ -148,6 +149,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const toolSelectionRef = useRef<ChatToolSelectionRequest>(DEFAULT_CHAT_TOOL_SELECTION);
   const runIdRef = useRef<string | null>(null);
   const runModeRef = useRef<"start" | "resume">("start");
+  const reconciliationRef = useRef<{
+    runId: string | null;
+    attempts: number;
+    timer: number | null;
+  }>({ runId: null, attempts: 0, timer: null });
   const latestMessagesRef = useRef<UIMessage[]>([]);
   const hydratedConversationRef = useRef<string | null>(null);
   const hydrationStateRef = useRef<"loading" | "ready" | "error">("loading");
@@ -381,6 +387,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
     runIdRef.current = null;
     runModeRef.current = "start";
+    reconciliationRef.current = { runId: null, attempts: 0, timer: null };
     createdAtRef.current = new Map();
     revisionRef.current = 0;
     persistenceDirtyRef.current = false;
@@ -427,8 +434,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     id: conversationId,
     messages: initialMessages,
     transport,
+    experimental_throttle: 50,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-    onFinish: ({ messages, isError }) => {
+    onFinish: ({ messages, isError, isAbort }) => {
       if (runIdRef.current) runModeRef.current = "resume";
       if (!isError) {
         chatFailureRef.current = false;
@@ -437,7 +445,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         setChatErrorRetryable(false);
       }
       setIsStopped(false);
-      const learningKey = getAgentLearningQueueKey(conversationId, messages, isError);
+      const learningKey = isAbort
+        ? null
+        : getAgentLearningQueueKey(conversationId, messages, isError);
       const shouldQueueLearning =
         learningKey != null && learningQueueKeyRef.current !== learningKey;
       if (shouldQueueLearning) learningQueueKeyRef.current = learningKey;
@@ -458,9 +468,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           console.error("[chat] failed to persist messages or queue learning:", err);
         });
       // 鑷姩鐢熸垚鏍囬锛氭湰杞彂閫佷簡娑堟伅 + assistant 瀹屾暣浜х敓 + 杩樻病鐢熸垚杩?
-      if (!isError) tryAutoTitle(conversationId, messages, titledRef);
+      if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titledRef);
       // 异步生成追问建议
-      if (!isError) void fetchFollowupSuggestions(messages);
+      if (!isError && !isAbort) void fetchFollowupSuggestions(messages);
     },
     onError: (err) => {
       reportChatError("streaming", err, {
@@ -478,6 +488,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }, [chat, conversationId, hydrationState, initialMessages]);
 
   const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
+  const isChatLoadingRef = useRef(isChatLoading);
+  isChatLoadingRef.current = isChatLoading;
   const isLoading = isChatLoading;
   const hasActivePersistedRun = !!runtimeSnapshot?.runtimeRuns.some(
     (item) =>
@@ -486,6 +498,43 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
   const isAgentRunActive = isChatLoading || hasActivePersistedRun;
   const shouldPollRuntime = isLoading || hasActivePersistedRun;
+
+  const { setMessages: setChatMessages, stop: stopChat } = chat;
+  const reconcileCompletedRun = useCallback(
+    (runId: string): void => {
+      const state = reconciliationRef.current;
+      if (state.runId !== runId) {
+        if (state.timer !== null) window.clearTimeout(state.timer);
+        state.runId = runId;
+        state.attempts = 0;
+        state.timer = null;
+      }
+      if (state.attempts >= 2 || state.timer !== null) return;
+
+      const delay = state.attempts === 0 ? 350 : 1_000;
+      state.attempts += 1;
+      state.timer = window.setTimeout(() => {
+        state.timer = null;
+        void api.messages
+          .list(conversationId)
+          .then((snapshot) => {
+            const persistedMessages = snapshot.messages
+              .map(hydrateStoredMessage)
+              .filter(isNonEmptyUIMessage);
+            const reconciled = reconcileChatMessages(latestMessagesRef.current, persistedMessages);
+            if (!reconciled || !isChatLoadingRef.current) return;
+
+            latestMessagesRef.current = reconciled;
+            setChatMessages(reconciled);
+            void stopChat().catch((error) => {
+              console.error("[chat] failed to finish reconciled stream:", error);
+            });
+          })
+          .catch((error) => console.error("[chat] failed to reconcile completed run:", error));
+      }, delay);
+    },
+    [conversationId, setChatMessages, stopChat],
+  );
 
   useEffect(() => {
     if (hydrationState !== "ready" || !isChatLoading) return;
@@ -539,6 +588,26 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
             runIdRef.current = activeRun.id;
             runModeRef.current = "resume";
           }
+
+          const trackedRunId = runIdRef.current;
+          const trackedRun = trackedRunId
+            ? snapshot.runtimeRuns.find(
+                (item) => item.id === trackedRunId && item.conversation_id === conversationId,
+              )
+            : undefined;
+          if (
+            trackedRun &&
+            shouldReconcileCompletedRun({
+              trackedRunId,
+              runId: trackedRun.id,
+              conversationId,
+              runConversationId: trackedRun.conversation_id,
+              isChatLoading: isChatLoadingRef.current,
+              status: trackedRun.status,
+            })
+          ) {
+            reconcileCompletedRun(trackedRun.id);
+          }
         }
       });
     };
@@ -546,14 +615,22 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (!shouldPollRuntime) {
       return () => {
         cancelled = true;
+        if (reconciliationRef.current.timer !== null) {
+          window.clearTimeout(reconciliationRef.current.timer);
+          reconciliationRef.current.timer = null;
+        }
       };
     }
     const id = window.setInterval(load, 1_200);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      if (reconciliationRef.current.timer !== null) {
+        window.clearTimeout(reconciliationRef.current.timer);
+        reconciliationRef.current.timer = null;
+      }
     };
-  }, [conversationId, shouldPollRuntime]);
+  }, [conversationId, reconcileCompletedRun, shouldPollRuntime]);
 
   /* ---------- 新建对话开场建议（随机生成） ---------- */
   const starterFetchedForRef = useRef<string | null>(null);
@@ -660,6 +737,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
     runIdRef.current = crypto.randomUUID();
     runModeRef.current = "start";
+    reconciliationRef.current = { runId: runIdRef.current, attempts: 0, timer: null };
     latestMessagesRef.current = pendingMessages;
     void persistAndTouch(pendingMessages).catch((err) => {
       console.error("[chat] failed to pre-save user message:", err);

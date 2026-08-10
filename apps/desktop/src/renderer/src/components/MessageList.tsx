@@ -14,7 +14,7 @@
  *  - onDeleteMessage(messageId)  删除该消息；如果删的是 user 消息，
  *    紧跟其后的 assistant 消息也会被一并删除（保持角色交替）
  */
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { MEDIA_GENERATION_TOOL_NAME, type MediaGenerationResponse } from "@shared/types";
@@ -82,6 +82,10 @@ type MessagePart = UIMessage["parts"][number];
 type ReasoningPart = Extract<MessagePart, { type: "reasoning" }>;
 type SourcePart = Extract<MessagePart, { type: "source-url" | "source-document" }>;
 
+export function isMessageStreaming(isLoading: boolean, index: number, lastIndex: number): boolean {
+  return isLoading && index === lastIndex;
+}
+
 export function MessageList({
   messages,
   isLoading,
@@ -100,6 +104,40 @@ export function MessageList({
   onToolApprovalResponse,
 }: MessageListProps): React.JSX.Element {
   const { t } = useT();
+  const callbacksRef = useRef({
+    onEditMessage,
+    onResendMessage,
+    onDeleteMessage,
+    onRetryMessage,
+    onToolApprovalResponse,
+  });
+  callbacksRef.current = {
+    onEditMessage,
+    onResendMessage,
+    onDeleteMessage,
+    onRetryMessage,
+    onToolApprovalResponse,
+  };
+  const stableEditMessage = useCallback(
+    (messageId: string, text: string) => callbacksRef.current.onEditMessage?.(messageId, text),
+    [],
+  );
+  const stableResendMessage = useCallback(
+    (messageId: string) => callbacksRef.current.onResendMessage?.(messageId),
+    [],
+  );
+  const stableDeleteMessage = useCallback(
+    (messageId: string) => callbacksRef.current.onDeleteMessage?.(messageId),
+    [],
+  );
+  const stableRetryMessage = useCallback(
+    (messageId: string) => callbacksRef.current.onRetryMessage?.(messageId),
+    [],
+  );
+  const stableToolApprovalResponse = useCallback<ChatAddToolApproveResponseFunction>(
+    (options) => callbacksRef.current.onToolApprovalResponse?.(options),
+    [],
+  );
   const activityStatus = getMessageActivityStatus(messages, isLoading, status);
   const lastMessage = messages.at(-1);
   const shouldShowFollowups =
@@ -140,20 +178,22 @@ export function MessageList({
         {messages.map((message, index) => (
           <motion.div
             key={message.id}
-            layout="position"
+            layout={isLoading ? false : "position"}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
-            <MessageItem
+            <MemoMessageItem
               message={message}
               isLastMessage={index === messages.length - 1}
-              isStreaming={isLoading}
-              onEdit={onEditMessage}
-              onResend={onResendMessage}
-              onDelete={onDeleteMessage}
-              onRetry={onRetryMessage}
-              onToolApprovalResponse={onToolApprovalResponse}
+              isStreaming={isMessageStreaming(isLoading, index, messages.length - 1)}
+              onEdit={onEditMessage ? stableEditMessage : undefined}
+              onResend={onResendMessage ? stableResendMessage : undefined}
+              onDelete={onDeleteMessage ? stableDeleteMessage : undefined}
+              onRetry={onRetryMessage ? stableRetryMessage : undefined}
+              onToolApprovalResponse={
+                onToolApprovalResponse ? stableToolApprovalResponse : undefined
+              }
             />
           </motion.div>
         ))}
@@ -176,7 +216,9 @@ export function MessageList({
           </motion.div>
         ) : null}
 
-        {activityStatus ? <MessageActivity status={activityStatus} /> : null}
+        {activityStatus ? (
+          <MessageActivity status={activityStatus} isStreaming={isLoading} />
+        ) : null}
 
         {error && (
           <div className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -226,7 +268,13 @@ export interface ReasoningDisplay {
   isStreaming: boolean;
 }
 
-function MessageActivity({ status }: { status: MessageActivityStatus }): React.JSX.Element {
+function MessageActivity({
+  status,
+  isStreaming,
+}: {
+  status: MessageActivityStatus;
+  isStreaming: boolean;
+}): React.JSX.Element {
   const { t } = useT();
   const activity = {
     submitted: { Icon: IconCircleDashed, label: t("msg.activity.submitted") },
@@ -239,7 +287,7 @@ function MessageActivity({ status }: { status: MessageActivityStatus }): React.J
   return (
     <motion.div
       key="message-activity"
-      layout="position"
+      layout={isStreaming ? false : "position"}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 6 }}
@@ -301,7 +349,7 @@ export function getReasoningDisplay(
   };
 }
 
-interface MessageItemProps {
+export interface MessageItemProps {
   message: UIMessage;
   isLastMessage: boolean;
   isStreaming: boolean;
@@ -705,6 +753,24 @@ function MessageItem({
 }
 
 /* ---------- 类型守卫 ---------- */
+
+export function areMessageItemPropsEqual(
+  previous: MessageItemProps,
+  next: MessageItemProps,
+): boolean {
+  return (
+    previous.message === next.message &&
+    previous.isLastMessage === next.isLastMessage &&
+    previous.isStreaming === next.isStreaming &&
+    previous.onEdit === next.onEdit &&
+    previous.onResend === next.onResend &&
+    previous.onDelete === next.onDelete &&
+    previous.onRetry === next.onRetry &&
+    previous.onToolApprovalResponse === next.onToolApprovalResponse
+  );
+}
+
+const MemoMessageItem = memo(MessageItem, areMessageItemPropsEqual);
 
 function formatExecutionTime(
   durationMs: number | undefined,
