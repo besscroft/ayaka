@@ -138,7 +138,7 @@ interface QueueItemProps extends Omit<HTMLAttributes<HTMLLIElement>, "title"> {
 
 const STATUS_TONE: Record<QueueItemStatus, string> = {
   pending: "text-foreground/35",
-  active: "text-accent",
+  active: "text-primary",
   done: "text-success",
 };
 

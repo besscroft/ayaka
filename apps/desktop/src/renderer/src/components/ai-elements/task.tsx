@@ -115,7 +115,7 @@ export function TaskTrigger({
         className={cn(
           "flex size-6 items-center justify-center rounded-md",
           derivedStatus === "complete" && "bg-success/10 text-success",
-          derivedStatus === "in_progress" && "bg-accent/12 text-accent",
+          derivedStatus === "in_progress" && "bg-accent/12 text-primary",
           derivedStatus === "pending" && "bg-muted text-muted-foreground",
         )}
       >
@@ -206,7 +206,7 @@ export function TaskItem({
         className={cn(
           "mt-0.5 flex size-4 shrink-0 items-center justify-center",
           status === "complete" && "text-success",
-          status === "in_progress" && "text-accent",
+          status === "in_progress" && "text-primary",
           status === "pending" && "text-foreground/35",
         )}
       >

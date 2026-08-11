@@ -10,7 +10,9 @@ import {
   DialogTitle,
   Input,
   Label,
+  LoadingIndicator,
   Slider,
+  SelectField,
   Switch,
   Tabs,
   TabsList,
@@ -167,90 +169,83 @@ export function SettingsDialog({
     { id: "about", label: t("settings.tab.about"), Icon: IconInfo, pinned: true },
   ];
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      <div
-        className="flex h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* 澶撮儴 */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-3.5">
-          <div>
-            <h2 id="settings-title" className="text-base font-semibold select-none">
-              {t("settings.title")}
-            </h2>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] p-0">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          {/* 澶撮儴 */}
+          <div className="flex items-center justify-between border-b border-border px-6 py-3.5">
+            <div>
+              <DialogTitle id="settings-title" className="text-base font-semibold select-none">
+                {t("settings.title")}
+              </DialogTitle>
+            </div>
+            <button
+              type="button"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={onClose}
-            aria-label={t("common.close")}
-          >
-            <IconClose className="size-5" />
-          </button>
-        </div>
 
-        {/* 涓讳綋锛氬鑸?+ 鍐呭锛岀獎灞忕旱鍚戝竷灞€ */}
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* 瀵艰埅 */}
-          <nav
-            aria-label={t("settings.nav")}
-            className="flex w-full shrink-0 flex-col gap-1 border-r border-border bg-muted/40 p-2 md:w-48 select-none"
-          >
-            {tabs.map(({ id, label, Icon, pinned }) => {
-              const active = tab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id)}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition",
-                    pinned && "mt-auto",
-                    active
-                      ? "bg-accent/10 text-accent"
-                      : "text-foreground/70 hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="truncate">{label}</span>
-                </button>
-              );
-            })}
-          </nav>
+          {/* 涓讳綋锛氬鑸?+ 鍐呭锛岀獎灞忕旱鍚戝竷灞€ */}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {/* 瀵艰埅 */}
+            <nav
+              aria-label={t("settings.nav")}
+              className="flex w-full shrink-0 flex-col gap-1 border-r border-border bg-muted/40 p-2 md:w-48 select-none"
+            >
+              {tabs.map(({ id, label, Icon, pinned }) => {
+                const active = tab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition",
+                      pinned && "mt-auto",
+                      active
+                        ? "bg-accent/10 text-primary"
+                        : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
 
-          {/* 鍐呭 */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col">
-            {tab === "appearance" && (
-              <AppearanceTab
-                settings={settings}
-                update={update}
-                onResetDefaults={() => setConfirmResetScope("appearance")}
-                resetDone={resetDoneScope === "appearance"}
-              />
-            )}
-            {tab === "pets" && <DesktopPetSection />}
-            {tab === "model" && <ModelTab settings={settings} update={update} />}
-            {tab === "diagnostics" && <DiagnosticsTab />}
-            {tab === "trash" && <TrashTab />}
-            {tab === "about" && <AboutSettings />}
+            {/* 鍐呭 */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col">
+              {tab === "appearance" && (
+                <AppearanceTab
+                  settings={settings}
+                  update={update}
+                  onResetDefaults={() => setConfirmResetScope("appearance")}
+                  resetDone={resetDoneScope === "appearance"}
+                />
+              )}
+              {tab === "pets" && <DesktopPetSection />}
+              {tab === "model" && <ModelTab settings={settings} update={update} />}
+              {tab === "diagnostics" && <DiagnosticsTab />}
+              {tab === "trash" && <TrashTab />}
+              {tab === "about" && <AboutSettings />}
+            </div>
+          </div>
+
+          {/* 搴曢儴 */}
+          <div className="flex items-center justify-between border-t border-border px-6 py-2.5">
+            <span aria-hidden="true" />
+            <Button variant="secondary" onPress={onClose}>
+              {t("common.done")}
+            </Button>
           </div>
         </div>
-
-        {/* 搴曢儴 */}
-        <div className="flex items-center justify-between border-t border-border px-6 py-2.5">
-          <span aria-hidden="true" />
-          <Button variant="secondary" onPress={onClose}>
-            {t("common.done")}
-          </Button>
-        </div>
-      </div>
+      </DialogContent>
 
       {/* 鎭㈠榛樿纭 */}
       <ConfirmDialog
@@ -275,7 +270,7 @@ export function SettingsDialog({
         }}
         onClose={() => setConfirmResetScope(null)}
       />
-    </div>
+    </Dialog>
   );
 }
 
@@ -311,7 +306,7 @@ function SettingSection({
       <header className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {icon && (
-            <span className="flex size-6 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-accent">
+            <span className="flex size-6 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-primary">
               {icon}
             </span>
           )}
@@ -714,22 +709,21 @@ function FontSelectRow({
       <label className="block min-w-0 select-none">
         <span className="text-sm font-medium">{label}</span>
       </label>
-      <select
-        value={matchedPreset ? matchedPreset.id : ""}
-        onChange={(e) => {
-          const next = presets.find((p) => p.id === e.target.value);
+      <SelectField
+        value={matchedPreset?.id ?? ""}
+        options={[
+          { value: "", label: t("common.none") },
+          ...presets.map((p) => ({ value: p.id, label: p.label })),
+        ]}
+        onChange={(id) => {
+          const next = presets.find((p) => p.id === id);
+          onChange(next ? next.value : "");
           // 选"无"时清空，否则用预设值
           onChange(next ? next.value : "");
         }}
-        className="w-full select-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring"
-      >
-        <option value="">{t("common.none")}</option>
-        {presets.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.label}
-          </option>
-        ))}
-      </select>
+        className="text-xs"
+        ariaLabel={label}
+      />
       {value && (
         <span
           className="block truncate text-xs text-foreground/50"
@@ -865,22 +859,21 @@ function LegacyModelTab({
           title={t("model.default")}
           desc={t("model.default.desc")}
           control={
-            <select
-              className="min-w-56 select-none rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring"
+            <SelectField
+              className="min-w-56"
               value={settings.selectedModel ?? ""}
-              onChange={(e) => void update({ selectedModel: e.target.value || null })}
-            >
-              <option value="">{t("chat.selectModel")}</option>
-              {enabledProviders.map((provider) => (
-                <optgroup key={provider.id} label={provider.label}>
-                  {provider.models.map((model) => (
-                    <option key={model.id} value={providerModelRef(provider.id, model.id)}>
-                      {model.label ?? model.id}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              options={[
+                { value: "", label: t("chat.selectModel") },
+                ...enabledProviders.flatMap((provider) =>
+                  provider.models.map((model) => ({
+                    value: providerModelRef(provider.id, model.id),
+                    label: `${provider.label} / ${model.label ?? model.id}`,
+                  })),
+                ),
+              ]}
+              onChange={(value) => void update({ selectedModel: value || null })}
+              ariaLabel={t("model.default")}
+            />
           }
         />
       </div>
@@ -934,7 +927,7 @@ function LegacyModelTab({
                         {model.hasApiKey ? t("apikey.configured") : t("apikey.notConfigured")}
                       </span>
                       {selected && (
-                        <span className="inline-flex items-center gap-1 text-xs text-accent">
+                        <span className="inline-flex items-center gap-1 text-xs text-primary">
                           <IconCheck className="size-3" /> {t("model.selected")}
                         </span>
                       )}
@@ -1207,33 +1200,30 @@ function ModelEditorDialog({
             {!isEditing && (
               <label className="select-none text-sm md:col-span-2">
                 <span className="mb-1 block text-xs text-foreground/60">{t("model.provider")}</span>
-                <select
-                  className="w-full select-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+                <SelectField
                   value={addMode}
-                  onChange={(e) => setAddMode(e.target.value === "custom" ? "custom" : "existing")}
-                >
-                  <option value="existing">{t("model.addToProvider")}</option>
-                  <option value="custom">{t("model.addWithProvider")}</option>
-                </select>
+                  options={[
+                    { value: "existing", label: t("model.addToProvider") },
+                    { value: "custom", label: t("model.addWithProvider") },
+                  ]}
+                  onChange={(value) => setAddMode(value === "custom" ? "custom" : "existing")}
+                  ariaLabel={t("model.provider")}
+                />
               </label>
             )}
 
             {!isEditing && addMode === "existing" && (
               <label className="select-none text-sm md:col-span-2">
                 <span className="mb-1 block text-xs text-foreground/60">{t("model.provider")}</span>
-                <select
-                  className="w-full select-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+                <SelectField
                   value={modelForm.providerId}
-                  onChange={(e) =>
-                    setModelForm((prev) => ({ ...prev, providerId: e.target.value }))
-                  }
-                >
-                  {providers.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.label}
-                    </option>
-                  ))}
-                </select>
+                  options={providers.map((provider) => ({
+                    value: provider.id,
+                    label: provider.label,
+                  }))}
+                  onChange={(value) => setModelForm((prev) => ({ ...prev, providerId: value }))}
+                  ariaLabel={t("model.provider")}
+                />
               </label>
             )}
 
@@ -1345,7 +1335,7 @@ function ModelEditorDialog({
                     href={providerHelpUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-accent hover:underline"
+                    className="text-xs text-primary hover:underline"
                   >
                     {t("apikey.getKey")}
                   </a>
@@ -1370,14 +1360,14 @@ function ModelEditorDialog({
                   <span>{t("model.temperature")}</span>
                   <span>{f.fixed(modelForm.temperature, 1)}</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={0}
                   max={2}
                   step={0.1}
                   value={modelForm.temperature}
-                  onChange={(e) => updateModelNumber({ temperature: Number(e.target.value) })}
-                  className="w-full accent-[var(--color-accent)]"
+                  onValueChange={(value) =>
+                    updateModelNumber({ temperature: Array.isArray(value) ? value[0] : value })
+                  }
                   aria-label={t("model.temperature")}
                 />
                 <p className="mt-0.5 text-xs text-foreground/40">{t("model.temperature.hint")}</p>
@@ -1387,14 +1377,14 @@ function ModelEditorDialog({
                   <span>{t("model.topP")}</span>
                   <span>{f.fixed(modelForm.topP, 2)}</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={0}
                   max={1}
                   step={0.05}
                   value={modelForm.topP}
-                  onChange={(e) => updateModelNumber({ topP: Number(e.target.value) })}
-                  className="w-full accent-[var(--color-accent)]"
+                  onValueChange={(value) =>
+                    updateModelNumber({ topP: Array.isArray(value) ? value[0] : value })
+                  }
                   aria-label={t("model.topP")}
                 />
                 <p className="mt-0.5 text-xs text-foreground/40">{t("model.topP.hint")}</p>
@@ -1874,22 +1864,21 @@ function ProviderModelWorkbench({
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h3 className="text-base font-semibold">{t("settings.tab.model")}</h3>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="h-9 min-w-64 select-none select-text rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+          <SelectField
+            className="h-9 min-w-64"
             value={settings.selectedModel ?? ""}
-            onChange={(event) => void update({ selectedModel: event.target.value || null })}
-          >
-            <option value="">{t("chat.selectModel")}</option>
-            {enabledProviders.map((provider) => (
-              <optgroup key={provider.id} label={provider.label}>
-                {provider.models.map((model) => (
-                  <option key={model.id} value={providerModelRef(provider.id, model.id)}>
-                    {model.label ?? model.id}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            options={[
+              { value: "", label: t("chat.selectModel") },
+              ...enabledProviders.flatMap((provider) =>
+                provider.models.map((model) => ({
+                  value: providerModelRef(provider.id, model.id),
+                  label: `${provider.label} / ${model.label ?? model.id}`,
+                })),
+              ),
+            ]}
+            onChange={(value) => void update({ selectedModel: value || null })}
+            ariaLabel={t("model.provider")}
+          />
           <Button variant="primary" size="sm" onPress={() => setAddProviderOpen(true)}>
             <IconPlus className="mr-1 size-3.5" />
             {t("model.addProvider")}
@@ -2132,7 +2121,7 @@ function ProviderModelWorkbench({
                         href={selectedProvider.helpUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-accent hover:underline"
+                        className="text-primary hover:underline"
                       >
                         {t("apikey.getKey")}
                       </a>
@@ -2205,7 +2194,7 @@ function ProviderModelWorkbench({
                                   : t("model.custom")}
                               </span>
                               {selected && (
-                                <span className="inline-flex items-center gap-1 text-xs text-accent">
+                                <span className="inline-flex items-center gap-1 text-xs text-primary">
                                   <IconCheck className="size-3" /> {t("model.selected")}
                                 </span>
                               )}
@@ -2634,22 +2623,20 @@ function ModelOptionsDialog({
 
             <TextField className="md:col-span-2">
               <Label>{t("model.reasoningDefault")}</Label>
-              <select
-                className="h-9 w-full select-text rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+              <SelectField
                 value={form.reasoningDefault}
-                onChange={(event) =>
+                options={form.reasoningLevels.map((level) => ({
+                  value: level,
+                  label: t(REASONING_LEVEL_LABEL_KEYS[level]),
+                }))}
+                onChange={(value) =>
                   setForm((prev) => ({
                     ...prev,
-                    reasoningDefault: event.target.value as ChatReasoningLevel,
+                    reasoningDefault: value as ChatReasoningLevel,
                   }))
                 }
-              >
-                {form.reasoningLevels.map((level) => (
-                  <option key={level} value={level}>
-                    {t(REASONING_LEVEL_LABEL_KEYS[level])}
-                  </option>
-                ))}
-              </select>
+                ariaLabel={t("model.reasoningDefault")}
+              />
               <Description className="mt-1">{t("model.reasoningDefault.hint")}</Description>
             </TextField>
 
@@ -2660,16 +2647,17 @@ function ModelOptionsDialog({
                   <span>{t("model.temperature")}</span>
                   <span>{f.fixed(form.temperature, 1)}</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={0}
                   max={2}
                   step={0.1}
                   value={form.temperature}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, temperature: Number(event.target.value) }))
+                  onValueChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      temperature: Array.isArray(value) ? value[0] : value,
+                    }))
                   }
-                  className="w-full accent-[var(--color-accent)]"
                   aria-label={t("model.temperature")}
                 />
               </div>
@@ -2678,16 +2666,17 @@ function ModelOptionsDialog({
                   <span>{t("model.topP")}</span>
                   <span>{f.fixed(form.topP, 2)}</span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={0}
                   max={1}
                   step={0.05}
                   value={form.topP}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, topP: Number(event.target.value) }))
+                  onValueChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      topP: Array.isArray(value) ? value[0] : value,
+                    }))
                   }
-                  className="w-full accent-[var(--color-accent)]"
                   aria-label={t("model.topP")}
                 />
               </div>
@@ -3164,7 +3153,11 @@ function TrashTab(): React.JSX.Element {
       {trashKind === "agents" ? (
         agentItems.length === 0 ? (
           <div className="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            {loading.agents ? t("chat.loadingHistory") : emptyMessage()}
+            {loading.agents ? (
+              <LoadingIndicator label={t("chat.loadingHistory")} />
+            ) : (
+              emptyMessage()
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -3216,7 +3209,11 @@ function TrashTab(): React.JSX.Element {
         )
       ) : activeRows.length === 0 ? (
         <div className="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          {loading[trashKind] ? t("chat.loadingHistory") : emptyMessage()}
+          {loading[trashKind] ? (
+            <LoadingIndicator label={t("chat.loadingHistory")} />
+          ) : (
+            emptyMessage()
+          )}
         </div>
       ) : (
         <>

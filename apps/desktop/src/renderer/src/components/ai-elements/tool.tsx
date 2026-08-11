@@ -56,7 +56,7 @@ const STATE_META: Record<
   },
   "input-available": {
     labelKey: "tool.status.input-available",
-    tone: "text-accent",
+    tone: "text-primary",
     Icon: IconCircleDashed,
   },
   "approval-requested": {

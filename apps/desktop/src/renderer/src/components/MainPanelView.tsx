@@ -3,6 +3,11 @@ import {
   Button,
   Card,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Select,
   SelectContent,
@@ -796,20 +801,12 @@ function MemoryEditModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className="mx-4 w-full max-w-lg select-none overflow-hidden rounded-lg border border-border bg-background shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h3 className="text-sm font-semibold">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[92vh] w-[min(560px,calc(100vw-24px))] max-w-none p-0">
+        <DialogHeader className="flex-row items-center justify-between px-5 py-3">
+          <DialogTitle className="text-sm font-semibold">
             {memory ? t("main.memory.edit") : t("main.memory.new")}
-          </h3>
+          </DialogTitle>
           <button
             type="button"
             className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -818,85 +815,87 @@ function MemoryEditModal({
           >
             <IconX className="size-4" />
           </button>
-        </div>
+        </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-5 py-4">
-            <div className="grid gap-1.5">
-              <Label>{t("main.memory.field.title")}</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={t("main.memory.field.title")}
-                maxLength={120}
-                className="select-text"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("main.memory.field.content")}</Label>
-              <TextArea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t("main.memory.field.content")}
-                rows={5}
-                maxLength={4000}
-                className="select-text"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("main.memory.filter.scope")}</Label>
-              <ToggleButtonGroup
-                selectedKeys={[scope]}
-                onSelectionChange={(keys) => {
-                  const key = [...keys][0];
-                  if (MEMORY_SCOPES.includes(key as MemoryScope)) setScope(key as MemoryScope);
-                }}
-                size="sm"
-                fullWidth
-              >
-                {MEMORY_SCOPES.map((s) => (
-                  <ToggleButton key={s} id={s}>
-                    {t(`main.memory.scope.${s}`)}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-            </div>
-            <div className="grid gap-1.5">
-              <Label>{t("main.memory.filter.kind")}</Label>
-              <ToggleButtonGroup
-                selectedKeys={[kind]}
-                onSelectionChange={(keys) => {
-                  const key = [...keys][0];
-                  if (MEMORY_KINDS.includes(key as MemoryKind)) setKind(key as MemoryKind);
-                }}
-                size="sm"
-                fullWidth
-              >
-                {MEMORY_KINDS.map((k) => (
-                  <ToggleButton key={k} id={k}>
-                    {t(`main.memory.kind.${k}`)}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-            </div>
-            <div className="grid gap-1.5">
-              <Label>
-                {t("main.memory.field.salience")}: {salience}
-              </Label>
-              <Slider
-                value={[salience]}
-                onValueChange={(values) => setSalience(values[0] ?? 70)}
-                min={1}
-                max={100}
-                step={1}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch isSelected={pinned} onChange={setPinned}>
-                {t("main.memory.field.pinned")}
-              </Switch>
+          <div className="max-h-[calc(92vh-9rem)] overflow-y-auto px-5 py-4">
+            <div className="grid gap-4">
+              <div className="grid gap-1.5">
+                <Label>{t("main.memory.field.title")}</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t("main.memory.field.title")}
+                  maxLength={120}
+                  className="select-text"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("main.memory.field.content")}</Label>
+                <TextArea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={t("main.memory.field.content")}
+                  rows={5}
+                  maxLength={4000}
+                  className="select-text"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("main.memory.filter.scope")}</Label>
+                <ToggleButtonGroup
+                  selectedKeys={[scope]}
+                  onSelectionChange={(keys) => {
+                    const key = [...keys][0];
+                    if (MEMORY_SCOPES.includes(key as MemoryScope)) setScope(key as MemoryScope);
+                  }}
+                  size="sm"
+                  fullWidth
+                >
+                  {MEMORY_SCOPES.map((s) => (
+                    <ToggleButton key={s} id={s}>
+                      {t(`main.memory.scope.${s}`)}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{t("main.memory.filter.kind")}</Label>
+                <ToggleButtonGroup
+                  selectedKeys={[kind]}
+                  onSelectionChange={(keys) => {
+                    const key = [...keys][0];
+                    if (MEMORY_KINDS.includes(key as MemoryKind)) setKind(key as MemoryKind);
+                  }}
+                  size="sm"
+                  fullWidth
+                >
+                  {MEMORY_KINDS.map((k) => (
+                    <ToggleButton key={k} id={k}>
+                      {t(`main.memory.kind.${k}`)}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>
+                  {t("main.memory.field.salience")}: {salience}
+                </Label>
+                <Slider
+                  value={[salience]}
+                  onValueChange={(values) => setSalience(values[0] ?? 70)}
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch isSelected={pinned} onChange={setPinned}>
+                  {t("main.memory.field.pinned")}
+                </Switch>
+              </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <DialogFooter className="flex-row justify-end px-5 py-3">
             <Button variant="tertiary" size="sm" onPress={onClose} isDisabled={isSaving}>
               {t("common.cancel")}
             </Button>
@@ -909,10 +908,10 @@ function MemoryEditModal({
             >
               {t("main.memory.save")}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

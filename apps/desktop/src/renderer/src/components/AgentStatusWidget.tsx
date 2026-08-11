@@ -180,7 +180,7 @@ export function AgentStatusWidget({
       {open ? (
         <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
-            <IconBrain className="size-4 shrink-0 text-accent" aria-hidden="true" />
+            <IconBrain className="size-4 shrink-0 text-primary" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground/85">
                 {t("agentStatus.panel")}
@@ -391,7 +391,7 @@ function Metric({ label, value }: { label: string; value: number }): React.JSX.E
   );
 }
 
-function StatusIcon({ status }: { status: string }): React.JSX.Element {
+export function StatusIcon({ status }: { status: string }): React.JSX.Element {
   if (status === "succeeded" || status === "completed") {
     return <IconCircleCheck className="mt-0.5 size-4 shrink-0 text-success" />;
   }
@@ -403,8 +403,12 @@ function StatusIcon({ status }: { status: string }): React.JSX.Element {
     return <IconBrain className="mt-0.5 size-4 shrink-0 animate-pulse text-warning" />;
   }
   return (
-    <span className="relative mt-0.5 inline-flex size-4 shrink-0 items-center justify-center">
-      <span className="absolute inset-0 animate-spin rounded-full border-2 border-accent/25 border-t-accent motion-reduce:animate-none" />
+    <span
+      className="relative mt-0.5 inline-flex size-4 shrink-0 items-center justify-center"
+      data-slot="status-spinner"
+      aria-hidden="true"
+    >
+      <span className="absolute inset-0 animate-spin rounded-full border-2 border-primary/25 border-t-primary motion-reduce:animate-none" />
     </span>
   );
 }

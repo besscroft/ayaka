@@ -156,7 +156,7 @@ function MemorySearchResult({ output }: { output: unknown }): React.JSX.Element 
                   {memory.title}
                 </p>
                 {memory.pinned ? (
-                  <span className="text-[10px] text-accent">{t("tool.generated.pinned")}</span>
+                  <span className="text-[10px] text-primary">{t("tool.generated.pinned")}</span>
                 ) : null}
               </div>
               <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-[11px] leading-relaxed text-foreground/60">
@@ -598,8 +598,8 @@ function SafeLink({
       rel="noreferrer noopener"
       className={
         compact
-          ? "inline-flex min-w-0 items-center gap-1 text-[10px] text-accent hover:underline"
-          : "inline-flex min-w-0 items-center gap-1 text-[11px] text-accent hover:underline"
+          ? "inline-flex min-w-0 items-center gap-1 text-[10px] text-primary hover:underline"
+          : "inline-flex min-w-0 items-center gap-1 text-[11px] text-primary hover:underline"
       }
     >
       {children}

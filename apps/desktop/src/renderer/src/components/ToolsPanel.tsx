@@ -10,6 +10,8 @@ import {
   DialogTitle,
   Input,
   Label,
+  LoadingIndicator,
+  SelectField,
   Switch,
   Tabs,
   TabsList,
@@ -136,32 +138,34 @@ export function ToolsPanel(): React.JSX.Element {
               className="pl-9"
             />
           </label>
-          <select
-            className="h-10 min-w-0 select-none rounded-md border border-border bg-background px-3 text-sm"
+          <SelectField
             value={kind}
-            onChange={(event) => setKind(event.target.value as ToolKindFilter)}
-          >
-            <option value="all">{t("tools.filter.allKinds")}</option>
-            <option value="builtin">{t("tools.kind.builtin")}</option>
-            <option value="mcp">{t("tools.kind.mcp")}</option>
-            <option value="sandbox">{t("tools.kind.sandbox")}</option>
-          </select>
-          <select
-            className="h-10 min-w-0 select-none rounded-md border border-border bg-background px-3 text-sm"
+            options={[
+              { value: "all", label: t("tools.filter.allKinds") },
+              { value: "builtin", label: t("tools.kind.builtin") },
+              { value: "mcp", label: t("tools.kind.mcp") },
+              { value: "sandbox", label: t("tools.kind.sandbox") },
+            ]}
+            onChange={(value) => setKind(value as ToolKindFilter)}
+            ariaLabel={t("tools.filter.allKinds")}
+          />
+          <SelectField
             value={status}
-            onChange={(event) => setStatus(event.target.value as ToolStatusFilter)}
-          >
-            <option value="all">{t("tools.filter.allStatus")}</option>
-            <option value="enabled">{t("tools.filter.enabled")}</option>
-            <option value="approval">{t("tools.filter.approval")}</option>
-          </select>
+            options={[
+              { value: "all", label: t("tools.filter.allStatus") },
+              { value: "enabled", label: t("tools.filter.enabled") },
+              { value: "approval", label: t("tools.filter.approval") },
+            ]}
+            onChange={(value) => setStatus(value as ToolStatusFilter)}
+            ariaLabel={t("tools.filter.allStatus")}
+          />
         </div>
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading && !snapshot ? (
-          <div className="rounded-md border border-dashed border-border px-4 py-16 text-center text-sm text-muted-foreground">
-            {t("main.loading")}
+          <div className="rounded-md border border-dashed border-border px-4 py-16">
+            <LoadingIndicator label={t("main.loading")} />
           </div>
         ) : null}
 
@@ -1335,9 +1339,7 @@ function CatalogDetailModal({
             <p className="text-sm text-muted-foreground">{item.description}</p>
           ) : null}
           {loading ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {t("catalog.detailLoading")}
-            </p>
+            <LoadingIndicator className="w-full py-10" label={t("catalog.detailLoading")} />
           ) : null}
           {error ? (
             <div className="flex flex-col gap-2">
@@ -1368,7 +1370,7 @@ function CatalogDetailModal({
           ) : null}
           {item?.catalogUrl ? (
             <a
-              className="text-xs text-accent underline underline-offset-2"
+              className="text-xs text-primary underline underline-offset-2"
               href={item.catalogUrl}
               target="_blank"
               rel="noreferrer"

@@ -14,7 +14,7 @@ import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { petFrameAt } from "../lib/pet-animation";
-import { Button, Switch, Tabs, TabsList, TabsTrigger } from "./ui";
+import { Button, SelectField, Switch, Tabs, TabsList, TabsTrigger } from "./ui";
 import {
   IconCheck,
   IconGlobe,
@@ -222,7 +222,7 @@ export function DesktopPetsSettings(): React.JSX.Element {
                 )}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs text-accent">
+                <div className="flex items-center gap-2 text-xs text-primary">
                   <IconSparkles className="size-3.5 shrink-0" />
                   <span>{t("pets.title")}</span>
                   <span className="text-foreground/25">/</span>
@@ -677,17 +677,13 @@ function FilterSelect({
   return (
     <label className="flex items-center gap-2 text-xs text-foreground/50">
       <span>{label}</span>
-      <select
+      <SelectField
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-ring"
-      >
-        {options.map(([id, text]) => (
-          <option key={id} value={id}>
-            {text}
-          </option>
-        ))}
-      </select>
+        options={options.map(([id, text]) => ({ value: id, label: text }))}
+        onChange={onChange}
+        className="h-8 text-xs"
+        ariaLabel={label}
+      />
     </label>
   );
 }

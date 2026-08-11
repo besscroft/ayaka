@@ -157,7 +157,7 @@ export function Context({
             <Metric
               label={t("chat.context.cost")}
               value={f.usd(metrics.costUsd)}
-              tone="text-accent"
+              tone="text-primary"
               icon={<IconCurrency className="size-3" />}
             />
           ) : null}

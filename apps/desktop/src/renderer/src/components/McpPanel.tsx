@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  LoadingIndicator,
+  SelectField,
   Switch,
   Tabs,
   TabsList,
@@ -208,8 +210,8 @@ export function McpPanel(): React.JSX.Element {
           />
         ) : null}
         {tab === "installed" && loading && !snapshot ? (
-          <div className="rounded-md border border-dashed border-border px-4 py-16 text-center text-sm text-muted-foreground">
-            {t("main.loading")}
+          <div className="rounded-md border border-dashed border-border px-4 py-16">
+            <LoadingIndicator label={t("main.loading")} />
           </div>
         ) : null}
 
@@ -225,26 +227,28 @@ export function McpPanel(): React.JSX.Element {
                   placeholder={t("tools.search.placeholder")}
                 />
               </label>
-              <select
-                className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+              <SelectField
                 value={status}
-                onChange={(event) => setStatus(event.currentTarget.value as typeof status)}
-              >
-                <option value="all">{t("tools.filter.allStatus")}</option>
-                <option value="enabled">{t("catalog.enabled")}</option>
-                <option value="disabled">{t("catalog.disabled")}</option>
-                <option value="error">{t("tools.filter.error")}</option>
-              </select>
-              <select
-                className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+                options={[
+                  { value: "all", label: t("tools.filter.allStatus") },
+                  { value: "enabled", label: t("catalog.enabled") },
+                  { value: "disabled", label: t("catalog.disabled") },
+                  { value: "error", label: t("tools.filter.error") },
+                ]}
+                onChange={(value) => setStatus(value as typeof status)}
+                ariaLabel={t("tools.filter.allStatus")}
+              />
+              <SelectField
                 value={transport}
-                onChange={(event) => setTransport(event.currentTarget.value as typeof transport)}
-              >
-                <option value="all">{t("catalog.mcp.allTransports")}</option>
-                <option value="stdio">STDIO</option>
-                <option value="http">HTTP</option>
-                <option value="sse">SSE</option>
-              </select>
+                options={[
+                  { value: "all", label: t("catalog.mcp.allTransports") },
+                  { value: "stdio", label: "STDIO" },
+                  { value: "http", label: "HTTP" },
+                  { value: "sse", label: "SSE" },
+                ]}
+                onChange={(value) => setTransport(value as typeof transport)}
+                ariaLabel={t("catalog.mcp.allTransports")}
+              />
             </div>
             <McpSection
               servers={filteredServers}
@@ -679,15 +683,16 @@ function AddMcpModal({
             ) : null}
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="服务类型">
-                <select
-                  className="h-10 min-w-0 select-none rounded-md border border-input bg-background px-3 text-sm"
+                <SelectField
                   value={form.transport}
-                  onChange={(event) => patch({ transport: event.target.value as McpTransportKind })}
-                >
-                  <option value="stdio">STDIO</option>
-                  <option value="http">HTTP</option>
-                  <option value="sse">SSE</option>
-                </select>
+                  options={[
+                    { value: "stdio", label: "STDIO" },
+                    { value: "http", label: "HTTP" },
+                    { value: "sse", label: "SSE" },
+                  ]}
+                  onChange={(value) => patch({ transport: value as McpTransportKind })}
+                  ariaLabel={t("tools.field.transport")}
+                />
               </Field>
               <Field label="服务器名称">
                 <Input

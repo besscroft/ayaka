@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { RuntimeRun, RuntimeStep } from "@shared/types";
 import {
   getRecentRuntimeSteps,
   resolveAgentPanelStatus,
   selectLatestConversationRun,
+  StatusIcon,
 } from "./AgentStatusWidget";
 
 function makeRun(id: string, conversationId: string, startedAt: number): RuntimeRun {
@@ -87,5 +90,14 @@ void describe("agent status widget runtime helpers", () => {
       "failed",
     );
     assert.equal(resolveAgentPanelStatus({ chatStatus: "ready", isChatActive: false }), "idle");
+  });
+
+  void it("uses visible skin tokens for active loading indicators", () => {
+    const html = renderToStaticMarkup(createElement(StatusIcon, { status: "running" }));
+
+    assert.match(html, /data-slot="status-spinner"/);
+    assert.match(html, /border-primary\/25/);
+    assert.match(html, /border-t-primary/);
+    assert.doesNotMatch(html, /border-accent/);
   });
 });

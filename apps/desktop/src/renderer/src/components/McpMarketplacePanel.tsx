@@ -9,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  LoadingIndicator,
+  SelectField,
 } from "./ui";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
@@ -217,26 +219,26 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
             />
           </label>
           <div className="grid grid-cols-2 gap-2 sm:flex">
-            <select
-              className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+            <SelectField
               value={tag}
-              onChange={(event) => setTag(event.currentTarget.value as TagFilter)}
-              aria-label={t("catalog.mcp.tag")}
-            >
-              <option value="all">{t("catalog.mcp.allTags")}</option>
-              <option value="featured">{t("catalog.mcp.featured")}</option>
-              <option value="verified">{t("catalog.mcp.verified")}</option>
-            </select>
-            <select
-              className="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm"
+              options={[
+                { value: "all", label: t("catalog.mcp.allTags") },
+                { value: "featured", label: t("catalog.mcp.featured") },
+                { value: "verified", label: t("catalog.mcp.verified") },
+              ]}
+              onChange={(value) => setTag(value as TagFilter)}
+              ariaLabel={t("catalog.mcp.tag")}
+            />
+            <SelectField
               value={sort}
-              onChange={(event) => setSort(event.currentTarget.value as CatalogSort)}
-              aria-label={t("catalog.mcp.sort")}
-            >
-              <option value="featured">{t("catalog.mcp.sortFeatured")}</option>
-              <option value="latest">{t("catalog.mcp.sortLatest")}</option>
-              <option value="name">{t("catalog.mcp.sortName")}</option>
-            </select>
+              options={[
+                { value: "featured", label: t("catalog.mcp.sortFeatured") },
+                { value: "latest", label: t("catalog.mcp.sortLatest") },
+                { value: "name", label: t("catalog.mcp.sortName") },
+              ]}
+              onChange={(value) => setSort(value as CatalogSort)}
+              ariaLabel={t("catalog.mcp.sort")}
+            />
             <Button
               isIconOnly
               size="md"
@@ -261,19 +263,18 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
               {t("catalog.loaded", { count: f.number(items.length) })}
             </span>
           </div>
-          <select
-            className="h-9 min-w-0 rounded-md border border-border bg-background px-3 text-xs"
+          <SelectField
             value={category}
-            onChange={(event) => setCategory(event.currentTarget.value)}
-            aria-label={t("catalog.mcp.category")}
-          >
-            <option value="">{t("catalog.mcp.allCategories")}</option>
-            {categories.map((facet) => (
-              <option key={facet.id} value={facet.id}>
-                {facet.label} ({f.number(facet.count)})
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: t("catalog.mcp.allCategories") },
+              ...categories.map((facet) => ({
+                value: facet.id,
+                label: `${facet.label} (${f.number(facet.count)})`,
+              })),
+            ]}
+            onChange={setCategory}
+            ariaLabel={t("catalog.mcp.category")}
+          />
         </div>
       </div>
 
@@ -312,7 +313,7 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
         {items.length > 0 && hasMore ? (
           <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3">
             {loadingMore ? (
-              <span className="text-xs text-muted-foreground">{t("catalog.mcp.loadingMore")}</span>
+              <LoadingIndicator className="text-xs" label={t("catalog.mcp.loadingMore")} />
             ) : null}
           </div>
         ) : null}
@@ -492,9 +493,7 @@ function McpMarketplaceDetailModal({
             <p className="text-sm text-muted-foreground">{item.description}</p>
           ) : null}
           {loading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {t("catalog.detailLoading")}
-            </p>
+            <LoadingIndicator className="w-full py-8" label={t("catalog.detailLoading")} />
           ) : null}
           {error ? (
             <div className="flex flex-col gap-2">
@@ -588,7 +587,7 @@ function McpMarketplaceDetailModal({
           ) : null}
           {item?.catalogUrl ? (
             <a
-              className="inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
+              className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
               href={item.catalogUrl}
               target="_blank"
               rel="noreferrer"
@@ -599,7 +598,7 @@ function McpMarketplaceDetailModal({
           ) : null}
           {mcp?.repositoryUrl ? (
             <a
-              className="ml-3 inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
+              className="ml-3 inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
               href={mcp.repositoryUrl}
               target="_blank"
               rel="noreferrer"

@@ -13,15 +13,19 @@ interface SwitchProps extends Omit<
   size?: "sm" | "md";
 }
 
+const SwitchSizeContext = React.createContext<"sm" | "md">("md");
+
 const SwitchContent = ({ className, ...props }: React.ComponentProps<"span">) => (
   <span className={cn("inline-flex select-none items-center gap-2", className)} {...props} />
 );
 
 function SwitchControl({ className, ...props }: React.ComponentProps<"span">) {
+  const size = React.useContext(SwitchSizeContext);
   return (
     <span
       className={cn(
-        "relative inline-flex shrink-0 items-center rounded-full bg-muted-foreground/25 transition-colors group-data-checked:bg-primary",
+        "relative inline-flex shrink-0 items-center rounded-full bg-muted-foreground/35 transition-colors group-data-checked:bg-primary",
+        size === "sm" ? "h-5 w-9" : "h-6 w-11",
         className,
       )}
       {...props}
@@ -30,10 +34,12 @@ function SwitchControl({ className, ...props }: React.ComponentProps<"span">) {
 }
 
 function SwitchThumb({ className, ...props }: SwitchPrimitive.Thumb.Props) {
+  const size = React.useContext(SwitchSizeContext);
   return (
     <SwitchPrimitive.Thumb
       className={cn(
-        "block rounded-full bg-background shadow-sm transition-transform group-data-checked:translate-x-5",
+        "block rounded-full bg-background shadow-sm transition-transform",
+        size === "sm" ? "size-4 data-checked:translate-x-4" : "size-5 data-checked:translate-x-5",
         className,
       )}
       {...props}
@@ -50,30 +56,34 @@ function SwitchRoot({
   children,
   ...props
 }: SwitchProps): React.JSX.Element {
-  const compound = React.Children.count(children) > 0;
+  const childArray = React.Children.toArray(children);
+  const compound = childArray.some(
+    (child) => React.isValidElement(child) && child.type === SwitchContent,
+  );
   return (
-    <SwitchPrimitive.Root
-      checked={isSelected}
-      disabled={isDisabled}
-      onCheckedChange={onChange}
-      className={cn(
-        "group inline-flex items-center gap-2 rounded-md text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    >
-      {compound ? (
-        children
-      ) : (
-        <SwitchContent>
-          <SwitchControl className={size === "sm" ? "h-5 w-9" : "h-6 w-11"}>
-            <SwitchThumb
-              className={size === "sm" ? "size-4 data-checked:translate-x-4" : "size-5"}
-            />
-          </SwitchControl>
-        </SwitchContent>
-      )}
-    </SwitchPrimitive.Root>
+    <SwitchSizeContext.Provider value={size}>
+      <SwitchPrimitive.Root
+        checked={isSelected}
+        disabled={isDisabled}
+        onCheckedChange={onChange}
+        className={cn(
+          "group inline-flex items-center gap-2 rounded-md text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+        {...props}
+      >
+        {compound ? (
+          children
+        ) : (
+          <SwitchContent>
+            <SwitchControl>
+              <SwitchThumb />
+            </SwitchControl>
+            {children}
+          </SwitchContent>
+        )}
+      </SwitchPrimitive.Root>
+    </SwitchSizeContext.Provider>
   );
 }
 

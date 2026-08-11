@@ -150,7 +150,7 @@ export function ReasoningTrigger({
       {...rest}
     >
       {isStreaming ? (
-        <IconDots className="size-3.5 animate-pulse text-accent" />
+        <IconDots className="size-3.5 animate-pulse text-primary" />
       ) : (
         <IconBrain className="size-3.5" />
       )}

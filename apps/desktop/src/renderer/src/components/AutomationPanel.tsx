@@ -10,7 +10,18 @@ import { CHAT_REASONING_LEVELS } from "@shared/types";
 import { api } from "../lib/api";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
-import { Button, Card, Chip, Input, TextArea, ToggleButton, ToggleButtonGroup } from "./ui";
+import {
+  Button,
+  Card,
+  Chip,
+  DateTimePicker,
+  Input,
+  LoadingIndicator,
+  SelectField,
+  TextArea,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 type ScheduleKind = CronSchedule["kind"];
@@ -140,11 +151,7 @@ export function AutomationPanel(): React.JSX.Element {
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {t("automation.loading")}
-      </div>
-    );
+    return <LoadingIndicator className="flex flex-1" label={t("automation.loading")} />;
   }
 
   if (error) {
@@ -416,10 +423,10 @@ function AutomationEditor({
         </Field>
         {draft.kind === "once" ? (
           <Field label={t("automation.runAt")}>
-            <Input
-              type="datetime-local"
+            <DateTimePicker
               value={draft.onceAt}
-              onChange={(event) => update("onceAt", event.currentTarget.value)}
+              onChange={(value) => update("onceAt", value)}
+              ariaLabel={t("automation.runAt")}
             />
           </Field>
         ) : null}
@@ -474,19 +481,15 @@ function AutomationEditor({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("automation.reasoning")}>
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            <SelectField
               value={draft.reasoning}
-              onChange={(event) =>
-                update("reasoning", event.currentTarget.value as ChatReasoningLevel)
-              }
-            >
-              {CHAT_REASONING_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {t(`reasoning.level.${level}`)}
-                </option>
-              ))}
-            </select>
+              options={CHAT_REASONING_LEVELS.map((level) => ({
+                value: level,
+                label: t(`reasoning.level.${level}`),
+              }))}
+              onChange={(value) => update("reasoning", value as ChatReasoningLevel)}
+              ariaLabel={t("automation.reasoning")}
+            />
           </Field>
           <Field label={t("automation.skills")}>
             <Input

@@ -101,7 +101,7 @@ export function ModelSelector({
         aria-expanded={open}
         aria-label={t("model.selector.label")}
       >
-        <span className="size-2 shrink-0 rounded-full bg-accent shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent)_18%,transparent)]" />
+        <span className="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-primary)_18%,transparent)]" />
         <span className="max-w-[160px] truncate font-medium">{selectedLabel()}</span>
         <IconChevronDown className={`size-3 shrink-0 transition ${open ? "rotate-180" : ""}`} />
       </button>

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { ABOUT_RESOURCES, normalizeAppVersion, type AboutResourceId } from "../lib/about";
 import { useT } from "../lib/i18n";
 import type { UpdateState } from "@shared/types";
-import { Button, Description } from "./ui";
+import { Button, Description, LoadingIndicator } from "./ui";
 import {
   IconArrowDown,
   IconBookOpen,
@@ -86,7 +86,7 @@ export function AboutSettings(): React.JSX.Element {
           className="size-20 shrink-0 rounded-xl shadow-sm ring-1 ring-border"
         />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-accent">{t("about.product")}</p>
+          <p className="text-xs font-medium text-primary">{t("about.product")}</p>
           <h3 className="mt-1 text-2xl font-semibold leading-tight">Paimon</h3>
           <Description className="mt-1">{t("shell.tagline")}</Description>
         </div>
@@ -99,7 +99,13 @@ export function AboutSettings(): React.JSX.Element {
       <dl className="mt-8 grid grid-cols-2 gap-x-8 gap-y-5">
         <div className="flex min-w-0 flex-col gap-1">
           <dt className="text-xs text-muted-foreground">{t("about.version")}</dt>
-          <dd className="break-words font-mono text-sm font-medium">{versionLabel}</dd>
+          <dd className="break-words font-mono text-sm font-medium">
+            {version === undefined ? (
+              <LoadingIndicator className="justify-start font-sans text-xs" label={versionLabel} />
+            ) : (
+              versionLabel
+            )}
+          </dd>
         </div>
         <div className="flex min-w-0 flex-col gap-1">
           <dt className="text-xs text-muted-foreground">{t("about.license")}</dt>

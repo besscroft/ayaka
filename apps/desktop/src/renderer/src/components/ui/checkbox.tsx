@@ -21,7 +21,7 @@ const CheckboxContent = ({ className, ...props }: React.ComponentProps<"span">) 
 const CheckboxControl = ({ className, children, ...props }: React.ComponentProps<"span">) => (
   <span
     className={cn(
-      "flex size-4 shrink-0 items-center justify-center rounded border border-border bg-background text-primary-foreground data-checked:border-primary data-checked:bg-primary",
+      "flex size-4 shrink-0 items-center justify-center rounded border border-border bg-background text-primary-foreground group-data-checked:border-primary group-data-checked:bg-primary",
       className,
     )}
     {...props}
@@ -50,14 +50,20 @@ function CheckboxRoot({
   children,
   ...props
 }: CheckboxProps): React.JSX.Element {
-  const compound = React.Children.count(children) > 0;
+  const childArray = React.Children.toArray(children);
+  const compound = childArray.some(
+    (child) => React.isValidElement(child) && child.type === CheckboxContent,
+  );
   return (
     <CheckboxPrimitive.Root
       checked={isSelected}
       indeterminate={isIndeterminate}
       disabled={isDisabled}
       onCheckedChange={onChange}
-      className={cn("inline-flex min-w-0 items-center gap-2 text-sm", className)}
+      className={cn(
+        "group inline-flex min-w-0 items-center gap-2 rounded-md text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
       {...props}
     >
       {compound ? (

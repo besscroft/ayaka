@@ -2,9 +2,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Button,
   Card,
+  Checkbox,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
+  SelectField,
   Slider,
   Switch,
   Tabs,
@@ -545,7 +553,7 @@ function AgentCard({
             className="flex min-w-0 flex-1 items-start gap-3 text-left"
             onClick={onSelect}
           >
-            <span className="flex size-10 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-accent">
+            <span className="flex size-10 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-primary">
               {agent.avatar || agent.name.slice(0, 1)}
             </span>
             <span className="min-w-0">
@@ -667,27 +675,18 @@ function AgentDetailModal({
   const handoffConfig = normalizeAgentHandoffConfig(agent.handoff_config_json);
   const toolPolicy = normalizeAgentToolPolicy(agent.tool_policy_json);
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="agent-detail-title"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-2xl p-0">
+        <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-9 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-accent">
+            <span className="flex size-9 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-primary">
               {agent.avatar || agent.name.slice(0, 1)}
             </span>
             <div className="min-w-0">
-              <h2 id="agent-detail-title" className="truncate text-base font-semibold">
-                {agent.name}
-              </h2>
-              <p className="truncate text-sm text-foreground/50">{agent.role}</p>
+              <DialogTitle className="truncate text-base font-semibold">{agent.name}</DialogTitle>
+              <DialogDescription className="truncate text-sm text-foreground/50">
+                {agent.role}
+              </DialogDescription>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -710,7 +709,7 @@ function AgentDetailModal({
               <IconClose className="size-4" />
             </Button>
           </div>
-        </header>
+        </DialogHeader>
         <div className="min-h-0 flex flex-1 flex-col gap-4 overflow-y-auto p-5">
           <Tabs value={tab} onValueChange={(key) => setTab(agentDetailTabKey(key))}>
             <TabsList aria-label={t("agents.detail.tabs")}>
@@ -877,8 +876,8 @@ function AgentDetailModal({
             </div>
           ) : null}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -930,23 +929,16 @@ function AgentEditorModal({
   const approvalTools = tools.filter((tool) => !isChatToolId(tool.id));
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="agent-editor-title"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-4xl p-0">
+        <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4">
           <div>
-            <h2 id="agent-editor-title" className="text-base font-semibold">
+            <DialogTitle className="text-base font-semibold">
               {mode === "create" ? t("agents.editor.create") : t("agents.editor.edit")}
-            </h2>
-            <p className="mt-1 text-sm text-foreground/50">{t("agents.editor.subtitle")}</p>
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-sm text-foreground/50">
+              {t("agents.editor.subtitle")}
+            </DialogDescription>
           </div>
           <Button
             isIconOnly
@@ -957,7 +949,7 @@ function AgentEditorModal({
           >
             <IconClose className="size-4" />
           </Button>
-        </header>
+        </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <div className="flex flex-col gap-5">
             <Tabs value={tab} onValueChange={(key) => setTab(agentEditorTabKey(key))}>
@@ -1001,18 +993,18 @@ function AgentEditorModal({
                 </Field>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.model")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.model_ref}
-                      onChange={(event) => patch({ model_ref: event.target.value })}
-                    >
-                      <option value="">{t("agents.inherit")}</option>
-                      {managedModels.map((model) => (
-                        <option key={model.ref} value={model.ref}>
-                          {model.providerLabel} / {model.modelLabel ?? model.modelId}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: "", label: t("agents.inherit") },
+                        ...managedModels.map((model) => ({
+                          value: model.ref,
+                          label: `${model.providerLabel} / ${model.modelLabel ?? model.modelId}`,
+                        })),
+                      ]}
+                      onChange={(value) => patch({ model_ref: value })}
+                      ariaLabel={t("agents.field.model")}
+                    />
                   </Field>
                   <Field label={t("agents.field.voice")}>
                     <Input
@@ -1042,16 +1034,15 @@ function AgentEditorModal({
               <div className="grid gap-4">
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label={t("agents.field.status")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.status}
-                      onChange={(event) =>
-                        patch({ status: event.target.value as AgentProfile["status"] })
-                      }
-                    >
-                      <option value="active">{t("status.agent.active")}</option>
-                      <option value="draft">{t("status.agent.draft")}</option>
-                    </select>
+                      options={[
+                        { value: "active", label: t("status.agent.active") },
+                        { value: "draft", label: t("status.agent.draft") },
+                      ]}
+                      onChange={(value) => patch({ status: value as AgentProfile["status"] })}
+                      ariaLabel={t("agents.field.status")}
+                    />
                   </Field>
                   <Field label={t("agents.field.maxTurns")}>
                     <Input
@@ -1063,19 +1054,15 @@ function AgentEditorModal({
                     />
                   </Field>
                   <Field label={t("agents.field.reasoning")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.runtimeConfig.reasoning ?? "provider-default"}
-                      onChange={(event) =>
-                        patchRuntime({ reasoning: event.target.value as ChatReasoningLevel })
-                      }
-                    >
-                      {CHAT_REASONING_LEVELS.map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
+                      options={CHAT_REASONING_LEVELS.map((level) => ({
+                        value: level,
+                        label: level,
+                      }))}
+                      onChange={(value) => patchRuntime({ reasoning: value as ChatReasoningLevel })}
+                      ariaLabel={t("agents.field.reasoning")}
+                    />
                   </Field>
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
@@ -1107,25 +1094,23 @@ function AgentEditorModal({
                     />
                   </Field>
                   <Field label={t("agents.field.contextMode")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.runtimeConfig.contextPolicy?.mode ?? "semantic"}
-                      onChange={(event) =>
+                      options={Object.entries(CONTEXT_MODE_KEYS).map(([value, key]) => ({
+                        value,
+                        label: t(key),
+                      }))}
+                      onChange={(value) =>
                         patchRuntime({
                           contextPolicy: {
                             ...(form.runtimeConfig.contextPolicy ??
                               DEFAULT_AGENT_RUNTIME_CONFIG.contextPolicy!),
-                            mode: event.target.value as "off" | "prune" | "semantic",
+                            mode: value as "off" | "prune" | "semantic",
                           },
                         })
                       }
-                    >
-                      {Object.entries(CONTEXT_MODE_KEYS).map(([value, key]) => (
-                        <option key={value} value={value}>
-                          {t(key)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("agents.field.contextMode")}
+                    />
                   </Field>
                 </div>
                 <div className="grid gap-3 md:grid-cols-4">
@@ -1175,20 +1160,18 @@ function AgentEditorModal({
                   </Field>
                 </div>
                 <Field label={t("agents.field.compactionModel")}>
-                  <select
-                    className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                  <SelectField
                     value={form.runtimeConfig.compactionModelRef ?? ""}
-                    onChange={(event) =>
-                      patchRuntime({ compactionModelRef: event.target.value || undefined })
-                    }
-                  >
-                    <option value="">{t("agents.option.compactionModel.active")}</option>
-                    {managedModels.map((model) => (
-                      <option key={model.ref} value={model.ref}>
-                        {model.modelLabel} / {model.providerLabel}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: t("agents.option.compactionModel.active") },
+                      ...managedModels.map((model) => ({
+                        value: model.ref,
+                        label: `${model.modelLabel} / ${model.providerLabel}`,
+                      })),
+                    ]}
+                    onChange={(value) => patchRuntime({ compactionModelRef: value || undefined })}
+                    ariaLabel={t("agents.field.compactionModel")}
+                  />
                 </Field>
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label={t("agents.field.temperature")}>
@@ -1223,42 +1206,34 @@ function AgentEditorModal({
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.reviewPolicy")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.runtimeConfig.reviewPolicy ?? "review_sensitive"}
-                      onChange={(event) =>
+                      options={Object.entries(REVIEW_POLICY_KEYS).map(([value, key]) => ({
+                        value,
+                        label: t(key),
+                      }))}
+                      onChange={(value) =>
                         patchRuntime({
-                          reviewPolicy: event.target.value as NonNullable<
-                            AgentRuntimeConfig["reviewPolicy"]
-                          >,
+                          reviewPolicy: value as NonNullable<AgentRuntimeConfig["reviewPolicy"]>,
                         })
                       }
-                    >
-                      {Object.entries(REVIEW_POLICY_KEYS).map(([value, key]) => (
-                        <option key={value} value={value}>
-                          {t(key)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("agents.field.reviewPolicy")}
+                    />
                   </Field>
                   <Field label={t("agents.field.sandboxPolicy")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.runtimeConfig.sandboxPolicy ?? "local"}
-                      onChange={(event) =>
+                      options={Object.entries(SANDBOX_POLICY_KEYS).map(([value, key]) => ({
+                        value,
+                        label: t(key),
+                      }))}
+                      onChange={(value) =>
                         patchRuntime({
-                          sandboxPolicy: event.target.value as NonNullable<
-                            AgentRuntimeConfig["sandboxPolicy"]
-                          >,
+                          sandboxPolicy: value as NonNullable<AgentRuntimeConfig["sandboxPolicy"]>,
                         })
                       }
-                    >
-                      {Object.entries(SANDBOX_POLICY_KEYS).map(([value, key]) => (
-                        <option key={value} value={value}>
-                          {t(key)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("agents.field.sandboxPolicy")}
+                    />
                   </Field>
                 </div>
                 <Switch isSelected={form.enabled} onChange={(enabled) => patch({ enabled })}>
@@ -1276,36 +1251,30 @@ function AgentEditorModal({
               <div className="grid gap-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.handoff")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.handoffConfig.mode}
-                      onChange={(event) =>
-                        patchHandoff({ mode: event.target.value as AgentHandoffConfig["mode"] })
+                      options={Object.entries(HANDOFF_MODE_KEYS).map(([value, key]) => ({
+                        value,
+                        label: t(key),
+                      }))}
+                      onChange={(value) =>
+                        patchHandoff({ mode: value as AgentHandoffConfig["mode"] })
                       }
-                    >
-                      {Object.entries(HANDOFF_MODE_KEYS).map(([value, key]) => (
-                        <option key={value} value={value}>
-                          {t(key)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("agents.field.handoff")}
+                    />
                   </Field>
                   <Field label={t("agents.field.priority")}>
-                    <select
-                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                    <SelectField
                       value={form.handoffConfig.priority}
-                      onChange={(event) =>
-                        patchHandoff({
-                          priority: event.target.value as AgentHandoffConfig["priority"],
-                        })
+                      options={Object.entries(PRIORITY_KEYS).map(([value, key]) => ({
+                        value,
+                        label: t(key),
+                      }))}
+                      onChange={(value) =>
+                        patchHandoff({ priority: value as AgentHandoffConfig["priority"] })
                       }
-                    >
-                      {Object.entries(PRIORITY_KEYS).map(([value, key]) => (
-                        <option key={value} value={value}>
-                          {t(key)}
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("agents.field.priority")}
+                    />
                   </Field>
                 </div>
                 <Field label={t("agents.field.accepts")}>
@@ -1330,16 +1299,17 @@ function AgentEditorModal({
             {tab === "tools" ? (
               <div className="flex flex-col gap-4">
                 <Field label={t("agents.field.toolMode")}>
-                  <select
-                    className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
+                  <SelectField
                     value={form.toolPolicy.mode}
-                    onChange={(event) =>
-                      patchTools({ mode: event.target.value === "custom" ? "custom" : "inherit" })
+                    options={[
+                      { value: "inherit", label: t("agents.option.toolPolicy.inherit") },
+                      { value: "custom", label: t("agents.option.toolPolicy.custom") },
+                    ]}
+                    onChange={(value) =>
+                      patchTools({ mode: value === "custom" ? "custom" : "inherit" })
                     }
-                  >
-                    <option value="inherit">{t("agents.option.toolPolicy.inherit")}</option>
-                    <option value="custom">{t("agents.option.toolPolicy.custom")}</option>
-                  </select>
+                    ariaLabel={t("agents.field.toolMode")}
+                  />
                 </Field>
                 <ToolChecklist
                   title={t("agents.field.allowedTools")}
@@ -1358,7 +1328,7 @@ function AgentEditorModal({
             ) : null}
           </div>
         </div>
-        <footer className="flex justify-end gap-2 border-t border-border px-5 py-4">
+        <DialogFooter className="flex-row justify-end px-5 py-4">
           <Button variant="tertiary" onPress={onClose}>
             {t("common.cancel")}
           </Button>
@@ -1366,9 +1336,9 @@ function AgentEditorModal({
             <IconCheck className="size-4" />
             {t("agents.action.save")}
           </Button>
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1398,22 +1368,26 @@ function ToolChecklist({
           <p className="px-3 py-4 text-sm text-foreground/45">{t("agents.noTools")}</p>
         ) : (
           tools.map((tool) => (
-            <label
+            <div
               key={tool.id}
               className="flex items-start gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0"
             >
-              <input
-                type="checkbox"
-                className="mt-1"
-                disabled={disabled}
-                checked={selectedSet.has(tool.id)}
-                onChange={(event) => toggle(tool.id, event.currentTarget.checked)}
+              <Checkbox
+                isSelected={selectedSet.has(tool.id)}
+                isDisabled={disabled}
+                onChange={(enabled) => toggle(tool.id, enabled)}
+                aria-label={tool.label}
               />
-              <span className="min-w-0">
+              <button
+                type="button"
+                className="min-w-0 flex-1 text-left"
+                disabled={disabled}
+                onClick={() => toggle(tool.id, !selectedSet.has(tool.id))}
+              >
                 <span className="block font-medium">{tool.label}</span>
                 <span className="line-clamp-2 text-xs text-foreground/50">{tool.description}</span>
-              </span>
-            </label>
+              </button>
+            </div>
           ))
         )}
       </div>

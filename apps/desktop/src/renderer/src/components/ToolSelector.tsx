@@ -155,7 +155,7 @@ export function ToolSelector({
               aria-label={t("chatTools.selector.label")}
               className={cn(
                 "relative size-8 shrink-0 rounded-xl text-foreground/65",
-                activeToolIds.length > 0 && "text-accent",
+                activeToolIds.length > 0 && "text-primary",
               )}
             >
               <IconWrench className="size-4" />
@@ -269,7 +269,7 @@ function ManualToolGroup({
                 "cursor-not-allowed border-border bg-muted text-muted-foreground hover:border-border hover:bg-muted",
             )}
           >
-            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-accent">
+            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-primary">
               {selected ? (
                 <IconCheckSquare className="size-4" />
               ) : (
@@ -328,7 +328,7 @@ function AutoToolList({
                 <span className="break-words text-xs font-semibold">
                   {toolLabel(t, id, descriptor)}
                 </span>
-                {enabled ? <IconCheck className="size-3 text-accent" /> : null}
+                {enabled ? <IconCheck className="size-3 text-primary" /> : null}
                 <ToolBadges descriptor={descriptor} compact />
               </div>
               <p className="mt-0.5 break-words text-[11px] leading-snug text-foreground/55">
@@ -448,7 +448,7 @@ function ToolBadges({
         </span>
       ) : null}
       {descriptor.id === "web_search" && descriptor.execution === "provider" ? (
-        <span className={cn(badgeClass, "bg-accent/10 text-accent")}>
+        <span className={cn(badgeClass, "bg-accent/10 text-primary")}>
           {t("chatTools.badge.native")}
         </span>
       ) : null}
@@ -458,7 +458,7 @@ function ToolBadges({
         </span>
       ) : null}
       {descriptor.category === "mcp" ? (
-        <span className={cn(badgeClass, "bg-accent/10 text-accent")}>
+        <span className={cn(badgeClass, "bg-accent/10 text-primary")}>
           {t("chatTools.badge.mcp")}
         </span>
       ) : null}

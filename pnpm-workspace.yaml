@@ -36,6 +36,8 @@ catalog:
   mem0ai: ^3.0.13
   cheerio: ^1.2.0
   croner: ^10.0.1
+  date-fns: ^4.4.0
+  react-day-picker: ^10.0.1
   tailwindcss: ^4.3.1
   "@tailwindcss/vite": ^4.3.2
   rolldown: 1.0.3

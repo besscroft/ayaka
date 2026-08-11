@@ -21,7 +21,7 @@ import {
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { getModelReasoningDefault } from "./ReasoningSelector";
-import { Button } from "./ui";
+import { Button, LoadingIndicator } from "./ui";
 import { api, type RuntimeSnapshot } from "../lib/api";
 import { hasMeaningfulConversationTitle } from "../lib/conversation-title";
 import { getChatErrorInfo, getChatErrorMessage } from "../lib/errors";
@@ -914,11 +914,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   };
 
   if (hydrationState === "loading") {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {t("chat.loadingHistory")}
-      </div>
-    );
+    return <LoadingIndicator className="flex flex-1" label={t("chat.loadingHistory")} />;
   }
 
   if (hydrationState === "error") {

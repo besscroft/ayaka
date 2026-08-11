@@ -1,5 +1,5 @@
 import { createContext, useContext, type ButtonHTMLAttributes, type HTMLAttributes } from "react";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { Badge as ShadcnBadge } from "./badge";
 import { Button } from "./button";
@@ -16,6 +16,14 @@ import { Input } from "./input";
 import { Label } from "./label";
 import { Switch } from "./switch";
 import { Textarea as TextArea } from "./textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
 import {
   ToggleGroup as BaseToggleGroup,
   ToggleGroupItem as BaseToggleGroupItem,
@@ -44,6 +52,8 @@ export {
 };
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 export { Slider } from "./slider";
+export { Calendar, CalendarDayButton } from "./calendar";
+export { DateTimePicker } from "./date-time-picker";
 export {
   Select,
   SelectContent,
@@ -122,6 +132,55 @@ export type ToggleButtonGroupProps = Omit<HTMLAttributes<HTMLDivElement>, "defau
   fullWidth?: boolean;
 };
 
+export interface SelectFieldOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export function SelectField({
+  value,
+  options,
+  onChange,
+  placeholder,
+  ariaLabel,
+  className,
+}: {
+  value: string;
+  options: SelectFieldOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+  className?: string;
+}): React.JSX.Element {
+  const selected = options.find((option) => option.value === value) ?? null;
+  return (
+    <Select
+      items={options}
+      value={selected}
+      isItemEqualToValue={(option, next) => option.value === next.value}
+      itemToStringLabel={(option) => option.label}
+      itemToStringValue={(option) => option.value}
+      onValueChange={(option) => onChange(option?.value ?? "")}
+    >
+      <SelectTrigger className={cn("w-full", className)} aria-label={ariaLabel}>
+        <SelectValue>
+          {(option: SelectFieldOption | null) => option?.label ?? placeholder ?? ""}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent alignItemWithTrigger={false} align="start">
+        <SelectGroup>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function ToggleButtonGroup({
   selectedKeys = [],
   onSelectionChange,
@@ -182,6 +241,28 @@ export function Description({
   ...props
 }: HTMLAttributes<HTMLParagraphElement>): React.JSX.Element {
   return <p className={cn("text-xs text-muted-foreground", className)} {...props} />;
+}
+
+export function LoadingIndicator({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        "inline-flex items-center justify-center gap-2 text-sm text-muted-foreground",
+        className,
+      )}
+    >
+      <Loader2 className="size-4 animate-spin text-primary" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
 }
 
 export function TextField({

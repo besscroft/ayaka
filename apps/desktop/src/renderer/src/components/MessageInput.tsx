@@ -309,7 +309,7 @@ export function MessageInput({
               {isDragging ? (
                 <div
                   data-slot="composer-drop-overlay"
-                  className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-lg border-2 border-dashed border-accent/40 bg-accent/5 text-sm text-accent"
+                  className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 text-sm text-primary"
                 >
                   {t("input.dropHint")}
                 </div>
