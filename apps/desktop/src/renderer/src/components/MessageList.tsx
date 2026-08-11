@@ -35,6 +35,9 @@ import {
   MessageContent,
   MessageResponse,
   PromptSuggestions,
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
   Tool,
   ToolContent,
   ToolHeader,
@@ -268,6 +271,50 @@ export interface ReasoningDisplay {
   isStreaming: boolean;
 }
 
+export interface ExecutionSummary {
+  toolCount: number;
+  activeToolCount: number;
+  pendingToolCount: number;
+  errorToolCount: number;
+  sourceCount: number;
+  compactionCount: number;
+  imageCount: number;
+  hasActivity: boolean;
+  hasAttention: boolean;
+}
+
+export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary {
+  const toolParts = parts.filter(isToolPart);
+  const activeToolCount = toolParts.filter(
+    (part) => part.state !== undefined && isActiveToolState(normalizeToolState(part.state)),
+  ).length;
+  const errorToolCount = toolParts.filter(
+    (part) => part.state !== undefined && isToolErrorState(normalizeToolState(part.state)),
+  ).length;
+  const pendingToolCount = toolParts.filter((part) => part.state === undefined).length;
+  const sourceCount = parts.filter(isSourcePart).length;
+  const compactionCount = parts.filter(
+    (part) => part.type === "custom" && (part as { kind?: unknown }).kind === "openai.compaction",
+  ).length;
+  const imageCount = parts.filter(isAttachmentPart).filter((part) => {
+    return (part.mediaType ?? "").startsWith("image/");
+  }).length;
+  const hasActivity =
+    toolParts.length > 0 || sourceCount > 0 || compactionCount > 0 || imageCount > 0;
+
+  return {
+    toolCount: toolParts.length,
+    activeToolCount,
+    pendingToolCount,
+    errorToolCount,
+    sourceCount,
+    compactionCount,
+    imageCount,
+    hasActivity,
+    hasAttention: activeToolCount > 0 || errorToolCount > 0,
+  };
+}
+
 function MessageActivity({
   status,
   isStreaming,
@@ -341,11 +388,17 @@ export function getReasoningDisplay(
   if (reasoningParts.length === 0) return null;
 
   const lastReasoningPart = reasoningParts.at(-1);
+  const lastPart = parts.at(-1);
   return {
-    text: reasoningParts.map((part) => part.text).join("\n\n"),
+    text: reasoningParts
+      .map((part) => part.text)
+      .filter((text) => text.length > 0)
+      .join("\n\n"),
     isStreaming:
-      reasoningParts.some((part) => part.state === "streaming") ||
-      (messageStreaming && lastReasoningPart?.state !== "done"),
+      messageStreaming &&
+      lastPart !== undefined &&
+      isReasoningPart(lastPart) &&
+      lastReasoningPart?.state !== "done",
   };
 }
 
@@ -384,11 +437,7 @@ function MessageItem({
 
   const parts = message.parts ?? [];
   const messageStreaming = isLastMessage && isStreaming;
-  const reasoningParts = parts.filter(isReasoningPart);
-  const toolParts = parts.filter(isToolPart);
-  const compactionParts = parts.filter(
-    (part) => part.type === "custom" && (part as { kind?: unknown }).kind === "openai.compaction",
-  );
+  const executionSummary = getExecutionSummary(parts);
   const reasoningDisplay = getReasoningDisplay(parts, messageStreaming);
   const reasoningText = reasoningDisplay?.text ?? "";
   const isReasoningStreaming = reasoningDisplay?.isStreaming ?? false;
@@ -404,27 +453,6 @@ function MessageItem({
     metadata.execution?.reasoningTokens !== undefined
       ? t("msg.cot.reasoningTokens", {
           count: f.number(metadata.execution.reasoningTokens),
-        })
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-  const cachedTokens =
-    metadata.execution?.cacheReadTokens !== undefined ||
-    metadata.execution?.cacheWriteTokens !== undefined
-      ? (metadata.execution.cacheReadTokens ?? 0) + (metadata.execution.cacheWriteTokens ?? 0)
-      : undefined;
-  const responseMetrics = [
-    metadata.execution?.inputTokens !== undefined
-      ? t("msg.cot.inputTokens", { count: f.number(metadata.execution.inputTokens) })
-      : null,
-    metadata.execution?.outputTokens !== undefined
-      ? t("msg.cot.outputTokens", { count: f.number(metadata.execution.outputTokens) })
-      : null,
-    cachedTokens !== undefined ? t("msg.cot.cacheTokens", { count: f.number(cachedTokens) }) : null,
-    metadata.execution?.contextUtilization !== undefined
-      ? t("msg.cot.contextUsage", {
-          percent: f.number(Math.round(metadata.execution.contextUtilization * 100)),
         })
       : null,
   ]
@@ -526,61 +554,83 @@ function MessageItem({
     <Message from={message.role}>
       {/* 气泡本体：思维链、附件、各类 part */}
       <MessageContent data-from={message.role}>
-        {(reasoningParts.length > 0 ||
-          toolParts.length > 0 ||
-          compactionParts.length > 0 ||
-          sourceParts.length > 0 ||
-          imageParts.length > 0) && (
+        {reasoningDisplay ? (
+          <Reasoning
+            isStreaming={isReasoningStreaming}
+            defaultOpen={isReasoningStreaming}
+            className="w-full"
+          >
+            <ReasoningTrigger
+              getThinkingMessage={(streaming) => {
+                const label = streaming ? t("msg.cot.reasoningActive") : t("msg.cot.reasoned");
+                return !streaming && reasoningMetrics ? `${label} · ${reasoningMetrics}` : label;
+              }}
+            />
+            <ReasoningContent>
+              {reasoningText ? (
+                <MessageResponse
+                  data-slot="reasoning-text"
+                  className="rounded-md border border-foreground/10 bg-background/65 px-2.5 py-2 font-mono text-[11px] leading-5 text-foreground/70"
+                >
+                  {reasoningText}
+                </MessageResponse>
+              ) : null}
+            </ReasoningContent>
+          </Reasoning>
+        ) : null}
+
+        {executionSummary.hasActivity && (
           <ChainOfThought
             active={messageStreaming}
-            defaultOpen={messageStreaming}
+            keepOpen={executionSummary.hasAttention}
+            defaultOpen={messageStreaming || executionSummary.hasAttention}
             title={messageStreaming ? t("msg.cot.activityActive") : t("msg.cot.activity")}
           >
-            {reasoningParts.length > 0 ? (
-              <ChainOfThoughtStep
-                icon="think"
-                status={isReasoningStreaming ? "active" : "complete"}
-                label={isReasoningStreaming ? t("msg.cot.thinking") : t("msg.cot.reasoned")}
-                description={reasoningMetrics || undefined}
-              >
-                {reasoningText ? (
-                  <p
-                    data-slot="reasoning-text"
-                    className="whitespace-pre-wrap break-words rounded-md border border-foreground/10 bg-background/65 px-2.5 py-2 font-mono text-[11px] leading-5 text-foreground/70"
-                  >
-                    {reasoningText}
-                  </p>
-                ) : null}
-              </ChainOfThoughtStep>
-            ) : null}
-
-            {toolParts.length > 0 ? (
+            {executionSummary.toolCount > 0 ? (
               <ChainOfThoughtStep
                 icon="tool"
                 status={
-                  toolParts.some((part) => isActiveToolState(normalizeToolState(part.state)))
-                    ? "active"
-                    : "complete"
+                  executionSummary.errorToolCount > 0
+                    ? "error"
+                    : executionSummary.activeToolCount > 0
+                      ? "active"
+                      : executionSummary.pendingToolCount > 0
+                        ? "pending"
+                        : "complete"
                 }
-                label={t("msg.cot.tools", { count: f.number(toolParts.length) })}
+                label={
+                  executionSummary.errorToolCount > 0
+                    ? t("msg.cot.toolsFailed", {
+                        count: f.number(executionSummary.errorToolCount),
+                      })
+                    : executionSummary.activeToolCount > 0
+                      ? t("msg.cot.toolsActive", {
+                          count: f.number(executionSummary.toolCount),
+                        })
+                      : executionSummary.pendingToolCount > 0
+                        ? t("msg.cot.toolsPending", {
+                            count: f.number(executionSummary.pendingToolCount),
+                          })
+                        : t("msg.cot.tools", { count: f.number(executionSummary.toolCount) })
+                }
               />
             ) : null}
 
-            {compactionParts.length > 0 ? (
+            {executionSummary.compactionCount > 0 ? (
               <ChainOfThoughtStep
                 icon="think"
                 status="complete"
                 label={t("msg.cot.contextCompacted", {
-                  count: f.number(compactionParts.length),
+                  count: f.number(executionSummary.compactionCount),
                 })}
               />
             ) : null}
 
-            {sourceParts.length > 0 ? (
+            {executionSummary.sourceCount > 0 ? (
               <ChainOfThoughtStep
                 icon="search"
                 status="complete"
-                label={t("msg.cot.search", { count: f.number(sourceParts.length) })}
+                label={t("msg.cot.search", { count: f.number(executionSummary.sourceCount) })}
               >
                 <ChainOfThoughtSearchResults>
                   {sourceParts.map((source) => {
@@ -602,11 +652,11 @@ function MessageItem({
               </ChainOfThoughtStep>
             ) : null}
 
-            {imageParts.length > 0 ? (
+            {executionSummary.imageCount > 0 ? (
               <ChainOfThoughtStep
                 icon="image"
                 status="complete"
-                label={t("msg.cot.image", { count: f.number(imageParts.length) })}
+                label={t("msg.cot.image", { count: f.number(executionSummary.imageCount) })}
               >
                 <div className="grid grid-cols-2 gap-1.5">
                   {imageParts.map((p, i) => (
@@ -618,15 +668,6 @@ function MessageItem({
                   ))}
                 </div>
               </ChainOfThoughtStep>
-            ) : null}
-
-            {fullText || messageStreaming ? (
-              <ChainOfThoughtStep
-                icon="sparkles"
-                status={messageStreaming ? "active" : "complete"}
-                label={messageStreaming ? t("msg.cot.responding") : t("msg.cot.responded")}
-                description={!messageStreaming && responseMetrics ? responseMetrics : undefined}
-              />
             ) : null}
           </ChainOfThought>
         )}
@@ -657,6 +698,7 @@ function MessageItem({
 
           if (isToolPart(part)) {
             const state = normalizeToolState(part.state);
+            const hasExplicitState = part.state !== undefined;
             const approval = part.approval;
             const mediaResult = state === "output-available" ? readMediaToolResult(part) : null;
             const generatedResult =
@@ -666,7 +708,10 @@ function MessageItem({
             const summary = getToolSummary(part);
             return (
               <Fragment key={key}>
-                <Tool active={isActiveToolState(state)} defaultOpen={getToolDefaultOpen(state)}>
+                <Tool
+                  active={hasExplicitState && isActiveToolState(state)}
+                  defaultOpen={hasExplicitState && getToolDefaultOpen(state)}
+                >
                   <ToolHeader
                     type={part.type}
                     toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
@@ -840,7 +885,9 @@ function isSourcePart(part: MessagePart): part is SourcePart {
   return part.type === "source-url" || part.type === "source-document";
 }
 
-function isAttachmentPart(part: MessagePart): boolean {
+function isAttachmentPart(
+  part: MessagePart,
+): part is Extract<MessagePart, { type: "file" | "reasoning-file" }> {
   return part.type === "file" || part.type === "reasoning-file";
 }
 
@@ -902,6 +949,10 @@ function isActiveToolState(state: ReturnType<typeof normalizeToolState>): boolea
   return (
     state === "input-streaming" || state === "input-available" || state === "approval-requested"
   );
+}
+
+function isToolErrorState(state: ReturnType<typeof normalizeToolState>): boolean {
+  return state === "output-error" || state === "output-denied";
 }
 
 export function getToolDefaultOpen(state: ReturnType<typeof normalizeToolState>): boolean {

@@ -25,6 +25,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../../lib/utils";
+import { useT } from "../../lib/i18n";
 import { IconBrain, IconChevronDown, IconDots } from "../icons";
 import {
   AnimatedDisclosure,
@@ -133,9 +134,10 @@ export function ReasoningTrigger({
   ...rest
 }: ReasoningTriggerProps): React.JSX.Element {
   const { isStreaming, duration } = useReasoningContext();
+  const { t } = useT();
   const message =
     getThinkingMessage?.(isStreaming, duration) ??
-    (isStreaming ? "Thinking..." : `Thought for ${duration}s`);
+    (isStreaming ? t("msg.cot.reasoningActive") : t("msg.cot.reasoned"));
 
   return (
     <AnimatedDisclosureTrigger
@@ -174,7 +176,7 @@ export function ReasoningContent({
     <AnimatedDisclosureContent
       data-slot="reasoning-content"
       innerClassName={cn(
-        "border-t border-foreground/10 px-3 py-2.5 text-xs leading-relaxed text-foreground/75",
+        "max-h-[min(32rem,50vh)] overflow-y-auto border-t border-foreground/10 px-3 py-2.5 text-xs leading-relaxed text-foreground/75",
         className,
       )}
       {...rest}

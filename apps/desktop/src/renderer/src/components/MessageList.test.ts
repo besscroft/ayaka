@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Fragment, createElement } from "react";
 import type { UIMessage } from "ai";
 import {
   areMessageItemPropsEqual,
+  getExecutionSummary,
   getMessageActivityStatus,
   getReasoningDisplay,
   getToolDefaultOpen,
   isMessageStreaming,
   readMediaToolResult,
 } from "./MessageList";
+import {
+  ChainOfThought,
+  ChainOfThoughtImage,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtStep,
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "./ai-elements";
 import { normalizeToolState } from "../lib/generated-tool-ui";
 
 function assistant(parts: UIMessage["parts"]): UIMessage[] {
@@ -87,6 +99,30 @@ void describe("reasoning display", () => {
     });
   });
 
+  void it("uses only the final reasoning part status", () => {
+    const display = getReasoningDisplay(
+      [
+        { type: "reasoning", text: "old stream", state: "streaming" },
+        { type: "reasoning", text: "finished", state: "done" },
+      ],
+      true,
+    );
+
+    assert.equal(display?.isStreaming, false);
+  });
+
+  void it("keeps empty reasoning content renderable without adding separators", () => {
+    const display = getReasoningDisplay(
+      [
+        { type: "reasoning", text: "", state: "done" },
+        { type: "reasoning", text: "", state: "done" },
+      ],
+      false,
+    );
+
+    assert.equal(display?.text, "");
+  });
+
   void it("marks completed reasoning as no longer streaming", () => {
     const display = getReasoningDisplay(
       [{ type: "reasoning", text: "final thought", state: "done" }],
@@ -95,6 +131,108 @@ void describe("reasoning display", () => {
 
     assert.equal(display?.text, "final thought");
     assert.equal(display?.isStreaming, false);
+  });
+
+  void it("stops reasoning when the answer is the latest streaming part", () => {
+    const display = getReasoningDisplay(
+      [
+        { type: "reasoning", text: "final thought", state: "done" },
+        { type: "text", text: "The answer" },
+      ],
+      true,
+    );
+
+    assert.equal(display?.isStreaming, false);
+  });
+
+  void it("does not animate persisted streaming parts after a stopped run", () => {
+    const display = getReasoningDisplay(
+      [{ type: "reasoning", text: "partial thought", state: "streaming" }],
+      false,
+    );
+
+    assert.equal(display?.isStreaming, false);
+  });
+});
+
+void describe("execution summary", () => {
+  void it("aggregates activity counts and blocking states", () => {
+    const summary = getExecutionSummary([
+      {
+        type: "dynamic-tool",
+        toolName: "search",
+        toolCallId: "tool-1",
+        state: "approval-requested",
+        input: {},
+      } as never,
+      {
+        type: "tool-web_search",
+        toolCallId: "tool-2",
+        state: "output-error",
+        input: {},
+      } as never,
+      { type: "source-url", sourceId: "source-1", url: "https://example.com" },
+      { type: "custom", kind: "openai.compaction" } as never,
+      { type: "file", mediaType: "image/png", url: "https://example.com/image.png" },
+    ]);
+
+    assert.deepEqual(summary, {
+      toolCount: 2,
+      activeToolCount: 1,
+      pendingToolCount: 0,
+      errorToolCount: 1,
+      sourceCount: 1,
+      compactionCount: 1,
+      imageCount: 1,
+      hasActivity: true,
+      hasAttention: true,
+    });
+
+    const legacySummary = getExecutionSummary([
+      { type: "tool-legacy", toolCallId: "legacy-1", input: {} } as never,
+    ]);
+    assert.equal(legacySummary.pendingToolCount, 1);
+    assert.equal(legacySummary.hasAttention, false);
+  });
+
+  void it("renders localized disclosures and filters unsafe source links", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        Fragment,
+        null,
+        createElement(
+          Reasoning,
+          { isStreaming: true, defaultOpen: true },
+          createElement(ReasoningTrigger),
+          createElement(ReasoningContent, null, "first thought"),
+        ),
+        createElement(
+          ChainOfThought,
+          { defaultOpen: true },
+          createElement(ChainOfThoughtStep, {
+            icon: "tool",
+            status: "error",
+            label: "Tool failed",
+          }),
+          createElement(ChainOfThoughtSearchResult, {
+            href: "javascript:alert(1)",
+            title: "Unsafe source",
+          }),
+          createElement(ChainOfThoughtImage, {
+            src: "javascript:alert(1)",
+            alt: "Unsafe image",
+          }),
+        ),
+      ),
+    );
+
+    assert.match(html, /data-slot="reasoning"/);
+    assert.match(html, /aria-expanded="true"/);
+    assert.match(html, /data-status="error"/);
+    assert.match(html, /Unsafe source/);
+    assert.doesNotMatch(html, /href="javascript:/);
+    assert.match(html, /Unsafe image/);
+    assert.doesNotMatch(html, /src="javascript:/);
   });
 });
 

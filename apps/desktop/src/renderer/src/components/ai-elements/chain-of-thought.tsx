@@ -23,7 +23,14 @@
  *     </ChainOfThoughtStep>
  *   </ChainOfThought>
  */
-import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type AnchorHTMLAttributes,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { cn } from "../../lib/utils";
 import { useT } from "../../lib/i18n";
 import {
@@ -31,12 +38,14 @@ import {
   IconChevronDown,
   IconCircleCheck,
   IconCircleDashed,
+  IconCircleX,
   IconImage,
   IconLink,
   IconSearch,
   IconSparkles,
   IconWrench,
 } from "../icons";
+import { sanitizeRichContentUrl } from "./rich-content-utils";
 import {
   AnimatedDisclosure,
   AnimatedDisclosureContent,
@@ -47,7 +56,7 @@ import {
 /* ---------- 类型定义 ---------- */
 
 /** 步骤状态 */
-export type ChainStepStatus = "complete" | "active" | "pending";
+export type ChainStepStatus = "complete" | "active" | "pending" | "error";
 
 /** 步骤图标类别 */
 export type ChainStepIcon = "default" | "search" | "image" | "think" | "tool" | "sparkles";
@@ -59,6 +68,7 @@ interface ChainOfThoughtProps extends Omit<HTMLAttributes<HTMLDivElement>, "titl
   defaultOpen?: boolean;
   open?: boolean;
   active?: boolean;
+  keepOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   children?: ReactNode;
 }
@@ -68,6 +78,7 @@ export function ChainOfThought({
   defaultOpen = true,
   open,
   active,
+  keepOpen = false,
   onOpenChange,
   className,
   children,
@@ -81,9 +92,9 @@ export function ChainOfThought({
   useEffect(() => {
     if (open !== undefined) return;
     if (active && !wasActive.current) setInternalOpen(true);
-    if (!active && wasActive.current) setInternalOpen(false);
+    if (!active && wasActive.current && !keepOpen) setInternalOpen(false);
     wasActive.current = Boolean(active);
-  }, [active, open]);
+  }, [active, keepOpen, open]);
 
   const resolvedOpen = open ?? internalOpen;
   const handleOpenChange = (nextOpen: boolean): void => {
@@ -181,10 +192,13 @@ export function ChainOfThoughtStep({
             status === "complete" && "border-success/30 bg-success/10 text-success",
             status === "active" && "border-accent/40 bg-accent/12 text-accent",
             status === "pending" && "border-foreground/15 bg-foreground/[0.05] text-foreground/45",
+            status === "error" && "border-danger/35 bg-danger/10 text-danger",
           )}
         >
           {status === "complete" ? (
             <IconCircleCheck className="size-3" />
+          ) : status === "error" ? (
+            <IconCircleX className="size-3" />
           ) : status === "active" ? (
             <Icon className="size-3 animate-pulse" />
           ) : (
@@ -247,6 +261,7 @@ export function ChainOfThoughtSearchResult({
   children,
   ...rest
 }: ChainOfThoughtSearchResultProps): React.JSX.Element {
+  const safeHref = href ? sanitizeRichContentUrl(href, "link") : null;
   const content = (
     <>
       <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06] text-foreground/55">
@@ -266,11 +281,11 @@ export function ChainOfThoughtSearchResult({
     </>
   );
 
-  if (href) {
+  if (safeHref) {
     return (
       <a
         data-slot="chain-of-thought-search-result"
-        href={href}
+        href={safeHref}
         target="_blank"
         rel="noreferrer noopener"
         className={cn(
@@ -278,6 +293,7 @@ export function ChainOfThoughtSearchResult({
           "transition hover:border-accent/35 hover:bg-accent/5",
           className,
         )}
+        {...(rest as unknown as AnchorHTMLAttributes<HTMLAnchorElement>)}
       >
         {content}
       </a>
@@ -313,6 +329,7 @@ export function ChainOfThoughtImage({
   className,
   ...rest
 }: ChainOfThoughtImageProps): React.JSX.Element {
+  const safeSrc = sanitizeRichContentUrl(src, "image");
   return (
     <figure
       data-slot="chain-of-thought-image"
@@ -322,12 +339,16 @@ export function ChainOfThoughtImage({
       )}
       {...rest}
     >
-      <img
-        src={src}
-        alt={alt ?? ""}
-        loading="lazy"
-        className="block max-h-48 w-full object-cover"
-      />
+      {safeSrc ? (
+        <img
+          src={safeSrc}
+          alt={alt ?? ""}
+          loading="lazy"
+          className="block max-h-48 w-full object-cover"
+        />
+      ) : (
+        <div className="px-2 py-3 text-[10.5px] text-foreground/50">{alt ?? ""}</div>
+      )}
       {caption ? (
         <figcaption className="border-t border-foreground/10 px-2 py-1 text-[10.5px] text-foreground/55">
           {caption}
