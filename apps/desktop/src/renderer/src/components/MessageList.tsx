@@ -17,7 +17,11 @@
 import { Fragment, memo, useCallback, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
-import { MEDIA_GENERATION_TOOL_NAME, type MediaGenerationResponse } from "@shared/types";
+import {
+  MEDIA_GENERATION_TOOL_NAME,
+  type MediaGenerationResponse,
+  type RuntimeStep,
+} from "@shared/types";
 import {
   ChainOfThought,
   ChainOfThoughtImage,
@@ -43,6 +47,8 @@ import {
   ToolHeader,
   ToolInput,
   ToolOutput,
+  type ChainStepIcon,
+  type ChainStepStatus,
   type ConversationStatusKind,
   type FilePartLike,
 } from "./ai-elements";
@@ -56,12 +62,14 @@ import {
   normalizeToolState,
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
-import { IconBrain, IconCircleDashed, IconCopy, IconKey, IconMessage, IconWrench } from "./icons";
+import { IconCopy } from "./icons";
 
 interface MessageListProps {
   messages: UIMessage[];
   isLoading: boolean;
   status: ConversationStatusKind;
+  runtimeSteps?: RuntimeStep[];
+  runtimeStartedAt?: number | null;
   error?: Error;
   errorDetail?: string | null;
   /** 后备建议（empty 状态） */
@@ -93,6 +101,8 @@ export function MessageList({
   messages,
   isLoading,
   status,
+  runtimeSteps = [],
+  runtimeStartedAt,
   error,
   errorDetail,
   emptySuggestions,
@@ -143,6 +153,7 @@ export function MessageList({
   );
   const activityStatus = getMessageActivityStatus(messages, isLoading, status);
   const lastMessage = messages.at(-1);
+  const showLiveThinking = shouldShowLiveThinking(messages, isLoading, status);
   const shouldShowFollowups =
     !isLoading &&
     status === "ready" &&
@@ -219,8 +230,21 @@ export function MessageList({
           </motion.div>
         ) : null}
 
-        {activityStatus ? (
-          <MessageActivity status={activityStatus} isStreaming={isLoading} />
+        {showLiveThinking && activityStatus ? (
+          <motion.div
+            key="live-thinking"
+            layout={isLoading ? false : "position"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <LiveThinkingPanel
+              status={activityStatus}
+              steps={runtimeSteps}
+              startedAt={runtimeStartedAt}
+            />
+          </motion.div>
         ) : null}
 
         {error && (
@@ -271,6 +295,129 @@ export interface ReasoningDisplay {
   isStreaming: boolean;
 }
 
+export type LiveThinkingKind = RuntimeStep["kind"] | "thinking";
+
+export interface LiveThinkingStep {
+  id: string;
+  kind: LiveThinkingKind;
+  status: ChainStepStatus;
+  title: string | null;
+}
+
+export function getLiveThinkingSteps(
+  steps: RuntimeStep[],
+  activityStatus: MessageActivityStatus,
+): LiveThinkingStep[] {
+  const visibleSteps: LiveThinkingStep[] = [...steps]
+    .sort((a, b) => a.started_at - b.started_at)
+    .slice(-5)
+    .map((step) => ({
+      id: step.id,
+      kind: step.kind,
+      status: getChainStepStatus(step.status),
+      title: step.title?.trim() || null,
+    }));
+  const hasLiveStep = visibleSteps.some(
+    (step) => step.status === "active" || step.status === "pending",
+  );
+
+  if (visibleSteps.length === 0 || !hasLiveStep) {
+    visibleSteps.push({
+      id: "live-thinking",
+      kind: "thinking",
+      status: "active",
+      title: null,
+    });
+  }
+
+  if (activityStatus === "waiting-approval") {
+    visibleSteps.push({
+      id: "live-approval",
+      kind: "approval",
+      status: "active",
+      title: null,
+    });
+  }
+
+  return visibleSteps;
+}
+
+function getChainStepStatus(status: string): ChainStepStatus {
+  if (status === "succeeded") return "complete";
+  if (status === "failed" || status === "cancelled" || status === "interrupted") return "error";
+  if (status === "running" || status === "waiting_approval" || status === "waiting_handoff") {
+    return "active";
+  }
+  return "pending";
+}
+
+function getLiveThinkingIcon(kind: LiveThinkingKind): ChainStepIcon {
+  if (kind === "tool" || kind === "sandbox") return "tool";
+  if (kind === "memory" || kind === "skill" || kind === "handoff") return "sparkles";
+  if (kind === "model" || kind === "agent" || kind === "thinking" || kind === "approval") {
+    return "think";
+  }
+  return "default";
+}
+
+function getLiveThinkingTitle(
+  status: MessageActivityStatus,
+  t: ReturnType<typeof useT>["t"],
+): string {
+  if (status === "submitted") return t("msg.thinking.connecting");
+  if (status === "responding") return t("msg.thinking.responding");
+  if (status === "tool-calling") return t("msg.activity.toolCalling");
+  if (status === "waiting-approval") return t("msg.activity.waitingApproval");
+  return t("msg.cot.reasoningActive");
+}
+
+export function LiveThinkingPanel({
+  status,
+  steps,
+  startedAt,
+}: {
+  status: MessageActivityStatus;
+  steps: RuntimeStep[];
+  startedAt?: number | null;
+}): React.JSX.Element {
+  const { t, f } = useT();
+  const liveSteps = getLiveThinkingSteps(steps, status);
+  const elapsed = startedAt ? formatExecutionTime(Date.now() - startedAt, f) : null;
+  const hasError = liveSteps.some((step) => step.status === "error");
+  return (
+    <Message from="assistant">
+      <MessageContent data-from="assistant">
+        <ChainOfThought
+          active
+          defaultOpen
+          keepOpen={status === "waiting-approval" || hasError}
+          title={getLiveThinkingTitle(status, t)}
+          aria-live="polite"
+        >
+          {liveSteps.map((step) => (
+            <ChainOfThoughtStep
+              key={step.id}
+              icon={getLiveThinkingIcon(step.kind)}
+              status={step.status}
+              label={
+                step.title ??
+                (step.kind === "thinking" || step.kind === "approval"
+                  ? getLiveThinkingTitle(status, t)
+                  : t(`runtime.kind.${step.kind}`))
+              }
+              description={
+                step.id === "live-thinking" && elapsed
+                  ? t("msg.thinking.elapsed", { duration: elapsed })
+                  : undefined
+              }
+            />
+          ))}
+        </ChainOfThought>
+      </MessageContent>
+    </Message>
+  );
+}
+
 export interface ExecutionSummary {
   toolCount: number;
   activeToolCount: number;
@@ -315,43 +462,6 @@ export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary
   };
 }
 
-function MessageActivity({
-  status,
-  isStreaming,
-}: {
-  status: MessageActivityStatus;
-  isStreaming: boolean;
-}): React.JSX.Element {
-  const { t } = useT();
-  const activity = {
-    submitted: { Icon: IconCircleDashed, label: t("msg.activity.submitted") },
-    thinking: { Icon: IconBrain, label: t("msg.activity.thinking") },
-    "tool-calling": { Icon: IconWrench, label: t("msg.activity.toolCalling") },
-    "waiting-approval": { Icon: IconKey, label: t("msg.activity.waitingApproval") },
-    responding: { Icon: IconMessage, label: t("msg.activity.responding") },
-  }[status];
-  const Icon = activity.Icon;
-  return (
-    <motion.div
-      key="message-activity"
-      layout={isStreaming ? false : "position"}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 6 }}
-      transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-      aria-live="polite"
-      className="flex justify-start"
-    >
-      <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-foreground/10 bg-foreground/[0.03] px-3 py-2 text-xs text-foreground/60">
-        <span className="flex size-5 select-none items-center justify-center rounded-full bg-accent/10 text-accent">
-          <Icon className="size-3 animate-pulse" />
-        </span>
-        <span>{activity.label}</span>
-      </div>
-    </motion.div>
-  );
-}
-
 export function getMessageActivityStatus(
   messages: UIMessage[],
   isLoading: boolean,
@@ -378,6 +488,18 @@ export function getMessageActivityStatus(
     }
   }
   return "thinking";
+}
+
+export function shouldShowLiveThinking(
+  messages: UIMessage[],
+  isLoading: boolean,
+  status: ConversationStatusKind,
+): boolean {
+  if (getMessageActivityStatus(messages, isLoading, status) === null) return false;
+  const lastMessage = messages.at(-1);
+  if (!lastMessage || lastMessage.role !== "assistant") return true;
+  const parts = lastMessage.parts ?? [];
+  return getReasoningDisplay(parts, isLoading) === null && !getExecutionSummary(parts).hasActivity;
 }
 
 export function getReasoningDisplay(

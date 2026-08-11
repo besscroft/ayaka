@@ -17,6 +17,9 @@ protocol, persistence format, IPC surface, and main-process runtime remain uncha
 - `ChainOfThought`: summarizes tools, sources, context compaction, and image/reasoning files as
   high-level steps. Existing Tool disclosures remain the source of detailed input, output, approval,
   and error content.
+- When the assistant has not emitted any visible part yet, `MessageList` renders an assistant-side
+  `ChainOfThought` fallback. It uses the existing runtime snapshot for model/tool/approval progress
+  and shows a single active waiting step until runtime data arrives; it never invents reasoning text.
 
 Reasoning is considered streaming only while the message is streaming, the last message part is a
 reasoning part, and the final reasoning part is not marked `done`. This deliberately ignores an
@@ -31,6 +34,10 @@ animation but preserve received content.
 Source links and reasoning images pass through the existing rich-content URL sanitizer. Unsafe URLs
 render as non-clickable content. Long reasoning content is rendered through the existing safe rich
 content renderer with a bounded scroll region.
+
+The fallback is removed as soon as a reasoning or execution part becomes available, so the user
+sees one authoritative progress surface at a time. Runtime step titles are used only as high-level
+labels; raw detail payloads and diagnostics are not rendered in the chat message.
 
 ## Verification
 

@@ -6,11 +6,14 @@ import type { UIMessage } from "ai";
 import {
   areMessageItemPropsEqual,
   getExecutionSummary,
+  getLiveThinkingSteps,
   getMessageActivityStatus,
   getReasoningDisplay,
   getToolDefaultOpen,
   isMessageStreaming,
+  LiveThinkingPanel,
   readMediaToolResult,
+  shouldShowLiveThinking,
 } from "./MessageList";
 import {
   ChainOfThought,
@@ -79,6 +82,108 @@ void describe("chat message activity", () => {
     assert.equal(
       getMessageActivityStatus(assistant([{ type: "text", text: "Done" }]), false, "ready"),
       null,
+    );
+  });
+
+  void it("uses an AI Elements fallback before the first assistant part", () => {
+    assert.equal(shouldShowLiveThinking([], true, "submitted"), true);
+    assert.equal(
+      shouldShowLiveThinking(
+        assistant([{ type: "reasoning", text: "Visible reasoning", state: "streaming" }]),
+        true,
+        "streaming",
+      ),
+      false,
+    );
+    assert.equal(
+      shouldShowLiveThinking(
+        assistant([
+          {
+            type: "dynamic-tool",
+            toolName: "search",
+            toolCallId: "tool-1",
+            state: "input-available",
+            input: {},
+          } as never,
+        ]),
+        true,
+        "streaming",
+      ),
+      false,
+    );
+    assert.equal(
+      shouldShowLiveThinking(assistant([{ type: "text", text: "Done" }]), false, "ready"),
+      false,
+    );
+  });
+
+  void it("maps runtime steps into visible statuses and adds current waiting state", () => {
+    const steps = getLiveThinkingSteps(
+      [
+        {
+          id: "model-1",
+          kind: "model",
+          status: "succeeded",
+          title: "Model step",
+          started_at: 1,
+        } as never,
+        {
+          id: "tool-1",
+          kind: "tool",
+          status: "running",
+          title: "Tool step",
+          started_at: 2,
+        } as never,
+      ],
+      "tool-calling",
+    );
+
+    assert.deepEqual(
+      steps.map(({ id, kind, status, title }) => ({ id, kind, status, title })),
+      [
+        { id: "model-1", kind: "model", status: "complete", title: "Model step" },
+        { id: "tool-1", kind: "tool", status: "active", title: "Tool step" },
+      ],
+    );
+
+    const approvalSteps = getLiveThinkingSteps([], "waiting-approval");
+    assert.deepEqual(
+      approvalSteps.map(({ id, kind, status }) => ({ id, kind, status })),
+      [
+        { id: "live-thinking", kind: "thinking", status: "active" },
+        { id: "live-approval", kind: "approval", status: "active" },
+      ],
+    );
+  });
+
+  void it("treats cancelled and interrupted runtime steps as errors", () => {
+    const steps = getLiveThinkingSteps(
+      [
+        {
+          id: "cancelled",
+          kind: "tool",
+          status: "cancelled",
+          title: "Stopped",
+          started_at: 1,
+        } as never,
+        {
+          id: "interrupted",
+          kind: "model",
+          status: "interrupted",
+          title: "Interrupted",
+          started_at: 2,
+        } as never,
+      ],
+      "thinking",
+    );
+
+    assert.deepEqual(
+      steps.map(({ id, status }) => ({ id, status })),
+      [
+        { id: "cancelled", status: "error" },
+        { id: "interrupted", status: "error" },
+        { id: "live-thinking", status: "active" },
+      ],
     );
   });
 });
@@ -233,6 +338,20 @@ void describe("execution summary", () => {
     assert.doesNotMatch(html, /href="javascript:/);
     assert.match(html, /Unsafe image/);
     assert.doesNotMatch(html, /src="javascript:/);
+  });
+
+  void it("renders the live fallback as a ChainOfThought disclosure", () => {
+    const html = renderToStaticMarkup(
+      createElement(LiveThinkingPanel, {
+        status: "thinking",
+        steps: [],
+      }),
+    );
+
+    assert.match(html, /data-slot="chain-of-thought"/);
+    assert.match(html, /data-slot="chain-of-thought-step"/);
+    assert.match(html, /data-status="active"/);
+    assert.doesNotMatch(html, /data-slot="message-activity"/);
   });
 });
 
