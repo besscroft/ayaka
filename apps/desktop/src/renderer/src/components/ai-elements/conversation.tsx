@@ -75,10 +75,10 @@ export function ConversationEmptyState({
       )}
       {...rest}
     >
-      {icon ? <div className="text-foreground/40 [&_svg]:size-10">{icon}</div> : null}
-      {title ? <p className="text-base font-medium text-foreground/80">{title}</p> : null}
+      {icon ? <div className="text-muted-foreground [&_svg]:size-10">{icon}</div> : null}
+      {title ? <p className="text-base font-medium text-foreground">{title}</p> : null}
       {description ? (
-        <p className="text-sm leading-relaxed text-foreground/45">{description}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       ) : null}
       {children}
     </div>
@@ -102,8 +102,8 @@ export function ConversationScrollButton({
       className={cn(
         "absolute bottom-4 left-1/2 z-10 -translate-x-1/2",
         "flex size-8 items-center justify-center rounded-full",
-        "border border-foreground/15 bg-background/90 shadow-lg",
-        "text-foreground/70 transition hover:bg-background hover:text-foreground",
+        "border border-border bg-background/90 shadow-md",
+        "text-muted-foreground transition hover:bg-background hover:text-foreground",
         className,
       )}
       {...rest}

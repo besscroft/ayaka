@@ -675,10 +675,10 @@ function AgentDetailModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-foreground/15 bg-background shadow-xl"
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-foreground/10 px-5 py-4">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-9 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-accent">
               {agent.avatar || agent.name.slice(0, 1)}
@@ -711,7 +711,7 @@ function AgentDetailModal({
             </Button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+        <div className="min-h-0 flex flex-1 flex-col gap-4 overflow-y-auto p-5">
           <Tabs value={tab} onValueChange={(key) => setTab(agentDetailTabKey(key))}>
             <TabsList aria-label={t("agents.detail.tabs")}>
               <TabsTrigger value="overview">{t("agents.tab.overview")}</TabsTrigger>
@@ -722,7 +722,7 @@ function AgentDetailModal({
           </Tabs>
 
           {tab === "overview" ? (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <p className="text-sm leading-6 text-foreground/65">
                 {agent.description || t("agents.noDescription")}
               </p>
@@ -742,14 +742,14 @@ function AgentDetailModal({
           ) : null}
 
           {tab === "instructions" ? (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <ReadBlock title={t("agents.field.persona")}>{agent.personality}</ReadBlock>
               <ReadBlock title={t("agents.field.instructions")}>{agent.soul_prompt}</ReadBlock>
             </div>
           ) : null}
 
           {tab === "runtime" ? (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <DetailGrid
                 rows={[
                   [
@@ -842,7 +842,7 @@ function AgentDetailModal({
           ) : null}
 
           {tab === "tools" ? (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <DetailGrid
                 rows={[
                   [
@@ -938,10 +938,10 @@ function AgentEditorModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-foreground/15 bg-background shadow-xl"
+        className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-foreground/10 px-5 py-4">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 id="agent-editor-title" className="text-base font-semibold">
               {mode === "create" ? t("agents.editor.create") : t("agents.editor.edit")}
@@ -959,7 +959,7 @@ function AgentEditorModal({
           </Button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <div className="space-y-5">
+          <div className="flex flex-col gap-5">
             <Tabs value={tab} onValueChange={(key) => setTab(agentEditorTabKey(key))}>
               <TabsList aria-label={t("agents.editor.tabs")}>
                 <TabsTrigger value="basics">{t("agents.tab.basics")}</TabsTrigger>
@@ -1002,7 +1002,7 @@ function AgentEditorModal({
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.model")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.model_ref}
                       onChange={(event) => patch({ model_ref: event.target.value })}
                     >
@@ -1043,7 +1043,7 @@ function AgentEditorModal({
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label={t("agents.field.status")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.status}
                       onChange={(event) =>
                         patch({ status: event.target.value as AgentProfile["status"] })
@@ -1064,7 +1064,7 @@ function AgentEditorModal({
                   </Field>
                   <Field label={t("agents.field.reasoning")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.runtimeConfig.reasoning ?? "provider-default"}
                       onChange={(event) =>
                         patchRuntime({ reasoning: event.target.value as ChatReasoningLevel })
@@ -1108,7 +1108,7 @@ function AgentEditorModal({
                   </Field>
                   <Field label={t("agents.field.contextMode")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.runtimeConfig.contextPolicy?.mode ?? "semantic"}
                       onChange={(event) =>
                         patchRuntime({
@@ -1176,7 +1176,7 @@ function AgentEditorModal({
                 </div>
                 <Field label={t("agents.field.compactionModel")}>
                   <select
-                    className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                    className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                     value={form.runtimeConfig.compactionModelRef ?? ""}
                     onChange={(event) =>
                       patchRuntime({ compactionModelRef: event.target.value || undefined })
@@ -1224,7 +1224,7 @@ function AgentEditorModal({
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.reviewPolicy")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.runtimeConfig.reviewPolicy ?? "review_sensitive"}
                       onChange={(event) =>
                         patchRuntime({
@@ -1243,7 +1243,7 @@ function AgentEditorModal({
                   </Field>
                   <Field label={t("agents.field.sandboxPolicy")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.runtimeConfig.sandboxPolicy ?? "local"}
                       onChange={(event) =>
                         patchRuntime({
@@ -1277,7 +1277,7 @@ function AgentEditorModal({
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t("agents.field.handoff")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.handoffConfig.mode}
                       onChange={(event) =>
                         patchHandoff({ mode: event.target.value as AgentHandoffConfig["mode"] })
@@ -1292,7 +1292,7 @@ function AgentEditorModal({
                   </Field>
                   <Field label={t("agents.field.priority")}>
                     <select
-                      className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                      className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                       value={form.handoffConfig.priority}
                       onChange={(event) =>
                         patchHandoff({
@@ -1328,10 +1328,10 @@ function AgentEditorModal({
             ) : null}
 
             {tab === "tools" ? (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 <Field label={t("agents.field.toolMode")}>
                   <select
-                    className="h-10 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+                    className="h-10 select-none rounded-md border border-input bg-background px-3 text-sm"
                     value={form.toolPolicy.mode}
                     onChange={(event) =>
                       patchTools({ mode: event.target.value === "custom" ? "custom" : "inherit" })
@@ -1358,7 +1358,7 @@ function AgentEditorModal({
             ) : null}
           </div>
         </div>
-        <footer className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-4">
+        <footer className="flex justify-end gap-2 border-t border-border px-5 py-4">
           <Button variant="tertiary" onPress={onClose}>
             {t("common.cancel")}
           </Button>
@@ -1391,16 +1391,16 @@ function ToolChecklist({
     onChange(enabled ? [...selectedSet, id] : selected.filter((item) => item !== id));
   };
   return (
-    <section className="space-y-2">
+    <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">{title}</h3>
-      <div className="max-h-64 overflow-y-auto rounded-md border border-foreground/10">
+      <div className="max-h-64 overflow-y-auto rounded-md border border-border">
         {tools.length === 0 ? (
           <p className="px-3 py-4 text-sm text-foreground/45">{t("agents.noTools")}</p>
         ) : (
           tools.map((tool) => (
             <label
               key={tool.id}
-              className="flex items-start gap-3 border-b border-foreground/10 px-3 py-2 text-sm last:border-b-0"
+              className="flex items-start gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0"
             >
               <input
                 type="checkbox"
@@ -1528,7 +1528,7 @@ function StatusChip({ status }: { status: string }): React.JSX.Element {
 
 function DetailGrid({ rows }: { rows: Array<[string, ReactNode]> }): React.JSX.Element {
   return (
-    <div className="grid gap-2 rounded-md border border-foreground/10 px-3 py-3 text-sm">
+    <div className="grid gap-2 rounded-md border border-border px-3 py-3 text-sm">
       {rows.map(([label, value]) => (
         <div key={label} className="grid gap-1 sm:grid-cols-[112px_minmax(0,1fr)]">
           <span className="text-foreground/40">{label}</span>
@@ -1544,7 +1544,7 @@ function ReadBlock({ title, children }: { title: string; children: ReactNode }):
   return (
     <section>
       <h3 className="text-sm font-medium">{title}</h3>
-      <div className="mt-2 rounded-md border border-foreground/10 bg-foreground/[0.025] p-3 text-sm leading-6 text-foreground/65">
+      <div className="mt-2 rounded-md border border-border bg-muted p-3 text-sm leading-6 text-foreground/65">
         {children || t("agents.emptyField")}
       </div>
     </section>
@@ -1561,16 +1561,16 @@ function MiniList({
   items: Array<{ id: string; title: string; detail: string }>;
 }): React.JSX.Element {
   return (
-    <section className="space-y-2">
+    <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">{title}</h3>
       {items.length === 0 ? (
-        <p className="rounded-md border border-dashed border-foreground/15 px-3 py-4 text-sm text-foreground/45">
+        <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
           {empty}
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {items.map((item) => (
-            <div key={item.id} className="min-w-0 rounded-md border border-foreground/10 px-3 py-2">
+            <div key={item.id} className="min-w-0 rounded-md border border-border px-3 py-2">
               <p className="line-clamp-2 break-words text-sm font-medium">{item.title}</p>
               <p className="mt-1 line-clamp-2 break-words text-xs text-foreground/45">
                 {item.detail}
@@ -1585,7 +1585,7 @@ function MiniList({
 
 function EmptyState({ title }: { title: string }): React.JSX.Element {
   return (
-    <div className="rounded-md border border-dashed border-foreground/15 px-4 py-10 text-center text-sm text-foreground/45">
+    <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
       {title}
     </div>
   );

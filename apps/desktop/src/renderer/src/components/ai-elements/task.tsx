@@ -48,7 +48,7 @@ export function Task({
       data-slot="task"
       open={open ?? defaultOpen}
       className={cn(
-        "group/task rounded-2xl border border-foreground/10 bg-foreground/[0.025]",
+        "group/task rounded-lg border border-border bg-card",
         "overflow-hidden",
         className,
       )}
@@ -106,7 +106,7 @@ export function TaskTrigger({
       className={cn(
         "flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-xs font-medium",
         "[&::-webkit-details-marker]:hidden",
-        "hover:bg-foreground/[0.04]",
+        "hover:bg-muted",
         className,
       )}
       {...(rest as HTMLAttributes<HTMLElement>)}
@@ -116,7 +116,7 @@ export function TaskTrigger({
           "flex size-6 items-center justify-center rounded-md",
           derivedStatus === "complete" && "bg-success/10 text-success",
           derivedStatus === "in_progress" && "bg-accent/12 text-accent",
-          derivedStatus === "pending" && "bg-foreground/[0.06] text-foreground/55",
+          derivedStatus === "pending" && "bg-muted text-muted-foreground",
         )}
       >
         <StatusIcon
@@ -130,7 +130,7 @@ export function TaskTrigger({
             "rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums",
             derivedStatus === "complete"
               ? "bg-success/12 text-success"
-              : "bg-foreground/[0.06] text-foreground/60",
+              : "bg-muted text-muted-foreground",
           )}
         >
           {completed ?? 0}/{count}
@@ -158,7 +158,7 @@ export function TaskContent({ className, children, ...rest }: TaskContentProps):
   return (
     <ul
       data-slot="task-content"
-      className={cn("space-y-0.5 border-t border-foreground/10 px-2 py-2 text-xs", className)}
+      className={cn("flex flex-col gap-0.5 border-t border-border px-2 py-2 text-xs", className)}
       {...rest}
     >
       {children}
@@ -197,7 +197,7 @@ export function TaskItem({
       data-status={status}
       className={cn(
         "flex items-start gap-2 rounded-md px-2 py-1.5",
-        "transition hover:bg-foreground/[0.04]",
+        "transition hover:bg-muted",
         className,
       )}
       {...rest}
@@ -252,21 +252,21 @@ export function TaskSection({
   return (
     <section
       data-slot="task-section"
-      className={cn("rounded-2xl border border-foreground/10 bg-background/40", className)}
+      className={cn("rounded-lg border border-border bg-card", className)}
       {...rest}
     >
       <header className="flex items-center gap-2 px-3 py-2">
-        <span className="flex size-5 items-center justify-center rounded-md bg-foreground/[0.06] text-foreground/65">
+        <span className="flex size-5 items-center justify-center rounded-md bg-muted text-foreground/65">
           <IconList className="size-3" />
         </span>
         <p className="flex-1 text-[12px] font-semibold text-foreground/75">{title}</p>
         {typeof count === "number" ? (
-          <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[10.5px] font-medium text-foreground/55">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
             {count}
           </span>
         ) : null}
       </header>
-      <div className="border-t border-foreground/10">{children}</div>
+      <div className="border-t border-border">{children}</div>
     </section>
   );
 }

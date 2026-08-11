@@ -3,9 +3,13 @@ import {
   Button,
   Card,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
-  Modal,
   Switch,
   Tabs,
   TabsList,
@@ -133,7 +137,7 @@ export function ToolsPanel(): React.JSX.Element {
             />
           </label>
           <select
-            className="h-10 min-w-0 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+            className="h-10 min-w-0 select-none rounded-md border border-border bg-background px-3 text-sm"
             value={kind}
             onChange={(event) => setKind(event.target.value as ToolKindFilter)}
           >
@@ -143,7 +147,7 @@ export function ToolsPanel(): React.JSX.Element {
             <option value="sandbox">{t("tools.kind.sandbox")}</option>
           </select>
           <select
-            className="h-10 min-w-0 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
+            className="h-10 min-w-0 select-none rounded-md border border-border bg-background px-3 text-sm"
             value={status}
             onChange={(event) => setStatus(event.target.value as ToolStatusFilter)}
           >
@@ -156,7 +160,7 @@ export function ToolsPanel(): React.JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading && !snapshot ? (
-          <div className="rounded-md border border-dashed border-foreground/15 px-4 py-16 text-center text-sm text-foreground/45">
+          <div className="rounded-md border border-dashed border-border px-4 py-16 text-center text-sm text-muted-foreground">
             {t("main.loading")}
           </div>
         ) : null}
@@ -295,33 +299,33 @@ function InstalledSkillsListSkeleton(): React.JSX.Element {
       {[0, 1, 2, 3].map((id) => (
         <Card key={id}>
           <Card.Header>
-            <div className="space-y-2">
-              <div className="h-4 w-2/5 rounded bg-foreground/10" />
-              <div className="h-3 w-4/5 rounded bg-foreground/[0.07]" />
-              <div className="h-3 w-3/5 rounded bg-foreground/[0.07]" />
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-2/5 rounded bg-muted" />
+              <div className="h-3 w-4/5 rounded bg-muted" />
+              <div className="h-3 w-3/5 rounded bg-muted" />
             </div>
           </Card.Header>
-          <Card.Content className="space-y-3 p-4">
+          <Card.Content className="flex flex-col gap-3 p-4">
             <div className="grid gap-2 sm:grid-cols-2">
               {[0, 1, 2].map((statId) => (
-                <div key={statId} className="space-y-1.5">
-                  <div className="h-3 w-1/3 rounded bg-foreground/[0.06]" />
-                  <div className="h-3 w-2/3 rounded bg-foreground/[0.09]" />
+                <div key={statId} className="flex flex-col gap-1.5">
+                  <div className="h-3 w-1/3 rounded bg-muted" />
+                  <div className="h-3 w-2/3 rounded bg-muted" />
                 </div>
               ))}
             </div>
-            <div className="h-16 rounded-md bg-foreground/[0.05]" />
+            <div className="h-16 rounded-md bg-muted" />
           </Card.Content>
           <Card.Footer>
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-4">
-                <div className="h-5 w-16 rounded-md bg-foreground/[0.08]" />
-                <div className="h-5 w-20 rounded-md bg-foreground/[0.08]" />
+                <div className="h-5 w-16 rounded-md bg-muted" />
+                <div className="h-5 w-20 rounded-md bg-muted" />
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
-                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
-                <div className="h-8 w-14 rounded-md bg-foreground/[0.08]" />
+                <div className="h-8 w-14 rounded-md bg-muted" />
+                <div className="h-8 w-14 rounded-md bg-muted" />
+                <div className="h-8 w-14 rounded-md bg-muted" />
               </div>
             </div>
           </Card.Footer>
@@ -338,13 +342,13 @@ function RegistrySection({ rows }: { rows: ToolRecord[] }): React.JSX.Element {
       {rows.length === 0 ? (
         <EmptyTools message={t("tools.registry.empty")} />
       ) : (
-        <div className="overflow-hidden rounded-md border border-foreground/10">
+        <div className="overflow-hidden rounded-md border border-border">
           {rows.map((tool, index) => (
             <div
               key={tool.id}
               className={[
                 "grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_auto]",
-                index > 0 ? "border-t border-foreground/10" : "",
+                index > 0 ? "border-t border-border" : "",
               ].join(" ")}
             >
               <div className="min-w-0">
@@ -456,7 +460,7 @@ function SkillCard({
           </Card.Description>
         </div>
       </Card.Header>
-      <Card.Content className="space-y-3 p-4">
+      <Card.Content className="flex flex-col gap-3 p-4">
         <div className="grid gap-2 text-xs sm:grid-cols-2">
           <ReadStat label={t("tools.field.category")} value={skill.category} />
           <ReadStat label="Source" value={source} />
@@ -466,7 +470,7 @@ function SkillCard({
           />
         </div>
         {instructions ? (
-          <p className="line-clamp-4 whitespace-pre-wrap rounded-md bg-foreground/[0.03] px-3 py-2 text-xs text-foreground/55">
+          <p className="line-clamp-4 whitespace-pre-wrap rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
             {instructions}
           </p>
         ) : null}
@@ -530,140 +534,136 @@ export function ToolDetailModal({
   const item = detail.item;
 
   return (
-    <Modal isOpen={!!detail} onOpenChange={(isOpen) => (!isOpen ? onClose() : undefined)}>
-      <Modal.Backdrop>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[85vh] w-[min(640px,calc(100vw-24px))]">
-            <Modal.Header>
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Modal.Heading>{item.name}</Modal.Heading>
-                  <p className="mt-1 line-clamp-2 text-sm text-foreground/50">
-                    {item.description || t("tools.noDescription")}
-                  </p>
-                </div>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
-                >
-                  <IconClose className="size-4" />
-                </Button>
+    <Dialog open={!!detail} onOpenChange={(isOpen) => (!isOpen ? onClose() : undefined)}>
+      <DialogContent className="max-h-[85vh] w-[min(640px,calc(100vw-24px))] max-w-none">
+        <DialogHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle>{item.name}</DialogTitle>
+              <p className="mt-1 line-clamp-2 text-sm text-foreground/50">
+                {item.description || t("tools.noDescription")}
+              </p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+          {isMcp ? (
+            <div className="flex flex-col gap-3">
+              <h4 className="text-sm font-medium">{t("tools.detail.mcpInfo")}</h4>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <ReadStat
+                  label={t("tools.field.transport")}
+                  value={(detail.item as ToolServer).transport}
+                />
+                <ReadStat
+                  label={t("tools.field.status")}
+                  value={
+                    (detail.item as ToolServer).enabled
+                      ? (detail.item as ToolServer).status
+                      : "disabled"
+                  }
+                />
+                <ReadStat
+                  label="Timeout"
+                  value={`${(detail.item as ToolServer).timeout_seconds}s`}
+                />
+                <ReadStat
+                  label={t("tools.field.tools")}
+                  value={`${detail.tools.filter((tool) => tool.enabled !== 0).length} / ${detail.tools.length}`}
+                />
+                <ReadStat
+                  className="sm:col-span-2"
+                  label={t("tools.field.endpoint")}
+                  value={formatEndpoint(detail.item as ToolServer)}
+                />
+                <ReadStat
+                  className="sm:col-span-2"
+                  label={t("tools.field.connected")}
+                  value={
+                    (detail.item as ToolServer).last_connected_at
+                      ? f.dateTime((detail.item as ToolServer).last_connected_at!)
+                      : t("tools.never")
+                  }
+                />
               </div>
-            </Modal.Header>
-            <Modal.Body className="space-y-4">
-              {isMcp ? (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">{t("tools.detail.mcpInfo")}</h4>
-                  <div className="grid gap-2 text-xs sm:grid-cols-2">
-                    <ReadStat
-                      label={t("tools.field.transport")}
-                      value={(detail.item as ToolServer).transport}
-                    />
-                    <ReadStat
-                      label={t("tools.field.status")}
-                      value={
-                        (detail.item as ToolServer).enabled
-                          ? (detail.item as ToolServer).status
-                          : "disabled"
-                      }
-                    />
-                    <ReadStat
-                      label="Timeout"
-                      value={`${(detail.item as ToolServer).timeout_seconds}s`}
-                    />
-                    <ReadStat
-                      label={t("tools.field.tools")}
-                      value={`${detail.tools.filter((tool) => tool.enabled !== 0).length} / ${detail.tools.length}`}
-                    />
-                    <ReadStat
-                      className="sm:col-span-2"
-                      label={t("tools.field.endpoint")}
-                      value={formatEndpoint(detail.item as ToolServer)}
-                    />
-                    <ReadStat
-                      className="sm:col-span-2"
-                      label={t("tools.field.connected")}
-                      value={
-                        (detail.item as ToolServer).last_connected_at
-                          ? f.dateTime((detail.item as ToolServer).last_connected_at!)
-                          : t("tools.never")
-                      }
-                    />
-                  </div>
-                  {(detail.item as ToolServer).last_error ? (
-                    <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
-                      {(detail.item as ToolServer).last_error}
-                    </p>
-                  ) : null}
-                  {detail.tools.length > 0 ? (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">{t("tools.detail.toolList")}</h4>
-                      <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-foreground/10 p-2">
-                        {detail.tools.map((tool) => (
-                          <div
-                            key={tool.id}
-                            className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs"
-                          >
-                            <span className="truncate font-medium">{tool.title ?? tool.name}</span>
-                            <Chip size="sm" variant={tool.enabled ? "soft" : "secondary"}>
-                              {tool.enabled ? t("main.value.enabled") : t("main.value.disabled")}
-                            </Chip>
-                          </div>
-                        ))}
+              {(detail.item as ToolServer).last_error ? (
+                <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
+                  {(detail.item as ToolServer).last_error}
+                </p>
+              ) : null}
+              {detail.tools.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">{t("tools.detail.toolList")}</h4>
+                  <div className="max-h-48 flex flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
+                    {detail.tools.map((tool) => (
+                      <div
+                        key={tool.id}
+                        className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs"
+                      >
+                        <span className="truncate font-medium">{tool.title ?? tool.name}</span>
+                        <Chip size="sm" variant={tool.enabled ? "soft" : "secondary"}>
+                          {tool.enabled ? t("main.value.enabled") : t("main.value.disabled")}
+                        </Chip>
                       </div>
-                    </div>
-                  ) : null}
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">{t("tools.detail.skillInfo")}</h4>
-                  <div className="grid gap-2 text-xs sm:grid-cols-2">
-                    <ReadStat
-                      label={t("tools.field.category")}
-                      value={(detail.item as ToolSkill).category}
-                    />
-                    <ReadStat
-                      label="Source"
-                      value={(() => {
-                        const config = safeJsonObject((detail.item as ToolSkill).config_json);
-                        return typeof config.source === "string" ? config.source : "manual";
-                      })()}
-                    />
-                    <ReadStat
-                      label={t("tools.field.lastRun")}
-                      value={
-                        (detail.item as ToolSkill).last_run_at
-                          ? f.dateTime((detail.item as ToolSkill).last_run_at!)
-                          : t("tools.never")
-                      }
-                    />
-                  </div>
-                  {(() => {
-                    const instructions = (detail.item as ToolSkill).instructions;
-                    return instructions ? (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">{t("tools.detail.instructions")}</h4>
-                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-foreground/[0.03] px-3 py-2 text-xs text-foreground/55">
-                          {instructions}
-                        </pre>
-                      </div>
-                    ) : null;
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <h4 className="text-sm font-medium">{t("tools.detail.skillInfo")}</h4>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <ReadStat
+                  label={t("tools.field.category")}
+                  value={(detail.item as ToolSkill).category}
+                />
+                <ReadStat
+                  label="Source"
+                  value={(() => {
+                    const config = safeJsonObject((detail.item as ToolSkill).config_json);
+                    return typeof config.source === "string" ? config.source : "manual";
                   })()}
-                </div>
-              )}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onPress={onClose}>
-                {t("common.close")}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+                />
+                <ReadStat
+                  label={t("tools.field.lastRun")}
+                  value={
+                    (detail.item as ToolSkill).last_run_at
+                      ? f.dateTime((detail.item as ToolSkill).last_run_at!)
+                      : t("tools.never")
+                  }
+                />
+              </div>
+              {(() => {
+                const instructions = (detail.item as ToolSkill).instructions;
+                return instructions ? (
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-sm font-medium">{t("tools.detail.instructions")}</h4>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                      {instructions}
+                    </pre>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onPress={onClose}>
+            {t("common.close")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -732,135 +732,133 @@ function AddSkillModal({
   };
 
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => (!isOpen ? close() : undefined)}>
-      <Modal.Backdrop>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[92vh] w-[min(920px,calc(100vw-24px))] overflow-hidden">
-            <Modal.Header>
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-base font-semibold">{t("tools.skill.add")}</h3>
-                  <p className="line-clamp-2 text-sm text-foreground/50">
-                    Upload a SKILL.md package or create one with AI.
-                  </p>
-                </div>
+    <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? close() : undefined)}>
+      <DialogContent className="max-h-[92vh] w-[min(920px,calc(100vw-24px))] max-w-none overflow-hidden">
+        <DialogHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base font-semibold">
+                {t("tools.skill.add")}
+              </DialogTitle>
+              <p className="line-clamp-2 text-sm text-foreground/50">
+                Upload a SKILL.md package or create one with AI.
+              </p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={close}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="grid gap-4">
+            {error ? (
+              <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Button variant="secondary" onPress={() => skillFileRef.current?.click()}>
+                <IconList className="size-4" />
+                SKILL.md
+              </Button>
+              <Button variant="secondary" onPress={() => folderRef.current?.click()}>
+                <IconList className="size-4" />
+                Folder
+              </Button>
+              <Button variant="secondary" onPress={() => zipRef.current?.click()}>
+                <IconList className="size-4" />
+                ZIP
+              </Button>
+            </div>
+            <input
+              ref={skillFileRef}
+              className="hidden"
+              type="file"
+              accept=".md,text/markdown,text/plain"
+              onChange={(event) => void handleSkillFile(event, loadMarkdown, setError)}
+            />
+            <input
+              ref={folderRef}
+              className="hidden"
+              type="file"
+              multiple
+              {...({ webkitdirectory: "" } as Record<string, string>)}
+              onChange={(event) => void handleSkillFolder(event, loadMarkdown, setError)}
+            />
+            <input
+              ref={zipRef}
+              className="hidden"
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(event) => void handleSkillZip(event, loadMarkdown, setError)}
+            />
+
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <Field label="AI prompt">
+                <TextArea
+                  rows={3}
+                  value={aiPrompt}
+                  placeholder="Describe the skill you want to create"
+                  onChange={(event) => setAiPrompt(event.target.value)}
+                />
+              </Field>
+              <div className="flex items-end">
                 <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={close}
-                  aria-label={t("common.close")}
+                  className="w-full md:w-auto"
+                  variant="primary"
+                  isDisabled={!aiPrompt.trim()}
+                  isPending={generating}
+                  onPress={generate}
                 >
-                  <IconClose className="size-4" />
+                  <IconSparkles className="size-4" />
+                  AI Create
                 </Button>
               </div>
-            </Modal.Header>
-            <Modal.Body className="min-h-0 overflow-y-auto">
-              <div className="grid gap-4">
-                {error ? (
-                  <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-                    {error}
-                  </p>
-                ) : null}
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <Button variant="secondary" onPress={() => skillFileRef.current?.click()}>
-                    <IconList className="size-4" />
-                    SKILL.md
-                  </Button>
-                  <Button variant="secondary" onPress={() => folderRef.current?.click()}>
-                    <IconList className="size-4" />
-                    Folder
-                  </Button>
-                  <Button variant="secondary" onPress={() => zipRef.current?.click()}>
-                    <IconList className="size-4" />
-                    ZIP
-                  </Button>
-                </div>
-                <input
-                  ref={skillFileRef}
-                  className="hidden"
-                  type="file"
-                  accept=".md,text/markdown,text/plain"
-                  onChange={(event) => void handleSkillFile(event, loadMarkdown, setError)}
-                />
-                <input
-                  ref={folderRef}
-                  className="hidden"
-                  type="file"
-                  multiple
-                  {...({ webkitdirectory: "" } as Record<string, string>)}
-                  onChange={(event) => void handleSkillFolder(event, loadMarkdown, setError)}
-                />
-                <input
-                  ref={zipRef}
-                  className="hidden"
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(event) => void handleSkillZip(event, loadMarkdown, setError)}
-                />
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <Field label="AI prompt">
-                    <TextArea
-                      rows={3}
-                      value={aiPrompt}
-                      placeholder="Describe the skill you want to create"
-                      onChange={(event) => setAiPrompt(event.target.value)}
-                    />
-                  </Field>
-                  <div className="flex items-end">
-                    <Button
-                      className="w-full md:w-auto"
-                      variant="primary"
-                      isDisabled={!aiPrompt.trim()}
-                      isPending={generating}
-                      onPress={generate}
-                    >
-                      <IconSparkles className="size-4" />
-                      AI Create
-                    </Button>
-                  </div>
-                </div>
-
-                <Field label="SKILL.md preview">
-                  <TextArea
-                    rows={12}
-                    value={markdown}
-                    className="font-mono text-xs"
-                    onChange={(event) => {
-                      setMarkdown(event.target.value);
-                      try {
-                        setDraft(parseSkillMarkdown(event.target.value, source));
-                        setError(null);
-                      } catch {
-                        setDraft(null);
-                      }
-                    }}
-                  />
-                </Field>
-                {draft ? (
-                  <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
-                    <p className="truncate text-sm font-medium">{draft.name}</p>
-                    <p className="line-clamp-2 text-xs text-foreground/55">{draft.description}</p>
-                  </div>
-                ) : null}
+            <Field label="SKILL.md preview">
+              <TextArea
+                rows={12}
+                value={markdown}
+                className="font-mono text-xs"
+                onChange={(event) => {
+                  setMarkdown(event.target.value);
+                  try {
+                    setDraft(parseSkillMarkdown(event.target.value, source));
+                    setError(null);
+                  } catch {
+                    setDraft(null);
+                  }
+                }}
+              />
+            </Field>
+            {draft ? (
+              <div className="rounded-md border border-border bg-muted px-3 py-2">
+                <p className="truncate text-sm font-medium">{draft.name}</p>
+                <p className="line-clamp-2 text-xs text-foreground/55">{draft.description}</p>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex w-full flex-wrap justify-end gap-2">
-                <Button variant="secondary" onPress={close}>
-                  {t("common.cancel")}
-                </Button>
-                <Button variant="primary" isDisabled={!draft} isPending={busy} onPress={install}>
-                  <IconCheck className="size-4" />
-                  {t("tools.skill.add")}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            ) : null}
+          </div>
+        </div>
+        <DialogFooter>
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Button variant="secondary" onPress={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" isDisabled={!draft} isPending={busy} onPress={install}>
+              <IconCheck className="size-4" />
+              {t("tools.skill.add")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -876,14 +874,14 @@ export function MetricCard({
   const { f } = useT();
   if (orientation === "horizontal") {
     return (
-      <div className="flex h-9 items-center gap-2 rounded-md border border-foreground/10 px-3 text-sm">
+      <div className="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm">
         <span className="font-semibold tabular-nums">{f.number(value)}</span>
         <span className="truncate text-xs text-foreground/45">{label}</span>
       </div>
     );
   }
   return (
-    <div className="rounded-md border border-foreground/10 px-4 py-3">
+    <div className="rounded-md border border-border px-4 py-3">
       <p className="truncate text-xs text-foreground/45">{label}</p>
       <p className="mt-1 text-xl font-semibold">{f.number(value)}</p>
     </div>
@@ -915,7 +913,7 @@ export function ReadStat({
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={["min-w-0 rounded-md bg-foreground/[0.03] px-3 py-2", className].join(" ")}>
+    <div className={["min-w-0 rounded-md bg-muted px-3 py-2", className].join(" ")}>
       <p className="truncate text-[11px] text-foreground/40">{label}</p>
       <p className="mt-1 break-all text-xs text-foreground/70">{value || "-"}</p>
     </div>
@@ -932,7 +930,7 @@ export function EmptyTools({
   onAction?: () => void;
 }): React.JSX.Element {
   return (
-    <div className="rounded-md border border-dashed border-foreground/15 px-4 py-12 text-center">
+    <div className="rounded-md border border-dashed border-border px-4 py-12 text-center">
       <p className="text-sm text-foreground/45">{message}</p>
       {action && onAction ? (
         <Button className="mt-4" variant="primary" size="sm" onPress={onAction}>
@@ -1180,20 +1178,20 @@ function CatalogListSkeleton(): React.JSX.Element {
         <Card key={id} className="overflow-hidden rounded-md">
           <Card.Header className="p-3">
             <div className="flex min-h-12 items-center gap-3">
-              <div className="size-9 shrink-0 rounded-full bg-foreground/10" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-4 w-3/5 rounded bg-foreground/10" />
-                <div className="h-3 w-4/5 rounded bg-foreground/[0.07]" />
+              <div className="size-9 shrink-0 rounded-full bg-muted" />
+              <div className="min-w-0 flex flex-1 flex-col gap-2">
+                <div className="h-4 w-3/5 rounded bg-muted" />
+                <div className="h-3 w-4/5 rounded bg-muted" />
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <div className="size-8 rounded-md bg-foreground/[0.08]" />
-                <div className="size-8 rounded-md bg-foreground/[0.1]" />
+                <div className="size-8 rounded-md bg-muted" />
+                <div className="size-8 rounded-md bg-muted" />
               </div>
             </div>
           </Card.Header>
           <Card.Content className="flex items-center gap-2 px-3 pb-3">
-            <div className="h-5 w-16 rounded-full bg-foreground/[0.08]" />
-            <div className="h-5 w-12 rounded-full bg-foreground/[0.08]" />
+            <div className="h-5 w-16 rounded-full bg-muted" />
+            <div className="h-5 w-12 rounded-full bg-muted" />
           </Card.Content>
         </Card>
       ))}
@@ -1218,7 +1216,7 @@ function CatalogCard({
     <Card className="overflow-hidden rounded-md">
       <Card.Header className="p-3">
         <div className="flex min-h-12 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background text-xs font-semibold">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
             {item.sourceKind === "skills-sh" ? "AI" : "MS"}
           </div>
           <div className="min-w-0 flex-1">
@@ -1298,111 +1296,107 @@ function CatalogDetailModal({
   const { t, f } = useT();
   const metric = item?.metrics.installs ?? item?.metrics.downloads ?? 0;
   return (
-    <Modal isOpen={item !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[88vh] w-[min(760px,calc(100vw-24px))] overflow-hidden">
-            <Modal.Header>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Modal.Heading>{item?.name}</Modal.Heading>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {item?.sourceLabel} · {item?.externalId}
-                  </p>
-                </div>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  aria-label={t("common.close")}
-                  onPress={onClose}
-                >
-                  <IconClose className="size-4" />
-                </Button>
-              </div>
-            </Modal.Header>
-            <Modal.Body className="min-h-0 space-y-4 overflow-y-auto">
-              {item ? (
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <ReadStat label={t("catalog.source")} value={item.sourceLabel} />
-                  <ReadStat
-                    label={t("catalog.installs")}
-                    value={metric ? f.compactNumber(metric) : "-"}
-                  />
-                  <ReadStat
-                    label={t("catalog.files")}
-                    value={detail ? String(detail.files.length) : "-"}
-                  />
-                </div>
-              ) : null}
-              {item?.description ? (
-                <p className="text-sm text-muted-foreground">{item.description}</p>
-              ) : null}
-              {loading ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">
-                  {t("catalog.detailLoading")}
-                </p>
-              ) : null}
-              {error ? (
-                <div className="space-y-2">
-                  <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
-                  <Button size="sm" variant="secondary" onPress={onRetry}>
-                    {t("catalog.retry")}
-                  </Button>
-                </div>
-              ) : null}
-              {detail ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                    <span>{t("catalog.packageSize", { size: f.number(detail.totalBytes) })}</span>
-                    <span>·</span>
-                    <span>{t("catalog.validated")}</span>
-                  </div>
-                  <div className="rounded-md border border-border p-4">
-                    <RichContent value={detail.markdown} />
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                    {detail.files.map((file) => (
-                      <span key={file.path} className="rounded bg-muted px-2 py-1 font-mono">
-                        {file.path}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {item?.catalogUrl ? (
-                <a
-                  className="text-xs text-accent underline underline-offset-2"
-                  href={item.catalogUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t("catalog.openSource")}
-                </a>
-              ) : null}
-            </Modal.Body>
-            <Modal.Footer className="flex justify-end gap-2">
-              <Button variant="tertiary" onPress={onClose}>
-                {t("common.cancel")}
+    <Dialog open={item !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-h-[88vh] w-[min(760px,calc(100vw-24px))] max-w-none overflow-hidden">
+        <DialogHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle>{item?.name}</DialogTitle>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {item?.sourceLabel} · {item?.externalId}
+              </p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              aria-label={t("common.close")}
+              onPress={onClose}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+          {item ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <ReadStat label={t("catalog.source")} value={item.sourceLabel} />
+              <ReadStat
+                label={t("catalog.installs")}
+                value={metric ? f.compactNumber(metric) : "-"}
+              />
+              <ReadStat
+                label={t("catalog.files")}
+                value={detail ? String(detail.files.length) : "-"}
+              />
+            </div>
+          ) : null}
+          {item?.description ? (
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+          ) : null}
+          {loading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t("catalog.detailLoading")}
+            </p>
+          ) : null}
+          {error ? (
+            <div className="flex flex-col gap-2">
+              <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+              <Button size="sm" variant="secondary" onPress={onRetry}>
+                {t("catalog.retry")}
               </Button>
-              {item ? (
-                <Button
-                  isPending={busy}
-                  isDisabled={item.installed && !item.updateAvailable}
-                  onPress={() => onInstall(item)}
-                >
-                  {item.updateAvailable
-                    ? t("catalog.updateDisabled")
-                    : item.installed
-                      ? t("catalog.installed")
-                      : t("catalog.installDisabled")}
-                </Button>
-              ) : null}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            </div>
+          ) : null}
+          {detail ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                <span>{t("catalog.packageSize", { size: f.number(detail.totalBytes) })}</span>
+                <span>·</span>
+                <span>{t("catalog.validated")}</span>
+              </div>
+              <div className="rounded-md border border-border p-4">
+                <RichContent value={detail.markdown} />
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                {detail.files.map((file) => (
+                  <span key={file.path} className="rounded bg-muted px-2 py-1 font-mono">
+                    {file.path}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {item?.catalogUrl ? (
+            <a
+              className="text-xs text-accent underline underline-offset-2"
+              href={item.catalogUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("catalog.openSource")}
+            </a>
+          ) : null}
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="tertiary" onPress={onClose}>
+            {t("common.cancel")}
+          </Button>
+          {item ? (
+            <Button
+              isPending={busy}
+              isDisabled={item.installed && !item.updateAvailable}
+              onPress={() => onInstall(item)}
+            >
+              {item.updateAvailable
+                ? t("catalog.updateDisabled")
+                : item.installed
+                  ? t("catalog.installed")
+                  : t("catalog.installDisabled")}
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

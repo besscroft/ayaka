@@ -404,7 +404,7 @@ export function MemoryFilePanel({
         />
       ) : (
         <div className="max-h-[480px] overflow-auto rounded-md border border-border bg-background p-3">
-          <pre className="whitespace-pre-wrap font-mono text-sm text-foreground/80">
+          <pre className="whitespace-pre-wrap font-mono text-sm text-foreground">
             {snapshot.content}
           </pre>
         </div>
@@ -560,7 +560,7 @@ function MemoryEntriesPanel(): React.JSX.Element {
               />
             ))}
             {isLoading && memories.length === 0 && (
-              <div className="space-y-2 px-1 py-2">
+              <div className="flex flex-col gap-2 px-1 py-2">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-12 animate-pulse rounded-md bg-muted/40" />
                 ))}
@@ -736,7 +736,7 @@ function MemoryDetail({
       </div>
 
       <div className="rounded-md border border-border bg-background p-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
           {memory.content}
         </p>
       </div>
@@ -747,8 +747,8 @@ function MemoryDetail({
 function MetaItem({ label, value }: { label: string; value: string }): React.JSX.Element {
   return (
     <div>
-      <p className="text-foreground/45">{label}</p>
-      <p className="mt-0.5 font-medium text-foreground/80">{value}</p>
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-medium text-foreground">{value}</p>
     </div>
   );
 }
@@ -803,16 +803,16 @@ function MemoryEditModal({
       aria-modal="true"
     >
       <div
-        className="mx-4 w-full max-w-lg select-none overflow-hidden rounded-lg border border-foreground/15 bg-background shadow-xl"
+        className="mx-4 w-full max-w-lg select-none overflow-hidden rounded-lg border border-border bg-background shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-foreground/10 px-5 py-3">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h3 className="text-sm font-semibold">
             {memory ? t("main.memory.edit") : t("main.memory.new")}
           </h3>
           <button
             type="button"
-            className="rounded p-1 text-foreground/50 hover:bg-foreground/10 hover:text-foreground"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t("common.close")}
           >
@@ -896,7 +896,7 @@ function MemoryEditModal({
               </Switch>
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-3">
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
             <Button variant="tertiary" size="sm" onPress={onClose} isDisabled={isSaving}>
               {t("common.cancel")}
             </Button>
@@ -966,7 +966,7 @@ function Label({ children }: { children: ReactNode }): React.JSX.Element {
 function EmptyState({ icon, title }: { icon: ReactNode; title: string }): React.JSX.Element {
   return (
     <Card>
-      <Card.Content className="flex min-h-48 flex-col items-center justify-center gap-3 text-foreground/45">
+      <Card.Content className="flex min-h-48 flex-col items-center justify-center gap-3 text-muted-foreground">
         <span className="text-2xl">{icon}</span>
         <p className="text-sm">{title}</p>
       </Card.Content>

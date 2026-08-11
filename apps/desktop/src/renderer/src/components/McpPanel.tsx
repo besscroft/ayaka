@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Input, Modal, Switch, Tabs, TabsList, TabsTrigger, TextArea } from "./ui";
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Switch,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TextArea,
+} from "./ui";
 import { api, type ToolsSnapshot } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
@@ -194,13 +208,13 @@ export function McpPanel(): React.JSX.Element {
           />
         ) : null}
         {tab === "installed" && loading && !snapshot ? (
-          <div className="rounded-md border border-dashed border-foreground/15 px-4 py-16 text-center text-sm text-foreground/45">
+          <div className="rounded-md border border-dashed border-border px-4 py-16 text-center text-sm text-muted-foreground">
             {t("main.loading")}
           </div>
         ) : null}
 
         {tab === "installed" && snapshot ? (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px]">
               <label className="relative min-w-0">
                 <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
@@ -375,115 +389,108 @@ function McpReviewModal({
   };
 
   return (
-    <Modal isOpen={target !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[90vh] w-[min(760px,calc(100vw-24px))]">
-            <Modal.Header>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Modal.Heading>{t("catalog.mcp.reviewTitle")}</Modal.Heading>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">{target?.item.name}</p>
-                </div>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
-                >
-                  <IconClose className="size-4" />
-                </Button>
-              </div>
-            </Modal.Header>
-            <Modal.Body className="space-y-4">
-              <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-                {t("catalog.mcp.reviewWarning")}
-              </div>
-              {target ? (
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <ReadStat label={t("catalog.source")} value={target.item.sourceLabel} />
-                  <ReadStat
-                    label={t("catalog.transport")}
-                    value={server?.transport ?? mcp?.config?.transport ?? "-"}
+    <Dialog open={target !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-h-[90vh] w-[min(760px,calc(100vw-24px))] max-w-none">
+        <DialogHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle>{t("catalog.mcp.reviewTitle")}</DialogTitle>
+              <p className="mt-1 truncate text-sm text-muted-foreground">{target?.item.name}</p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+          <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+            {t("catalog.mcp.reviewWarning")}
+          </div>
+          {target ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <ReadStat label={t("catalog.source")} value={target.item.sourceLabel} />
+              <ReadStat
+                label={t("catalog.transport")}
+                value={server?.transport ?? mcp?.config?.transport ?? "-"}
+              />
+              <ReadStat label={t("catalog.mcp.tools")} value={String(mcp?.tools?.length ?? 0)} />
+            </div>
+          ) : null}
+          {error ? (
+            <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          {mcp?.warnings && mcp.warnings.length > 0 ? (
+            <div className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">{t("catalog.mcp.warnings")}</p>
+              <ul className="mt-1 list-disc pl-4 [&>li+li]:mt-1">
+                {mcp.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">{t("catalog.safetyDetails")}</p>
+            <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] text-muted-foreground">
+              {JSON.stringify(
+                {
+                  transport: server?.transport,
+                  command: server?.command,
+                  args: server?.args_json,
+                  url: server?.url,
+                  headers: server?.headers_json,
+                  env: server?.env_json,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </div>
+          {secretKeys.length > 0 ? (
+            <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+              <p className="text-sm font-medium">{t("catalog.secrets")}</p>
+              {secretKeys.map((key) => (
+                <label key={key} className="grid gap-1.5 text-xs font-medium">
+                  <span>
+                    {key}
+                    {savedKeys.includes(key) ? ` · ${t("catalog.mcp.secretSaved")}` : ""}
+                  </span>
+                  <Input
+                    type="password"
+                    placeholder="$secret:{key}"
+                    ref={(node) => {
+                      secretRefs.current[key] = node;
+                    }}
                   />
-                  <ReadStat
-                    label={t("catalog.mcp.tools")}
-                    value={String(mcp?.tools?.length ?? 0)}
-                  />
-                </div>
-              ) : null}
-              {error ? (
-                <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-                  {error}
-                </p>
-              ) : null}
-              {mcp?.warnings && mcp.warnings.length > 0 ? (
-                <div className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground">{t("catalog.mcp.warnings")}</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-4">
-                    {mcp.warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <div className="space-y-2">
-                <p className="text-sm font-medium">{t("catalog.safetyDetails")}</p>
-                <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] text-muted-foreground">
-                  {JSON.stringify(
-                    {
-                      transport: server?.transport,
-                      command: server?.command,
-                      args: server?.args_json,
-                      url: server?.url,
-                      headers: server?.headers_json,
-                      env: server?.env_json,
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </div>
-              {secretKeys.length > 0 ? (
-                <div className="space-y-2 rounded-md border border-border p-3">
-                  <p className="text-sm font-medium">{t("catalog.secrets")}</p>
-                  {secretKeys.map((key) => (
-                    <label key={key} className="grid gap-1.5 text-xs font-medium">
-                      <span>
-                        {key}
-                        {savedKeys.includes(key) ? ` · ${t("catalog.mcp.secretSaved")}` : ""}
-                      </span>
-                      <Input
-                        type="password"
-                        placeholder="$secret:{key}"
-                        ref={(node) => {
-                          secretRefs.current[key] = node;
-                        }}
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-            </Modal.Body>
-            <Modal.Footer className="flex justify-end gap-2">
-              <Button variant="tertiary" onPress={onClose}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                isPending={pending || busy}
-                isDisabled={!server}
-                onPress={() => void enable()}
-              >
-                <IconCheck className="size-4" />
-                {t("catalog.reviewEnable")}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="tertiary" onPress={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            isPending={pending || busy}
+            isDisabled={!server}
+            onPress={() => void enable()}
+          >
+            <IconCheck className="size-4" />
+            {t("catalog.reviewEnable")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -558,7 +565,7 @@ function McpCard({
           <IconGlobe className="size-5 shrink-0 text-foreground/40" />
         </div>
       </Card.Header>
-      <Card.Content className="space-y-3 p-4">
+      <Card.Content className="flex flex-col gap-3 p-4">
         <div className="grid gap-2 text-xs sm:grid-cols-2">
           <ReadStat label={t("tools.field.transport")} value={server.transport} />
           <ReadStat label={t("tools.field.tools")} value={`${enabledTools} / ${tools.length}`} />
@@ -640,138 +647,132 @@ function AddMcpModal({
   };
 
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => (!isOpen ? close() : undefined)}>
-      <Modal.Backdrop>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[92vh] w-[min(880px,calc(100vw-24px))] overflow-hidden">
-            <Modal.Header>
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-base font-semibold">{t("tools.mcp.add")}</h3>
-                  <p className="line-clamp-2 text-sm text-foreground/50">
-                    Manual MCP server connection.
-                  </p>
-                </div>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={close}
-                  aria-label={t("common.close")}
+    <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? close() : undefined)}>
+      <DialogContent className="max-h-[92vh] w-[min(880px,calc(100vw-24px))] max-w-none overflow-hidden">
+        <DialogHeader>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base font-semibold">
+                {t("tools.mcp.add")}
+              </DialogTitle>
+              <p className="line-clamp-2 text-sm text-foreground/50">
+                Manual MCP server connection.
+              </p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={close}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="grid gap-4">
+            {error ? (
+              <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="服务类型">
+                <select
+                  className="h-10 min-w-0 select-none rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.transport}
+                  onChange={(event) => patch({ transport: event.target.value as McpTransportKind })}
                 >
-                  <IconClose className="size-4" />
-                </Button>
-              </div>
-            </Modal.Header>
-            <Modal.Body className="min-h-0 overflow-y-auto">
-              <div className="grid gap-4">
-                {error ? (
-                  <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-                    {error}
-                  </p>
-                ) : null}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="服务类型">
-                    <select
-                      className="h-10 min-w-0 select-none rounded-md border border-foreground/10 bg-background px-3 text-sm"
-                      value={form.transport}
-                      onChange={(event) =>
-                        patch({ transport: event.target.value as McpTransportKind })
-                      }
-                    >
-                      <option value="stdio">STDIO</option>
-                      <option value="http">HTTP</option>
-                      <option value="sse">SSE</option>
-                    </select>
-                  </Field>
-                  <Field label="服务器名称">
-                    <Input
-                      value={form.name}
-                      placeholder="my-mcp-server"
-                      onChange={(event) => patch({ name: event.target.value })}
-                    />
-                  </Field>
-                </div>
-                <Field label={t("tools.field.description")}>
-                  <TextArea
-                    rows={2}
-                    value={form.description}
-                    onChange={(event) => patch({ description: event.target.value })}
+                  <option value="stdio">STDIO</option>
+                  <option value="http">HTTP</option>
+                  <option value="sse">SSE</option>
+                </select>
+              </Field>
+              <Field label="服务器名称">
+                <Input
+                  value={form.name}
+                  placeholder="my-mcp-server"
+                  onChange={(event) => patch({ name: event.target.value })}
+                />
+              </Field>
+            </div>
+            <Field label={t("tools.field.description")}>
+              <TextArea
+                rows={2}
+                value={form.description}
+                onChange={(event) => patch({ description: event.target.value })}
+              />
+            </Field>
+            {form.transport === "stdio" ? (
+              <Field label="命令">
+                <TextArea
+                  rows={3}
+                  value={form.commandLine}
+                  placeholder="npx -y @modelcontextprotocol/server-filesystem"
+                  className="font-mono text-sm"
+                  onChange={(event) => patch({ commandLine: event.target.value })}
+                />
+              </Field>
+            ) : (
+              <Field label={t("tools.field.url")}>
+                <Input
+                  value={form.url}
+                  placeholder="https://example.com/mcp"
+                  onChange={(event) => patch({ url: event.target.value })}
+                />
+              </Field>
+            )}
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label={form.transport === "stdio" ? "环境变量（可选）" : "Headers（可选）"}>
+                <TextArea
+                  rows={4}
+                  value={form.transport === "stdio" ? form.env : form.headers}
+                  placeholder={
+                    form.transport === "stdio"
+                      ? "API_KEY=your-api-key"
+                      : "Authorization=Bearer token"
+                  }
+                  className="font-mono text-sm"
+                  onChange={(event) =>
+                    form.transport === "stdio"
+                      ? patch({ env: event.target.value })
+                      : patch({ headers: event.target.value })
+                  }
+                />
+              </Field>
+              <div className="grid gap-3">
+                <Field label={t("tools.field.cwd")}>
+                  <Input
+                    value={form.cwd}
+                    onChange={(event) => patch({ cwd: event.target.value })}
                   />
                 </Field>
-                {form.transport === "stdio" ? (
-                  <Field label="命令">
-                    <TextArea
-                      rows={3}
-                      value={form.commandLine}
-                      placeholder="npx -y @modelcontextprotocol/server-filesystem"
-                      className="font-mono text-sm"
-                      onChange={(event) => patch({ commandLine: event.target.value })}
-                    />
-                  </Field>
-                ) : (
-                  <Field label={t("tools.field.url")}>
-                    <Input
-                      value={form.url}
-                      placeholder="https://example.com/mcp"
-                      onChange={(event) => patch({ url: event.target.value })}
-                    />
-                  </Field>
-                )}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field
-                    label={form.transport === "stdio" ? "环境变量（可选）" : "Headers（可选）"}
-                  >
-                    <TextArea
-                      rows={4}
-                      value={form.transport === "stdio" ? form.env : form.headers}
-                      placeholder={
-                        form.transport === "stdio"
-                          ? "API_KEY=your-api-key"
-                          : "Authorization=Bearer token"
-                      }
-                      className="font-mono text-sm"
-                      onChange={(event) =>
-                        form.transport === "stdio"
-                          ? patch({ env: event.target.value })
-                          : patch({ headers: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <div className="grid gap-3">
-                    <Field label={t("tools.field.cwd")}>
-                      <Input
-                        value={form.cwd}
-                        onChange={(event) => patch({ cwd: event.target.value })}
-                      />
-                    </Field>
-                    <Field label="超时时间（秒）">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={600}
-                        value={form.timeoutSeconds}
-                        onChange={(event) => patch({ timeoutSeconds: event.target.value })}
-                      />
-                    </Field>
-                  </div>
-                </div>
+                <Field label="超时时间（秒）">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={600}
+                    value={form.timeoutSeconds}
+                    onChange={(event) => patch({ timeoutSeconds: event.target.value })}
+                  />
+                </Field>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex w-full flex-wrap justify-end gap-2">
-                <Button variant="secondary" onPress={close}>
-                  {t("common.cancel")}
-                </Button>
-                <Button variant="primary" isPending={busy} onPress={save}>
-                  <IconCheck className="size-4" />
-                  {t("tools.mcp.add")}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Button variant="secondary" onPress={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" isPending={busy} onPress={save}>
+              <IconCheck className="size-4" />
+              {t("tools.mcp.add")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

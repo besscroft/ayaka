@@ -185,12 +185,15 @@ export function AppShell({
                   opacity: { duration: 0.18, ease: "easeOut" },
                 }
           }
-          className="app-sidebar shrink-0 overflow-hidden bg-foreground/[0.025]"
+          className="app-sidebar shrink-0 overflow-hidden bg-sidebar"
           aria-hidden={!sidebarExpanded}
           inert={!sidebarExpanded}
         >
-          <div className="flex h-full w-[280px] flex-col border-r border-foreground/10">
-            <nav className="select-none space-y-1 px-2 py-3" aria-label={t("shell.nav.primary")}>
+          <div className="flex h-full w-[280px] flex-col border-r border-sidebar-border">
+            <nav
+              className="flex select-none flex-col gap-1 px-2 py-3"
+              aria-label={t("shell.nav.primary")}
+            >
               {primaryNav.map(({ id, labelKey, Icon }) => {
                 const active = activeView === id;
                 const label = t(labelKey);
@@ -203,8 +206,8 @@ export function AppShell({
                     className={[
                       "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition",
                       active
-                        ? "bg-accent/10 text-accent"
-                        : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground",
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     ].join(" ")}
                     onClick={() => onSelectView(id)}
                     aria-current={active ? "page" : undefined}
@@ -216,9 +219,9 @@ export function AppShell({
               })}
             </nav>
 
-            <div className="flex min-h-0 flex-1 flex-col border-t border-foreground/10">
+            <div className="flex min-h-0 flex-1 flex-col border-t border-sidebar-border">
               <div className="flex items-center justify-between gap-2 px-3 py-3">
-                <span className="select-none text-xs font-medium uppercase tracking-normal text-foreground/45">
+                <span className="select-none text-xs font-medium text-sidebar-foreground/60">
                   {t("shell.conversations")}
                 </span>
                 <Button
@@ -243,7 +246,7 @@ export function AppShell({
                       onChange={(e) => setSearchQuery(e.currentTarget.value)}
                       placeholder={t("shell.searchPlaceholder")}
                       aria-label={t("shell.searchPlaceholder")}
-                      className="h-7 w-full rounded-md border border-foreground/10 bg-background/60 pl-7 pr-7 text-xs text-foreground/80 outline-none transition placeholder:text-foreground/35 focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
+                      className="h-8 w-full rounded-md border border-input bg-background px-3 pl-7 pr-7 text-xs text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
                     />
                     {searchQuery && (
                       <button
@@ -264,17 +267,17 @@ export function AppShell({
                 aria-label={t("shell.nav.conversations")}
               >
                 {groupedConversations.length === 0 ? (
-                  <p className="whitespace-pre-line px-3 py-8 text-center text-sm text-foreground/50">
+                  <p className="whitespace-pre-line px-3 py-8 text-center text-sm text-muted-foreground">
                     {searchQuery ? t("shell.noSearchResult") : t("shell.noConversation")}
                   </p>
                 ) : (
-                  <ul className="space-y-3">
+                  <ul className="flex flex-col gap-3">
                     {groupedConversations.map((group) => (
                       <li key={group.label}>
                         <p className="select-none px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/35">
                           {group.label}
                         </p>
-                        <ul className="space-y-0.5">
+                        <ul className="flex flex-col gap-0.5">
                           {group.items.map((conv) => {
                             const isActive =
                               conv.id === activeConversationId && activeView === "chat";
@@ -285,7 +288,9 @@ export function AppShell({
                                   transition={{ type: "tween", duration: 0.1, ease: "easeOut" }}
                                   className={[
                                     "group/conv flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm transition",
-                                    isActive ? "bg-accent/10 text-accent" : "hover:bg-foreground/5",
+                                    isActive
+                                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                      : "hover:bg-sidebar-accent",
                                   ].join(" ")}
                                   onClick={() => {
                                     onSelectConversation(conv.id);
@@ -317,7 +322,7 @@ export function AppShell({
               </nav>
             </div>
 
-            <div className="border-t border-foreground/10 p-2">
+            <div className="border-t border-sidebar-border p-2">
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-2"

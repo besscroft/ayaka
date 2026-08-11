@@ -31,20 +31,20 @@ const STATUS_META: Record<
 > = {
   ready: {
     labelKey: "chat.status.ready",
-    tone: "bg-foreground/[0.06] text-foreground/65",
-    dotClass: "text-foreground/40",
+    tone: "bg-muted text-muted-foreground",
+    dotClass: "text-muted-foreground",
     pulse: false,
   },
   submitted: {
     labelKey: "chat.status.submitted",
-    tone: "bg-accent/12 text-accent",
-    dotClass: "text-accent",
+    tone: "bg-primary/10 text-primary",
+    dotClass: "text-primary",
     pulse: true,
   },
   streaming: {
     labelKey: "chat.status.streaming",
-    tone: "bg-accent/12 text-accent",
-    dotClass: "text-accent",
+    tone: "bg-primary/10 text-primary",
+    dotClass: "text-primary",
     pulse: true,
   },
   stopped: {

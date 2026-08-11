@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Chip, Input, Modal } from "./ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+} from "./ui";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
@@ -327,18 +337,18 @@ function McpMarketplaceSkeleton(): React.JSX.Element {
     <div className="grid animate-pulse gap-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
       {[0, 1, 2, 3, 4, 5].map((id) => (
         <Card key={id} className="rounded-md">
-          <Card.Header className="space-y-3">
+          <Card.Header className="flex flex-col gap-3">
             <div className="flex gap-3">
-              <div className="size-9 rounded-full bg-foreground/10" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-4 w-3/5 rounded bg-foreground/10" />
-                <div className="h-3 w-4/5 rounded bg-foreground/[0.07]" />
+              <div className="size-9 rounded-full bg-muted" />
+              <div className="min-w-0 flex flex-1 flex-col gap-2">
+                <div className="h-4 w-3/5 rounded bg-muted" />
+                <div className="h-3 w-4/5 rounded bg-muted" />
               </div>
             </div>
-            <div className="h-8 rounded bg-foreground/[0.06]" />
+            <div className="h-8 rounded bg-muted" />
           </Card.Header>
           <Card.Footer>
-            <div className="h-8 rounded bg-foreground/[0.07]" />
+            <div className="h-8 rounded bg-muted" />
           </Card.Footer>
         </Card>
       ))}
@@ -361,7 +371,7 @@ function McpMarketplaceCard({
     <Card className="flex h-full flex-col rounded-md">
       <Card.Header>
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <IconGlobe className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -442,197 +452,193 @@ function McpMarketplaceDetailModal({
   }, [item?.id]);
 
   return (
-    <Modal isOpen={item !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container>
-          <Modal.Dialog className="max-h-[90vh] w-[min(820px,calc(100vw-24px))]">
-            <Modal.Header>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Modal.Heading>{item?.name}</Modal.Heading>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {item?.sourceLabel} / {item?.externalId}
-                  </p>
-                </div>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
-                >
-                  <IconClose className="size-4" />
-                </Button>
+    <Dialog open={item !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-h-[90vh] w-[min(820px,calc(100vw-24px))] max-w-none">
+        <DialogHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle>{item?.name}</DialogTitle>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {item?.sourceLabel} / {item?.externalId}
+              </p>
+            </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+          {item ? (
+            <div className="grid gap-2 sm:grid-cols-4">
+              <ReadStat label={t("catalog.mcp.author")} value={mcp?.author || "-"} />
+              <ReadStat label={t("catalog.transport")} value={mcp?.config.transport || "-"} />
+              <ReadStat
+                label={t("catalog.mcp.tools")}
+                value={mcp ? f.number(mcp.tools.length) : "-"}
+              />
+              <ReadStat
+                label={t("catalog.installs")}
+                value={metric ? f.compactNumber(metric) : "-"}
+              />
+            </div>
+          ) : null}
+          {item?.description ? (
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+          ) : null}
+          {loading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {t("catalog.detailLoading")}
+            </p>
+          ) : null}
+          {error ? (
+            <div className="flex flex-col gap-2">
+              <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+              <Button size="sm" variant="secondary" onPress={onRetry}>
+                {t("catalog.retry")}
+              </Button>
+            </div>
+          ) : null}
+          {mcp ? (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {mcp.featured ? (
+                  <Chip size="sm" color="accent">
+                    {t("catalog.mcp.featured")}
+                  </Chip>
+                ) : null}
+                {mcp.verified ? (
+                  <Chip size="sm" color="success">
+                    {t("catalog.mcp.verified")}
+                  </Chip>
+                ) : null}
+                {mcp.category ? (
+                  <Chip size="sm" variant="secondary">
+                    {mcp.category}
+                  </Chip>
+                ) : null}
+                {mcp.tags.map((value) => (
+                  <Chip key={value} size="sm" variant="secondary">
+                    {value}
+                  </Chip>
+                ))}
               </div>
-            </Modal.Header>
-            <Modal.Body className="space-y-4">
-              {item ? (
-                <div className="grid gap-2 sm:grid-cols-4">
-                  <ReadStat label={t("catalog.mcp.author")} value={mcp?.author || "-"} />
-                  <ReadStat label={t("catalog.transport")} value={mcp?.config.transport || "-"} />
-                  <ReadStat
-                    label={t("catalog.mcp.tools")}
-                    value={mcp ? f.number(mcp.tools.length) : "-"}
-                  />
-                  <ReadStat
-                    label={t("catalog.installs")}
-                    value={metric ? f.compactNumber(metric) : "-"}
-                  />
+              {mcp.warnings.length > 0 ? (
+                <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <p className="font-medium">{t("catalog.mcp.warnings")}</p>
+                  <ul className="mt-1 list-disc pl-4 [&>li+li]:mt-1">
+                    {mcp.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
-              {item?.description ? (
-                <p className="text-sm text-muted-foreground">{item.description}</p>
-              ) : null}
-              {loading ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {t("catalog.detailLoading")}
-                </p>
-              ) : null}
-              {error ? (
-                <div className="space-y-2">
-                  <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
-                  <Button size="sm" variant="secondary" onPress={onRetry}>
-                    {t("catalog.retry")}
-                  </Button>
+              {secretKeys.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{t("catalog.secrets")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("catalog.mcp.secretsHint")}
+                    </p>
+                  </div>
+                  {secretKeys.map((key) => (
+                    <label key={key} className="grid gap-1.5 text-xs font-medium">
+                      <span>{key}</span>
+                      <Input
+                        type="password"
+                        placeholder="$secret:{key}"
+                        ref={(node) => {
+                          secretRefs.current[key] = node;
+                        }}
+                      />
+                    </label>
+                  ))}
                 </div>
               ) : null}
-              {mcp ? (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {mcp.featured ? (
-                      <Chip size="sm" color="accent">
-                        {t("catalog.mcp.featured")}
-                      </Chip>
-                    ) : null}
-                    {mcp.verified ? (
-                      <Chip size="sm" color="success">
-                        {t("catalog.mcp.verified")}
-                      </Chip>
-                    ) : null}
-                    {mcp.category ? (
-                      <Chip size="sm" variant="secondary">
-                        {mcp.category}
-                      </Chip>
-                    ) : null}
-                    {mcp.tags.map((value) => (
-                      <Chip key={value} size="sm" variant="secondary">
-                        {value}
-                      </Chip>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">{t("catalog.mcp.configuration")}</p>
+                <pre className="max-h-52 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] text-muted-foreground">
+                  {JSON.stringify(mcp.config, null, 2)}
+                </pre>
+              </div>
+              {mcp.tools.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">{t("catalog.mcp.toolSummary")}</p>
+                  <div className="max-h-44 flex flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
+                    {mcp.tools.map((tool) => (
+                      <div
+                        key={tool.name}
+                        className="rounded px-2 py-1.5 text-xs hover:bg-muted/50"
+                      >
+                        <p className="font-medium">{tool.name}</p>
+                        {tool.description ? (
+                          <p className="mt-0.5 text-muted-foreground">{tool.description}</p>
+                        ) : null}
+                      </div>
                     ))}
                   </div>
-                  {mcp.warnings.length > 0 ? (
-                    <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                      <p className="font-medium">{t("catalog.mcp.warnings")}</p>
-                      <ul className="mt-1 list-disc space-y-1 pl-4">
-                        {mcp.warnings.map((warning) => (
-                          <li key={warning}>{warning}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {secretKeys.length > 0 ? (
-                    <div className="space-y-2 rounded-md border border-border p-3">
-                      <div>
-                        <p className="text-sm font-medium">{t("catalog.secrets")}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("catalog.mcp.secretsHint")}
-                        </p>
-                      </div>
-                      {secretKeys.map((key) => (
-                        <label key={key} className="grid gap-1.5 text-xs font-medium">
-                          <span>{key}</span>
-                          <Input
-                            type="password"
-                            placeholder="$secret:{key}"
-                            ref={(node) => {
-                              secretRefs.current[key] = node;
-                            }}
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">{t("catalog.mcp.configuration")}</p>
-                    <pre className="max-h-52 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] text-muted-foreground">
-                      {JSON.stringify(mcp.config, null, 2)}
-                    </pre>
-                  </div>
-                  {mcp.tools.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">{t("catalog.mcp.toolSummary")}</p>
-                      <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-                        {mcp.tools.map((tool) => (
-                          <div
-                            key={tool.name}
-                            className="rounded px-2 py-1.5 text-xs hover:bg-muted/50"
-                          >
-                            <p className="font-medium">{tool.name}</p>
-                            {tool.description ? (
-                              <p className="mt-0.5 text-muted-foreground">{tool.description}</p>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </>
+                </div>
               ) : null}
-              {item?.catalogUrl ? (
-                <a
-                  className="inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
-                  href={item.catalogUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <IconLink className="size-3.5" />
-                  {t("catalog.openSource")}
-                </a>
-              ) : null}
-              {mcp?.repositoryUrl ? (
-                <a
-                  className="ml-3 inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
-                  href={mcp.repositoryUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <IconLink className="size-3.5" />
-                  {t("catalog.mcp.repository")}
-                </a>
-              ) : null}
-            </Modal.Body>
-            <Modal.Footer className="flex justify-end gap-2">
-              <Button variant="tertiary" onPress={onClose}>
-                {t("common.cancel")}
-              </Button>
-              {item ? (
-                <Button
-                  variant="primary"
-                  isPending={busy}
-                  isDisabled={
-                    !mcp ||
-                    mcp.parseStatus === "unsupported" ||
-                    (item.installed && !item.updateAvailable)
-                  }
-                  onPress={() =>
-                    onInstall(
-                      item,
-                      Object.fromEntries(
-                        secretKeys
-                          .map((key) => [key, secretRefs.current[key]?.value.trim() ?? ""] as const)
-                          .filter(([, value]) => value),
-                      ),
-                    )
-                  }
-                >
-                  <IconPlus className="size-4" />
-                  {item.installed ? t("catalog.updateDisabled") : t("catalog.mcp.installReview")}
-                </Button>
-              ) : null}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            </>
+          ) : null}
+          {item?.catalogUrl ? (
+            <a
+              className="inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
+              href={item.catalogUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <IconLink className="size-3.5" />
+              {t("catalog.openSource")}
+            </a>
+          ) : null}
+          {mcp?.repositoryUrl ? (
+            <a
+              className="ml-3 inline-flex items-center gap-1 text-xs text-accent underline underline-offset-2"
+              href={mcp.repositoryUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <IconLink className="size-3.5" />
+              {t("catalog.mcp.repository")}
+            </a>
+          ) : null}
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="tertiary" onPress={onClose}>
+            {t("common.cancel")}
+          </Button>
+          {item ? (
+            <Button
+              variant="primary"
+              isPending={busy}
+              isDisabled={
+                !mcp ||
+                mcp.parseStatus === "unsupported" ||
+                (item.installed && !item.updateAvailable)
+              }
+              onPress={() =>
+                onInstall(
+                  item,
+                  Object.fromEntries(
+                    secretKeys
+                      .map((key) => [key, secretRefs.current[key]?.value.trim() ?? ""] as const)
+                      .filter(([, value]) => value),
+                  ),
+                )
+              }
+            >
+              <IconPlus className="size-4" />
+              {item.installed ? t("catalog.updateDisabled") : t("catalog.mcp.installReview")}
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -169,9 +169,9 @@ export function AgentStatusWidget({
         reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34, mass: 0.8 }
       }
       className={cn(
-        "absolute inset-y-0 right-0 z-40 flex max-w-[calc(100vw-2.5rem)] shrink-0 overflow-hidden border-l border-foreground/10 bg-background",
+        "absolute inset-y-0 right-0 z-40 flex max-w-[calc(100vw-2.5rem)] shrink-0 overflow-hidden border-l border-border bg-background",
         "lg:relative lg:z-10",
-        open && "shadow-[-12px_0_24px_-24px_rgba(0,0,0,0.5)]",
+        open && "shadow-lg",
       )}
       data-open={open}
       role="complementary"
@@ -179,7 +179,7 @@ export function AgentStatusWidget({
     >
       {open ? (
         <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-foreground/10 px-3 py-3">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
             <IconBrain className="size-4 shrink-0 text-accent" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground/85">
@@ -189,7 +189,7 @@ export function AgentStatusWidget({
             </div>
             <button
               type="button"
-              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               onClick={() => onOpenChange(false)}
               aria-label={t("agentStatus.close")}
               title={t("agentStatus.close")}
@@ -199,10 +199,7 @@ export function AgentStatusWidget({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <section
-              className="border-b border-foreground/10 pb-3"
-              aria-labelledby="agent-status-current"
-            >
+            <section className="border-b border-border pb-3" aria-labelledby="agent-status-current">
               <p
                 id="agent-status-current"
                 className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
@@ -228,10 +225,7 @@ export function AgentStatusWidget({
               </div>
             </section>
 
-            <section
-              className="border-b border-foreground/10 py-3"
-              aria-labelledby="agent-status-agents"
-            >
+            <section className="border-b border-border py-3" aria-labelledby="agent-status-agents">
               <div className="flex items-center justify-between gap-2">
                 <p
                   id="agent-status-agents"
@@ -243,7 +237,7 @@ export function AgentStatusWidget({
                   {children.length + 1}
                 </span>
               </div>
-              <div className="mt-2 space-y-1">
+              <div className="mt-2 flex flex-col gap-1">
                 <AgentRow
                   name={t("agentStatus.rootAgent")}
                   path="/root"
@@ -258,7 +252,7 @@ export function AgentStatusWidget({
             </section>
 
             <section
-              className="border-b border-foreground/10 py-3"
+              className="border-b border-border py-3"
               aria-labelledby="agent-status-activity"
             >
               <p
@@ -270,7 +264,7 @@ export function AgentStatusWidget({
               {steps.length === 0 ? (
                 <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
               ) : (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 flex flex-col gap-1">
                   {steps.slice(0, 6).map((step) => (
                     <ActivityRow key={step.id} step={step} />
                   ))}
@@ -293,14 +287,14 @@ export function AgentStatusWidget({
             </section>
 
             {!run ? (
-              <p className="border-t border-foreground/10 pt-3 text-xs text-foreground/45">
+              <p className="border-t border-border pt-3 text-xs text-foreground/45">
                 {t("agentStatus.noRun")}
               </p>
             ) : null}
           </div>
 
           {active && run ? (
-            <div className="shrink-0 border-t border-foreground/10 px-3 py-3">
+            <div className="shrink-0 border-t border-border px-3 py-3">
               <Button size="sm" variant="tertiary" className="w-full" onPress={onStop}>
                 {t("input.stop")}
               </Button>
@@ -310,7 +304,7 @@ export function AgentStatusWidget({
       ) : (
         <button
           type="button"
-          className="flex h-full w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+          className="flex h-full w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
           onClick={() => onOpenChange(true)}
           aria-label={t("agentStatus.open")}
           aria-expanded={false}
@@ -340,7 +334,7 @@ function AgentRow({
 }): React.JSX.Element {
   const { t } = useT();
   return (
-    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-2 hover:bg-foreground/[0.035]">
+    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-2 hover:bg-muted">
       <StatusIcon status={status} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
@@ -375,7 +369,7 @@ function ActivityRow({ step }: { step: RuntimeStep }): React.JSX.Element {
     ? step.finished_at - step.started_at
     : Date.now() - step.started_at;
   return (
-    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-foreground/[0.035]">
+    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
       <StatusIcon status={step.status} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-foreground/75">{step.title}</p>
@@ -390,7 +384,7 @@ function ActivityRow({ step }: { step: RuntimeStep }): React.JSX.Element {
 
 function Metric({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
-    <div className="min-w-0 rounded-md border border-foreground/10 px-2 py-2">
+    <div className="min-w-0 rounded-md border border-border px-2 py-2">
       <p className="truncate text-[10px] text-foreground/40">{label}</p>
       <p className="mt-1 text-sm font-medium tabular-nums text-foreground/75">{value}</p>
     </div>

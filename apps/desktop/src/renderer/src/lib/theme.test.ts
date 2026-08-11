@@ -80,45 +80,58 @@ void describe("applyTheme", () => {
   void it("syncs app theme attributes and appearance settings", () => {
     const applied = applyTheme(
       themeSettings({
-        skin: "nova-dark",
+        skin: "black",
         fontSize: "lg",
         density: "compact",
       }),
     );
 
-    assert.equal(applied, "nova-dark");
-    assert.equal(root.dataset.skin, "nova-dark");
+    assert.equal(applied, "black");
+    assert.equal(root.dataset.skin, "black");
     assert.equal(root.style.getPropertyValue("color-scheme"), "dark");
     assert.equal(root.classList.contains("dark"), true);
     assert.equal(root.classList.contains("light"), false);
     assert.equal(root.dataset.density, "compact");
-    assert.equal(root.style.getPropertyValue("--skin-radius"), "6px");
-    assert.equal(root.style.getPropertyValue("--skin-accent"), "oklch(0.72 0.17 264)");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
+    assert.equal(root.style.getPropertyValue("--skin-primary"), "oklch(0.922 0 0)");
     assert.equal(root.style.fontSize, "16px");
   });
 
   void it("updates skin radius and color mode when switching skins", () => {
     applyTheme(
       themeSettings({
-        skin: "ocean-light",
+        skin: "ocean",
         fontSize: "base",
         density: "comfortable",
       }),
     );
-    assert.equal(root.style.getPropertyValue("--skin-radius"), "4px");
-    assert.equal(root.dataset.skin, "ocean-light");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
+    assert.equal(root.dataset.skin, "ocean");
     assert.equal(root.classList.contains("light"), true);
     assert.equal(root.classList.contains("dark"), false);
 
     applyTheme(
       themeSettings({
-        skin: "nova-light",
+        skin: "white",
         fontSize: "base",
         density: "comfortable",
       }),
     );
-    assert.equal(root.style.getPropertyValue("--skin-radius"), "6px");
-    assert.equal(root.dataset.skin, "nova-light");
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
+    assert.equal(root.dataset.skin, "white");
+  });
+
+  void it("keeps Ocean geometry aligned with White while changing only the palette", () => {
+    const white = SKIN_DEFINITIONS.find((skin) => skin.id === "white");
+    const ocean = SKIN_DEFINITIONS.find((skin) => skin.id === "ocean");
+    assert.ok(white);
+    assert.ok(ocean);
+    assert.equal(ocean.radius, white.radius);
+    assert.equal(ocean.fontStack, white.fontStack);
+    assert.equal(ocean.monoFontStack, white.monoFontStack);
+    assert.equal(ocean.colorScheme, white.colorScheme);
+    assert.notEqual(ocean.tokens.primary, white.tokens.primary);
+    assert.notEqual(ocean.tokens.background, white.tokens.background);
   });
 
   void it("defines every required semantic token for every built-in skin", () => {
@@ -131,6 +144,12 @@ void describe("applyTheme", () => {
       "overlayForeground",
       "fieldBackground",
       "fieldForeground",
+      "primary",
+      "primaryForeground",
+      "secondary",
+      "secondaryForeground",
+      "muted",
+      "mutedForeground",
       "border",
       "separator",
       "accent",

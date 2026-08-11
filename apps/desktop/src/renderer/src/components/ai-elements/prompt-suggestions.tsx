@@ -45,13 +45,13 @@ export function PromptSuggestions({
         {...rest}
       >
         {title && (
-          <p className="px-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
+          <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {title}
           </p>
         )}
         <div className="flex w-full flex-wrap gap-2">
           {SUGGESTION_SKELETON_WIDTHS.map((w, i) => (
-            <div key={i} className={cn("h-7 animate-pulse rounded-full bg-foreground/10", w)} />
+            <div key={i} className={cn("h-7 animate-pulse rounded-md bg-muted", w)} />
           ))}
         </div>
       </div>
@@ -65,7 +65,7 @@ export function PromptSuggestions({
       {...rest}
     >
       {title && (
-        <p className="px-1 text-xs font-medium uppercase tracking-wider text-foreground/40">
+        <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {title}
         </p>
       )}
@@ -76,16 +76,16 @@ export function PromptSuggestions({
             type="button"
             onClick={() => onSelect(s)}
             className={cn(
-              "group/sug flex items-center gap-2 rounded-full border border-foreground/10 bg-background/60 px-3 py-1.5 text-left text-xs text-foreground/75",
-              "transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-accent/5 hover:text-foreground",
+              "group/sug flex items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-1.5 text-left text-xs text-foreground",
+              "transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:text-foreground",
               "active:translate-y-0",
             )}
           >
             <span className="line-clamp-1 max-w-[280px]">{s}</span>
             <IconArrowUp
               className={cn(
-                "size-3 -rotate-45 text-foreground/30 transition",
-                "group-hover/sug:text-accent",
+                "size-3 -rotate-45 text-muted-foreground transition",
+                "group-hover/sug:text-primary",
               )}
             />
           </button>

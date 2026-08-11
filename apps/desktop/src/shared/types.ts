@@ -1992,7 +1992,7 @@ export type SettingKeyType = (typeof SettingKey)[keyof typeof SettingKey];
 // ============================================================
 
 /** 涓婚妯″紡 */
-export type SkinId = "nova-light" | "nova-dark" | "ocean-light";
+export type SkinId = "white" | "black" | "ocean";
 
 export interface SkinTokenValues {
   background: string;
@@ -2003,6 +2003,12 @@ export interface SkinTokenValues {
   overlayForeground: string;
   fieldBackground: string;
   fieldForeground: string;
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  muted: string;
+  mutedForeground: string;
   border: string;
   separator: string;
   accent: string;
@@ -2038,8 +2044,8 @@ export interface SkinDefinition {
 const NOVA_FONT_STACK = "'Inter', 'PingFang SC', system-ui, sans-serif";
 const NOVA_MONO_FONT_STACK = "'JetBrains Mono', 'Fira Code', ui-monospace, monospace";
 
-const NOVA_LIGHT_TOKENS: SkinTokenValues = {
-  background: "oklch(0.985 0 0)",
+const WHITE_TOKENS: SkinTokenValues = {
+  background: "oklch(1 0 0)",
   foreground: "oklch(0.145 0 0)",
   surface: "oklch(1 0 0)",
   surfaceForeground: "oklch(0.145 0 0)",
@@ -2047,12 +2053,18 @@ const NOVA_LIGHT_TOKENS: SkinTokenValues = {
   overlayForeground: "oklch(0.145 0 0)",
   fieldBackground: "oklch(1 0 0)",
   fieldForeground: "oklch(0.145 0 0)",
-  border: "oklch(0.88 0 0)",
-  separator: "oklch(0.92 0 0)",
-  accent: "oklch(0.55 0.22 264)",
-  accentForeground: "oklch(0.98 0.01 264)",
-  focus: "oklch(0.55 0.22 264)",
-  link: "oklch(0.55 0.22 264)",
+  primary: "oklch(0.205 0 0)",
+  primaryForeground: "oklch(0.985 0 0)",
+  secondary: "oklch(0.97 0 0)",
+  secondaryForeground: "oklch(0.205 0 0)",
+  muted: "oklch(0.97 0 0)",
+  mutedForeground: "oklch(0.556 0 0)",
+  accent: "oklch(0.97 0 0)",
+  accentForeground: "oklch(0.205 0 0)",
+  border: "oklch(0.922 0 0)",
+  separator: "oklch(0.922 0 0)",
+  focus: "oklch(0.708 0 0)",
+  link: "oklch(0.205 0 0)",
   success: "oklch(0.62 0.17 155)",
   successForeground: "oklch(0.98 0.01 155)",
   warning: "oklch(0.72 0.18 70)",
@@ -2061,86 +2073,98 @@ const NOVA_LIGHT_TOKENS: SkinTokenValues = {
   dangerForeground: "oklch(0.98 0.01 25)",
 };
 
-const NOVA_DARK_TOKENS: SkinTokenValues = {
-  ...NOVA_LIGHT_TOKENS,
+const BLACK_TOKENS: SkinTokenValues = {
+  ...WHITE_TOKENS,
   background: "oklch(0.145 0 0)",
-  foreground: "oklch(0.985 0.003 247)",
+  foreground: "oklch(0.985 0 0)",
   surface: "oklch(0.205 0 0)",
-  surfaceForeground: "oklch(0.985 0.003 247)",
-  overlay: "oklch(0.23 0 0)",
-  overlayForeground: "oklch(0.985 0.003 247)",
-  fieldBackground: "oklch(0.255 0 0)",
-  fieldForeground: "oklch(0.985 0.003 247)",
-  border: "oklch(0.34 0 0)",
-  separator: "oklch(0.28 0 0)",
-  accent: "oklch(0.72 0.17 264)",
-  accentForeground: "oklch(0.145 0.01 260)",
-  focus: "oklch(0.72 0.17 264)",
-  link: "oklch(0.72 0.17 264)",
+  surfaceForeground: "oklch(0.985 0 0)",
+  overlay: "oklch(0.205 0 0)",
+  overlayForeground: "oklch(0.985 0 0)",
+  fieldBackground: "oklch(0.205 0 0)",
+  fieldForeground: "oklch(0.985 0 0)",
+  primary: "oklch(0.922 0 0)",
+  primaryForeground: "oklch(0.205 0 0)",
+  secondary: "oklch(0.269 0 0)",
+  secondaryForeground: "oklch(0.985 0 0)",
+  muted: "oklch(0.269 0 0)",
+  mutedForeground: "oklch(0.708 0 0)",
+  accent: "oklch(0.269 0 0)",
+  accentForeground: "oklch(0.985 0 0)",
+  border: "oklch(1 0 0 / 10%)",
+  separator: "oklch(1 0 0 / 10%)",
+  focus: "oklch(0.556 0 0)",
+  link: "oklch(0.922 0 0)",
 };
 
-const OCEAN_LIGHT_TOKENS: SkinTokenValues = {
-  ...NOVA_LIGHT_TOKENS,
+const OCEAN_TOKENS: SkinTokenValues = {
+  ...WHITE_TOKENS,
   background: "oklch(0.985 0.015 225)",
-  foreground: "oklch(0.145 0.01 260)",
-  surfaceForeground: "oklch(0.145 0.01 260)",
-  overlayForeground: "oklch(0.145 0.01 260)",
-  fieldForeground: "oklch(0.145 0.01 260)",
+  foreground: "oklch(0.18 0.03 230)",
+  surfaceForeground: "oklch(0.18 0.03 230)",
+  overlayForeground: "oklch(0.18 0.03 230)",
+  fieldForeground: "oklch(0.18 0.03 230)",
+  primary: "oklch(0.46 0.15 230)",
+  primaryForeground: "oklch(0.985 0.003 247)",
+  secondary: "oklch(0.95 0.025 225)",
+  secondaryForeground: "oklch(0.18 0.03 230)",
+  muted: "oklch(0.95 0.025 225)",
+  mutedForeground: "oklch(0.45 0.04 230)",
+  accent: "oklch(0.95 0.025 225)",
+  accentForeground: "oklch(0.18 0.03 230)",
   border: "oklch(0.72 0.06 230 / 32%)",
   separator: "oklch(0.9 0.025 230)",
-  accent: "oklch(0.46 0.15 230)",
-  accentForeground: "oklch(0.985 0.003 247)",
   focus: "oklch(0.46 0.15 230)",
-  link: "oklch(0.46 0.15 230)",
+  link: "oklch(0.4 0.14 230)",
 };
 
 export const SKIN_DEFINITIONS: SkinDefinition[] = [
   {
-    id: "nova-light",
-    labelKey: "skin.nova.light",
-    descKey: "skin.nova.light.desc",
+    id: "white",
+    labelKey: "skin.white",
+    descKey: "skin.white.desc",
     colorScheme: "light",
     preview: {
-      background: "#f7f7f8",
+      background: "#ffffff",
       surface: "#ffffff",
-      accent: "#4f46e5",
-      foreground: "#252525",
+      accent: "#171717",
+      foreground: "#262626",
     },
-    tokens: NOVA_LIGHT_TOKENS,
-    radius: 6,
+    tokens: WHITE_TOKENS,
+    radius: 10,
     fontStack: NOVA_FONT_STACK,
     monoFontStack: NOVA_MONO_FONT_STACK,
   },
   {
-    id: "nova-dark",
-    labelKey: "skin.nova.dark",
-    descKey: "skin.nova.dark.desc",
+    id: "black",
+    labelKey: "skin.black",
+    descKey: "skin.black.desc",
     colorScheme: "dark",
     preview: {
-      background: "#252525",
-      surface: "#363636",
-      accent: "#a5b4fc",
-      foreground: "#f8fafc",
+      background: "#171717",
+      surface: "#262626",
+      accent: "#fafafa",
+      foreground: "#fafafa",
     },
-    tokens: NOVA_DARK_TOKENS,
-    radius: 6,
+    tokens: BLACK_TOKENS,
+    radius: 10,
     fontStack: NOVA_FONT_STACK,
     monoFontStack: NOVA_MONO_FONT_STACK,
   },
   {
-    id: "ocean-light",
-    labelKey: "skin.ocean.light",
-    descKey: "skin.ocean.light.desc",
+    id: "ocean",
+    labelKey: "skin.ocean",
+    descKey: "skin.ocean.desc",
     colorScheme: "light",
     preview: {
-      background: "#dff3fb",
+      background: "#e9f7fa",
       surface: "#ffffff",
-      accent: "#237a9b",
+      accent: "#176b82",
       foreground: "#17313d",
     },
-    tokens: OCEAN_LIGHT_TOKENS,
-    radius: 4,
-    fontStack: "'Inter', system-ui, sans-serif",
+    tokens: OCEAN_TOKENS,
+    radius: 10,
+    fontStack: NOVA_FONT_STACK,
     monoFontStack: NOVA_MONO_FONT_STACK,
   },
 ];
@@ -2260,7 +2284,7 @@ export interface AppSettings {
  * "鎭㈠榛樿璁剧疆" 涓€閿噸缃埌姝ゅ璞°€?
  */
 export const DEFAULT_SETTINGS: AppSettings = {
-  skin: "nova-light",
+  skin: "white",
   fontFamily: "",
   monoFontFamily: "",
   translucentSidebar: true,

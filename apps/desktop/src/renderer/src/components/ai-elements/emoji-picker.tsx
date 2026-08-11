@@ -690,14 +690,14 @@ export function EmojiPicker({
       aria-label={t("ai.emoji.picker")}
       className={cn(
         "absolute bottom-full left-0 z-50 mb-2 w-[320px] overflow-hidden",
-        "rounded-2xl border border-foreground/10 bg-background shadow-2xl",
+        "rounded-lg border border-border bg-background shadow-lg",
         "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
         className,
       )}
     >
       {/* 搜索框 */}
-      <div className="flex items-center gap-2 border-b border-foreground/10 px-3 py-2">
-        <IconSearch className="size-4 shrink-0 text-foreground/40" />
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <IconSearch className="size-4 shrink-0 text-muted-foreground" />
         <input
           ref={searchRef}
           type="text"
@@ -707,13 +707,13 @@ export function EmojiPicker({
           aria-label={t("ai.emoji.search")}
           className={cn(
             "h-6 flex-1 bg-transparent text-sm outline-none",
-            "placeholder:text-foreground/35",
+            "placeholder:text-muted-foreground",
           )}
         />
         <button
           type="button"
           onClick={() => onOpenChange(false)}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-foreground/40 transition hover:bg-foreground/5 hover:text-foreground"
+          className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground"
           aria-label={t("ai.emoji.close")}
         >
           <IconClose className="size-3.5" />
@@ -721,10 +721,7 @@ export function EmojiPicker({
       </div>
 
       {/* 分类 tab */}
-      <div
-        role="tablist"
-        className="flex items-center gap-0.5 border-b border-foreground/10 px-1 py-1"
-      >
+      <div role="tablist" className="flex items-center gap-0.5 border-b border-border px-1 py-1">
         {categories.map((cat) => {
           const isActive = cat.id === activeCategory;
           return (
@@ -736,9 +733,7 @@ export function EmojiPicker({
               onClick={() => handleCategoryClick(cat.id)}
               className={cn(
                 "flex size-7 shrink-0 items-center justify-center rounded-lg text-base transition",
-                isActive
-                  ? "bg-foreground/10"
-                  : "opacity-50 hover:bg-foreground/5 hover:opacity-100",
+                isActive ? "bg-muted" : "opacity-50 hover:bg-muted hover:opacity-100",
               )}
               title={getCategoryLabel(t, cat)}
             >
@@ -754,7 +749,7 @@ export function EmojiPicker({
         data-slot="emoji-grid"
       >
         {visibleEntries.length === 0 ? (
-          <p className="col-span-8 py-8 text-center text-xs text-foreground/40">
+          <p className="col-span-8 py-8 text-center text-xs text-muted-foreground">
             {t("ai.emoji.noMatch")}
           </p>
         ) : (
@@ -768,7 +763,7 @@ export function EmojiPicker({
               }}
               className={cn(
                 "flex size-8 items-center justify-center rounded-md text-lg transition",
-                "hover:bg-foreground/10 active:scale-95",
+                "hover:bg-muted active:scale-95",
               )}
               title={entry.keywords[0] ?? entry.char}
               aria-label={t("ai.emoji.label", { label: entry.keywords[0] ?? entry.char })}

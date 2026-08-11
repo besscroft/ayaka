@@ -192,12 +192,12 @@ export function MessageInput({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "select-none rounded-[24px] border bg-background/95 shadow-[0_18px_60px_-42px_rgba(15,23,42,0.65)] transition-all duration-200",
+            "select-none rounded-lg border bg-background/95 shadow-lg transition-all duration-200",
             "focus-within:border-accent/45 focus-within:ring-4 focus-within:ring-accent/10",
             isDragging
               ? "border-accent/60 ring-4 ring-accent/15"
               : modelReady
-                ? "border-foreground/15"
+                ? "border-border"
                 : "border-warning/35",
           )}
         >
@@ -246,7 +246,7 @@ export function MessageInput({
                     onClick={() => fileInputRef.current?.click()}
                     aria-label={t("input.attach")}
                     title={t("input.attach")}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-xl text-foreground/60 transition hover:bg-foreground/10 hover:text-foreground"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   >
                     <IconPaperclip className="size-4" />
                   </button>
@@ -260,7 +260,7 @@ export function MessageInput({
                     aria-hidden
                   />
 
-                  <span className="mx-1 h-4 w-px shrink-0 bg-foreground/10" />
+                  <span className="mx-1 h-4 w-px shrink-0 bg-border" />
 
                   <ToolSelector
                     value={toolSelection}
@@ -299,7 +299,7 @@ export function MessageInput({
                     onClick={onStop}
                     aria-label={t("input.stop")}
                     data-slot="prompt-input-stop"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md border border-foreground/20 bg-foreground/10 text-foreground/80 transition hover:bg-foreground/15"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground/80 transition hover:bg-accent"
                   >
                     <span className="size-3 rounded-[2px] bg-current" aria-hidden />
                   </button>
@@ -309,7 +309,7 @@ export function MessageInput({
               {isDragging ? (
                 <div
                   data-slot="composer-drop-overlay"
-                  className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent/40 bg-accent/5 text-sm text-accent"
+                  className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-lg border-2 border-dashed border-accent/40 bg-accent/5 text-sm text-accent"
                 >
                   {t("input.dropHint")}
                 </div>

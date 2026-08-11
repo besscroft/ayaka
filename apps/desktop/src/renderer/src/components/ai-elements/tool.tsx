@@ -51,7 +51,7 @@ const STATE_META: Record<
 > = {
   "input-streaming": {
     labelKey: "tool.status.input-streaming",
-    tone: "text-foreground/55",
+    tone: "text-muted-foreground",
     Icon: IconCircleDashed,
   },
   "input-available": {
@@ -66,7 +66,7 @@ const STATE_META: Record<
   },
   "approval-responded": {
     labelKey: "tool.status.approval-responded",
-    tone: "text-foreground/65",
+    tone: "text-muted-foreground",
     Icon: IconCircleDashed,
   },
   "output-available": {
@@ -106,7 +106,7 @@ export function Tool({
       defaultOpen={defaultOpen}
       open={open}
       onOpenChange={onOpenChange}
-      className={cn("rounded-xl border border-foreground/10 bg-foreground/[0.03]", className)}
+      className={cn("rounded-lg border border-border bg-muted/30", className)}
       {...rest}
     >
       {children}
@@ -145,24 +145,21 @@ export function ToolHeader({
       data-state={state}
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium",
-        "rounded-t-xl hover:bg-foreground/[0.04]",
+        "rounded-t-lg hover:bg-muted/60",
         className,
       )}
       {...rest}
     >
-      <IconWrench className="size-3.5 shrink-0 text-foreground/65" />
-      <span className="min-w-0 flex-1 truncate text-foreground/85">{displayName}</span>
+      <IconWrench className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate text-foreground">{displayName}</span>
       {summary ? (
-        <span className="min-w-0 max-w-[32%] truncate text-[10px] font-normal text-foreground/45">
+        <span className="min-w-0 max-w-[32%] truncate text-[10px] font-normal text-muted-foreground">
           {summary}
         </span>
       ) : null}
       <span
         data-slot="tool-status"
-        className={cn(
-          "flex items-center gap-1 rounded-full bg-foreground/[0.06] px-1.5 py-0.5",
-          meta.tone,
-        )}
+        className={cn("flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5", meta.tone)}
       >
         <StatusIcon className={cn("size-3", stateIconClass)} />
         <span className="text-[10px] font-medium uppercase tracking-wide">{t(meta.labelKey)}</span>
@@ -183,7 +180,10 @@ export function ToolContent({ className, children, ...rest }: ToolContentProps):
   return (
     <AnimatedDisclosureContent
       data-slot="tool-content"
-      innerClassName={cn("space-y-2 border-t border-foreground/10 px-3 py-2.5 text-xs", className)}
+      innerClassName={cn(
+        "flex flex-col gap-2 border-t border-border px-3 py-2.5 text-xs",
+        className,
+      )}
       {...rest}
     >
       {children}
@@ -199,11 +199,11 @@ interface ToolInputProps extends HTMLAttributes<HTMLDivElement> {
 export function ToolInput({ input, className, ...rest }: ToolInputProps): React.JSX.Element {
   const { t } = useT();
   return (
-    <div data-slot="tool-input" className={cn("space-y-1", className)} {...rest}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/45">
+    <div data-slot="tool-input" className={cn("flex flex-col gap-1", className)} {...rest}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {t("tool.parameters")}
       </p>
-      <pre className="overflow-x-auto rounded-md bg-foreground/[0.05] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-foreground/80">
+      <pre className="overflow-x-auto rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] leading-relaxed text-foreground">
         {input === undefined ? "{}" : safeJsonStringify(input, t("tool.unserializable"))}
       </pre>
     </div>
@@ -225,11 +225,11 @@ export function ToolOutput({
   const { t } = useT();
   const isError = Boolean(errorText);
   return (
-    <div data-slot="tool-output" className={cn("space-y-1", className)} {...rest}>
+    <div data-slot="tool-output" className={cn("flex flex-col gap-1", className)} {...rest}>
       <p
         className={cn(
           "text-[10px] font-semibold uppercase tracking-wide",
-          isError ? "text-danger" : "text-foreground/45",
+          isError ? "text-danger" : "text-muted-foreground",
         )}
       >
         {isError ? t("tool.error") : t("tool.result")}
@@ -239,11 +239,11 @@ export function ToolOutput({
           {errorText}
         </pre>
       ) : output ? (
-        <div className="overflow-x-auto rounded-md bg-foreground/[0.05] px-2 py-1.5 text-[11px] leading-relaxed text-foreground/85 [&_p]:m-0">
+        <div className="overflow-x-auto rounded-md bg-muted px-2 py-1.5 text-[11px] leading-relaxed text-foreground/85 [&_p]:m-0">
           {output}
         </div>
       ) : (
-        <pre className="overflow-x-auto rounded-md bg-foreground/[0.05] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-foreground/45">
+        <pre className="overflow-x-auto rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
           {t("tool.empty")}
         </pre>
       )}

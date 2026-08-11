@@ -91,7 +91,7 @@ function WebSearchResult({ output }: { output: unknown }): React.JSX.Element {
       {normalized.results.length === 0 ? (
         <EmptyResult />
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {normalized.results.map((result) => (
             <div key={result.url} className="min-w-0">
               <SafeLink href={result.url}>
@@ -129,7 +129,7 @@ function WebOpenResult({ output }: { output: unknown }): React.JSX.Element {
       {normalized.description ? (
         <p className="text-[11px] leading-relaxed text-foreground/60">{normalized.description}</p>
       ) : null}
-      <div className="max-h-64 overflow-y-auto rounded-md bg-foreground/[0.04] px-2.5 py-2">
+      <div className="max-h-64 overflow-y-auto rounded-md bg-muted px-2.5 py-2">
         <RichContent value={truncateText(normalized.text, 16_000)} className="gap-2 text-[11px]" />
       </div>
       {normalized.truncated ? (
@@ -148,7 +148,7 @@ function MemorySearchResult({ output }: { output: unknown }): React.JSX.Element 
       {normalized.results.length === 0 ? (
         <EmptyResult />
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {normalized.results.map((memory) => (
             <div key={memory.id} className="min-w-0 border-l-2 border-accent/40 pl-2">
               <div className="flex min-w-0 items-center gap-2">
@@ -224,7 +224,7 @@ function AutomationResult({ output }: { output: unknown }): React.JSX.Element {
         const nextRunAt = readNumber(record.nextRunAt) ?? readNumber(record.next_run_at);
         const description = readString(record.description);
         return (
-          <div key={readString(record.id) ?? index} className="space-y-1">
+          <div key={readString(record.id) ?? index} className="flex flex-col gap-1">
             <div className="flex min-w-0 items-center gap-2">
               <IconClock className="size-3 shrink-0 text-foreground/50" />
               <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/80">
@@ -254,7 +254,7 @@ function SandboxFilesResult({ output }: { output: unknown }): React.JSX.Element 
   return (
     <ResultStack>
       {rootPath ? <ResultLabel icon={<IconBookOpen />} text={rootPath} /> : null}
-      <div className="space-y-1">
+      <div className="flex flex-col gap-1">
         {entries.slice(0, 50).map((value, index) => {
           const entry = asRecord(value);
           const path =
@@ -294,7 +294,7 @@ function SandboxFileResult({ output }: { output: unknown }): React.JSX.Element {
   return (
     <ResultStack>
       <ResultLabel icon={<IconBookOpen />} text={path} />
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
         {truncateText(text, 16_000)}
       </pre>
       {truncated ? (
@@ -344,7 +344,7 @@ function SandboxCommandResult({ output }: { output: unknown }): React.JSX.Elemen
       </div>
       {result.cwd ? <p className="font-mono text-[10px] text-foreground/40">{result.cwd}</p> : null}
       {log ? (
-        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
+        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
           {log}
         </pre>
       ) : null}
@@ -510,7 +510,7 @@ function ConversationSearchResult({ output }: { output: unknown }): React.JSX.El
         const text = readString(item?.text) ?? safeJsonStringify(value);
         const role = readString(item?.role);
         return (
-          <div key={readString(item?.id) ?? index} className="border-l-2 border-foreground/15 pl-2">
+          <div key={readString(item?.id) ?? index} className="border-l-2 border-border pl-2">
             <p className="line-clamp-3 whitespace-pre-wrap text-[11px] leading-relaxed text-foreground/65">
               {text}
             </p>
@@ -543,11 +543,11 @@ function ProviderResult({
         text={t("tool.generated.providerOutput", { tool: toolName })}
       />
       {text ? (
-        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
+        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
           {truncateText(text, 12_000)}
         </pre>
       ) : items.length > 0 ? (
-        <div className="space-y-1 text-[11px] text-foreground/65">
+        <div className="flex flex-col gap-1 text-[11px] text-foreground/65">
           {items.slice(0, 12).map((item, index) => (
             <p key={index} className="line-clamp-3 whitespace-pre-wrap">
               {readString(asRecord(item)?.title) ??
@@ -566,7 +566,7 @@ function ProviderResult({
 }
 
 function ResultStack({ children }: { children: ReactNode }): React.JSX.Element {
-  return <div className="space-y-2">{children}</div>;
+  return <div className="flex flex-col gap-2">{children}</div>;
 }
 
 function ResultLabel({ icon, text }: { icon: ReactNode; text: string }): React.JSX.Element {

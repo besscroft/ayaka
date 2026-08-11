@@ -40,13 +40,13 @@ export function Queue({ title, className, children, ...rest }: QueueProps): Reac
     <div
       data-slot="queue"
       className={cn(
-        "flex w-full flex-col gap-2 rounded-2xl border border-foreground/10 bg-background/40 p-2.5",
+        "flex w-full flex-col gap-2 rounded-lg border border-border bg-background/40 p-2.5",
         className,
       )}
       {...rest}
     >
       {title ? (
-        <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-foreground/45">
+        <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           <IconList className="size-3" />
           {title}
         </p>
@@ -81,7 +81,7 @@ export function QueueSection({
       data-slot="queue-section"
       open={open ?? defaultOpen}
       className={cn(
-        "group/sec rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden",
+        "group/sec overflow-hidden rounded-lg border border-border bg-muted/20",
         className,
       )}
       {...rest}
@@ -91,23 +91,23 @@ export function QueueSection({
         className={cn(
           "flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-[11.5px] font-medium",
           "[&::-webkit-details-marker]:hidden",
-          "hover:bg-foreground/[0.04]",
+          "hover:bg-muted/60",
         )}
       >
-        <span className="flex-1 truncate text-foreground/80">{title}</span>
+        <span className="flex-1 truncate text-foreground">{title}</span>
         {typeof count === "number" ? (
-          <span className="rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-foreground/55">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
             {count}
           </span>
         ) : null}
         <IconChevronDown
           className={cn(
-            "size-3 shrink-0 text-foreground/45 transition-transform",
+            "size-3 shrink-0 text-muted-foreground transition-transform",
             "group-open/sec:rotate-180",
           )}
         />
       </summary>
-      <div className="border-t border-foreground/10 p-1.5">{children}</div>
+      <div className="border-t border-border p-1.5">{children}</div>
     </details>
   );
 }
@@ -164,7 +164,7 @@ export function QueueItem({
       data-status={status}
       className={cn(
         "flex items-start gap-2 rounded-md px-2 py-1.5 text-xs transition",
-        "hover:bg-foreground/[0.05]",
+        "hover:bg-muted",
         className,
       )}
       {...rest}
@@ -177,14 +177,14 @@ export function QueueItem({
           <p
             className={cn(
               "truncate text-[12px] font-medium",
-              status === "done" ? "text-foreground/55 line-through" : "text-foreground/85",
+              status === "done" ? "text-muted-foreground line-through" : "text-foreground/85",
             )}
           >
             {title}
           </p>
           <span
             className={cn(
-              "ml-auto rounded-full bg-foreground/[0.06] px-1.5 py-px text-[9.5px] font-medium uppercase tracking-wider",
+              "ml-auto rounded-full bg-muted px-1.5 py-px text-[9.5px] font-medium uppercase tracking-wider",
               STATUS_TONE[status],
             )}
           >

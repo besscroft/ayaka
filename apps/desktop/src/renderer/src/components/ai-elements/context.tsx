@@ -88,10 +88,7 @@ export function Context({
   return (
     <div
       data-slot="context"
-      className={cn(
-        "rounded-xl border border-foreground/10 bg-foreground/[0.025] px-3 py-2 text-xs",
-        className,
-      )}
+      className={cn("rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs", className)}
       {...rest}
     >
       <button
@@ -103,17 +100,17 @@ export function Context({
         <span
           className={cn(
             "flex size-6 shrink-0 items-center justify-center rounded-md",
-            "bg-foreground/[0.06] text-foreground/65",
+            "bg-muted text-muted-foreground",
           )}
         >
           <IconChartBar className="size-3.5" />
         </span>
-        <span className="flex-1 truncate text-[12px] font-medium text-foreground/80">
+        <span className="flex-1 truncate text-[12px] font-medium text-foreground">
           {displayTitle}
         </span>
         <span
           className={cn(
-            "flex items-center gap-1.5 rounded-full bg-foreground/[0.05] px-2 py-0.5 text-[10.5px] font-medium",
+            "flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-medium",
             tone,
           )}
         >
@@ -123,14 +120,14 @@ export function Context({
         </span>
         <IconChevronDown
           className={cn(
-            "size-3.5 shrink-0 text-foreground/45 transition-transform",
+            "size-3.5 shrink-0 text-muted-foreground transition-transform",
             isOpen && "rotate-180",
           )}
         />
       </button>
 
       {/* 进度条 */}
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.06]">
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn("h-full rounded-full bg-gradient-to-r transition-all", barTone)}
           style={{ width: `${percent}%` }}
@@ -186,8 +183,8 @@ function Metric({
   icon,
 }: MetricProps): React.JSX.Element {
   return (
-    <div className="rounded-md bg-foreground/[0.04] px-2 py-1">
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-foreground/40">
+    <div className="rounded-md bg-muted px-2 py-1">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
         {icon}
         {label}
       </div>
@@ -316,13 +313,13 @@ export function ContextPopover({
         title={t("chat.context.title")}
         className={cn(
           "group/trigger flex items-center gap-1.5 rounded-xl px-2 py-1.5",
-          "text-foreground/60 transition",
-          "hover:bg-foreground/10 hover:text-foreground",
-          isOpen && "bg-foreground/10 text-foreground",
+          "text-muted-foreground transition",
+          "hover:bg-muted hover:text-foreground",
+          isOpen && "bg-muted text-foreground",
         )}
       >
         <IconChartBar className="size-3.5 shrink-0" />
-        <span className="relative flex h-1.5 w-10 overflow-hidden rounded-full bg-foreground/[0.08]">
+        <span className="relative flex h-1.5 w-10 overflow-hidden rounded-full bg-muted">
           <span
             className={cn("h-full rounded-full bg-gradient-to-r transition-all", barTone)}
             style={{ width: `${percent}%` }}
@@ -341,7 +338,7 @@ export function ContextPopover({
           aria-label={t("ai.context.details")}
           className={cn(
             "absolute bottom-full left-1/2 z-50 mb-2 w-[300px] -translate-x-1/2",
-            "rounded-xl border border-foreground/10 bg-background/95 p-2 shadow-2xl",
+            "rounded-lg border border-border bg-background/95 p-2 shadow-lg",
             "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
           )}
         >

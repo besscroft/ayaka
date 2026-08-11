@@ -122,8 +122,8 @@ function ActionButton({
       className={cn(
         "flex size-6 items-center justify-center rounded-md transition",
         tone === "danger"
-          ? "text-foreground/40 hover:bg-danger/10 hover:text-danger"
-          : "text-foreground/40 hover:bg-foreground/10 hover:text-foreground",
+          ? "text-muted-foreground hover:bg-danger/10 hover:text-danger"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {icon}

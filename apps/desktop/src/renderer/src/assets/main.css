@@ -32,6 +32,14 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 /* ============================================================
@@ -41,7 +49,7 @@
 :root {
   --spacing: 0.25rem;
   /* Skin metrics feed Tailwind's named radius utilities. */
-  --skin-radius: 0.5rem;
+  --skin-radius: 0.625rem;
   --radius: var(--skin-radius);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -68,6 +76,12 @@
   --overlay-foreground: var(--skin-overlay-foreground);
   --field-background: var(--skin-field-background);
   --field-foreground: var(--skin-field-foreground);
+  --primary: var(--skin-primary);
+  --primary-foreground: var(--skin-primary-foreground);
+  --secondary: var(--skin-secondary);
+  --secondary-foreground: var(--skin-secondary-foreground);
+  --muted: var(--skin-muted);
+  --muted-foreground: var(--skin-muted-foreground);
   --border: var(--skin-border);
   --separator: var(--skin-separator);
   --accent: var(--skin-accent);
@@ -85,16 +99,19 @@
   --card-foreground: var(--surface-foreground);
   --popover: var(--overlay);
   --popover-foreground: var(--overlay-foreground);
-  --primary: var(--accent);
-  --primary-foreground: var(--accent-foreground);
-  --secondary: color-mix(in oklch, var(--foreground) 8%, var(--background));
-  --secondary-foreground: var(--foreground);
-  --muted: color-mix(in oklch, var(--foreground) 6%, var(--background));
-  --muted-foreground: color-mix(in oklch, var(--foreground) 60%, transparent);
   --destructive: var(--danger);
   --destructive-foreground: var(--danger-foreground);
   --input: var(--border);
   --ring: var(--focus);
+
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -168,8 +185,8 @@ body {
 
 .window-close-button:hover,
 .window-close-button:focus-visible {
-  color: oklch(0.985 0 0);
-  background: oklch(0.58 0.2 25);
+  color: var(--danger-foreground);
+  background: var(--danger);
 }
 
 html[data-surface="pet"] body {
@@ -323,12 +340,12 @@ code {
 /* 差异标记：symbol 模式（data-diff-mark="symbol"） */
 [data-diff-mark="symbol"] .diff-add::before {
   content: "+ ";
-  color: var(--color-success, #16a34a);
+  color: var(--color-success);
   font-weight: 700;
 }
 [data-diff-mark="symbol"] .diff-remove::before {
   content: "- ";
-  color: var(--color-danger, #dc2626);
+  color: var(--color-danger);
   font-weight: 700;
 }
 [data-diff-mark="color"] .diff-add::before,

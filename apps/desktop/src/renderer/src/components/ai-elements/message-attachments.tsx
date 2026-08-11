@@ -97,7 +97,7 @@ function ImageTile({ item }: { item: AttachmentItem }): ReactNode {
   const src = item.url ? sanitizeRichContentUrl(item.url, "image") : null;
   if (!src) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-lg bg-foreground/10 text-xs text-foreground/40">
+      <div className="flex aspect-square items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
         {item.name}
       </div>
     );
@@ -107,7 +107,7 @@ function ImageTile({ item }: { item: AttachmentItem }): ReactNode {
       href={src}
       target="_blank"
       rel="noreferrer noopener"
-      className="group/tile relative block aspect-square overflow-hidden rounded-lg bg-foreground/5"
+      className="group/tile relative block aspect-square overflow-hidden rounded-lg bg-muted"
       title={item.name}
     >
       <img
@@ -124,8 +124,8 @@ function AudioAttachment({ item }: { item: AttachmentItem }): React.JSX.Element 
   const src = item.url ? sanitizeRichContentUrl(item.url, "media") : null;
   if (!src) return <AttachmentChip item={item} compact />;
   return (
-    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.035] p-2">
-      <div className="mb-1 truncate text-xs font-medium text-foreground/65" title={item.name}>
+    <div className="rounded-lg border border-border bg-muted/30 p-2">
+      <div className="mb-1 truncate text-xs font-medium text-foreground" title={item.name}>
         {item.name}
       </div>
       <audio controls src={src} className="w-full" preload="metadata" />
@@ -137,17 +137,14 @@ function VideoAttachment({ item }: { item: AttachmentItem }): React.JSX.Element 
   const src = item.url ? sanitizeRichContentUrl(item.url, "media") : null;
   if (!src) return <AttachmentChip item={item} compact />;
   return (
-    <div
-      className="overflow-hidden rounded-lg border border-foreground/10 bg-foreground/[0.035]"
-      title={item.name}
-    >
+    <div className="overflow-hidden rounded-lg border border-border bg-muted/30" title={item.name}>
       <video
         controls
         src={src}
         className="aspect-video w-full bg-black object-contain"
         preload="metadata"
       />
-      <div className="truncate px-2 py-1.5 text-xs font-medium text-foreground/65">{item.name}</div>
+      <div className="truncate px-2 py-1.5 text-xs font-medium text-foreground">{item.name}</div>
     </div>
   );
 }

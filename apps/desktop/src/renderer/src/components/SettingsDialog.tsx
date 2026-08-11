@@ -3,10 +3,13 @@ import {
   Button,
   Checkbox,
   Description,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
-  Modal,
-  SearchField,
   Slider,
   Switch,
   Tabs,
@@ -43,6 +46,7 @@ import {
   IconTrash,
   IconPlus,
   IconInfo,
+  IconSearch,
 } from "./icons";
 import {
   CHAT_REASONING_LEVELS,
@@ -171,11 +175,11 @@ export function SettingsDialog({
       aria-labelledby="settings-title"
     >
       <div
-        className="flex h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] flex-col overflow-hidden rounded-xl border border-foreground/15 bg-background shadow-2xl"
+        className="flex h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 澶撮儴 */}
-        <div className="flex items-center justify-between border-b border-foreground/10 px-6 py-3.5">
+        <div className="flex items-center justify-between border-b border-border px-6 py-3.5">
           <div>
             <h2 id="settings-title" className="text-base font-semibold select-none">
               {t("settings.title")}
@@ -183,7 +187,7 @@ export function SettingsDialog({
           </div>
           <button
             type="button"
-            className="rounded p-1 text-foreground/50 hover:bg-foreground/10 hover:text-foreground"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t("common.close")}
           >
@@ -196,7 +200,7 @@ export function SettingsDialog({
           {/* 瀵艰埅 */}
           <nav
             aria-label={t("settings.nav")}
-            className="flex w-full shrink-0 flex-col gap-1 border-r border-foreground/10 bg-foreground/[0.02] p-2 md:w-48 select-none"
+            className="flex w-full shrink-0 flex-col gap-1 border-r border-border bg-muted/40 p-2 md:w-48 select-none"
           >
             {tabs.map(({ id, label, Icon, pinned }) => {
               const active = tab === id;
@@ -211,7 +215,7 @@ export function SettingsDialog({
                     pinned && "mt-auto",
                     active
                       ? "bg-accent/10 text-accent"
-                      : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground",
+                      : "text-foreground/70 hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -240,7 +244,7 @@ export function SettingsDialog({
         </div>
 
         {/* 搴曢儴 */}
-        <div className="flex items-center justify-between border-t border-foreground/10 px-6 py-2.5">
+        <div className="flex items-center justify-between border-t border-border px-6 py-2.5">
           <span aria-hidden="true" />
           <Button variant="secondary" onPress={onClose}>
             {t("common.done")}
@@ -303,12 +307,7 @@ function SettingSection({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section
-      className={cn(
-        "rounded-xl border border-foreground/10 bg-foreground/[0.018] p-3.5",
-        className,
-      )}
-    >
+    <section className={cn("rounded-lg border border-border bg-muted/40 p-3.5", className)}>
       <header className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {icon && (
@@ -323,7 +322,7 @@ function SettingSection({
         </div>
         {action}
       </header>
-      <div className={cn("space-y-3", bodyClassName)}>{children}</div>
+      <div className={cn("flex flex-col gap-3", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -339,7 +338,7 @@ function SettingItem({
   control: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2 transition hover:border-foreground/15">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 transition hover:border-border/70">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
         {desc && <p className="mt-0.5 text-xs text-foreground/50">{desc}</p>}
@@ -409,12 +408,12 @@ function SkinPreviewCard({
       className={[
         "group flex w-full flex-col items-stretch gap-2 rounded-xl border-2 p-2 text-left transition",
         active
-          ? "border-accent shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent)_18%,transparent)]"
-          : "border-foreground/10 hover:border-foreground/25",
+          ? "border-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-primary)_18%,transparent)]"
+          : "border-border hover:border-primary/50",
       ].join(" ")}
     >
       <div
-        className="flex h-20 w-full flex-col gap-2 rounded-md border border-foreground/10 p-2"
+        className="flex h-20 w-full flex-col gap-2 rounded-md border border-border p-2"
         style={{ backgroundColor: preview.background }}
         aria-hidden="true"
       >
@@ -437,13 +436,13 @@ function SkinPreviewCard({
       </div>
       <div className="flex items-center justify-between px-1 pb-1">
         <span
-          className={["text-sm font-medium", active ? "text-accent" : "text-foreground/80"].join(
+          className={["text-sm font-medium", active ? "text-primary" : "text-foreground/80"].join(
             " ",
           )}
         >
           {label}
         </span>
-        {active && <IconCheck className="size-4 text-accent" />}
+        {active && <IconCheck className="size-4 text-primary" />}
       </div>
     </button>
   );
@@ -472,7 +471,7 @@ function AppearanceTab({
         />
       </div>
 
-      <div className="space-y-5 overflow-y-auto min-h-0 flex-1 px-5 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-4">
         <SettingSection
           title={t("appearance.skin")}
           desc={t("appearance.skin.desc")}
@@ -516,7 +515,7 @@ function AppearanceTab({
             onChange={(v) => void update({ monoFontFamily: v })}
           />
           {/* 字号：Slider 选择（5 档） */}
-          <div className="flex h-full flex-col gap-2 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2.5">
+          <div className="flex h-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-sm font-medium">{t("appearance.fontSize")}</p>
               <p className="mt-0.5 text-xs text-foreground/50">{t("appearance.fontSize.desc")}</p>
@@ -535,7 +534,7 @@ function AppearanceTab({
             />
           </div>
           {/* 代码字号：Slider 选择（5 档） */}
-          <div className="flex h-full flex-col gap-2 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2.5">
+          <div className="flex h-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-sm font-medium">{t("appearance.codeFontSize")}</p>
               <p className="mt-0.5 text-xs text-foreground/50">
@@ -711,7 +710,7 @@ function FontSelectRow({
   // 褰撳墠 value 鍛戒腑鏌愪釜棰勮鏃堕珮浜畠
   const matchedPreset = presets.find((p) => p.value === value);
   return (
-    <div className="flex h-full flex-col gap-2 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2.5">
+    <div className="flex h-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
       <label className="block min-w-0 select-none">
         <span className="text-sm font-medium">{label}</span>
       </label>
@@ -722,7 +721,7 @@ function FontSelectRow({
           // 选"无"时清空，否则用预设值
           onChange(next ? next.value : "");
         }}
-        className="w-full select-none rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs outline-none focus:border-accent/50"
+        className="w-full select-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring"
       >
         <option value="">{t("common.none")}</option>
         {presets.map((p) => (
@@ -859,7 +858,7 @@ function LegacyModelTab({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="shrink-0 space-y-3">
+      <div className="flex shrink-0 flex-col gap-3">
         <h3 className="text-sm font-medium text-foreground/70">{t("settings.tab.model")}</h3>
 
         <SettingItem
@@ -867,7 +866,7 @@ function LegacyModelTab({
           desc={t("model.default.desc")}
           control={
             <select
-              className="min-w-56 select-none rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm outline-none focus:border-accent/50"
+              className="min-w-56 select-none rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring"
               value={settings.selectedModel ?? ""}
               onChange={(e) => void update({ selectedModel: e.target.value || null })}
             >
@@ -899,11 +898,11 @@ function LegacyModelTab({
         }
       >
         {models.length === 0 ? (
-          <div className="rounded-md border border-dashed border-foreground/15 px-4 py-6 text-center text-sm text-foreground/50">
+          <div className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
             {t("model.empty")}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-foreground/10">
+          <div className="overflow-hidden rounded-md border border-border">
             {models.map((model, index) => {
               const selected = settings.selectedModel === model.ref;
               return (
@@ -911,7 +910,7 @@ function LegacyModelTab({
                   key={model.ref}
                   className={[
                     "grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_auto]",
-                    index > 0 ? "border-t border-foreground/10" : "",
+                    index > 0 ? "border-t border-border" : "",
                     selected ? "bg-accent/10" : "",
                     model.enabled ? "" : "opacity-65",
                   ].join(" ")}
@@ -921,7 +920,7 @@ function LegacyModelTab({
                       <span className="truncate text-sm font-medium">
                         {model.modelLabel ?? model.modelId}
                       </span>
-                      <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/55">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                         {t("model.custom")}
                       </span>
                       <span
@@ -1183,275 +1182,263 @@ function ModelEditorDialog({
   };
 
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container size="lg" placement="center" scroll="inside">
-          <Modal.Dialog>
-            <Modal.Header>
-              <div className="flex w-full items-center justify-between gap-3">
-                <Modal.Heading className="text-base font-semibold">
-                  {isEditing ? t("model.editModel") : t("model.addModel")}
-                </Modal.Heading>
-                <Button
-                  type="button"
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="flex w-full items-center justify-between gap-3">
+            <DialogTitle className="text-base font-semibold">
+              {isEditing ? t("model.editModel") : t("model.addModel")}
+            </DialogTitle>
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            {!isEditing && (
+              <label className="select-none text-sm md:col-span-2">
+                <span className="mb-1 block text-xs text-foreground/60">{t("model.provider")}</span>
+                <select
+                  className="w-full select-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+                  value={addMode}
+                  onChange={(e) => setAddMode(e.target.value === "custom" ? "custom" : "existing")}
                 >
-                  <IconClose className="size-4" />
-                </Button>
-              </div>
-            </Modal.Header>
+                  <option value="existing">{t("model.addToProvider")}</option>
+                  <option value="custom">{t("model.addWithProvider")}</option>
+                </select>
+              </label>
+            )}
 
-            <Modal.Body>
-              <div className="grid gap-3 md:grid-cols-2">
-                {!isEditing && (
-                  <label className="select-none text-sm md:col-span-2">
-                    <span className="mb-1 block text-xs text-foreground/60">
-                      {t("model.provider")}
-                    </span>
-                    <select
-                      className="w-full select-none rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm outline-none focus:border-accent/50"
-                      value={addMode}
-                      onChange={(e) =>
-                        setAddMode(e.target.value === "custom" ? "custom" : "existing")
-                      }
-                    >
-                      <option value="existing">{t("model.addToProvider")}</option>
-                      <option value="custom">{t("model.addWithProvider")}</option>
-                    </select>
-                  </label>
-                )}
+            {!isEditing && addMode === "existing" && (
+              <label className="select-none text-sm md:col-span-2">
+                <span className="mb-1 block text-xs text-foreground/60">{t("model.provider")}</span>
+                <select
+                  className="w-full select-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+                  value={modelForm.providerId}
+                  onChange={(e) =>
+                    setModelForm((prev) => ({ ...prev, providerId: e.target.value }))
+                  }
+                >
+                  {providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-                {!isEditing && addMode === "existing" && (
-                  <label className="select-none text-sm md:col-span-2">
-                    <span className="mb-1 block text-xs text-foreground/60">
-                      {t("model.provider")}
-                    </span>
-                    <select
-                      className="w-full select-none rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm outline-none focus:border-accent/50"
-                      value={modelForm.providerId}
-                      onChange={(e) =>
-                        setModelForm((prev) => ({ ...prev, providerId: e.target.value }))
-                      }
-                    >
-                      {providers.map((provider) => (
-                        <option key={provider.id} value={provider.id}>
-                          {provider.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-
-                {((!isEditing && addMode === "custom") || canEditProvider) && (
-                  <>
-                    <TextField>
-                      <Label>{t("model.providerName")}</Label>
-                      <Input
-                        value={providerForm.label}
-                        placeholder={t("model.placeholder.providerName")}
-                        onChange={(e) =>
-                          setProviderForm((prev) => ({
-                            ...prev,
-                            label: (e.target as HTMLInputElement).value,
-                          }))
-                        }
-                      />
-                    </TextField>
-                    {!isEditing && (
-                      <TextField>
-                        <Label>{t("model.providerId")}</Label>
-                        <Input
-                          value={providerForm.id ?? ""}
-                          placeholder={t("model.placeholder.providerId")}
-                          onChange={(e) =>
-                            setProviderForm((prev) => ({
-                              ...prev,
-                              id: (e.target as HTMLInputElement).value,
-                            }))
-                          }
-                        />
-                      </TextField>
-                    )}
-                    <TextField>
-                      <Label>{t("model.baseUrl")}</Label>
-                      <Input
-                        value={providerForm.baseUrl}
-                        placeholder={t("model.placeholder.baseUrl")}
-                        onChange={(e) =>
-                          setProviderForm((prev) => ({
-                            ...prev,
-                            baseUrl: (e.target as HTMLInputElement).value,
-                          }))
-                        }
-                      />
-                    </TextField>
-                    <TextField>
-                      <Label>{t("model.helpUrl")}</Label>
-                      <Input
-                        value={providerForm.helpUrl ?? ""}
-                        placeholder={t("model.placeholder.helpUrl")}
-                        onChange={(e) =>
-                          setProviderForm((prev) => ({
-                            ...prev,
-                            helpUrl: (e.target as HTMLInputElement).value,
-                          }))
-                        }
-                      />
-                    </TextField>
-                  </>
-                )}
-
-                {isEditing && (
-                  <TextField>
-                    <Label>{t("model.provider")}</Label>
-                    <Input value={model?.providerId ?? ""} disabled />
-                  </TextField>
-                )}
+            {((!isEditing && addMode === "custom") || canEditProvider) && (
+              <>
                 <TextField>
-                  <Label>{t("model.modelId")}</Label>
+                  <Label>{t("model.providerName")}</Label>
                   <Input
-                    value={modelForm.id}
-                    placeholder={t("model.placeholder.modelId")}
-                    disabled={isEditing}
+                    value={providerForm.label}
+                    placeholder={t("model.placeholder.providerName")}
                     onChange={(e) =>
-                      setModelForm((prev) => ({
-                        ...prev,
-                        id: (e.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.modelName")}</Label>
-                  <Input
-                    value={modelForm.label}
-                    placeholder={t("model.placeholder.modelName")}
-                    onChange={(e) =>
-                      setModelForm((prev) => ({
+                      setProviderForm((prev) => ({
                         ...prev,
                         label: (e.target as HTMLInputElement).value,
                       }))
                     }
                   />
                 </TextField>
-                <TextField className="md:col-span-2">
-                  <Label>{t("model.apiKey")}</Label>
-                  <Input
-                    type="password"
-                    value={apiKey}
-                    placeholder={
-                      hasApiKey ? t("apikey.placeholder.replace") : t("model.placeholder.apiKey")
-                    }
-                    onChange={(e) => setApiKey((e.target as HTMLInputElement).value)}
-                  />
-                  {providerHelpUrl && (
-                    <Description className="mt-1">
-                      <a
-                        href={providerHelpUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-accent hover:underline"
-                      >
-                        {t("apikey.getKey")}
-                      </a>
-                    </Description>
-                  )}
-                </TextField>
-
-                <div className="md:col-span-2">
-                  <Switch
-                    size="sm"
-                    isSelected={modelForm.enabled}
-                    onChange={(enabled) => setModelForm((prev) => ({ ...prev, enabled }))}
-                  >
-                    {t("model.enabled")}
-                  </Switch>
-                </div>
-
-                <div className="space-y-4 md:col-span-2">
-                  <p className="text-xs font-medium text-foreground/60">{t("model.params")}</p>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
-                      <span>{t("model.temperature")}</span>
-                      <span>{f.fixed(modelForm.temperature, 1)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={modelForm.temperature}
-                      onChange={(e) => updateModelNumber({ temperature: Number(e.target.value) })}
-                      className="w-full accent-[var(--color-accent)]"
-                      aria-label={t("model.temperature")}
-                    />
-                    <p className="mt-0.5 text-xs text-foreground/40">
-                      {t("model.temperature.hint")}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
-                      <span>{t("model.topP")}</span>
-                      <span>{f.fixed(modelForm.topP, 2)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={modelForm.topP}
-                      onChange={(e) => updateModelNumber({ topP: Number(e.target.value) })}
-                      className="w-full accent-[var(--color-accent)]"
-                      aria-label={t("model.topP")}
-                    />
-                    <p className="mt-0.5 text-xs text-foreground/40">{t("model.topP.hint")}</p>
-                  </div>
+                {!isEditing && (
                   <TextField>
-                    <Label>{t("model.maxTokens")}</Label>
+                    <Label>{t("model.providerId")}</Label>
                     <Input
-                      type="number"
-                      min={1}
-                      max={32768}
-                      step={256}
-                      value={String(modelForm.maxOutputTokens)}
+                      value={providerForm.id ?? ""}
+                      placeholder={t("model.placeholder.providerId")}
                       onChange={(e) =>
-                        updateModelNumber({
-                          maxOutputTokens: Math.max(
-                            1,
-                            Number((e.target as HTMLInputElement).value) || 1,
-                          ),
-                        })
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          id: (e.target as HTMLInputElement).value,
+                        }))
                       }
                     />
-                    <Description className="mt-1">{t("model.maxTokens.hint")}</Description>
                   </TextField>
-                </div>
-              </div>
-            </Modal.Body>
-
-            <Modal.Footer>
-              <div className="flex w-full flex-wrap justify-end gap-2">
-                {isEditing && hasApiKey && (
-                  <Button variant="tertiary" onPress={handleClearKey}>
-                    {t("common.clear")}
-                  </Button>
                 )}
-                <Button variant="secondary" onPress={onClose}>
-                  {t("common.cancel")}
-                </Button>
-                <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
-                  {t("common.save")}
-                </Button>
+                <TextField>
+                  <Label>{t("model.baseUrl")}</Label>
+                  <Input
+                    value={providerForm.baseUrl}
+                    placeholder={t("model.placeholder.baseUrl")}
+                    onChange={(e) =>
+                      setProviderForm((prev) => ({
+                        ...prev,
+                        baseUrl: (e.target as HTMLInputElement).value,
+                      }))
+                    }
+                  />
+                </TextField>
+                <TextField>
+                  <Label>{t("model.helpUrl")}</Label>
+                  <Input
+                    value={providerForm.helpUrl ?? ""}
+                    placeholder={t("model.placeholder.helpUrl")}
+                    onChange={(e) =>
+                      setProviderForm((prev) => ({
+                        ...prev,
+                        helpUrl: (e.target as HTMLInputElement).value,
+                      }))
+                    }
+                  />
+                </TextField>
+              </>
+            )}
+
+            {isEditing && (
+              <TextField>
+                <Label>{t("model.provider")}</Label>
+                <Input value={model?.providerId ?? ""} disabled />
+              </TextField>
+            )}
+            <TextField>
+              <Label>{t("model.modelId")}</Label>
+              <Input
+                value={modelForm.id}
+                placeholder={t("model.placeholder.modelId")}
+                disabled={isEditing}
+                onChange={(e) =>
+                  setModelForm((prev) => ({
+                    ...prev,
+                    id: (e.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField>
+              <Label>{t("model.modelName")}</Label>
+              <Input
+                value={modelForm.label}
+                placeholder={t("model.placeholder.modelName")}
+                onChange={(e) =>
+                  setModelForm((prev) => ({
+                    ...prev,
+                    label: (e.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField className="md:col-span-2">
+              <Label>{t("model.apiKey")}</Label>
+              <Input
+                type="password"
+                value={apiKey}
+                placeholder={
+                  hasApiKey ? t("apikey.placeholder.replace") : t("model.placeholder.apiKey")
+                }
+                onChange={(e) => setApiKey((e.target as HTMLInputElement).value)}
+              />
+              {providerHelpUrl && (
+                <Description className="mt-1">
+                  <a
+                    href={providerHelpUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-accent hover:underline"
+                  >
+                    {t("apikey.getKey")}
+                  </a>
+                </Description>
+              )}
+            </TextField>
+
+            <div className="md:col-span-2">
+              <Switch
+                size="sm"
+                isSelected={modelForm.enabled}
+                onChange={(enabled) => setModelForm((prev) => ({ ...prev, enabled }))}
+              >
+                {t("model.enabled")}
+              </Switch>
+            </div>
+
+            <div className="flex flex-col gap-4 md:col-span-2">
+              <p className="text-xs font-medium text-foreground/60">{t("model.params")}</p>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
+                  <span>{t("model.temperature")}</span>
+                  <span>{f.fixed(modelForm.temperature, 1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={modelForm.temperature}
+                  onChange={(e) => updateModelNumber({ temperature: Number(e.target.value) })}
+                  className="w-full accent-[var(--color-accent)]"
+                  aria-label={t("model.temperature")}
+                />
+                <p className="mt-0.5 text-xs text-foreground/40">{t("model.temperature.hint")}</p>
               </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
+                  <span>{t("model.topP")}</span>
+                  <span>{f.fixed(modelForm.topP, 2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={modelForm.topP}
+                  onChange={(e) => updateModelNumber({ topP: Number(e.target.value) })}
+                  className="w-full accent-[var(--color-accent)]"
+                  aria-label={t("model.topP")}
+                />
+                <p className="mt-0.5 text-xs text-foreground/40">{t("model.topP.hint")}</p>
+              </div>
+              <TextField>
+                <Label>{t("model.maxTokens")}</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={32768}
+                  step={256}
+                  value={String(modelForm.maxOutputTokens)}
+                  onChange={(e) =>
+                    updateModelNumber({
+                      maxOutputTokens: Math.max(
+                        1,
+                        Number((e.target as HTMLInputElement).value) || 1,
+                      ),
+                    })
+                  }
+                />
+                <Description className="mt-1">{t("model.maxTokens.hint")}</Description>
+              </TextField>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            {isEditing && hasApiKey && (
+              <Button variant="tertiary" onPress={handleClearKey}>
+                {t("common.clear")}
+              </Button>
+            )}
+            <Button variant="secondary" onPress={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1888,7 +1875,7 @@ function ProviderModelWorkbench({
         <h3 className="text-base font-semibold">{t("settings.tab.model")}</h3>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="h-9 min-w-64 select-none select-text rounded-md border border-foreground/15 bg-background px-3 text-sm outline-none focus:border-accent/50"
+            className="h-9 min-w-64 select-none select-text rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring"
             value={settings.selectedModel ?? ""}
             onChange={(event) => void update({ selectedModel: event.target.value || null })}
           >
@@ -1910,24 +1897,35 @@ function ProviderModelWorkbench({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.018] lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
-        <aside className="min-h-0 flex flex-col border-b border-foreground/10 p-3 lg:border-b-0 lg:border-r">
-          <SearchField
-            aria-label={t("model.provider.search")}
-            value={providerQuery}
-            onChange={setProviderQuery}
-            fullWidth
-          >
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input className="select-text" placeholder={t("model.provider.search")} />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
+      <div className="grid min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/40 lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+        <aside className="min-h-0 flex flex-col border-b border-border p-3 lg:border-b-0 lg:border-r">
+          <div className="relative w-full">
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              aria-label={t("model.provider.search")}
+              value={providerQuery}
+              onChange={(event) => setProviderQuery(event.currentTarget.value)}
+              placeholder={t("model.provider.search")}
+              className="select-text pl-9 pr-9"
+            />
+            {providerQuery ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+                aria-label={t("common.clear")}
+                onPress={() => setProviderQuery("")}
+              >
+                <IconClose aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
 
-          <div className="mt-3 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+          <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
             {filteredProviders.length === 0 ? (
-              <div className="rounded-md border border-dashed border-foreground/15 px-3 py-8 text-center text-xs text-foreground/50">
+              <div className="rounded-md border border-dashed border-border px-3 py-8 text-center text-xs text-muted-foreground">
                 {t("model.provider.noMatches")}
               </div>
             ) : (
@@ -1945,7 +1943,7 @@ function ProviderModelWorkbench({
                       "w-full select-none rounded-lg border px-3 py-2.5 text-left transition",
                       active
                         ? "border-accent/50 bg-accent/10 shadow-sm"
-                        : "border-transparent hover:border-foreground/10 hover:bg-foreground/[0.04]",
+                        : "border-transparent hover:border-border hover:bg-muted",
                     ].join(" ")}
                     onClick={() => setSelectedProviderId(provider.id)}
                   >
@@ -1959,7 +1957,7 @@ function ProviderModelWorkbench({
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {provider.label}
                       </span>
-                      <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/55">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                         {provider.source === "builtin"
                           ? t("model.provider.builtin")
                           : t("model.provider.custom")}
@@ -1983,16 +1981,16 @@ function ProviderModelWorkbench({
 
         <div className="min-h-0 min-w-0 flex flex-col overflow-hidden p-4">
           {!selectedProvider ? (
-            <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-dashed border-foreground/15 text-sm text-foreground/50">
+            <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
               {t("model.provider.empty")}
             </div>
           ) : (
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="shrink-0 flex flex-col gap-3 border-b border-foreground/10 pb-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex shrink-0 flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="truncate text-base font-semibold">{selectedProvider.label}</h4>
-                    <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/55">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                       {selectedProvider.kind}
                     </span>
                     <span
@@ -2143,8 +2141,8 @@ function ProviderModelWorkbench({
                 </TextField>
               </div>
 
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-foreground/10">
-                <div className="flex flex-col gap-2 border-b border-foreground/10 bg-foreground/[0.025] px-3 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
+                <div className="flex flex-col gap-2 border-b border-border bg-muted px-3 py-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h5 className="text-sm font-medium">{t("model.models.available")}</h5>
                     <p className="mt-0.5 text-xs text-foreground/45">
@@ -2201,7 +2199,7 @@ function ProviderModelWorkbench({
                               <span className="truncate text-sm font-medium">
                                 {model.label ?? model.id}
                               </span>
-                              <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/55">
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                                 {model.source === "builtin"
                                   ? t("model.provider.builtin")
                                   : t("model.custom")}
@@ -2372,101 +2370,95 @@ function AddProviderDialog({
   };
 
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container size="lg" placement="center" scroll="inside">
-          <Modal.Dialog>
-            <Modal.Header>
-              <div className="flex w-full items-center justify-between gap-3">
-                <Modal.Heading className="text-base font-semibold">
-                  {t("model.addProvider")}
-                </Modal.Heading>
-                <Button
-                  type="button"
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
-                >
-                  <IconClose className="size-4" />
-                </Button>
-              </div>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="grid gap-3 md:grid-cols-2">
-                <TextField>
-                  <Label>{t("model.providerName")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.label}
-                    placeholder={t("model.placeholder.providerName")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        label: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.providerId")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.id ?? ""}
-                    placeholder={t("model.placeholder.providerId")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        id: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.baseUrl")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.baseUrl}
-                    placeholder={t("model.placeholder.baseUrl")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        baseUrl: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.helpUrl")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.helpUrl ?? ""}
-                    placeholder={t("model.placeholder.helpUrl")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        helpUrl: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex w-full justify-end gap-2">
-                <Button variant="secondary" onPress={onClose}>
-                  {t("common.cancel")}
-                </Button>
-                <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
-                  {t("common.save")}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="flex w-full items-center justify-between gap-3">
+            <DialogTitle className="text-base font-semibold">{t("model.addProvider")}</DialogTitle>
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <TextField>
+              <Label>{t("model.providerName")}</Label>
+              <Input
+                className="select-text"
+                value={form.label}
+                placeholder={t("model.placeholder.providerName")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    label: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField>
+              <Label>{t("model.providerId")}</Label>
+              <Input
+                className="select-text"
+                value={form.id ?? ""}
+                placeholder={t("model.placeholder.providerId")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    id: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField>
+              <Label>{t("model.baseUrl")}</Label>
+              <Input
+                className="select-text"
+                value={form.baseUrl}
+                placeholder={t("model.placeholder.baseUrl")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    baseUrl: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField>
+              <Label>{t("model.helpUrl")}</Label>
+              <Input
+                className="select-text"
+                value={form.helpUrl ?? ""}
+                placeholder={t("model.placeholder.helpUrl")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    helpUrl: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+          </div>
+        </div>
+        <DialogFooter>
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="secondary" onPress={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2577,242 +2569,236 @@ function ModelOptionsDialog({
   };
 
   return (
-    <Modal isOpen={!!state} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <Modal.Backdrop isDismissable>
-        <Modal.Container size="lg" placement="center" scroll="inside">
-          <Modal.Dialog>
-            <Modal.Header>
-              <div className="flex w-full items-center justify-between gap-3">
-                <div>
-                  <Modal.Heading className="text-base font-semibold">
-                    {isEditing ? t("model.options.title") : t("model.addModel")}
-                  </Modal.Heading>
-                  <p className="mt-0.5 text-xs text-foreground/50">{provider.label}</p>
+    <Dialog open={!!state} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div>
+              <DialogTitle className="text-base font-semibold">
+                {isEditing ? t("model.options.title") : t("model.addModel")}
+              </DialogTitle>
+              <p className="mt-0.5 text-xs text-foreground/50">{provider.label}</p>
+            </div>
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={onClose}
+              aria-label={t("common.close")}
+            >
+              <IconClose className="size-4" />
+            </Button>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <TextField>
+              <Label>{t("model.modelId")}</Label>
+              <Input
+                className="select-text"
+                value={form.id}
+                disabled={isEditing}
+                placeholder={t("model.placeholder.modelId")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    id: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <TextField>
+              <Label>{t("model.modelName")}</Label>
+              <Input
+                className="select-text"
+                value={form.label}
+                placeholder={t("model.placeholder.modelName")}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    label: (event.target as HTMLInputElement).value,
+                  }))
+                }
+              />
+            </TextField>
+            <div className="md:col-span-2">
+              <Switch
+                size="sm"
+                isSelected={form.enabled}
+                onChange={(enabled) => setForm((prev) => ({ ...prev, enabled }))}
+              >
+                {t("model.enabled")}
+              </Switch>
+            </div>
+
+            <TextField className="md:col-span-2">
+              <Label>{t("model.reasoningDefault")}</Label>
+              <select
+                className="h-9 w-full select-text rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+                value={form.reasoningDefault}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    reasoningDefault: event.target.value as ChatReasoningLevel,
+                  }))
+                }
+              >
+                {form.reasoningLevels.map((level) => (
+                  <option key={level} value={level}>
+                    {t(REASONING_LEVEL_LABEL_KEYS[level])}
+                  </option>
+                ))}
+              </select>
+              <Description className="mt-1">{t("model.reasoningDefault.hint")}</Description>
+            </TextField>
+
+            <div className="flex flex-col gap-4 md:col-span-2">
+              <p className="text-xs font-medium text-foreground/60">{t("model.params")}</p>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
+                  <span>{t("model.temperature")}</span>
+                  <span>{f.fixed(form.temperature, 1)}</span>
                 </div>
-                <Button
-                  type="button"
-                  isIconOnly
-                  size="sm"
-                  variant="tertiary"
-                  onPress={onClose}
-                  aria-label={t("common.close")}
-                >
-                  <IconClose className="size-4" />
-                </Button>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={form.temperature}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, temperature: Number(event.target.value) }))
+                  }
+                  className="w-full accent-[var(--color-accent)]"
+                  aria-label={t("model.temperature")}
+                />
               </div>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="grid gap-3 md:grid-cols-2">
-                <TextField>
-                  <Label>{t("model.modelId")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.id}
-                    disabled={isEditing}
-                    placeholder={t("model.placeholder.modelId")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        id: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.modelName")}</Label>
-                  <Input
-                    className="select-text"
-                    value={form.label}
-                    placeholder={t("model.placeholder.modelName")}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        label: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                <div className="md:col-span-2">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
+                  <span>{t("model.topP")}</span>
+                  <span>{f.fixed(form.topP, 2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={form.topP}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, topP: Number(event.target.value) }))
+                  }
+                  className="w-full accent-[var(--color-accent)]"
+                  aria-label={t("model.topP")}
+                />
+              </div>
+            </div>
+
+            <TextField>
+              <Label>{t("model.contextWindow")}</Label>
+              <Input
+                type="number"
+                className="select-text"
+                min={1}
+                step={1024}
+                value={String(form.contextWindow)}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    contextWindow: Math.max(
+                      1,
+                      Number((event.target as HTMLInputElement).value) || 1,
+                    ),
+                  }))
+                }
+              />
+              <Description className="mt-1">{t("model.contextWindow.hint")}</Description>
+            </TextField>
+            <TextField>
+              <Label>{t("model.maxTokens")}</Label>
+              <Input
+                type="number"
+                className="select-text"
+                min={1}
+                max={32768}
+                step={256}
+                value={String(form.maxOutputTokens)}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    maxOutputTokens: Math.max(
+                      1,
+                      Number((event.target as HTMLInputElement).value) || 1,
+                    ),
+                  }))
+                }
+              />
+              <Description className="mt-1">{t("model.maxTokens.hint")}</Description>
+            </TextField>
+
+            <div className="md:col-span-2">
+              <p className="mb-2 text-xs font-medium text-foreground/60">
+                {t("model.options.capabilities")}
+              </p>
+              <p className="mb-2 text-xs text-foreground/45">{t("model.capability.syncNotice")}</p>
+              <p className="mb-2 text-xs text-foreground/45">
+                {t("model.capability.sourceLabel")}:{" "}
+                {t("model.capability.sourcesSummary", capabilitySourceCounts)}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {(
+                  [
+                    ["textGeneration", "model.capability.textGeneration"],
+                    ["vision", "model.capability.vision"],
+                    ["imageOutput", "model.capability.imageOutput"],
+                    ["speechOutput", "model.capability.speechOutput"],
+                    ["transcription", "model.capability.transcription"],
+                    ["videoOutput", "model.capability.videoOutput"],
+                    ["toolCalling", "model.capability.toolCalling"],
+                    ["reasoning", "model.capability.reasoning"],
+                    ["embedding", "model.capability.embedding"],
+                  ] as const
+                ).map(([key, labelKey]) => (
                   <Switch
+                    key={key}
                     size="sm"
-                    isSelected={form.enabled}
-                    onChange={(enabled) => setForm((prev) => ({ ...prev, enabled }))}
+                    isSelected={form.capabilities[key]}
+                    onChange={(enabled) => updateCapabilities({ [key]: enabled })}
                   >
-                    {t("model.enabled")}
+                    {t(labelKey)}
                   </Switch>
-                </div>
-
-                <TextField className="md:col-span-2">
-                  <Label>{t("model.reasoningDefault")}</Label>
-                  <select
-                    className="h-9 w-full select-text rounded-md border border-foreground/15 bg-background px-3 text-sm outline-none focus:border-accent/50"
-                    value={form.reasoningDefault}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        reasoningDefault: event.target.value as ChatReasoningLevel,
-                      }))
-                    }
-                  >
-                    {form.reasoningLevels.map((level) => (
-                      <option key={level} value={level}>
-                        {t(REASONING_LEVEL_LABEL_KEYS[level])}
-                      </option>
-                    ))}
-                  </select>
-                  <Description className="mt-1">{t("model.reasoningDefault.hint")}</Description>
-                </TextField>
-
-                <div className="space-y-4 md:col-span-2">
-                  <p className="text-xs font-medium text-foreground/60">{t("model.params")}</p>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
-                      <span>{t("model.temperature")}</span>
-                      <span>{f.fixed(form.temperature, 1)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={form.temperature}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, temperature: Number(event.target.value) }))
-                      }
-                      className="w-full accent-[var(--color-accent)]"
-                      aria-label={t("model.temperature")}
-                    />
-                  </div>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-foreground/60">
-                      <span>{t("model.topP")}</span>
-                      <span>{f.fixed(form.topP, 2)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={form.topP}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, topP: Number(event.target.value) }))
-                      }
-                      className="w-full accent-[var(--color-accent)]"
-                      aria-label={t("model.topP")}
-                    />
-                  </div>
-                </div>
-
-                <TextField>
-                  <Label>{t("model.contextWindow")}</Label>
-                  <Input
-                    type="number"
-                    className="select-text"
-                    min={1}
-                    step={1024}
-                    value={String(form.contextWindow)}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        contextWindow: Math.max(
-                          1,
-                          Number((event.target as HTMLInputElement).value) || 1,
-                        ),
-                      }))
-                    }
-                  />
-                  <Description className="mt-1">{t("model.contextWindow.hint")}</Description>
-                </TextField>
-                <TextField>
-                  <Label>{t("model.maxTokens")}</Label>
-                  <Input
-                    type="number"
-                    className="select-text"
-                    min={1}
-                    max={32768}
-                    step={256}
-                    value={String(form.maxOutputTokens)}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        maxOutputTokens: Math.max(
-                          1,
-                          Number((event.target as HTMLInputElement).value) || 1,
-                        ),
-                      }))
-                    }
-                  />
-                  <Description className="mt-1">{t("model.maxTokens.hint")}</Description>
-                </TextField>
-
-                <div className="md:col-span-2">
-                  <p className="mb-2 text-xs font-medium text-foreground/60">
-                    {t("model.options.capabilities")}
-                  </p>
-                  <p className="mb-2 text-xs text-foreground/45">
-                    {t("model.capability.syncNotice")}
-                  </p>
-                  <p className="mb-2 text-xs text-foreground/45">
-                    {t("model.capability.sourceLabel")}:{" "}
-                    {t("model.capability.sourcesSummary", capabilitySourceCounts)}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {(
-                      [
-                        ["textGeneration", "model.capability.textGeneration"],
-                        ["vision", "model.capability.vision"],
-                        ["imageOutput", "model.capability.imageOutput"],
-                        ["speechOutput", "model.capability.speechOutput"],
-                        ["transcription", "model.capability.transcription"],
-                        ["videoOutput", "model.capability.videoOutput"],
-                        ["toolCalling", "model.capability.toolCalling"],
-                        ["reasoning", "model.capability.reasoning"],
-                        ["embedding", "model.capability.embedding"],
-                      ] as const
-                    ).map(([key, labelKey]) => (
-                      <Switch
-                        key={key}
-                        size="sm"
-                        isSelected={form.capabilities[key]}
-                        onChange={(enabled) => updateCapabilities({ [key]: enabled })}
-                      >
-                        {t(labelKey)}
-                      </Switch>
-                    ))}
-                  </div>
-                </div>
-
-                <TextField className="md:col-span-2" isInvalid={!!jsonError}>
-                  <Label>{t("model.options.providerOptions")}</Label>
-                  <TextArea
-                    rows={8}
-                    value={form.providerOptionsJson}
-                    onChange={(event) => handleJsonChange(event.target.value)}
-                    className="select-text font-mono text-xs"
-                    spellCheck={false}
-                  />
-                  <Description className="mt-1">
-                    {jsonError
-                      ? t("error.providerOptions.json")
-                      : t("model.options.providerOptions.desc")}
-                  </Description>
-                </TextField>
+                ))}
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <div className="flex w-full flex-wrap justify-end gap-2">
-                <Button variant="secondary" onPress={onClose}>
-                  {t("common.cancel")}
-                </Button>
-                <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
-                  {t("common.save")}
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            </div>
+
+            <TextField className="md:col-span-2" isInvalid={!!jsonError}>
+              <Label>{t("model.options.providerOptions")}</Label>
+              <TextArea
+                rows={8}
+                value={form.providerOptionsJson}
+                onChange={(event) => handleJsonChange(event.target.value)}
+                className="select-text font-mono text-xs"
+                spellCheck={false}
+              />
+              <Description className="mt-1">
+                {jsonError
+                  ? t("error.providerOptions.json")
+                  : t("model.options.providerOptions.desc")}
+              </Description>
+            </TextField>
+          </div>
+        </div>
+        <DialogFooter>
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Button variant="secondary" onPress={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" onPress={handleSave} isDisabled={!canSave}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -3147,7 +3133,7 @@ function TrashTab(): React.JSX.Element {
   };
 
   return (
-    <section className="space-y-4 select-none">
+    <section className="flex flex-col gap-4 select-none">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h3 className="text-base font-semibold">{t("trash.title")}</h3>
         <ToggleButtonGroup
@@ -3177,16 +3163,16 @@ function TrashTab(): React.JSX.Element {
 
       {trashKind === "agents" ? (
         agentItems.length === 0 ? (
-          <div className="rounded-md border border-foreground/10 px-4 py-8 text-center text-sm text-foreground/45">
+          <div className="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {loading.agents ? t("chat.loadingHistory") : emptyMessage()}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {agentItems.map((agent) => (
-              <div key={agent.id} className="rounded-md border border-foreground/10 p-4">
+              <div key={agent.id} className="rounded-md border border-border bg-card p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-foreground/10 bg-foreground/[0.03] text-lg">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-lg">
                       {agent.avatar || "A"}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -3229,12 +3215,12 @@ function TrashTab(): React.JSX.Element {
           </div>
         )
       ) : activeRows.length === 0 ? (
-        <div className="rounded-md border border-foreground/10 px-4 py-8 text-center text-sm text-foreground/45">
+        <div className="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">
           {loading[trashKind] ? t("chat.loadingHistory") : emptyMessage()}
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted px-3 py-2">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Checkbox
                 id="trash-select-all"
@@ -3275,11 +3261,11 @@ function TrashTab(): React.JSX.Element {
             </Button>
           </div>
 
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {activeRows.map((row) => {
               const checked = selectedIds.has(row.id);
               return (
-                <div key={row.id} className="rounded-md border border-foreground/10 p-4">
+                <div key={row.id} className="rounded-md border border-border bg-card p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex min-w-0 items-start gap-3">
                       <Checkbox
@@ -3457,16 +3443,16 @@ function DiagnosticsTab(): React.JSX.Element {
         </Button>
       </div>
 
-      <div className="space-y-2 overflow-y-auto min-h-0 flex-1 px-5 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4">
         {events.length === 0 ? (
-          <p className="rounded-md border border-foreground/10 p-6 text-center text-sm text-foreground/45">
+          <p className="rounded-md border border-border p-6 text-center text-sm text-muted-foreground">
             {t("tools.audit.empty")}
           </p>
         ) : (
           events.slice(0, 80).map((event) => (
             <div
               key={event.id}
-              className="grid gap-2 rounded-md border border-foreground/10 p-3 text-sm md:grid-cols-[160px_1fr_auto]"
+              className="grid gap-2 rounded-md border border-border p-3 text-sm md:grid-cols-[160px_1fr_auto]"
             >
               <div className="text-xs text-foreground/45">{f.dateTime(event.created_at)}</div>
               <div className="min-w-0">

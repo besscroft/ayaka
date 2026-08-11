@@ -91,7 +91,7 @@ export function AttachmentChip({
       data-slot="attachment-chip"
       data-category={category}
       className={cn(
-        "group relative flex items-center gap-2 overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.04] text-xs",
+        "group relative flex items-center gap-2 overflow-hidden rounded-md border border-border bg-muted/40 text-xs",
         compact ? "h-8 pl-1.5 pr-2" : "h-12 pl-1.5 pr-2",
         className,
       )}
@@ -100,7 +100,7 @@ export function AttachmentChip({
       {/* 缩略图 / 类型 icon */}
       <div
         className={cn(
-          "shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]",
+          "shrink-0 overflow-hidden rounded-lg bg-muted",
           compact ? "size-6" : "size-9",
         )}
       >
@@ -118,11 +118,11 @@ export function AttachmentChip({
 
       {/* 文件名 + 大小 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-foreground/85" title={item.name}>
+        <span className="truncate text-foreground" title={item.name}>
           {item.name}
         </span>
         {!compact && (
-          <span className="truncate text-[10px] text-foreground/45">{f.bytes(item.size)}</span>
+          <span className="truncate text-[10px] text-muted-foreground">{f.bytes(item.size)}</span>
         )}
       </div>
 
@@ -133,8 +133,8 @@ export function AttachmentChip({
           onClick={() => onRemove(item.id)}
           aria-label={t("attachment.remove", { name: item.name })}
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-md text-foreground/40 transition",
-            "hover:bg-foreground/10 hover:text-foreground",
+            "flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition",
+            "hover:bg-muted hover:text-foreground",
             compact ? "size-5" : "size-6",
           )}
         >
@@ -157,7 +157,7 @@ function CategoryGlyph({
   // 简化 SVG：基于 emoji/字符绘制
   if (category === "video") {
     return (
-      <div className="flex size-full items-center justify-center text-foreground/55">
+      <div className="flex size-full items-center justify-center text-muted-foreground">
         <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M3 6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm14 2.5l4-2.5v12l-4-2.5v-7z" />
         </svg>
@@ -166,7 +166,7 @@ function CategoryGlyph({
   }
   if (category === "audio") {
     return (
-      <div className="flex size-full items-center justify-center text-foreground/55">
+      <div className="flex size-full items-center justify-center text-muted-foreground">
         <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M9 18V5l12-2v13" />
           <circle cx="6" cy="18" r="3" />
@@ -177,7 +177,7 @@ function CategoryGlyph({
   }
   // file (default)
   return (
-    <div className="flex size-full items-center justify-center text-foreground/55">
+    <div className="flex size-full items-center justify-center text-muted-foreground">
       <svg
         width={size}
         height={size}

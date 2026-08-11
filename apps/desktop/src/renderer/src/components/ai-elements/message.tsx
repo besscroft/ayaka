@@ -46,7 +46,7 @@ export function MessageContent({
       className={cn(
         "flex flex-col gap-1 text-sm leading-relaxed",
         isUser
-          ? "rounded-2xl bg-accent px-4 py-2.5 text-accent-foreground"
+          ? "rounded-xl bg-primary px-4 py-2.5 text-primary-foreground shadow-xs"
           : "w-full bg-transparent px-0 py-0 text-foreground",
         className,
       )}

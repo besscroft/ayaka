@@ -95,7 +95,7 @@ export function ModelSelector({
       <button
         type="button"
         disabled={disabled}
-        className="flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-foreground/10 bg-foreground/[0.035] px-2.5 text-[13px] shadow-sm transition hover:bg-foreground/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 text-[13px] shadow-xs transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -110,11 +110,11 @@ export function ModelSelector({
         <div
           role="listbox"
           aria-label={t("model.selector.label")}
-          className={`absolute z-50 max-h-80 w-72 select-none overflow-y-auto rounded-lg border border-foreground/15 bg-background shadow-xl ${menuPlacement}`}
+          className={`absolute z-50 max-h-80 w-72 select-none overflow-y-auto rounded-lg border border-border bg-popover shadow-lg ${menuPlacement}`}
         >
           {enabledProviders.map((p) => (
             <div key={p.id}>
-              <div className="border-b border-foreground/10 px-3 py-1.5 text-xs font-semibold text-foreground/50">
+              <div className="border-b border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground">
                 {p.label}
               </div>
               {p.models.map((m) => {
@@ -128,7 +128,7 @@ export function ModelSelector({
                     aria-selected={selected}
                     className={[
                       "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition",
-                      selected ? "bg-accent/10 text-accent" : "hover:bg-foreground/5",
+                      selected ? "bg-accent text-accent-foreground" : "hover:bg-muted",
                     ].join(" ")}
                     onClick={() => handleChange(ref)}
                   >

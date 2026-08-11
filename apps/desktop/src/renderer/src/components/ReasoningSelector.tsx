@@ -83,7 +83,7 @@ export function ReasoningSelector({
       <button
         type="button"
         disabled={disabled}
-        className="flex size-8 shrink-0 items-center justify-center rounded-xl text-foreground/60 transition motion-reduce:transition-none hover:bg-foreground/10 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition motion-reduce:transition-none hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         onClick={() => setOpen((next) => !next)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -98,9 +98,9 @@ export function ReasoningSelector({
           role="listbox"
           aria-label={t("reasoning.selector.label")}
           onKeyDown={handleListKeyDown}
-          className={`absolute z-50 w-56 select-none overflow-hidden rounded-lg border border-foreground/15 bg-background shadow-xl ${menuPlacement}`}
+          className={`absolute z-50 w-56 select-none overflow-hidden rounded-lg border border-border bg-popover shadow-lg ${menuPlacement}`}
         >
-          <div className="border-b border-foreground/10 px-3 py-1.5 text-xs font-semibold text-foreground/50">
+          <div className="border-b border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground">
             {t("reasoning.selector.title")}
           </div>
           <div className="max-h-80 overflow-y-auto p-1">
@@ -117,7 +117,7 @@ export function ReasoningSelector({
                   disabled={!supported}
                   className={[
                     "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition",
-                    selected ? "bg-accent/10 text-accent" : "hover:bg-foreground/5",
+                    selected ? "bg-accent text-accent-foreground" : "hover:bg-muted",
                     !supported ? "cursor-not-allowed opacity-40" : "",
                   ].join(" ")}
                   onClick={() => handleChange(level)}
@@ -136,7 +136,7 @@ export function ReasoningSelector({
             })}
           </div>
           {providerOverride ? (
-            <p className="border-t border-foreground/10 px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
+            <p className="border-t border-border px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
               {t("reasoning.providerOverride")}
             </p>
           ) : null}

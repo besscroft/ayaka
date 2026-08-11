@@ -114,7 +114,7 @@ export function Reasoning({
         active={isStreaming}
         open={isOpen}
         onOpenChange={setIsOpen}
-        className={cn("rounded-xl border border-foreground/10 bg-foreground/[0.03]", className)}
+        className={cn("rounded-xl border border-border bg-muted/30", className)}
         {...rest}
       >
         {children}
@@ -143,8 +143,8 @@ export function ReasoningTrigger({
     <AnimatedDisclosureTrigger
       data-slot="reasoning-trigger"
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-foreground/65",
-        "hover:text-foreground/90",
+        "flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground",
+        "hover:text-foreground",
         className,
       )}
       {...rest}
@@ -176,7 +176,7 @@ export function ReasoningContent({
     <AnimatedDisclosureContent
       data-slot="reasoning-content"
       innerClassName={cn(
-        "max-h-[min(32rem,50vh)] overflow-y-auto border-t border-foreground/10 px-3 py-2.5 text-xs leading-relaxed text-foreground/75",
+        "max-h-[min(32rem,50vh)] overflow-y-auto border-t border-border px-3 py-2.5 text-xs leading-relaxed text-muted-foreground",
         className,
       )}
       {...rest}

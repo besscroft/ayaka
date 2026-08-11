@@ -915,7 +915,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   if (hydrationState === "loading") {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-foreground/40">
+      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         {t("chat.loadingHistory")}
       </div>
     );
@@ -1021,7 +1021,7 @@ function ChatHeader({ status }: ChatHeaderProps): React.JSX.Element {
   const { t } = useT();
   return (
     <header
-      className="relative z-30 flex shrink-0 select-none items-center border-b border-foreground/10 px-4 py-2.5 sm:px-6"
+      className="relative z-30 flex shrink-0 select-none items-center border-b border-border px-4 py-2.5 sm:px-6"
       data-streaming={status === "streaming" || status === "submitted"}
     >
       <div className="flex min-w-0 items-center gap-2.5 lg:min-h-9">
@@ -1029,9 +1029,7 @@ function ChatHeader({ status }: ChatHeaderProps): React.JSX.Element {
           className="flex size-2 shrink-0 rounded-full bg-success/80 ring-2 ring-success/20"
           aria-hidden
         />
-        <h1 className="shrink-0 text-sm font-medium text-foreground/80">
-          {t("chat.header.title")}
-        </h1>
+        <h1 className="shrink-0 text-sm font-medium text-foreground">{t("chat.header.title")}</h1>
         <ConversationStatus status={status} />
       </div>
     </header>
@@ -1147,9 +1145,11 @@ function EmptyState({
   return (
     <div className="flex flex-1 items-center justify-center overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 px-6 py-10 text-center">
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-foreground/85">{title}</h2>
-          <p className="mx-auto max-w-md text-sm leading-relaxed text-foreground/55">{subtitle}</p>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
+            {subtitle}
+          </p>
         </div>
         <PromptSuggestions
           title={t("chat.suggestions.title")}

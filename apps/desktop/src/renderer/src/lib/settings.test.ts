@@ -4,22 +4,34 @@ import { CHAT_REASONING_LEVELS, SettingKey } from "@shared/types";
 import { parseSettings } from "./settings";
 
 void describe("parseSettings", () => {
-  void it("uses the default Nova light skin", () => {
+  void it("uses the default White skin", () => {
     const settings = parseSettings({} as Record<string, string | null>);
 
     assert.equal(settings.language, "system");
-    assert.equal(settings.skin, "nova-light");
+    assert.equal(settings.skin, "white");
     assert.equal(settings.chatReasoningLevel, "provider-default");
   });
 
   void it("keeps explicit language and skin values", () => {
     const settings = parseSettings({
       [SettingKey.Language]: "zh-CN",
-      [SettingKey.Skin]: "ocean-light",
+      [SettingKey.Skin]: "ocean",
     } as Record<string, string | null>);
 
     assert.equal(settings.language, "zh-CN");
-    assert.equal(settings.skin, "ocean-light");
+    assert.equal(settings.skin, "ocean");
+
+    const legacyIds = [
+      ["nova-light", "white"],
+      ["nova-dark", "black"],
+      ["ocean-light", "ocean"],
+    ] as const;
+    for (const [legacy, expected] of legacyIds) {
+      const migrated = parseSettings({
+        [SettingKey.Skin]: legacy,
+      } as Record<string, string | null>);
+      assert.equal(migrated.skin, expected);
+    }
   });
 
   void it("rejects invalid enum values", () => {
@@ -30,7 +42,7 @@ void describe("parseSettings", () => {
     } as Record<string, string | null>);
 
     assert.equal(settings.language, "system");
-    assert.equal(settings.skin, "nova-light");
+    assert.equal(settings.skin, "white");
     assert.equal(settings.chatReasoningLevel, "provider-default");
   });
 

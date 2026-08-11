@@ -110,7 +110,7 @@ export function ChainOfThought({
       open={resolvedOpen}
       onOpenChange={handleOpenChange}
       className={cn(
-        "group/cot overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/[0.025]",
+        "group/cot overflow-hidden rounded-lg border border-border bg-muted/30",
         className,
       )}
       {...rest}
@@ -119,19 +119,19 @@ export function ChainOfThought({
         data-slot="chain-of-thought-trigger"
         className={cn(
           "flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-xs font-medium",
-          "hover:bg-foreground/[0.04]",
+          "hover:bg-muted/60",
         )}
       >
-        <span className="flex size-6 items-center justify-center rounded-md bg-accent/12 text-accent">
+        <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
           <IconBrain className="size-3.5" />
         </span>
-        <span className="flex-1 truncate text-foreground/80">{resolvedTitle}</span>
-        <AnimatedDisclosureChevron className="flex size-3.5 shrink-0 items-center justify-center text-foreground/45">
+        <span className="flex-1 truncate text-foreground">{resolvedTitle}</span>
+        <AnimatedDisclosureChevron className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
           <IconChevronDown className="size-3.5" />
         </AnimatedDisclosureChevron>
       </AnimatedDisclosureTrigger>
-      <AnimatedDisclosureContent innerClassName="border-t border-foreground/10 px-2 py-2.5 text-xs">
-        <ol data-slot="chain-of-thought-content" className="relative space-y-1.5">
+      <AnimatedDisclosureContent innerClassName="border-t border-border px-2 py-2.5 text-xs">
+        <ol data-slot="chain-of-thought-content" className="relative flex flex-col gap-1.5">
           {children}
         </ol>
       </AnimatedDisclosureContent>
@@ -180,7 +180,7 @@ export function ChainOfThoughtStep({
       data-status={status}
       className={cn(
         "group/step relative flex flex-col gap-1.5 rounded-lg px-2 py-1.5 transition",
-        "hover:bg-foreground/[0.035]",
+        "hover:bg-muted/50",
         className,
       )}
       {...rest}
@@ -190,8 +190,8 @@ export function ChainOfThoughtStep({
           className={cn(
             "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
             status === "complete" && "border-success/30 bg-success/10 text-success",
-            status === "active" && "border-accent/40 bg-accent/12 text-accent",
-            status === "pending" && "border-foreground/15 bg-foreground/[0.05] text-foreground/45",
+            status === "active" && "border-primary/40 bg-primary/10 text-primary",
+            status === "pending" && "border-border bg-muted/50 text-muted-foreground",
             status === "error" && "border-danger/35 bg-danger/10 text-danger",
           )}
         >
@@ -206,13 +206,13 @@ export function ChainOfThoughtStep({
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="truncate text-[12px] font-medium text-foreground/85">{label}</p>
+          <p className="truncate text-[12px] font-medium text-foreground">{label}</p>
           {description ? (
-            <p className="text-[11px] leading-relaxed text-foreground/55">{description}</p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">{description}</p>
           ) : null}
         </div>
       </div>
-      {children ? <div className="ml-7 mt-0.5 space-y-1.5">{children}</div> : null}
+      {children ? <div className="ml-7 mt-0.5 flex flex-col gap-1.5">{children}</div> : null}
     </li>
   );
 }
@@ -264,15 +264,13 @@ export function ChainOfThoughtSearchResult({
   const safeHref = href ? sanitizeRichContentUrl(href, "link") : null;
   const content = (
     <>
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06] text-foreground/55">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <IconLink className="size-3" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {title ? (
-          <p className="truncate text-[12px] font-medium text-foreground/80">{title}</p>
-        ) : null}
+        {title ? <p className="truncate text-[12px] font-medium text-foreground">{title}</p> : null}
         {description ? (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-foreground/50">
+          <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -289,7 +287,7 @@ export function ChainOfThoughtSearchResult({
         target="_blank"
         rel="noreferrer noopener"
         className={cn(
-          "flex items-start gap-2 rounded-md border border-foreground/10 bg-background/60 px-2 py-1.5",
+          "flex items-start gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5",
           "transition hover:border-accent/35 hover:bg-accent/5",
           className,
         )}
@@ -303,7 +301,7 @@ export function ChainOfThoughtSearchResult({
     <div
       data-slot="chain-of-thought-search-result"
       className={cn(
-        "flex items-start gap-2 rounded-md border border-foreground/10 bg-background/60 px-2 py-1.5",
+        "flex items-start gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5",
         className,
       )}
       {...rest}
@@ -333,10 +331,7 @@ export function ChainOfThoughtImage({
   return (
     <figure
       data-slot="chain-of-thought-image"
-      className={cn(
-        "overflow-hidden rounded-md border border-foreground/10 bg-background/60",
-        className,
-      )}
+      className={cn("overflow-hidden rounded-md border border-border bg-background/60", className)}
       {...rest}
     >
       {safeSrc ? (
@@ -347,10 +342,10 @@ export function ChainOfThoughtImage({
           className="block max-h-48 w-full object-cover"
         />
       ) : (
-        <div className="px-2 py-3 text-[10.5px] text-foreground/50">{alt ?? ""}</div>
+        <div className="px-2 py-3 text-[10.5px] text-muted-foreground">{alt ?? ""}</div>
       )}
       {caption ? (
-        <figcaption className="border-t border-foreground/10 px-2 py-1 text-[10.5px] text-foreground/55">
+        <figcaption className="border-t border-border px-2 py-1 text-[10.5px] text-muted-foreground">
           {caption}
         </figcaption>
       ) : null}

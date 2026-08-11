@@ -88,9 +88,9 @@ export function EditableMessage({
         placeholder={placeholderText}
         rows={1}
         className={cn(
-          "w-full resize-none rounded-2xl border border-foreground/15 bg-background/95 px-4 py-2.5",
-          "text-sm leading-relaxed text-foreground placeholder:text-foreground/40",
-          "focus:border-accent/45 focus:outline-none focus:ring-4 focus:ring-accent/10",
+          "w-full resize-none rounded-md border border-input bg-background px-4 py-2.5",
+          "text-sm leading-relaxed text-foreground placeholder:text-muted-foreground",
+          "focus:border-ring focus:outline-none focus:ring-4 focus:ring-ring/10",
         )}
       />
       <div className="flex items-center justify-end gap-1.5">
@@ -98,7 +98,7 @@ export function EditableMessage({
           type="button"
           onClick={onCancel}
           disabled={isSaving}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground/55 transition hover:bg-foreground/10 hover:text-foreground"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <IconClose className="size-3" />
           {t("common.cancel")}
@@ -110,8 +110,8 @@ export function EditableMessage({
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition",
             canSave
-              ? "bg-accent/12 text-accent hover:bg-accent/20"
-              : "bg-foreground/[0.04] text-foreground/30",
+              ? "bg-primary/10 text-primary hover:bg-primary/15"
+              : "bg-muted text-muted-foreground",
           )}
         >
           <IconCheck className="size-3" />

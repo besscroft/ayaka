@@ -3,6 +3,10 @@ import {
   Button,
   Chip,
   Popover,
+  PopoverContent,
+  PopoverDialog,
+  PopoverHeading,
+  PopoverTrigger,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -141,7 +145,7 @@ export function ToolSelector({
     <Popover>
       <Tooltip>
         <TooltipTrigger>
-          <Popover.Trigger>
+          <PopoverTrigger>
             <Button
               type="button"
               isIconOnly
@@ -161,22 +165,23 @@ export function ToolSelector({
                 </span>
               ) : null}
             </Button>
-          </Popover.Trigger>
+          </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>{summary}</TooltipContent>
       </Tooltip>
 
-      <Popover.Content
-        placement="top start"
-        offset={10}
-        className="z-[1000] w-[420px] max-w-[calc(100vw-1rem)] select-none overflow-hidden rounded-xl border border-foreground/10 bg-background p-0 shadow-2xl"
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={10}
+        className="z-[1000] w-[420px] max-w-[calc(100vw-1rem)] select-none overflow-hidden rounded-lg border border-border bg-popover p-0 shadow-lg"
       >
-        <Popover.Dialog className="flex max-h-[min(560px,calc(100vh-7rem))] min-w-0 flex-col bg-background outline-none">
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-4 py-3">
+        <PopoverDialog className="flex max-h-[min(560px,calc(100vh-7rem))] min-w-0 flex-col bg-background outline-none">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
-              <Popover.Heading className="text-sm font-semibold text-foreground">
+              <PopoverHeading className="text-sm font-semibold text-foreground">
                 {t("chatTools.selector.title")}
-              </Popover.Heading>
+              </PopoverHeading>
               <p className="mt-0.5 max-w-[30rem] text-xs leading-relaxed text-foreground/55">
                 {t("chatTools.selector.description")}
               </p>
@@ -221,12 +226,12 @@ export function ToolSelector({
           </div>
 
           {selection.mode === "manual" ? (
-            <div className="shrink-0 border-t border-foreground/10 px-4 py-3">
+            <div className="shrink-0 border-t border-border px-4 py-3">
               <ActiveToolChips descriptors={descriptors} ids={activeToolIds} />
             </div>
           ) : null}
-        </Popover.Dialog>
-      </Popover.Content>
+        </PopoverDialog>
+      </PopoverContent>
     </Popover>
   );
 }
@@ -259,9 +264,9 @@ function ManualToolGroup({
               "flex min-h-[4.5rem] w-full min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition",
               selected
                 ? "border-accent/35 bg-accent/10 text-foreground"
-                : "border-foreground/10 bg-background text-foreground hover:border-foreground/20 hover:bg-foreground/[0.035]",
+                : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted",
               !descriptor.available &&
-                "cursor-not-allowed border-foreground/10 bg-foreground/[0.025] text-foreground/45 hover:border-foreground/10 hover:bg-foreground/[0.025]",
+                "cursor-not-allowed border-border bg-muted text-muted-foreground hover:border-border hover:bg-muted",
             )}
           >
             <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-accent">
@@ -314,7 +319,7 @@ function AutoToolList({
               "flex min-w-0 items-start gap-2 rounded-md border px-2.5 py-2",
               enabled
                 ? "border-accent/20 bg-accent/5 text-foreground"
-                : "border-foreground/10 bg-foreground/[0.025] text-foreground/55",
+                : "border-border bg-muted text-muted-foreground",
             )}
           >
             <Icon className="mt-0.5 size-3.5 shrink-0" />

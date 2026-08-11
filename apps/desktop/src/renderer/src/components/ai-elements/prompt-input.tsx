@@ -183,7 +183,7 @@ export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTe
         className={cn(
           "block w-full max-h-[152px] min-h-16 resize-none overflow-hidden bg-transparent",
           "text-[15px] leading-6 text-foreground outline-none",
-          "placeholder:text-foreground/35",
+          "placeholder:text-muted-foreground",
           "disabled:cursor-not-allowed disabled:opacity-70",
           className,
         )}
@@ -228,11 +228,11 @@ export function PromptInputSubmit({
       disabled={computedDisabled}
       aria-label={rest["aria-label"] ?? (isLoading ? t("input.stop") : t("input.send"))}
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-xl",
+        "flex size-8 shrink-0 items-center justify-center rounded-md",
         "border border-transparent transition",
         computedDisabled
-          ? "bg-foreground/10 text-foreground/35"
-          : "bg-accent text-accent-foreground shadow-lg shadow-accent/20 hover:brightness-110",
+          ? "bg-muted text-muted-foreground"
+          : "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         className,
       )}
       {...rest}

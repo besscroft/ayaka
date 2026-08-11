@@ -67,9 +67,7 @@ export function QuickReactions({
               title={t("ai.quickReactions.reactWith", { emoji })}
               className={cn(
                 "flex size-7 items-center justify-center rounded-full text-base transition-colors",
-                selected
-                  ? "bg-accent/15 text-foreground ring-1 ring-accent/30"
-                  : "hover:bg-foreground/10",
+                selected ? "bg-accent/15 text-foreground ring-1 ring-accent/30" : "hover:bg-muted",
               )}
             >
               {emoji}

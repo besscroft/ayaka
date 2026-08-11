@@ -190,7 +190,7 @@ export function DesktopPetsSettings(): React.JSX.Element {
 
   return (
     <section className="-mx-5 -my-4 flex min-h-0 flex-1 select-none flex-col overflow-hidden [&_input]:select-text [&_textarea]:select-text">
-      <header className="shrink-0 border-b border-foreground/10 px-6">
+      <header className="shrink-0 border-b border-border px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs value={view} onValueChange={(next) => setView(next as PageView)} className="py-3">
             <TabsList aria-label={t("pets.title")}>
@@ -212,8 +212,8 @@ export function DesktopPetsSettings(): React.JSX.Element {
         </div>
 
         {view === "installed" ? (
-          <div className="border-t border-foreground/10 pb-3 pt-3">
-            <div className="grid gap-3 rounded-lg bg-foreground/[0.035] p-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-center">
+          <div className="border-t border-border pb-3 pt-3">
+            <div className="grid gap-3 rounded-lg bg-muted p-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-center">
               <div className="flex h-20 items-center justify-center rounded-md bg-background/75">
                 {selectedPet?.available ? (
                   <PetSprite pet={selectedPet} animate />
@@ -354,7 +354,7 @@ function InstalledPets({
   return (
     <>
       {loadError ? (
-        <div className="mb-5 rounded-xl bg-foreground/[0.035] px-5 py-8 text-center">
+        <div className="mb-5 rounded-lg bg-muted px-5 py-8 text-center">
           <IconRefresh className="mx-auto size-7 text-foreground/25" />
           <p className="mt-3 text-sm font-medium">{t("pets.library.title")}</p>
           <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
@@ -371,8 +371,8 @@ function InstalledPets({
         {pets.map((pet) => (
           <article
             key={pet.selector}
-            className={`group relative flex min-h-60 flex-col overflow-hidden rounded-xl bg-foreground/[0.035] transition duration-200 ${
-              selected === pet.selector ? "ring-2 ring-accent/60" : "hover:bg-foreground/[0.065]"
+            className={`group relative flex min-h-60 flex-col overflow-hidden rounded-lg bg-muted transition duration-200 ${
+              selected === pet.selector ? "ring-2 ring-ring" : "hover:bg-accent"
             }`}
           >
             <button
@@ -453,7 +453,7 @@ function StorePets({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 select-none px-6 pb-5 pt-5">
-        <div className="flex flex-col gap-3 rounded-xl bg-foreground/[0.035] p-3">
+        <div className="flex flex-col gap-3 rounded-lg bg-muted p-3">
           <form
             className="flex gap-2"
             onSubmit={(event) => {
@@ -467,7 +467,7 @@ function StorePets({
                 value={draft}
                 onChange={(event) => onDraft(event.target.value)}
                 placeholder={t("pets.store.search")}
-                className="h-9 w-full select-text rounded-md border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none transition focus:border-accent/55 focus:ring-2 focus:ring-accent/15"
+                className="h-9 w-full select-text rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
             </label>
             <Button type="submit" size="sm" variant="primary">
@@ -516,7 +516,7 @@ function StorePets({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         {error ? (
-          <div className="rounded-xl bg-foreground/[0.035] px-5 py-10 text-center">
+          <div className="rounded-lg bg-muted px-5 py-10 text-center">
             <IconGlobe className="mx-auto size-7 text-foreground/25" />
             <p className="mt-3 text-sm font-medium">{t("pets.store.unavailable")}</p>
             <Button className="mt-4" size="sm" variant="secondary" onPress={onRetry}>
@@ -527,7 +527,7 @@ function StorePets({
         ) : loading ? (
           <StoreSkeleton />
         ) : page.pets.length === 0 ? (
-          <div className="rounded-xl bg-foreground/[0.035] px-5 py-12 text-center text-sm text-foreground/50">
+          <div className="rounded-lg bg-muted px-5 py-12 text-center text-sm text-muted-foreground">
             {t("pets.store.empty")}
           </div>
         ) : (
@@ -535,7 +535,7 @@ function StorePets({
             {page.pets.map((pet) => (
               <article
                 key={pet.id}
-                className="flex min-h-72 flex-col overflow-hidden rounded-xl bg-foreground/[0.035] transition hover:bg-foreground/[0.06]"
+                className="flex min-h-72 flex-col overflow-hidden rounded-lg bg-muted transition hover:bg-accent"
               >
                 <div className="relative flex h-36 items-center justify-center overflow-hidden bg-background/70">
                   <img
@@ -680,7 +680,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-8 rounded-md border border-foreground/10 bg-background px-2 text-xs text-foreground outline-none focus:border-accent/55"
+        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-ring"
       >
         {options.map(([id, text]) => (
           <option key={id} value={id}>
@@ -695,11 +695,11 @@ function FilterSelect({
 function PetsSkeleton(): React.JSX.Element {
   return (
     <div className="flex flex-1 select-none animate-pulse flex-col gap-4 p-6">
-      <div className="h-7 w-40 rounded bg-foreground/10" />
-      <div className="h-40 rounded-xl bg-foreground/[0.06]" />
+      <div className="h-7 w-40 rounded bg-muted" />
+      <div className="h-40 rounded-lg bg-muted" />
       <div className="grid grid-cols-3 gap-3">
         {[0, 1, 2].map((id) => (
-          <div key={id} className="h-52 rounded-xl bg-foreground/[0.06]" />
+          <div key={id} className="h-52 rounded-lg bg-muted" />
         ))}
       </div>
     </div>
@@ -710,7 +710,7 @@ function StoreSkeleton(): React.JSX.Element {
   return (
     <div className="grid animate-pulse grid-cols-2 gap-3 lg:grid-cols-3">
       {[0, 1, 2, 3, 4, 5].map((id) => (
-        <div key={id} className="h-72 rounded-xl bg-foreground/[0.055]" />
+        <div key={id} className="h-72 rounded-lg bg-muted" />
       ))}
     </div>
   );

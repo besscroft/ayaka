@@ -114,20 +114,23 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
     }
     case "code":
       return (
-        <div key={key} className="overflow-hidden rounded-lg border border-foreground/10">
+        <div key={key} className="overflow-hidden rounded-lg border border-border">
           {block.lang ? (
-            <div className="border-b border-foreground/10 bg-foreground/[0.04] px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-foreground/45">
+            <div className="border-b border-border bg-muted px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {block.lang}
             </div>
           ) : null}
-          <pre className="m-0 max-w-full overflow-x-auto bg-foreground/[0.035] p-3 text-[12px] leading-6">
+          <pre className="m-0 max-w-full overflow-x-auto bg-muted/50 p-3 text-[12px] leading-6">
             <code className="bg-transparent p-0 font-mono font-normal">{block.code}</code>
           </pre>
         </div>
       );
     case "blockquote":
       return (
-        <blockquote key={key} className="m-0 border-l-2 border-accent/60 pl-3 text-foreground/70">
+        <blockquote
+          key={key}
+          className="m-0 border-l-2 border-primary/60 pl-3 text-muted-foreground"
+        >
           {block.text.split(/\n{2,}/).map((paragraph, index) => (
             <p key={`${key}-q-${index}`} className={cn("m-0", index > 0 && "mt-2")}>
               {renderInlineMarkdown(paragraph, `${key}-q-${index}`)}
@@ -141,14 +144,14 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
         <Tag
           key={key}
           className={cn(
-            "m-0 space-y-1 pl-5 leading-7",
+            "m-0 flex flex-col gap-1 pl-5 leading-7",
             block.ordered ? "list-decimal" : "list-disc",
           )}
         >
           {block.items.map((item, index) => (
             <li key={`${key}-item-${index}`} className="pl-1">
               {item.checked !== undefined ? (
-                <span className="-ml-5 mr-2 inline-flex size-4 translate-y-0.5 items-center justify-center rounded border border-foreground/20 bg-foreground/[0.04] text-[10px]">
+                <span className="-ml-5 mr-2 inline-flex size-4 translate-y-0.5 items-center justify-center rounded border border-border bg-muted text-[10px]">
                   {item.checked ? "✓" : ""}
                 </span>
               ) : null}
@@ -160,17 +163,14 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
     }
     case "table":
       return (
-        <div
-          key={key}
-          className="max-w-full overflow-x-auto rounded-lg border border-foreground/10"
-        >
+        <div key={key} className="max-w-full overflow-x-auto rounded-lg border border-border">
           <table className="w-full border-collapse text-left text-xs">
-            <thead className="bg-foreground/[0.04] text-foreground/65">
+            <thead className="bg-muted text-muted-foreground">
               <tr>
                 {block.headers.map((header, index) => (
                   <th
                     key={`${key}-th-${index}`}
-                    className="border-b border-foreground/10 px-3 py-2 font-semibold"
+                    className="border-b border-border px-3 py-2 font-semibold"
                   >
                     {renderInlineMarkdown(header, `${key}-th-${index}`)}
                   </th>
@@ -179,7 +179,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
             </thead>
             <tbody>
               {block.rows.map((row, rowIndex) => (
-                <tr key={`${key}-tr-${rowIndex}`} className="border-t border-foreground/8">
+                <tr key={`${key}-tr-${rowIndex}`} className="border-t border-border">
                   {row.map((cell, cellIndex) => (
                     <td key={`${key}-td-${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top">
                       {renderInlineMarkdown(cell, `${key}-td-${rowIndex}-${cellIndex}`)}
@@ -194,7 +194,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
     case "html":
       return <SafeHtml key={key} html={block.html} />;
     case "hr":
-      return <hr key={key} className="my-1 border-foreground/10" />;
+      return <hr key={key} className="my-1 border-border" />;
   }
 }
 
@@ -370,8 +370,7 @@ function getSafeHtmlProps(tag: string, element: HTMLElement): Record<string, unk
         loading: "lazy",
         decoding: "async",
         draggable: false,
-        className:
-          "my-2 max-h-[520px] max-w-full rounded-lg border border-foreground/10 object-contain",
+        className: "my-2 max-h-[520px] max-w-full rounded-lg border border-border object-contain",
       };
     }
     case "audio": {
@@ -394,7 +393,7 @@ function getSafeHtmlProps(tag: string, element: HTMLElement): Record<string, unk
         controls: true,
         preload: "metadata",
         className:
-          "my-2 aspect-video max-h-[560px] w-full rounded-lg border border-foreground/10 bg-black object-contain",
+          "my-2 aspect-video max-h-[560px] w-full rounded-lg border border-border bg-black object-contain",
       };
     }
     case "source": {
@@ -426,7 +425,7 @@ function MediaEmbed({
 
   if (kind === "audio") {
     return (
-      <span className="my-2 block rounded-lg border border-foreground/10 bg-foreground/[0.035] p-2">
+      <span className="my-2 block rounded-lg border border-border bg-muted p-2">
         {title || alt ? (
           <span className="mb-1 block truncate text-xs font-medium text-foreground/65">
             {title || alt}
@@ -439,7 +438,7 @@ function MediaEmbed({
 
   if (kind === "video") {
     return (
-      <span className="my-2 block overflow-hidden rounded-lg border border-foreground/10 bg-foreground/[0.035]">
+      <span className="my-2 block overflow-hidden rounded-lg border border-border bg-muted">
         <video
           controls
           src={src}
@@ -460,7 +459,7 @@ function MediaEmbed({
       href={src}
       target="_blank"
       rel="noreferrer noopener"
-      className="my-2 block w-fit max-w-full overflow-hidden rounded-lg border border-foreground/10 bg-foreground/[0.035]"
+      className="my-2 block w-fit max-w-full overflow-hidden rounded-lg border border-border bg-muted"
       title={title || alt}
     >
       <img src={src} alt={alt} loading="lazy" className="max-h-[520px] max-w-full object-contain" />
@@ -511,27 +510,27 @@ function htmlClassName(tag: string): string | undefined {
     case "h6":
       return headingClass(4);
     case "ul":
-      return "m-0 list-disc space-y-1 pl-5 leading-7";
+      return "m-0 list-disc pl-5 leading-7 [&>li+li]:mt-1";
     case "ol":
-      return "m-0 list-decimal space-y-1 pl-5 leading-7";
+      return "m-0 list-decimal pl-5 leading-7 [&>li+li]:mt-1";
     case "li":
       return "pl-1";
     case "blockquote":
       return "m-0 border-l-2 border-accent/60 pl-3 text-foreground/70";
     case "pre":
-      return "m-0 max-w-full overflow-x-auto rounded-lg border border-foreground/10 bg-foreground/[0.035] p-3 text-[12px] leading-6";
+      return "m-0 max-w-full overflow-x-auto rounded-lg border border-border bg-muted p-3 text-[12px] leading-6";
     case "code":
       return "font-mono";
     case "table":
       return "w-full border-collapse text-left text-xs";
     case "thead":
-      return "bg-foreground/[0.04] text-foreground/65";
+      return "bg-muted text-foreground/65";
     case "th":
-      return "border-b border-foreground/10 px-3 py-2 font-semibold";
+      return "border-b border-border px-3 py-2 font-semibold";
     case "td":
-      return "border-t border-foreground/10 px-3 py-2 align-top";
+      return "border-t border-border px-3 py-2 align-top";
     case "hr":
-      return "my-1 border-foreground/10";
+      return "my-1 border-border";
     case "mark":
       return "rounded bg-warning/20 px-1 text-foreground";
     default:

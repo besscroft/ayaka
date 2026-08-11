@@ -6,7 +6,7 @@ import App, { AppProviders } from "./App";
 import { DesktopPetApp } from "./components/DesktopPetApp";
 import { applySkin } from "./lib/theme";
 
-applySkin("nova-light");
+applySkin("white");
 
 const surface = new URLSearchParams(window.location.search).get("surface");
 document.documentElement.dataset.surface = surface === "pet" ? "pet" : "main";
