@@ -373,6 +373,7 @@ export const api = {
   system: {
     locale: (): Promise<string> => assertApi().system.locale(),
     version: (): Promise<string> => assertApi().system.version(),
+    changelog: (): Promise<string> => assertApi().system.changelog(),
     onPetOpenSettings: (handler: () => void): (() => void) =>
       assertApi().system.onPetOpenSettings(handler),
     onPetOpenAbout: (handler: () => void): (() => void) =>

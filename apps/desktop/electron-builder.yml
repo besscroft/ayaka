@@ -16,6 +16,8 @@ extraResources:
   - from: drizzle
     to: drizzle
     filter: ["**/*"]
+  - from: ../CHANGELOG.md
+    to: CHANGELOG.md
 win:
   executableName: desktop
   icon: build/icon.ico

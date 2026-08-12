@@ -3,6 +3,11 @@ import type { AppLanguage } from "@shared/types";
 export type Dict = Record<string, string>;
 
 const entries = {
+  "about.action.changelog": { zh: "更新日志", en: "Update log" },
+  "about.changelog.title": { zh: "更新日志", en: "Update log" },
+  "about.changelog.loading": { zh: "正在加载更新日志...", en: "Loading update log..." },
+  "about.changelog.error": { zh: "无法加载更新日志。", en: "Could not load the update log." },
+  "about.changelog.retry": { zh: "重试", en: "Retry" },
   "common.refresh": { zh: "\u5237\u65b0", en: "Refresh" },
   "settings.tab.workspace": { zh: "\u5de5\u4f5c\u533a", en: "Workspace" },
   "workspace.title": { zh: "\u5bf9\u8bdd\u5de5\u4f5c\u533a", en: "Conversation workspaces" },

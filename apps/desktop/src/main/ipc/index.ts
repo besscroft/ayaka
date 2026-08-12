@@ -142,6 +142,7 @@ import {
   selectWorkspaceParent,
 } from "../lib/conversation-workspace";
 import { updateManager } from "../lib/update-manager";
+import { readChangelog } from "../lib/changelog";
 
 /**
  * IPC handlers 娉ㄥ唽
@@ -626,6 +627,13 @@ export function registerIpcHandlers(): void {
   // ---------- System information ----------
   ipcMain.handle("system:locale", () => app.getLocale());
   ipcMain.handle("system:version", () => app.getVersion());
+  ipcMain.handle("system:changelog", () =>
+    readChangelog({
+      isDev: process.env.VOID_AI_DEV === "1",
+      appPath: process.env.VOID_AI_APP_PATH ?? app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+    }),
+  );
 }
 
 /** 瀵煎嚭绫诲瀷渚?preload 浣跨敤 */

@@ -2,14 +2,25 @@ import { useEffect, useState } from "react";
 import appIcon from "../../../../resources/icon.png";
 import { api } from "../lib/api";
 import { ABOUT_RESOURCES, normalizeAppVersion, type AboutResourceId } from "../lib/about";
+import { selectChangelogLanguage } from "../lib/changelog";
 import { useT } from "../lib/i18n";
 import type { UpdateState } from "@shared/types";
 import { Button, Description, LoadingIndicator } from "./ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { RichContent } from "./ai-elements/rich-content";
 import {
   IconArrowDown,
   IconBookOpen,
   IconBug,
   IconGitFork,
+  IconHistory,
   IconRefresh,
   IconRotateCcw,
 } from "./icons";
@@ -21,9 +32,31 @@ const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
 };
 
 export function AboutSettings(): React.JSX.Element {
-  const { t, f } = useT();
+  const { t, f, locale } = useT();
   const [version, setVersion] = useState<string | null | undefined>(undefined);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [changelogRetry, setChangelogRetry] = useState(0);
+  const [changelogState, setChangelogState] = useState<
+    { status: "loading" } | { status: "loaded"; content: string } | { status: "error" }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    if (!changelogOpen) return;
+    let cancelled = false;
+    setChangelogState({ status: "loading" });
+    void api.system.changelog().then(
+      (content) => {
+        if (!cancelled) setChangelogState({ status: "loaded", content });
+      },
+      () => {
+        if (!cancelled) setChangelogState({ status: "error" });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [changelogOpen, changelogRetry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +149,10 @@ export function AboutSettings(): React.JSX.Element {
       <div className="mt-8 flex flex-col gap-3">
         <h4 className="text-sm font-medium">{t("about.resources")}</h4>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onPress={() => setChangelogOpen(true)}>
+            <IconHistory data-icon="inline-start" aria-hidden="true" />
+            {t("about.action.changelog")}
+          </Button>
           {ABOUT_RESOURCES.map((resource) => {
             const Icon = RESOURCE_ICONS[resource.id];
             return (
@@ -224,6 +261,51 @@ export function AboutSettings(): React.JSX.Element {
       ) : null}
 
       <p className="mt-8 text-xs text-muted-foreground">Copyright (c) 2026 ZZZVoid</p>
+
+      <Dialog
+        open={changelogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setChangelogOpen(false);
+            setChangelogState({ status: "loading" });
+          }
+        }}
+      >
+        <DialogContent className="max-h-[calc(100vh-32px)] w-[min(760px,calc(100vw-24px))] max-w-none p-0">
+          <DialogHeader>
+            <DialogTitle>{t("about.changelog.title")}</DialogTitle>
+            <DialogDescription>{t("about.description")}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {changelogState.status === "loading" ? (
+              <LoadingIndicator label={t("about.changelog.loading")} />
+            ) : null}
+            {changelogState.status === "loaded" ? (
+              <RichContent
+                value={selectChangelogLanguage(changelogState.content, locale)}
+                className="text-sm"
+              />
+            ) : null}
+            {changelogState.status === "error" ? (
+              <div className="flex flex-col items-start gap-3">
+                <Description className="text-danger">{t("about.changelog.error")}</Description>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setChangelogRetry((value) => value + 1)}
+                >
+                  {t("about.changelog.retry")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onPress={() => setChangelogOpen(false)}>
+              {t("common.done")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

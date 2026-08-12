@@ -22,6 +22,7 @@ import {
   GitFork,
   Globe,
   FolderOpen,
+  History,
   Image,
   Info,
   Key,
@@ -124,6 +125,7 @@ export const IconLink = fromLucide(Link);
 export const IconGitFork = fromLucide(GitFork);
 export const IconBookOpen = fromLucide(BookOpen);
 export const IconBug = fromLucide(Bug);
+export const IconHistory = fromLucide(History);
 export const IconStatusDot = (props: IconProps): React.JSX.Element => (
   <svg
     viewBox="0 0 24 24"

@@ -236,6 +236,7 @@ const api = {
   system: {
     locale: () => ipcRenderer.invoke("system:locale"),
     version: () => ipcRenderer.invoke("system:version"),
+    changelog: () => ipcRenderer.invoke("system:changelog"),
     onPetOpenSettings: (handler: () => void) => {
       const listener = (): void => handler();
       ipcRenderer.on("desktopPet:openSettings", listener);
