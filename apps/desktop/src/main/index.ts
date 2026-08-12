@@ -147,6 +147,9 @@ function quitApp(): void {
 
 // 应用就绪后初始化所有子系统
 void app.whenReady().then(async () => {
+  process.env.VOID_AI_USER_DATA_DIR ??= app.getPath("userData");
+  process.env.VOID_AI_APP_PATH ??= app.getAppPath();
+  process.env.VOID_AI_DEV = is.dev ? "1" : "0";
   electronApp.setAppUserModelId(WINDOWS_APP_ID);
   app.setName("Paimon");
 

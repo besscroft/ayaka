@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, createCipheriv, createDecipheriv } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { app } from "electron";
+import { resolveUserDataDir } from "./runtime-paths";
 
 /**
  * 主密钥文件名（存放在 userData 目录下，受文件系统权限保护）
@@ -27,7 +27,7 @@ let cachedMasterKey: Buffer | null = null;
 function getMasterKey(): Buffer {
   if (cachedMasterKey) return cachedMasterKey;
 
-  const keyPath = join(app.getPath("userData"), MASTER_KEY_FILENAME);
+  const keyPath = join(resolveUserDataDir(), MASTER_KEY_FILENAME);
   if (existsSync(keyPath)) {
     cachedMasterKey = readFileSync(keyPath);
     if (cachedMasterKey.length !== KEY_LEN) {
@@ -37,7 +37,7 @@ function getMasterKey(): Buffer {
   }
 
   // 首次创建：确保目录存在
-  const userDataDir = app.getPath("userData");
+  const userDataDir = resolveUserDataDir();
   if (!existsSync(userDataDir)) mkdirSync(userDataDir, { recursive: true });
 
   cachedMasterKey = randomBytes(KEY_LEN);
@@ -114,6 +114,6 @@ export function decrypt(payload: EncryptedPayload): string {
  */
 export function resetMasterKey(): void {
   cachedMasterKey = null;
-  const keyPath = join(app.getPath("userData"), MASTER_KEY_FILENAME);
+  const keyPath = join(resolveUserDataDir(), MASTER_KEY_FILENAME);
   if (existsSync(keyPath)) unlinkSync(keyPath);
 }

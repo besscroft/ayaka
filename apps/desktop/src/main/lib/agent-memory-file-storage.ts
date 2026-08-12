@@ -1,7 +1,7 @@
-import { app } from "electron";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_AGENT_ID } from "../../shared/types";
+import { resolveUserDataDir } from "./runtime-paths";
 
 const AGENT_MEMORIES_DIRNAME = "agent-memories";
 const SOUL_FILE_NAME = "SOUL.md.enc";
@@ -18,8 +18,7 @@ export function registerSoulCacheInvalidator(invalidator: (agentId: string) => v
 }
 
 export function resolveAgentMemoriesRoot(): string {
-  const userDataDir = process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData");
-  return join(userDataDir, "data", AGENT_MEMORIES_DIRNAME);
+  return join(resolveUserDataDir(), "data", AGENT_MEMORIES_DIRNAME);
 }
 
 export function resolveAgentSoulFilePaths(agentId: string): AgentSoulFilePaths {

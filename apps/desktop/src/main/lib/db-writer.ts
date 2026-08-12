@@ -1,7 +1,7 @@
 import { Worker } from "node:worker_threads";
-import { app } from "electron";
 import { join } from "node:path";
 import type { NewRuntimeEvent } from "./schema";
+import { resolveAppPath, resolveUserDataDir } from "./runtime-paths";
 
 type WriterMessage = {
   type: "ready" | "result" | "error" | "shutdown";
@@ -32,7 +32,7 @@ export function isDbWriterStarted(): boolean {
 }
 
 function resolveDbPath(): string {
-  const userData = process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData");
+  const userData = resolveUserDataDir();
   return join(userData, "data", "void-ai.db");
 }
 
@@ -52,6 +52,8 @@ export function startDbWriter(options: {
         role: "sqlite-writer",
         dbPath: options.dbPath ?? resolveDbPath(),
         migrationsFolder: options.migrationsFolder,
+        appPath: resolveAppPath(),
+        userDataDir: resolveUserDataDir(),
       },
     });
     worker = instance;

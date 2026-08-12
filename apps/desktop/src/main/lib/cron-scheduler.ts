@@ -47,7 +47,9 @@ export class CronScheduler {
 
   start(): void {
     if (this.timer) return;
-    void recoverCronJobs();
+    void recoverCronJobs().catch((error) => {
+      console.error("[cron] failed to recover jobs:", error);
+    });
     this.timer = setInterval(() => void this.tick(), this.pollIntervalMs);
     void this.tick();
   }
@@ -71,7 +73,11 @@ export class CronScheduler {
   async tick(now = Date.now()): Promise<void> {
     const capacity = this.maxConcurrency - this.running.size;
     if (capacity <= 0) return;
-    for (const claim of await claimDueCronJobs(now, capacity)) this.launch(claim);
+    try {
+      for (const claim of await claimDueCronJobs(now, capacity)) this.launch(claim);
+    } catch (error) {
+      console.error("[cron] failed to claim due jobs:", error);
+    }
   }
 
   private launch(claim: ClaimedCronRun): void {

@@ -1,12 +1,10 @@
 import Database from "better-sqlite3";
-import { app } from "electron";
-import { is } from "@electron-toolkit/utils";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, or } from "drizzle-orm";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { decrypt, encrypt, type EncryptedPayload } from "./crypto";
 import {
   DEFAULT_BUILTIN_TOOL_SEEDS,
@@ -129,9 +127,10 @@ import {
   type ToolSkillInput,
   type ToolsSnapshot,
 } from "../../shared/types";
-import { resolveDesktopPet } from "./desktop-pet-assets";
+import { resolveDesktopPet } from "./desktop-pet-resolver";
 import { applyDesktopPetIdleTimeout, resolveDesktopPetActivity } from "./desktop-pet-activity";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
+import { resolveUserDataDir } from "./runtime-paths";
 import {
   enqueueLowPriorityRuntimeEvent,
   flushDbWriter,
@@ -186,14 +185,14 @@ const agentRuntimeStates = new Map<string, AgentRuntimeState>();
 const conversationAgentStates = new Map<string, ConversationAgentState>();
 
 function resolveDataDir(): string {
-  const userDataDir = process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData");
+  const userDataDir = resolveUserDataDir();
   const dir = join(userDataDir, DATA_DIRNAME);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 function resolveMigrationsFolder(): string {
-  if (is.dev) {
+  if (process.env.VOID_AI_DEV === "1") {
     const candidates = [
       join(__dirname, "..", "..", "drizzle"),
       join(__dirname, "..", "..", "..", "drizzle"),
@@ -227,6 +226,8 @@ export function resolveMigrationsPath(): string {
 }
 
 function openAndMigrateDb(dbPath: string, options: DbInitOptions): DbInstance {
+  const parentDir = dirname(dbPath);
+  if (!existsSync(parentDir)) mkdirSync(parentDir, { recursive: true });
   rawDb = new Database(
     dbPath,
     options.readOnly ? { readonly: true, fileMustExist: true } : undefined,
