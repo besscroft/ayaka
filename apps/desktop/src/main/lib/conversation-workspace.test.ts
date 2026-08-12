@@ -127,6 +127,7 @@ void describe("conversation workspaces", () => {
     await writeFile(path.join(parent, "2026-08-12-conv-orphan", "keep.txt"), "keep");
     const orphans = await workspace.listWorkspaceOrphans();
     assert.equal(orphans.length, 1);
+    assert.equal(await workspace.openWorkspaceOrphan(orphans[0]!.id), true);
     assert.equal(await workspace.removeWorkspaceOrphan(orphans[0]!.id), true);
     assert.equal((await workspace.listWorkspaceOrphans()).length, 0);
     await assert.rejects(workspace.removeWorkspaceOrphan("missing-orphan"), /not found/);
@@ -141,7 +142,7 @@ void describe("conversation workspaces", () => {
     const deletedOrphans = await workspace.listWorkspaceOrphans();
     assert.equal(
       deletedOrphans.some((orphan) => orphan.name === path.basename(rootPath)),
-      true,
+      false,
     );
 
     await db.restoreConversation(id);

@@ -442,7 +442,7 @@ export async function deleteConversation(id: string): Promise<void> {
       .where(eq(conversations.id, id))
       .run();
     tx.update(conversationWorkspaces)
-      .set({ status: "orphaned", updated_at: now })
+      .set({ status: "active", updated_at: now })
       .where(eq(conversationWorkspaces.conversation_id, id))
       .run();
   });
@@ -494,8 +494,7 @@ export async function purgeExpiredDeletedConversations(now = Date.now()): Promis
   if (expired.length === 0) return 0;
   const ids = expired.map((conversation) => conversation.id);
   return getDb().transaction((tx) => {
-    tx.update(conversationWorkspaces)
-      .set({ status: "orphaned", updated_at: now })
+    tx.delete(conversationWorkspaces)
       .where(inArray(conversationWorkspaces.conversation_id, ids))
       .run();
     return tx.delete(conversations).where(inArray(conversations.id, ids)).run().changes;

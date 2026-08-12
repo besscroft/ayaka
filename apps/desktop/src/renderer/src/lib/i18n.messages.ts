@@ -45,6 +45,22 @@ const entries = {
     zh: "\u9009\u62e9\u5de5\u4f5c\u533a\u7236\u76ee\u5f55\u5931\u8d25",
     en: "Failed to choose workspace folder",
   },
+  "workspace.openFailed": {
+    zh: "\u6253\u5f00\u5de5\u4f5c\u533a\u5931\u8d25",
+    en: "Failed to open workspace",
+  },
+  "workspace.delete.title": {
+    zh: "\u5220\u9664\u5b64\u7acb\u5de5\u4f5c\u533a",
+    en: "Delete orphaned workspace",
+  },
+  "workspace.delete.message": {
+    zh: "\u786e\u5b9a\u5220\u9664\u201c{name}\u201d\uff1f\u5de5\u4f5c\u533a\u4e2d\u7684\u6587\u4ef6\u5c06\u88ab\u6c38\u4e45\u5220\u9664\uff0c\u6b64\u64cd\u4f5c\u65e0\u6cd5\u64a4\u9500\u3002",
+    en: 'Delete "{name}"? All files in this workspace will be permanently removed. This action cannot be undone.',
+  },
+  "workspace.deleteFailed": {
+    zh: "\u5220\u9664\u5de5\u4f5c\u533a\u5931\u8d25",
+    en: "Failed to delete workspace",
+  },
   "about.action.documentation": { zh: "\u6587\u6863", en: "Documentation" },
   "about.action.issues": { zh: "\u95ee\u9898\u53cd\u9988", en: "Issue tracker" },
   "agents.value.untilComplete": { zh: "直到任务完成或手动停止", en: "Until complete or stopped" },

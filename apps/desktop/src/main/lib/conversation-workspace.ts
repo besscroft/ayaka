@@ -349,13 +349,8 @@ export async function materializeWorkspaceFileReferences(
 
 export async function listWorkspaceOrphans(): Promise<WorkspaceOrphan[]> {
   const rows = listConversationWorkspaces();
-  const known = new Set(
-    rows.filter((row) => row.status === "active").map((row) => path.resolve(row.root_path)),
-  );
-  const parents = new Set(rows.map((row) => path.resolve(row.parent_path)));
-  parents.add(resolveDefaultWorkspaceParent());
-  const { getSetting } = await import("./db");
-  parents.add(normalizeWorkspaceParent(getSetting("workspace_parent_directory")));
+  const known = new Set(rows.map((row) => workspacePathKey(row.root_path)));
+  const parents = await getWorkspaceOrphanParents(rows);
   const result: WorkspaceOrphan[] = [];
   orphanPaths.clear();
   for (const parent of parents) {
@@ -363,7 +358,7 @@ export async function listWorkspaceOrphans(): Promise<WorkspaceOrphan[]> {
     for (const entry of await readdir(parent, { withFileTypes: true })) {
       if (!entry.isDirectory() || !entry.name.includes("-conv-")) continue;
       const rootPath = path.join(parent, entry.name);
-      if (known.has(path.resolve(rootPath))) continue;
+      if (known.has(workspacePathKey(rootPath))) continue;
       const info = await stat(rootPath);
       const id = randomUUID();
       orphanPaths.set(id, rootPath);
@@ -393,8 +388,37 @@ export async function removeWorkspaceOrphan(id: string): Promise<boolean> {
 }
 
 async function isCurrentOrphan(rootPath: string): Promise<boolean> {
-  const current = await listWorkspaceOrphans();
-  return current.some((item) => orphanPaths.get(item.id) === path.resolve(rootPath));
+  const resolvedRoot = path.resolve(rootPath);
+  const rows = listConversationWorkspaces();
+  const known = new Set(rows.map((row) => workspacePathKey(row.root_path)));
+  const parents = await getWorkspaceOrphanParents(rows);
+  if (
+    !new Set([...parents].map(workspacePathKey)).has(workspacePathKey(path.dirname(resolvedRoot)))
+  ) {
+    return false;
+  }
+  if (!path.basename(resolvedRoot).includes("-conv-")) return false;
+  if (known.has(workspacePathKey(resolvedRoot))) return false;
+  try {
+    return (await stat(resolvedRoot)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function getWorkspaceOrphanParents(
+  rows: ReturnType<typeof listConversationWorkspaces>,
+): Promise<Set<string>> {
+  const parents = new Set(rows.map((row) => path.resolve(row.parent_path)));
+  parents.add(resolveDefaultWorkspaceParent());
+  const { getSetting } = await import("./db");
+  parents.add(normalizeWorkspaceParent(getSetting("workspace_parent_directory")));
+  return parents;
+}
+
+function workspacePathKey(value: string): string {
+  const resolved = path.normalize(path.resolve(value));
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 function toWorkspaceInfo(row: {
