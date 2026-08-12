@@ -114,10 +114,14 @@ export class AgentLoopSession {
     return Math.max(1, this.maxDurationMs - (Date.now() - this.startedAt));
   }
 
-  enqueue(kind: AgentRunInputKind, source: AgentRunInputSource, message: UIMessage): AgentRunInput {
+  async enqueue(
+    kind: AgentRunInputKind,
+    source: AgentRunInputSource,
+    message: UIMessage,
+  ): Promise<AgentRunInput> {
     this.assertActive();
     this.appendMessages([message]);
-    const queued = enqueueAgentRunInput({ runId: this.runId, kind, source, message });
+    const queued = await enqueueAgentRunInput({ runId: this.runId, kind, source, message });
     insertRuntimeEvent({
       runId: this.runId,
       conversationId: this.conversationId,
@@ -129,9 +133,9 @@ export class AgentLoopSession {
     return queued;
   }
 
-  drain(kind: AgentRunInputKind): UIMessage[] {
+  async drain(kind: AgentRunInputKind): Promise<UIMessage[]> {
     this.assertActive();
-    const inputs = consumeAgentRunInputs(this.runId, kind);
+    const inputs = await consumeAgentRunInputs(this.runId, kind);
     for (const input of inputs) {
       insertRuntimeEvent({
         runId: this.runId,
@@ -158,14 +162,14 @@ export class AgentLoopSession {
     return true;
   }
 
-  markWaitingApproval(): void {
+  async markWaitingApproval(): Promise<void> {
     if (!this.isActive) return;
-    updateRuntimeRun(this.runId, { status: "waiting_approval" });
+    await updateRuntimeRun(this.runId, { status: "waiting_approval" });
   }
 
-  markRunning(): void {
+  async markRunning(): Promise<void> {
     if (!this.isActive) return;
-    updateRuntimeRun(this.runId, { status: "running" });
+    await updateRuntimeRun(this.runId, { status: "running" });
   }
 
   attachRuntime(handles: { coordinator: unknown; recorder: unknown }): void {
@@ -181,20 +185,20 @@ export class AgentLoopSession {
     }
   }
 
-  cancel(reason = "user_cancelled"): void {
+  async cancel(reason = "user_cancelled"): Promise<void> {
     if (this.closed) return;
     this.controller.abort(reason);
-    this.close("cancelled", "cancelled", reason);
+    await this.close("cancelled", "cancelled", reason);
   }
 
-  interrupt(reason = "application_interrupted"): void {
+  async interrupt(reason = "application_interrupted"): Promise<void> {
     if (this.closed) return;
     this.controller.abort(reason);
-    this.close("interrupted", "interrupted", reason);
+    await this.close("interrupted", "interrupted", reason);
   }
 
-  complete(outputSummary?: string, usage?: unknown): void {
-    this.close(
+  async complete(outputSummary?: string, usage?: unknown): Promise<void> {
+    await this.close(
       "succeeded",
       this.budgetReason ? "budget_exhausted" : "natural",
       this.budgetReason ?? undefined,
@@ -203,8 +207,8 @@ export class AgentLoopSession {
     );
   }
 
-  fail(error: string): void {
-    this.close("failed", "error", error);
+  async fail(error: string): Promise<void> {
+    await this.close("failed", "error", error);
   }
 
   private checkBudget(): AgentLoopBudgetReason | null {
@@ -220,18 +224,18 @@ export class AgentLoopSession {
     }
   }
 
-  private close(
+  private async close(
     status: "succeeded" | "failed" | "cancelled" | "interrupted",
     finishReason: NonNullable<RuntimeRun["finish_reason"]>,
     detail?: string,
     outputSummary?: string,
     usage?: unknown,
-  ): void {
+  ): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     const now = Date.now();
-    discardAgentRunInputs(this.runId, detail ?? finishReason, now);
-    updateRuntimeRun(this.runId, {
+    await discardAgentRunInputs(this.runId, detail ?? finishReason, now);
+    await updateRuntimeRun(this.runId, {
       status,
       finish_reason: finishReason,
       output_summary: outputSummary,
@@ -256,7 +260,7 @@ export class AgentLoopSession {
 export class AgentLoopSessionManager {
   private readonly sessions = new Map<string, AgentLoopSession>();
 
-  start(options: AgentLoopSessionOptions): AgentLoopSession {
+  async start(options: AgentLoopSessionOptions): Promise<AgentLoopSession> {
     const mode = options.mode ?? "start";
     const active = this.sessions.get(options.runId);
     if (active) {
@@ -272,7 +276,7 @@ export class AgentLoopSessionManager {
           "Agent run belongs to a different conversation.",
         );
       }
-      active.markRunning();
+      await active.markRunning();
       active.appendMessages(options.messages ?? []);
       return active;
     }
@@ -310,7 +314,7 @@ export class AgentLoopSessionManager {
         `Conversation already has active agent run '${busy.id}'.`,
       );
     }
-    const run = createRuntimeRun({
+    const run = await createRuntimeRun({
       id: options.runId,
       conversation_id: options.conversationId ?? null,
       root_agent_id: options.rootAgentId,
@@ -342,12 +346,12 @@ export class AgentLoopSessionManager {
     return false;
   }
 
-  enqueue(
+  async enqueue(
     runId: string,
     kind: AgentRunInputKind,
     source: AgentRunInputSource,
     message: UIMessage,
-  ): AgentRunInput {
+  ): Promise<AgentRunInput> {
     const session = this.sessions.get(runId);
     if (!session) {
       throw new AgentLoopSessionError("run_not_active", `Agent run '${runId}' is not active.`);
@@ -359,15 +363,15 @@ export class AgentLoopSessionManager {
     return this.enqueue(runId, "follow_up", source, message);
   }
 
-  cancel(runId: string): boolean {
+  async cancel(runId: string): Promise<boolean> {
     const session = this.sessions.get(runId);
     if (!session) return false;
-    session.cancel();
+    await session.cancel();
     return true;
   }
 
-  interruptAll(): void {
-    for (const session of this.sessions.values()) session.interrupt();
+  async interruptAll(): Promise<void> {
+    await Promise.all([...this.sessions.values()].map((session) => session.interrupt()));
   }
 }
 

@@ -19,16 +19,22 @@ import type {
   JsonObject,
 } from "../../shared/types";
 import {
-  createSkillTool,
-  deleteSkillTool,
+  createSkillToolAsync as createSkillTool,
+  deleteSkillToolAsync as deleteSkillTool,
   getDb,
-  setSkillToolEnabled,
-  setToolServerEnabled,
-  updateSkillTool,
-  createToolServer,
-  setToolSecret,
-  updateToolServer,
-  permanentlyDeleteToolServer,
+  setSkillToolEnabledAsync as setSkillToolEnabled,
+  setToolServerEnabledAsync as setToolServerEnabled,
+  updateSkillToolAsync as updateSkillTool,
+  createToolServerAsync as createToolServer,
+  setToolSecretAsync as setToolSecret,
+  updateToolServerAsync as updateToolServer,
+  permanentlyDeleteToolServerAsync as permanentlyDeleteToolServer,
+  ensureBuiltinCatalogSources as ensureBuiltinCatalogSourcesDb,
+  cacheCatalogItems,
+  updateCatalogSource,
+  upsertArtifactInstallation,
+  updateArtifactInstallation,
+  deleteArtifactInstallation,
 } from "./db";
 import { artifactInstallations, catalogItems, catalogSources } from "./schema";
 import {
@@ -93,30 +99,15 @@ const MCP_SO_SOURCE: typeof catalogSources.$inferInsert = {
   updated_at: 0,
 };
 
-export function ensureBuiltinCatalogSources(now = Date.now()): void {
-  const db = getDb();
-  db.transaction((tx) => {
-    for (const source of [MODELSCOPE_SKILLS_SOURCE, SKILLS_SH_SOURCE, MCP_SO_SOURCE]) {
-      tx.insert(catalogSources)
-        .values({ ...source, created_at: now, updated_at: now })
-        .onConflictDoUpdate({
-          target: catalogSources.id,
-          set: {
-            name: source.name,
-            kind: source.kind,
-            url: source.url,
-            enabled: 1,
-            builtin: 1,
-            updated_at: now,
-          },
-        })
-        .run();
-    }
-  });
+export async function ensureBuiltinCatalogSources(now = Date.now()): Promise<void> {
+  await ensureBuiltinCatalogSourcesDb(
+    [MODELSCOPE_SKILLS_SOURCE, SKILLS_SH_SOURCE, MCP_SO_SOURCE],
+    now,
+  );
 }
 
-export function getCatalogSnapshot(): CatalogSnapshot {
-  ensureBuiltinCatalogSources();
+export async function getCatalogSnapshot(): Promise<CatalogSnapshot> {
+  await ensureBuiltinCatalogSources();
   return { installations: listArtifactInstallations() };
 }
 
@@ -124,7 +115,7 @@ export async function searchCatalogSkills(
   input: CatalogSearchInput = {},
 ): Promise<CatalogSearchResult> {
   if (input.artifactType === "mcp") throw new Error("Use the MCP catalog search for MCP items.");
-  ensureBuiltinCatalogSources();
+  await ensureBuiltinCatalogSources();
   const page = normalizeInteger(input.page, 1, 1, 1_000);
   const pageSize = normalizeInteger(input.pageSize, 48, 1, 100);
   const source =
@@ -147,8 +138,8 @@ export async function searchCatalogSkills(
         kind === "skills-sh"
           ? (result as Awaited<ReturnType<typeof searchSkillsShSkills>>).hasMore
           : page * pageSize < (result as Awaited<ReturnType<typeof searchModelScopeSkills>>).total;
-      cacheSourceItems(sourceIdForKind(kind), items);
-      setSourceSuccess(sourceIdForKind(kind));
+      await cacheSourceItems(sourceIdForKind(kind), items);
+      await setSourceSuccess(sourceIdForKind(kind));
       return {
         kind,
         items: catalogItemsInOrder(
@@ -161,15 +152,15 @@ export async function searchCatalogSkills(
   );
   const lists: CatalogItem[][] = [];
   const states: CatalogSourceState[] = [];
-  settled.forEach((result, index) => {
+  for (const [index, result] of settled.entries()) {
     const kind = requested[index]!;
     if (result.status === "fulfilled") {
       lists.push(result.value.items);
       states.push({ source: kind, status: "online", hasMore: result.value.hasMore });
-      return;
+      continue;
     }
     const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
-    setSourceError(sourceIdForKind(kind), message);
+    await setSourceError(sourceIdForKind(kind), message);
     const cached = searchCachedCatalogItems(sourceIdForKind(kind), query, page, pageSize);
     if (cached.length > 0) {
       lists.push(cached);
@@ -182,7 +173,7 @@ export async function searchCatalogSkills(
     } else {
       states.push({ source: kind, status: "error", hasMore: false, error: message });
     }
-  });
+  }
   const items = mergeCatalogItems(lists);
   if (items.length === 0 && states.every((state) => state.status === "error")) {
     throw new Error(
@@ -204,14 +195,14 @@ export async function searchCatalogSkills(
 export async function searchCatalogMcp(
   input: CatalogSearchInput = {},
 ): Promise<CatalogSearchResult> {
-  ensureBuiltinCatalogSources();
+  await ensureBuiltinCatalogSources();
   const page = normalizeInteger(input.page, 1, 1, 1_000);
   const pageSize = normalizeInteger(input.pageSize, 24, 1, 60);
   const query = input.query?.trim() ?? "";
   try {
     const result = await searchMcpSoServers({ ...input, artifactType: "mcp", page, pageSize });
-    cacheSourceItems(MCP_SO_SOURCE_ID, result.items, "mcp");
-    setSourceSuccess(MCP_SO_SOURCE_ID);
+    await cacheSourceItems(MCP_SO_SOURCE_ID, result.items, "mcp");
+    await setSourceSuccess(MCP_SO_SOURCE_ID);
     const onlineItems = catalogItemsInOrder(
       MCP_SO_SOURCE_ID,
       result.items.map((item) => item.externalId),
@@ -232,7 +223,7 @@ export async function searchCatalogMcp(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setSourceError(MCP_SO_SOURCE_ID, message);
+    await setSourceError(MCP_SO_SOURCE_ID, message);
     const cached = searchCachedCatalogItems(MCP_SO_SOURCE_ID, query, page, pageSize, input);
     if (cached.length === 0) throw error;
     return {
@@ -291,7 +282,7 @@ export async function getCatalogItemDetail(itemId: string): Promise<CatalogItemD
   if (item.artifact_type === "mcp") {
     try {
       const result = await getMcpSoServerDetail(item.external_id);
-      cacheSourceItems(MCP_SO_SOURCE_ID, [result.item], "mcp");
+      await cacheSourceItems(MCP_SO_SOURCE_ID, [result.item], "mcp");
       const hash = result.item.contentHash ?? item.content_hash ?? "";
       return {
         itemId,
@@ -341,48 +332,42 @@ export async function setArtifactInstallationEnabled(
   try {
     if (row.artifact_type === "skill") {
       if (!row.skill_id) throw new Error("Installed skill record is missing.");
-      setSkillToolEnabled(row.skill_id, enabled);
+      await setSkillToolEnabled(row.skill_id, enabled);
     } else {
       if (!row.tool_server_id) throw new Error("Installed MCP server record is missing.");
       if (enabled) {
         const discovery = await discoverMcpServer(row.tool_server_id);
         if (discovery.server.status === "error") throw new Error(discovery.message);
       }
-      setToolServerEnabled(row.tool_server_id, enabled);
+      await setToolServerEnabled(row.tool_server_id, enabled);
     }
   } catch (error) {
-    getDb()
-      .update(artifactInstallations)
-      .set({ status: "error", last_error: String(error).slice(0, 2_000), updated_at: Date.now() })
-      .where(eq(artifactInstallations.id, id))
-      .run();
+    await updateArtifactInstallation(id, {
+      status: "error",
+      last_error: String(error).slice(0, 2_000),
+      updated_at: Date.now(),
+    });
     throw error;
   }
-  getDb()
-    .update(artifactInstallations)
-    .set({
-      status: enabled ? "enabled" : "disabled",
-      safety_json: JSON.stringify({
-        ...parseJson(row.safety_json),
-        ...(enabled ? { reviewed: true, reviewedAt: Date.now() } : {}),
-      }),
-      last_error: null,
-      updated_at: Date.now(),
-    })
-    .where(eq(artifactInstallations.id, id))
-    .run();
+  await updateArtifactInstallation(id, {
+    status: enabled ? "enabled" : "disabled",
+    safety_json: JSON.stringify({
+      ...parseJson(row.safety_json),
+      ...(enabled ? { reviewed: true, reviewedAt: Date.now() } : {}),
+    }),
+    last_error: null,
+    updated_at: Date.now(),
+  });
   return toInstallation(requireInstallation(id));
 }
 
-export function uninstallArtifact(id: string): boolean {
+export async function uninstallArtifact(id: string): Promise<boolean> {
   const row = requireInstallation(id);
-  if (row.skill_id) deleteSkillTool(row.skill_id);
-  if (row.tool_server_id) permanentlyDeleteToolServer(row.tool_server_id);
+  if (row.skill_id) await deleteSkillTool(row.skill_id);
+  if (row.tool_server_id) await permanentlyDeleteToolServer(row.tool_server_id);
   if (row.install_path && existsSync(row.install_path))
     rmSync(row.install_path, { recursive: true, force: true });
-  return (
-    getDb().delete(artifactInstallations).where(eq(artifactInstallations.id, id)).run().changes > 0
-  );
+  return deleteArtifactInstallation(id);
 }
 
 async function installSkillItem(
@@ -400,7 +385,7 @@ async function installSkillItem(
     .where(eq(artifactInstallations.id, installationId))
     .get();
   const skill = existing?.skill_id
-    ? updateSkillTool(existing.skill_id, {
+    ? await updateSkillTool(existing.skill_id, {
         name: inspected.name,
         description: inspected.description,
         instructions: inspected.markdown,
@@ -411,7 +396,7 @@ async function installSkillItem(
           sourceItemId: item.id,
         },
       })
-    : createSkillTool({
+    : await createSkillTool({
         name: inspected.name,
         description: inspected.description,
         instructions: inspected.markdown,
@@ -458,7 +443,7 @@ async function installSkillItem(
     installed_at: existing?.installed_at ?? now,
     updated_at: now,
   };
-  upsertInstallation(row);
+  await upsertInstallation(row);
   if (input.enable) return await setArtifactInstallationEnabled(installationId, true);
   return toInstallation(requireInstallation(installationId));
 }
@@ -496,12 +481,12 @@ async function installMcpItem(
   let server;
   if (existing?.tool_server_id) {
     await closeMcpClient(existing.tool_server_id);
-    server = updateToolServer(existing.tool_server_id, serverInput);
+    server = await updateToolServer(existing.tool_server_id, serverInput);
   } else {
-    server = createToolServer(serverInput);
+    server = await createToolServer(serverInput);
   }
   for (const [key, value] of Object.entries(input.secrets ?? {})) {
-    setToolSecret({ ownerType: "server", ownerId: server.id, key, label: key, value });
+    await setToolSecret({ ownerType: "server", ownerId: server.id, key, label: key, value });
   }
   const now = Date.now();
   const row: typeof artifactInstallations.$inferInsert = {
@@ -528,7 +513,7 @@ async function installMcpItem(
     installed_at: existing?.installed_at ?? now,
     updated_at: now,
   };
-  upsertInstallation(row);
+  await upsertInstallation(row);
   if (input.enable) return await setArtifactInstallationEnabled(row.id, true);
   return toInstallation(requireInstallation(row.id));
 }
@@ -607,15 +592,8 @@ function atomicWriteSkill(target: string, files: Record<string, Uint8Array>): vo
   }
 }
 
-function upsertInstallation(row: typeof artifactInstallations.$inferInsert): void {
-  getDb()
-    .insert(artifactInstallations)
-    .values(row)
-    .onConflictDoUpdate({
-      target: artifactInstallations.id,
-      set: { ...row, id: undefined },
-    })
-    .run();
+async function upsertInstallation(row: typeof artifactInstallations.$inferInsert): Promise<void> {
+  await upsertArtifactInstallation(row);
 }
 
 function existingInstallationId(itemId: string): string | null {
@@ -757,63 +735,40 @@ function catalogItemsInOrder(sourceId: string, externalIds: string[]): CatalogIt
   });
 }
 
-function cacheSourceItems(
+async function cacheSourceItems(
   sourceId: string,
   items: CatalogAdapterItem[],
   artifactType: CatalogArtifactType = "skill",
-): void {
+): Promise<void> {
   const now = Date.now();
-  getDb().transaction((tx) => {
-    for (const item of items) {
-      tx.insert(catalogItems)
-        .values({
-          id: catalogItemId(sourceId, item.externalId),
-          source_id: sourceId,
-          artifact_type: artifactType,
-          external_id: item.externalId,
-          name: item.name.slice(0, 200),
-          description: item.description.slice(0, 2_000),
-          version: item.version ?? null,
-          install_url: item.installUrl,
-          detail_json: JSON.stringify(item.detail),
-          content_hash: item.contentHash ?? null,
-          cached_at: now,
-          updated_at: now,
-        })
-        .onConflictDoUpdate({
-          target: catalogItems.id,
-          set: {
-            artifact_type: artifactType,
-            name: item.name.slice(0, 200),
-            description: item.description.slice(0, 2_000),
-            version: item.version ?? null,
-            install_url: item.installUrl,
-            detail_json: JSON.stringify(item.detail),
-            content_hash: item.contentHash ?? null,
-            cached_at: now,
-            updated_at: now,
-          },
-        })
-        .run();
-    }
+  await cacheCatalogItems(
+    items.map((item) => ({
+      id: catalogItemId(sourceId, item.externalId),
+      source_id: sourceId,
+      artifact_type: artifactType,
+      external_id: item.externalId,
+      name: item.name.slice(0, 200),
+      description: item.description.slice(0, 2_000),
+      version: item.version ?? null,
+      install_url: item.installUrl,
+      detail_json: JSON.stringify(item.detail),
+      content_hash: item.contentHash ?? null,
+      cached_at: now,
+      updated_at: now,
+    })),
+  );
+}
+
+async function setSourceSuccess(sourceId: string): Promise<void> {
+  const now = Date.now();
+  await updateCatalogSource(sourceId, { last_synced_at: now, last_error: null, updated_at: now });
+}
+
+async function setSourceError(sourceId: string, message: string): Promise<void> {
+  await updateCatalogSource(sourceId, {
+    last_error: message.slice(0, 2_000),
+    updated_at: Date.now(),
   });
-}
-
-function setSourceSuccess(sourceId: string): void {
-  const now = Date.now();
-  getDb()
-    .update(catalogSources)
-    .set({ last_synced_at: now, last_error: null, updated_at: now })
-    .where(eq(catalogSources.id, sourceId))
-    .run();
-}
-
-function setSourceError(sourceId: string, message: string): void {
-  getDb()
-    .update(catalogSources)
-    .set({ last_error: message.slice(0, 2_000), updated_at: Date.now() })
-    .where(eq(catalogSources.id, sourceId))
-    .run();
 }
 
 export function mergeCatalogItems(lists: CatalogItem[][]): CatalogItem[] {

@@ -207,7 +207,7 @@ void describe("MemoryOrchestrator", () => {
     assert.equal(memories[0]?.sync_status, "synced");
   });
 
-  void it("archives an old weak episode during decay", () => {
+  void it("archives an old weak episode during decay", async () => {
     memories.push(
       memoryRecord({
         id: "old",
@@ -216,7 +216,7 @@ void describe("MemoryOrchestrator", () => {
         last_reinforced_at: Date.now() - 365 * 24 * 60 * 60 * 1_000,
       }),
     );
-    assert.equal(orchestrator.decay(), 1);
+    assert.equal(await orchestrator.decay(), 1);
     assert.equal(memories[0]?.status, "archived");
   });
 });

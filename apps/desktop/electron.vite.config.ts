@@ -12,6 +12,10 @@ export default defineConfig({
     //    __dirname 指向 out/main/，使 electron 的 path.txt 检查失败
     build: {
       rollupOptions: {
+        input: {
+          index: resolve("src/main/index.ts"),
+          "db-writer-worker": resolve("src/main/lib/db-writer-worker.ts"),
+        },
         external: [
           "ai",
           "@ai-sdk/openai",
@@ -23,6 +27,7 @@ export default defineConfig({
           "@electron-toolkit/utils",
           "@electron-toolkit/preload",
           "electron-updater",
+          "fflate",
           "better-sqlite3",
           "drizzle-orm",
           "drizzle-orm/better-sqlite3",

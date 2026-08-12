@@ -41,27 +41,27 @@ import {
   getSyncState,
   getRuntimeSnapshot,
   getToolsSnapshot,
-  createToolServer,
-  updateToolServer,
-  deleteToolServer,
+  createToolServerAsync as createToolServer,
+  updateToolServerAsync as updateToolServer,
+  deleteToolServerAsync as deleteToolServer,
   listDeletedToolServers,
-  restoreToolServer,
-  permanentlyDeleteToolServer,
-  permanentlyDeleteToolServers,
-  purgeExpiredDeletedToolServers,
-  setToolServerEnabled,
-  updateToolRecord,
-  createSkillTool,
-  updateSkillTool,
-  deleteSkillTool,
+  restoreToolServerAsync as restoreToolServer,
+  permanentlyDeleteToolServerAsync as permanentlyDeleteToolServer,
+  permanentlyDeleteToolServersAsync as permanentlyDeleteToolServers,
+  purgeExpiredDeletedToolServersAsync as purgeExpiredDeletedToolServers,
+  setToolServerEnabledAsync as setToolServerEnabled,
+  updateToolRecordAsync as updateToolRecord,
+  createSkillToolAsync as createSkillTool,
+  updateSkillToolAsync as updateSkillTool,
+  deleteSkillToolAsync as deleteSkillTool,
   listDeletedSkillTools,
-  restoreSkillTool,
-  permanentlyDeleteSkillTool,
-  permanentlyDeleteSkillTools,
-  purgeExpiredDeletedSkillTools,
-  setSkillToolEnabled,
-  setToolSecret,
-  deleteToolSecret,
+  restoreSkillToolAsync as restoreSkillTool,
+  permanentlyDeleteSkillToolAsync as permanentlyDeleteSkillTool,
+  permanentlyDeleteSkillToolsAsync as permanentlyDeleteSkillTools,
+  purgeExpiredDeletedSkillToolsAsync as purgeExpiredDeletedSkillTools,
+  setSkillToolEnabledAsync as setSkillToolEnabled,
+  setToolSecretAsync as setToolSecret,
+  deleteToolSecretAsync as deleteToolSecret,
 } from "../lib/db";
 import {
   clearProviderApiKey,
@@ -177,25 +177,25 @@ export function registerIpcHandlers(): void {
     createConversation(id, title),
   );
 
-  ipcMain.handle("conversations:delete", (_e, id: string) => {
-    deleteConversation(id);
+  ipcMain.handle("conversations:delete", async (_e, id: string) => {
+    await deleteConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:touch", (_e, id: string, title?: string) => {
-    touchConversation(id, title);
+  ipcMain.handle("conversations:touch", async (_e, id: string, title?: string) => {
+    await touchConversation(id, title);
     return true;
   });
 
   ipcMain.handle("conversations:listDeleted", () => listDeletedConversations());
 
-  ipcMain.handle("conversations:restore", (_e, id: string) => {
-    restoreConversation(id);
+  ipcMain.handle("conversations:restore", async (_e, id: string) => {
+    await restoreConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:permanentDelete", (_e, id: string) => {
-    permanentlyDeleteConversation(id);
+  ipcMain.handle("conversations:permanentDelete", async (_e, id: string) => {
+    await permanentlyDeleteConversation(id);
     return true;
   });
 
@@ -210,13 +210,13 @@ export function registerIpcHandlers(): void {
     getMessagesSnapshot(conversationId),
   );
 
-  ipcMain.handle("messages:save", (_e, msg: MessageRow) => {
-    saveMessage(msg);
+  ipcMain.handle("messages:save", async (_e, msg: MessageRow) => {
+    await saveMessage(msg);
     return true;
   });
 
-  ipcMain.handle("messages:saveBatch", (_e, msgs: MessageRow[]) => {
-    saveMessagesBatch(msgs);
+  ipcMain.handle("messages:saveBatch", async (_e, msgs: MessageRow[]) => {
+    await saveMessagesBatch(msgs);
     return true;
   });
 
@@ -248,8 +248,8 @@ export function registerIpcHandlers(): void {
   // ---------- 璁剧疆 ----------
   ipcMain.handle("settings:get", (_e, key: string) => getSetting(key));
 
-  ipcMain.handle("settings:set", (_e, key: string, value: string) => {
-    setSetting(key, value);
+  ipcMain.handle("settings:set", async (_e, key: string, value: string) => {
+    await setSetting(key, value);
     return true;
   });
 
@@ -262,13 +262,13 @@ export function registerIpcHandlers(): void {
   // ---------- API Key ----------
   ipcMain.handle("apikeys:list", () => listApiKeyProviders());
 
-  ipcMain.handle("apikeys:set", (_e, provider: string, apiKey: string) => {
-    setApiKey(provider, apiKey);
+  ipcMain.handle("apikeys:set", async (_e, provider: string, apiKey: string) => {
+    await setApiKey(provider, apiKey);
     return true;
   });
 
-  ipcMain.handle("apikeys:delete", (_e, provider: string) => {
-    deleteApiKey(provider);
+  ipcMain.handle("apikeys:delete", async (_e, provider: string) => {
+    await deleteApiKey(provider);
     return true;
   });
   // 娉ㄦ剰锛氫笉鏆撮湶 apikeys:get 鏄庢枃鎺ュ彛锛屾覆鏌撳眰鏃犻渶璇诲彇鏄庢枃 key
@@ -320,7 +320,7 @@ export function registerIpcHandlers(): void {
       }
     },
   );
-  ipcMain.handle("runtime:cancelRun", (_event, runId: string) => {
+  ipcMain.handle("runtime:cancelRun", async (_event, runId: string) => {
     if (typeof runId !== "string" || !runId) throw new Error("runId is required.");
     return agentLoopSessions.cancel(runId);
   });
@@ -333,8 +333,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("agents:archive", (_e, id: string) => archiveAgent(id));
   ipcMain.handle("agents:restore", (_e, id: string) => restoreAgentProfile(id));
   ipcMain.handle("agents:duplicate", (_e, id: string) => duplicateAgent(id));
-  ipcMain.handle("agents:delete", (_e, id: string) => {
-    deleteAgent(id);
+  ipcMain.handle("agents:delete", async (_e, id: string) => {
+    await deleteAgent(id);
     return true;
   });
   ipcMain.handle("agents:runtimeSnapshot", () => runtimeSnapshot());
@@ -342,8 +342,8 @@ export function registerIpcHandlers(): void {
     queueAgentLearning(conversationId);
     return true;
   });
-  ipcMain.handle("agents:save", (_e, agent: AgentProfile) => {
-    saveAgent(agent);
+  ipcMain.handle("agents:save", async (_e, agent: AgentProfile) => {
+    await saveAgent(agent);
     return true;
   });
   ipcMain.handle("memories:list", () => listMemories());
@@ -359,12 +359,12 @@ export function registerIpcHandlers(): void {
       : searchMemories(filters),
   );
   ipcMain.handle("memories:get", (_e, id: string) => getMemoryById(id));
-  ipcMain.handle("memories:save", (_e, memory: MemoryRecord) => {
+  ipcMain.handle("memories:save", async (_e, memory: MemoryRecord) => {
     const existing = getMemoryById(memory.id);
     if (existing) {
-      memoryOrchestrator.update(memory.id, memory);
+      await memoryOrchestrator.update(memory.id, memory);
     } else {
-      memoryOrchestrator.saveExplicit({
+      await memoryOrchestrator.saveExplicit({
         id: memory.id,
         title: memory.title,
         content: memory.content,
@@ -379,8 +379,8 @@ export function registerIpcHandlers(): void {
     }
     return true;
   });
-  ipcMain.handle("memories:delete", (_e, id: string) => {
-    deleteMemory(id);
+  ipcMain.handle("memories:delete", async (_e, id: string) => {
+    await deleteMemory(id);
     return true;
   });
   ipcMain.handle("memories:deleteBatch", (_e, ids: string[]) => deleteMemoriesBatch(ids));
@@ -427,20 +427,20 @@ export function registerIpcHandlers(): void {
   );
   ipcMain.handle("mcp:create", (_e, input: ToolServerInput) => createToolServer(input));
   ipcMain.handle("mcp:update", async (_e, id: string, input: Partial<ToolServerInput>) => {
-    const server = updateToolServer(id, input);
+    const server = await updateToolServer(id, input);
     await closeMcpClient(id);
     return server;
   });
   ipcMain.handle("mcp:delete", async (_e, id: string) => {
     await closeMcpClient(id);
-    deleteToolServer(id);
+    await deleteToolServer(id);
     return true;
   });
   ipcMain.handle("mcp:listDeleted", () => listDeletedToolServers("mcp"));
   ipcMain.handle("mcp:restore", (_e, id: string) => restoreToolServer(id));
   ipcMain.handle("mcp:permanentDelete", async (_e, id: string) => {
     await closeMcpClient(id);
-    permanentlyDeleteToolServer(id);
+    await permanentlyDeleteToolServer(id);
     return true;
   });
   ipcMain.handle("mcp:permanentDeleteBatch", async (_e, ids: string[]) => {
@@ -449,7 +449,7 @@ export function registerIpcHandlers(): void {
   });
   ipcMain.handle("mcp:purgeExpired", () => purgeExpiredDeletedToolServers());
   ipcMain.handle("mcp:setEnabled", async (_e, id: string, enabled: boolean) => {
-    const server = setToolServerEnabled(id, enabled);
+    const server = await setToolServerEnabled(id, enabled);
     if (!enabled) await closeMcpClient(id);
     return server;
   });
@@ -470,8 +470,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("mcp:setSecret", (_e, input: ToolSecretInput) =>
     setToolSecret({ ...input, ownerType: "server" }),
   );
-  ipcMain.handle("mcp:deleteSecret", (_e, id: string) => {
-    deleteToolSecret(id);
+  ipcMain.handle("mcp:deleteSecret", async (_e, id: string) => {
+    await deleteToolSecret(id);
     return true;
   });
 
@@ -482,14 +482,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("tools:skills:update", (_e, id: string, input: Partial<ToolSkillInput>) =>
     updateSkillTool(id, input),
   );
-  ipcMain.handle("tools:skills:delete", (_e, id: string) => {
-    deleteSkillTool(id);
+  ipcMain.handle("tools:skills:delete", async (_e, id: string) => {
+    await deleteSkillTool(id);
     return true;
   });
   ipcMain.handle("tools:skills:listDeleted", () => listDeletedSkillTools());
   ipcMain.handle("tools:skills:restore", (_e, id: string) => restoreSkillTool(id));
-  ipcMain.handle("tools:skills:permanentDelete", (_e, id: string) => {
-    permanentlyDeleteSkillTool(id);
+  ipcMain.handle("tools:skills:permanentDelete", async (_e, id: string) => {
+    await permanentlyDeleteSkillTool(id);
     return true;
   });
   ipcMain.handle("tools:skills:permanentDeleteBatch", (_e, ids: string[]) =>
@@ -505,8 +505,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("tools:skills:setSecret", (_e, input: ToolSecretInput) =>
     setToolSecret({ ...input, ownerType: "tool" }),
   );
-  ipcMain.handle("tools:skills:deleteSecret", (_e, id: string) => {
-    deleteToolSecret(id);
+  ipcMain.handle("tools:skills:deleteSecret", async (_e, id: string) => {
+    await deleteToolSecret(id);
     return true;
   });
   // ---------- Provider metadata ----------
@@ -518,18 +518,18 @@ export function registerIpcHandlers(): void {
     upsertCustomProvider(input),
   );
 
-  ipcMain.handle("providers:deleteCustomProvider", (_e, providerId: string) => {
-    deleteCustomProvider(providerId);
+  ipcMain.handle("providers:deleteCustomProvider", async (_e, providerId: string) => {
+    await deleteCustomProvider(providerId);
     return true;
   });
 
-  ipcMain.handle("providers:setProviderApiKey", (_e, providerId: string, apiKey: string) => {
-    saveProviderApiKey(providerId, apiKey);
+  ipcMain.handle("providers:setProviderApiKey", async (_e, providerId: string, apiKey: string) => {
+    await saveProviderApiKey(providerId, apiKey);
     return true;
   });
 
-  ipcMain.handle("providers:deleteProviderApiKey", (_e, providerId: string) => {
-    clearProviderApiKey(providerId);
+  ipcMain.handle("providers:deleteProviderApiKey", async (_e, providerId: string) => {
+    await clearProviderApiKey(providerId);
     return true;
   });
 
@@ -545,27 +545,27 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "providers:updateModelEnabled",
-    (_e, providerId: string, modelId: string, enabled: boolean) => {
-      updateModelEnabled(providerId, modelId, enabled);
+    async (_e, providerId: string, modelId: string, enabled: boolean) => {
+      await updateModelEnabled(providerId, modelId, enabled);
       return true;
     },
   );
 
   ipcMain.handle(
     "providers:setModelApiKey",
-    (_e, providerId: string, modelId: string, apiKey: string) => {
-      saveModelApiKey(providerId, modelId, apiKey);
+    async (_e, providerId: string, modelId: string, apiKey: string) => {
+      await saveModelApiKey(providerId, modelId, apiKey);
       return true;
     },
   );
 
-  ipcMain.handle("providers:deleteModelApiKey", (_e, providerId: string, modelId: string) => {
-    clearModelApiKey(providerId, modelId);
+  ipcMain.handle("providers:deleteModelApiKey", async (_e, providerId: string, modelId: string) => {
+    await clearModelApiKey(providerId, modelId);
     return true;
   });
 
-  ipcMain.handle("providers:deleteCustomModel", (_e, providerId: string, modelId: string) => {
-    deleteCustomModel(providerId, modelId);
+  ipcMain.handle("providers:deleteCustomModel", async (_e, providerId: string, modelId: string) => {
+    await deleteCustomModel(providerId, modelId);
     return true;
   });
 

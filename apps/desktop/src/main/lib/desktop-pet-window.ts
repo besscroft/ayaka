@@ -10,8 +10,8 @@ import {
 import {
   getDesktopPetSnapshot,
   isDesktopPetEnabled,
-  setDesktopPetEnabled,
-  updateDesktopPetConfig,
+  setDesktopPetEnabledAsync as setDesktopPetEnabled,
+  updateDesktopPetConfigAsync as updateDesktopPetConfig,
 } from "./db";
 import {
   beginLocalPetImport,
@@ -105,21 +105,21 @@ export class DesktopPetWindowController {
   async show(): Promise<DesktopPetSnapshot> {
     const current = getDesktopPetSnapshot();
     await ensureDesktopPetAsset(current.config.selectedPet);
-    const snapshot = setDesktopPetEnabled(true);
+    const snapshot = await setDesktopPetEnabled(true);
     await this.ensureWindow(snapshot);
     this.options.syncTrayMenu?.();
     return getDesktopPetSnapshot();
   }
 
   async hide(): Promise<DesktopPetSnapshot> {
-    const snapshot = setDesktopPetEnabled(false);
+    const snapshot = await setDesktopPetEnabled(false);
     this.closePetWindow();
     this.options.syncTrayMenu?.();
     return snapshot;
   }
 
   async updateWindow(patch: Partial<DesktopPetWindowConfig>): Promise<DesktopPetSnapshot> {
-    const snapshot = updateDesktopPetConfig({ window: patch });
+    const snapshot = await updateDesktopPetConfig({ window: patch });
     if (this.petWindow && !this.petWindow.isDestroyed()) {
       this.applyWindowConfig(snapshot.config);
     }
@@ -128,7 +128,7 @@ export class DesktopPetWindowController {
 
   async selectPet(selector: DesktopPetSelector): Promise<DesktopPetSnapshot> {
     await ensureDesktopPetAsset(selector);
-    const snapshot = updateDesktopPetConfig({ selectedPet: selector });
+    const snapshot = await updateDesktopPetConfig({ selectedPet: selector });
     if (snapshot.enabled) {
       await this.ensureWindow(snapshot);
       this.reloadPetRenderer();
@@ -165,7 +165,7 @@ export class DesktopPetWindowController {
     if (current.config.selectedPet === selector) {
       const fallback: DesktopPetSelector = "builtin:paimon";
       await ensureDesktopPetAsset(fallback);
-      updateDesktopPetConfig({ selectedPet: fallback });
+      await updateDesktopPetConfig({ selectedPet: fallback });
       if (current.enabled) this.reloadPetRenderer();
     }
     deleteInstalledPet(selector);
@@ -292,7 +292,7 @@ export class DesktopPetWindowController {
     win.on("closed", () => {
       this.petWindow = null;
       if (!this.closingFromApi && !this.isAppQuitting) {
-        setDesktopPetEnabled(false);
+        void setDesktopPetEnabled(false);
         this.options.syncTrayMenu?.();
       }
       this.closingFromApi = false;
@@ -339,7 +339,7 @@ export class DesktopPetWindowController {
     const bounds = this.petWindow.getBounds();
     try {
       const current = getDesktopPetSnapshot().config.window;
-      updateDesktopPetConfig({
+      void updateDesktopPetConfig({
         window: {
           x: bounds.x,
           y: bounds.y,

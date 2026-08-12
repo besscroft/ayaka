@@ -40,14 +40,14 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  db.closeDb();
+  await db.closeDb();
   testRoot = await mkdtemp(path.join(tmpdir(), "void-ai-agent-lifecycle-"));
   process.env.VOID_AI_USER_DATA_DIR = testRoot;
   db.initDb();
 });
 
 afterEach(async () => {
-  db.closeDb();
+  await db.closeDb();
   delete process.env.VOID_AI_USER_DATA_DIR;
   if (testRoot) await rm(testRoot, { recursive: true, force: true });
   testRoot = "";
@@ -114,66 +114,66 @@ void describe("agent lifecycle persistence", () => {
     }
   });
 
-  void it("rejects locked or busy agents before archiving and deleting", () => {
-    assert.throws(() => db.archiveAgent(DEFAULT_AGENT_ID), /locked/i);
-    assert.throws(() => db.deleteAgent(DEFAULT_AGENT_ID), /locked/i);
+  void it("rejects locked or busy agents before archiving and deleting", async () => {
+    await assert.rejects(db.archiveAgent(DEFAULT_AGENT_ID), /locked/i);
+    await assert.rejects(db.deleteAgent(DEFAULT_AGENT_ID), /locked/i);
 
-    const agent = db.createAgent(makeAgentInput("Busy agent"));
+    const agent = await db.createAgent(makeAgentInput("Busy agent"));
     db.upsertAgentRuntimeState({
       agent_id: agent.id,
       status: "running",
       current_run_id: "run-busy",
     });
 
-    assert.throws(() => db.archiveAgent(agent.id), /busy \(running\)/i);
-    assert.throws(() => db.deleteAgent(agent.id), /busy \(running\)/i);
+    await assert.rejects(db.archiveAgent(agent.id), /busy \(running\)/i);
+    await assert.rejects(db.deleteAgent(agent.id), /busy \(running\)/i);
     assert.equal(db.getAgent(agent.id)?.status, "active");
 
     db.upsertAgentRuntimeState({ agent_id: agent.id, status: "failed" });
-    const archived = db.archiveAgent(agent.id);
+    const archived = await db.archiveAgent(agent.id);
     assert.equal(archived.status, "archived");
     assert.equal(archived.enabled, 0);
   });
 
-  void it("restores only archived agents as disabled drafts", () => {
-    const agent = db.createAgent(makeAgentInput("Restorable agent"));
+  void it("restores only archived agents as disabled drafts", async () => {
+    const agent = await db.createAgent(makeAgentInput("Restorable agent"));
 
-    assert.throws(() => db.restoreAgent(agent.id), /only archived/i);
-    db.archiveAgent(agent.id);
+    await assert.rejects(db.restoreAgent(agent.id), /only archived/i);
+    await db.archiveAgent(agent.id);
 
-    const restored = db.restoreAgent(agent.id);
+    const restored = await db.restoreAgent(agent.id);
     assert.equal(restored.status, "draft");
     assert.equal(restored.enabled, 0);
-    assert.throws(() => db.restoreAgent(agent.id), /only archived/i);
+    await assert.rejects(db.restoreAgent(agent.id), /only archived/i);
   });
 
-  void it("keeps soul files through archive and restore", () => {
-    const agent = db.createAgent(makeAgentInput("Restorable soul agent"));
+  void it("keeps soul files through archive and restore", async () => {
+    const agent = await db.createAgent(makeAgentInput("Restorable soul agent"));
     const soul = "# SOUL\n\nPreserve this soul while the agent is archived.";
     memoryFiles.writeMemoryFile("soul", soul, { source: "user", agentId: agent.id });
     const paths = memoryStorage.resolveAgentSoulFilePaths(agent.id);
 
-    db.archiveAgent(agent.id);
+    await db.archiveAgent(agent.id);
     assert.equal(existsSync(paths.primary), true);
     assert.equal(memoryFiles.readMemoryFile("soul", agent.id), soul);
 
-    db.restoreAgent(agent.id);
+    await db.restoreAgent(agent.id);
     assert.equal(existsSync(paths.primary), true);
     assert.equal(memoryFiles.readMemoryFile("soul", agent.id), soul);
   });
 
-  void it("deletes agents without a soul file", () => {
-    const agent = db.createAgent(makeAgentInput("Agent without soul file"));
+  void it("deletes agents without a soul file", async () => {
+    const agent = await db.createAgent(makeAgentInput("Agent without soul file"));
     const paths = memoryStorage.resolveAgentSoulFilePaths(agent.id);
 
     assert.equal(existsSync(paths.primary), false);
     assert.equal(existsSync(paths.backup), false);
-    db.deleteAgent(agent.id);
+    await db.deleteAgent(agent.id);
     assert.equal(db.getAgent(agent.id), null);
   });
 
-  void it("publishes drafts and keeps duplicates disabled drafts", () => {
-    const draft = db.createAgent({
+  void it("publishes drafts and keeps duplicates disabled drafts", async () => {
+    const draft = await db.createAgent({
       ...makeAgentInput("Draft agent"),
       status: "draft",
       enabled: false,
@@ -181,17 +181,17 @@ void describe("agent lifecycle persistence", () => {
     assert.equal(draft.status, "draft");
     assert.equal(draft.enabled, 0);
 
-    const published = db.updateAgent(draft.id, { status: "active", enabled: true });
+    const published = await db.updateAgent(draft.id, { status: "active", enabled: true });
     assert.equal(published.status, "active");
     assert.equal(published.enabled, 1);
 
-    const copy = db.duplicateAgent(published.id);
+    const copy = await db.duplicateAgent(published.id);
     assert.equal(copy.status, "draft");
     assert.equal(copy.enabled, 0);
   });
 
-  void it("deletes agents atomically, removes soul files, and clears runtime state", () => {
-    const agent = db.createAgent(makeAgentInput("Disposable agent"));
+  void it("deletes agents atomically, removes soul files, and clears runtime state", async () => {
+    const agent = await db.createAgent(makeAgentInput("Disposable agent"));
     const soul = "# SOUL\n\nThis file must be deleted with the agent.";
     memoryFiles.writeMemoryFile("soul", soul, { source: "user", agentId: agent.id });
     memoryFiles.writeMemoryFile("soul", `${soul}\nUpdated`, {
@@ -202,13 +202,13 @@ void describe("agent lifecycle persistence", () => {
     assert.equal(existsSync(soulPaths.primary), true);
     assert.equal(existsSync(soulPaths.backup), true);
 
-    const run = db.createRuntimeRun({
+    const run = await db.createRuntimeRun({
       id: "run-delete-agent",
       root_agent_id: agent.id,
       final_agent_id: agent.id,
       status: "succeeded",
     });
-    const step = db.createRuntimeStep({
+    const step = await db.createRuntimeStep({
       id: "step-delete-agent",
       run_id: run.id,
       agent_id: agent.id,
@@ -225,7 +225,7 @@ void describe("agent lifecycle persistence", () => {
       title: "Referenced event",
     });
 
-    db.deleteAgent(agent.id);
+    await db.deleteAgent(agent.id);
 
     assert.equal(db.getAgent(agent.id), null);
     assert.equal(existsSync(soulPaths.primary), false);

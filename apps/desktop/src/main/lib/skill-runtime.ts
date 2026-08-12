@@ -1,6 +1,6 @@
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type { ChatToolDescriptor, ToolSkill, JsonObject } from "../../shared/types";
-import { getSkillTool, insertRuntimeEvent, listSkillTools, markSkillToolRun } from "./db";
+import { getSkillTool, insertRuntimeEvent, listSkillTools, markSkillToolRunAsync } from "./db";
 import type { ChatToolModelContext } from "./chat-tools";
 
 export function skillToolReference(skillId: string): string {
@@ -105,7 +105,7 @@ export async function runToolSkill({
       config: safeJson(skill.config_json, {}) as JsonObject,
       model: model ? { providerId: model.providerId, modelId: model.modelId } : null,
     };
-    markSkillToolRun(skill.id);
+    await markSkillToolRunAsync(skill.id);
     insertRuntimeEvent({
       kind: "skill",
       title: "Skill instructions loaded: " + skill.name,

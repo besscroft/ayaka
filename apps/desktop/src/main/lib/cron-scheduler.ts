@@ -47,7 +47,7 @@ export class CronScheduler {
 
   start(): void {
     if (this.timer) return;
-    recoverCronJobs();
+    void recoverCronJobs();
     this.timer = setInterval(() => void this.tick(), this.pollIntervalMs);
     void this.tick();
   }
@@ -63,7 +63,7 @@ export class CronScheduler {
     if (this.running.size >= this.maxConcurrency) {
       throw new Error("The automation concurrency limit is currently full.");
     }
-    const claim = claimCronJobNow(jobId);
+    const claim = await claimCronJobNow(jobId);
     this.launch(claim);
     return claim.run;
   }
@@ -71,7 +71,7 @@ export class CronScheduler {
   async tick(now = Date.now()): Promise<void> {
     const capacity = this.maxConcurrency - this.running.size;
     if (capacity <= 0) return;
-    for (const claim of claimDueCronJobs(now, capacity)) this.launch(claim);
+    for (const claim of await claimDueCronJobs(now, capacity)) this.launch(claim);
   }
 
   private launch(claim: ClaimedCronRun): void {
@@ -80,7 +80,7 @@ export class CronScheduler {
     void this.execute(claim.job, claim.run, controller.signal)
       .then((result) => {
         if (this.timer) {
-          completeCronRun(
+          void completeCronRun(
             claim,
             typeof result === "string"
               ? { output: result }
@@ -91,7 +91,7 @@ export class CronScheduler {
       .catch((error) => {
         if (!this.timer) return;
         const message = error instanceof Error ? error.message : String(error);
-        completeCronRun(claim, { error: message, transient: isTransientCronError(error) });
+        void completeCronRun(claim, { error: message, transient: isTransientCronError(error) });
       })
       .finally(() => {
         this.running.delete(claim.job.id);
@@ -207,7 +207,7 @@ async function persistCronMessages(conversationId: string, messages: UIMessage[]
       content: JSON.stringify(message),
       created_at: now + index,
     }));
-    const result = applyMessagesPatch({
+    const result = await applyMessagesPatch({
       conversationId,
       baseRevision: snapshot.revision,
       upserts: rows,

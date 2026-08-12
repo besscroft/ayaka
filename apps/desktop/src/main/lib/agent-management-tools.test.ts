@@ -30,14 +30,14 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  db.closeDb();
+  await db.closeDb();
   testRoot = await mkdtemp(path.join(tmpdir(), "void-ai-agent-management-"));
   process.env.VOID_AI_USER_DATA_DIR = testRoot;
   db.initDb();
 });
 
 afterEach(async () => {
-  db.closeDb();
+  await db.closeDb();
   delete process.env.VOID_AI_USER_DATA_DIR;
   if (testRoot) await rm(testRoot, { recursive: true, force: true });
   testRoot = "";
@@ -66,7 +66,7 @@ void describe("agent management tools", () => {
   });
 
   void it("creates an active enabled child with normalized configuration", async () => {
-    db.createRuntimeRun({
+    await db.createRuntimeRun({
       id: "run-create",
       root_agent_id: DEFAULT_AGENT_ID,
       status: "running",
@@ -103,7 +103,7 @@ void describe("agent management tools", () => {
   });
 
   void it("deep merges updates and replaces arrays", async () => {
-    const existing = db.createAgent({
+    const existing = await db.createAgent({
       name: "Existing",
       role: "Specialist",
       description: "Keep this",

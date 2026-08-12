@@ -42,7 +42,7 @@ export function getMemoryUserId(): string {
   const existing = getSetting(MEMORY_USER_ID_SETTING);
   if (existing) return existing;
   const created = randomUUID();
-  setSetting(MEMORY_USER_ID_SETTING, created);
+  void setSetting(MEMORY_USER_ID_SETTING, created);
   return created;
 }
 

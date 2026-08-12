@@ -175,9 +175,9 @@ async function executeCreate(
   return executeWithAudit(
     AGENT_CREATE_TOOL_NAME,
     context,
-    () => {
+    async () => {
       const status = input.status ?? "active";
-      const agent = createAgent(
+      const agent = await createAgent(
         toAgentInput(input, {
           status,
           enabled: input.enabled ?? status === "active",
@@ -196,7 +196,7 @@ async function executeUpdate(
   return executeWithAudit(
     AGENT_UPDATE_TOOL_NAME,
     context,
-    () => {
+    async () => {
       assertEditableChild(input.agentId);
       const existing = getAgent(input.agentId);
       if (!existing) throw new Error("Agent not found.");
@@ -315,12 +315,12 @@ function parseJson(raw: string): Record<string, unknown> {
 async function executeWithAudit<T>(
   toolName: string,
   context: AgentManagementToolContext,
-  execute: () => T,
+  execute: () => T | Promise<T>,
   detail: (value: T) => Record<string, unknown>,
 ): Promise<T> {
   const started = Date.now();
   try {
-    const value = execute();
+    const value = await execute();
     recordToolEvent({
       ...context,
       toolName,

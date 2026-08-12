@@ -40,6 +40,9 @@ import {
   toolSecrets,
   toolServers,
   tools,
+  artifactInstallations,
+  catalogItems,
+  catalogSources,
   type AgentRunInput as DbAgentRunInput,
   type AgentPolicy as DbAgentPolicy,
   type AgentInstance as DbAgentInstance,
@@ -129,6 +132,14 @@ import {
 import { resolveDesktopPet } from "./desktop-pet-assets";
 import { applyDesktopPetIdleTimeout, resolveDesktopPetActivity } from "./desktop-pet-activity";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
+import {
+  enqueueLowPriorityRuntimeEvent,
+  flushDbWriter,
+  isDbWriterWorker,
+  shutdownDbWriter,
+  startDbWriter,
+  writeDb,
+} from "./db-writer";
 export type {
   AgentRunInput,
   AgentProfile,
@@ -169,6 +180,7 @@ type RuntimeStatus = RunStatus;
 
 let rawDb: Database.Database | null = null;
 let dbInstance: DbInstance | null = null;
+let writesThroughWorker = false;
 
 const agentRuntimeStates = new Map<string, AgentRuntimeState>();
 const conversationAgentStates = new Map<string, ConversationAgentState>();
@@ -191,25 +203,51 @@ function resolveMigrationsFolder(): string {
   return join(process.resourcesPath, "drizzle");
 }
 
-export function initDb(): DbInstance {
-  if (dbInstance) return dbInstance;
-
-  const dbPath = join(resolveDataDir(), DB_FILENAME);
-  return openAndMigrateDb(dbPath);
+export interface DbInitOptions {
+  readOnly?: boolean;
+  migrate?: boolean;
+  seed?: boolean;
+  dbPath?: string;
+  migrationsFolder?: string;
 }
 
-function openAndMigrateDb(dbPath: string): DbInstance {
-  rawDb = new Database(dbPath);
-  rawDb.pragma("journal_mode = WAL");
+export function initDb(options: DbInitOptions = {}): DbInstance {
+  if (dbInstance) return dbInstance;
+
+  const dbPath = options.dbPath ?? join(resolveDataDir(), DB_FILENAME);
+  return openAndMigrateDb(dbPath, options);
+}
+
+export function resolveDbPath(): string {
+  return join(resolveDataDir(), DB_FILENAME);
+}
+
+export function resolveMigrationsPath(): string {
+  return resolveMigrationsFolder();
+}
+
+function openAndMigrateDb(dbPath: string, options: DbInitOptions): DbInstance {
+  rawDb = new Database(
+    dbPath,
+    options.readOnly ? { readonly: true, fileMustExist: true } : undefined,
+  );
+  if (!options.readOnly) rawDb.pragma("journal_mode = WAL");
   rawDb.pragma("foreign_keys = ON");
   rawDb.pragma("busy_timeout = 5000");
+  if (options.readOnly) rawDb.pragma("query_only = ON");
 
   dbInstance = drizzle(rawDb, { schema });
   try {
-    migrate(dbInstance, { migrationsFolder: resolveMigrationsFolder() });
-    cancelStaleRuntimeRuns();
-    purgeExpiredDeletedConversations();
-    seedDefaults();
+    if (!options.readOnly && options.migrate !== false) {
+      migrate(dbInstance, {
+        migrationsFolder: options.migrationsFolder ?? resolveMigrationsFolder(),
+      });
+    }
+    if (!options.readOnly && options.seed !== false) {
+      cancelStaleRuntimeRuns();
+      void purgeExpiredDeletedConversations();
+      seedDefaults();
+    }
   } catch (error) {
     rawDb.close();
     rawDb = null;
@@ -249,15 +287,43 @@ export function getDb(): DbInstance {
   return dbInstance;
 }
 
-export function closeDb(): void {
+export async function closeDb(): Promise<void> {
+  if (!isDbWriterWorker) {
+    await flushDbWriter();
+    await shutdownDbWriter();
+  }
   rawDb?.close();
   rawDb = null;
   dbInstance = null;
   agentRuntimeStates.clear();
   conversationAgentStates.clear();
+  writesThroughWorker = false;
 }
 
-export function createConversation(id: string, title = "New conversation"): Conversation {
+export async function initDbWriter(options: DbInitOptions = {}): Promise<void> {
+  if (isDbWriterWorker) return;
+  const dbPath = options.dbPath ?? resolveDbPath();
+  await startDbWriter({
+    dbPath,
+    migrationsFolder: options.migrationsFolder ?? resolveMigrationsPath(),
+  });
+  writesThroughWorker = true;
+  initDb({ dbPath, readOnly: true, migrate: false, seed: false });
+}
+
+function shouldRouteWrites(): boolean {
+  return writesThroughWorker && !isDbWriterWorker;
+}
+
+export function isDbWriterEnabled(): boolean {
+  return writesThroughWorker;
+}
+
+export async function createConversation(
+  id: string,
+  title = "New conversation",
+): Promise<Conversation> {
+  if (shouldRouteWrites()) return writeDb<Conversation>("createConversation", [id, title]);
   const now = Date.now();
   const row: Conversation = {
     id,
@@ -294,13 +360,15 @@ export function getConversation(id: string): Conversation | null {
   return getDb().select().from(conversations).where(eq(conversations.id, id)).get() ?? null;
 }
 
-export function touchConversation(id: string, title?: string): void {
+export async function touchConversation(id: string, title?: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("touchConversation", [id, title]);
   const patch: Partial<Conversation> = { updated_at: Date.now() };
   if (typeof title === "string" && title.trim()) patch.title = title.trim().slice(0, 160);
   getDb().update(conversations).set(patch).where(eq(conversations.id, id)).run();
 }
 
-export function deleteConversation(id: string): void {
+export async function deleteConversation(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteConversation", [id]);
   const now = Date.now();
   getDb()
     .update(conversations)
@@ -309,7 +377,8 @@ export function deleteConversation(id: string): void {
     .run();
 }
 
-export function restoreConversation(id: string): void {
+export async function restoreConversation(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("restoreConversation", [id]);
   getDb()
     .update(conversations)
     .set({ deleted_at: null, purge_after_at: null, updated_at: Date.now() })
@@ -317,11 +386,13 @@ export function restoreConversation(id: string): void {
     .run();
 }
 
-export function permanentlyDeleteConversation(id: string): void {
+export async function permanentlyDeleteConversation(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("permanentlyDeleteConversation", [id]);
   getDb().delete(conversations).where(eq(conversations.id, id)).run();
 }
 
-export function permanentlyDeleteConversations(ids: string[]): number {
+export async function permanentlyDeleteConversations(ids: string[]): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("permanentlyDeleteConversations", [ids]);
   let deleted = 0;
   for (const id of ids) {
     const result = getDb().delete(conversations).where(eq(conversations.id, id)).run();
@@ -330,14 +401,16 @@ export function permanentlyDeleteConversations(ids: string[]): number {
   return deleted;
 }
 
-export function purgeExpiredDeletedConversations(now = Date.now()): number {
+export async function purgeExpiredDeletedConversations(now = Date.now()): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("purgeExpiredDeletedConversations", [now]);
   return getDb()
     .delete(conversations)
     .where(and(isNotNull(conversations.purge_after_at), lt(conversations.purge_after_at, now)))
     .run().changes;
 }
 
-export function saveMessage(msg: MessageRow): void {
+export async function saveMessage(msg: MessageRow): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("saveMessage", [msg]);
   const row = messageToDb(msg);
   getDb().transaction((tx) => {
     tx.insert(messages)
@@ -366,7 +439,8 @@ export function saveMessage(msg: MessageRow): void {
   });
 }
 
-export function saveMessagesBatch(rows: MessageRow[]): void {
+export async function saveMessagesBatch(rows: MessageRow[]): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("saveMessagesBatch", [rows]);
   const db = getDb();
   db.transaction((tx) => {
     for (const msg of rows) {
@@ -400,7 +474,8 @@ export function saveMessagesBatch(rows: MessageRow[]): void {
   });
 }
 
-export function applyMessagesPatch(patch: MessagePatch): MessagePatchResult {
+export async function applyMessagesPatch(patch: MessagePatch): Promise<MessagePatchResult> {
+  if (shouldRouteWrites()) return writeDb<MessagePatchResult>("applyMessagesPatch", [patch]);
   const { conversationId, baseRevision, upserts, deleteIds } = patch;
   if (upserts.some((row) => row.conversation_id !== conversationId)) {
     throw new Error("Message patch contains rows from another conversation.");
@@ -477,7 +552,8 @@ export function getSetting(key: string): string | null {
   return getDb().select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
 }
 
-export function setSetting(key: string, value: string): void {
+export async function setSetting(key: string, value: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("setSetting", [key, value]);
   getDb()
     .insert(settings)
     .values({ key, value })
@@ -485,7 +561,8 @@ export function setSetting(key: string, value: string): void {
     .run();
 }
 
-export function setApiKey(provider: string, apiKey: string): void {
+export async function setApiKey(provider: string, apiKey: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("setApiKey", [provider, apiKey]);
   const payload = encrypt(apiKey);
   getDb()
     .insert(apiKeys)
@@ -507,7 +584,8 @@ export function getApiKey(provider: string): string | null {
   }
 }
 
-export function deleteApiKey(provider: string): void {
+export async function deleteApiKey(provider: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteApiKey", [provider]);
   getDb().delete(apiKeys).where(eq(apiKeys.provider, provider)).run();
 }
 
@@ -519,7 +597,12 @@ export function listApiKeyProviders(): string[] {
     .map((row) => row.provider);
 }
 
-export function setModelApiKey(providerId: string, modelId: string, apiKey: string): void {
+export async function setModelApiKey(
+  providerId: string,
+  modelId: string,
+  apiKey: string,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("setModelApiKey", [providerId, modelId, apiKey]);
   const payload = encrypt(apiKey);
   const row = {
     provider_id: providerId,
@@ -551,14 +634,16 @@ export function getModelApiKey(providerId: string, modelId: string): string | nu
   }
 }
 
-export function deleteModelApiKey(providerId: string, modelId: string): void {
+export async function deleteModelApiKey(providerId: string, modelId: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteModelApiKey", [providerId, modelId]);
   getDb()
     .delete(modelApiKeys)
     .where(and(eq(modelApiKeys.provider_id, providerId), eq(modelApiKeys.model_id, modelId)))
     .run();
 }
 
-export function deleteModelApiKeysForProvider(providerId: string): void {
+export async function deleteModelApiKeysForProvider(providerId: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteModelApiKeysForProvider", [providerId]);
   getDb().delete(modelApiKeys).where(eq(modelApiKeys.provider_id, providerId)).run();
 }
 
@@ -579,7 +664,8 @@ export function getAgent(id: string): AgentProfile | null {
   return row ? toAgentProfile(row) : null;
 }
 
-export function createAgent(input: AgentInput): AgentProfile {
+export async function createAgent(input: AgentInput): Promise<AgentProfile> {
+  if (shouldRouteWrites()) return writeDb<AgentProfile>("createAgent", [input]);
   const now = Date.now();
   const normalized = normalizeAgentInput(randomUUID(), input, null, now);
   getDb().insert(agents).values(normalized.agent).run();
@@ -595,7 +681,8 @@ export function createAgent(input: AgentInput): AgentProfile {
   return toAgentProfile(normalized.agent);
 }
 
-export function updateAgent(id: string, input: Partial<AgentInput>): AgentProfile {
+export async function updateAgent(id: string, input: Partial<AgentInput>): Promise<AgentProfile> {
+  if (shouldRouteWrites()) return writeDb<AgentProfile>("updateAgent", [id, input]);
   const existing = getRequiredAgentRow(id);
   assertAgentEditable(existing);
   const now = Date.now();
@@ -625,7 +712,8 @@ export function updateAgent(id: string, input: Partial<AgentInput>): AgentProfil
   return getAgent(id)!;
 }
 
-export function saveAgent(agent: AgentProfile): void {
+export async function saveAgent(agent: AgentProfile): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("saveAgent", [agent]);
   const existing = getDb().select().from(agents).where(eq(agents.id, agent.id)).get() ?? null;
   if (existing) assertAgentEditable(existing);
   const now = Date.now();
@@ -670,7 +758,8 @@ export function saveAgent(agent: AgentProfile): void {
   upsertAgentRuntimeState({ agent_id: agent.id, status: "idle" });
 }
 
-export function archiveAgent(id: string): AgentProfile {
+export async function archiveAgent(id: string): Promise<AgentProfile> {
+  if (shouldRouteWrites()) return writeDb<AgentProfile>("archiveAgent", [id]);
   const existing = getRequiredAgentRow(id);
   assertAgentEditable(existing);
   assertAgentNotBusy(id);
@@ -689,7 +778,8 @@ export function archiveAgent(id: string): AgentProfile {
   return getAgent(id)!;
 }
 
-export function restoreAgent(id: string): AgentProfile {
+export async function restoreAgent(id: string): Promise<AgentProfile> {
+  if (shouldRouteWrites()) return writeDb<AgentProfile>("restoreAgent", [id]);
   const existing = getRequiredAgentRow(id);
   assertAgentEditable(existing);
   if (existing.status !== "archived") {
@@ -711,7 +801,8 @@ export function restoreAgent(id: string): AgentProfile {
 }
 
 /** 永久删除智能体：硬删除 agents 表行；不允许删除 root/locked agent。 */
-export function deleteAgent(id: string): void {
+export async function deleteAgent(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteAgent", [id]);
   const existing = getRequiredAgentRow(id);
   assertAgentEditable(existing);
   if (existing.kind === "main") throw new Error("Root agent cannot be deleted.");
@@ -772,10 +863,11 @@ function formatAgentDeletionError(error: unknown): string {
   }
 }
 
-export function duplicateAgent(id: string): AgentProfile {
+export async function duplicateAgent(id: string): Promise<AgentProfile> {
+  if (shouldRouteWrites()) return writeDb<AgentProfile>("duplicateAgent", [id]);
   const existing = getAgent(id);
   if (!existing) throw new Error("Agent not found.");
-  const copy = createAgent({
+  const copy = await createAgent({
     ...existing,
     name: existing.name + " Copy",
     status: "draft",
@@ -806,7 +898,7 @@ export function getRuntimeRun(id: string): RuntimeRun | null {
   return row ? toRuntimeRun(row) : null;
 }
 
-export function createRuntimeRun(input: {
+export async function createRuntimeRun(input: {
   id?: string;
   conversation_id?: string | null;
   root_agent_id?: string | null;
@@ -823,7 +915,8 @@ export function createRuntimeRun(input: {
   metadata_json?: string;
   started_at?: number;
   finished_at?: number | null;
-}): RuntimeRun {
+}): Promise<RuntimeRun> {
+  if (shouldRouteWrites()) return writeDb<RuntimeRun>("createRuntimeRun", [input]);
   const now = Date.now();
   const row: NewRuntimeRun = {
     id: input.id ?? randomUUID(),
@@ -848,7 +941,11 @@ export function createRuntimeRun(input: {
   return toRuntimeRun(row as DbRuntimeRun);
 }
 
-export function cancelActiveRuntimeRunsForConversation(conversationId: string): number {
+export async function cancelActiveRuntimeRunsForConversation(
+  conversationId: string,
+): Promise<number> {
+  if (shouldRouteWrites())
+    return writeDb<number>("cancelActiveRuntimeRunsForConversation", [conversationId]);
   const now = Date.now();
   const result = getDb()
     .update(runtimeRuns)
@@ -868,10 +965,11 @@ export function cancelActiveRuntimeRunsForConversation(conversationId: string): 
   return result.changes;
 }
 
-export function updateRuntimeRun(
+export async function updateRuntimeRun(
   id: string,
   patch: Partial<Omit<RuntimeRun, "id" | "started_at">>,
-): RuntimeRun | null {
+): Promise<RuntimeRun | null> {
+  if (shouldRouteWrites()) return writeDb<RuntimeRun | null>("updateRuntimeRun", [id, patch]);
   const existing = getDb().select().from(runtimeRuns).where(eq(runtimeRuns.id, id)).get();
   if (!existing) return null;
   getDb()
@@ -909,14 +1007,15 @@ export function listAgentRunInputs(runId?: string, limit = 500): AgentRunInput[]
   return query.all().map(toAgentRunInput);
 }
 
-export function enqueueAgentRunInput(input: {
+export async function enqueueAgentRunInput(input: {
   runId: string;
   kind: AgentRunInputKind;
   source: AgentRunInputSource;
   message: unknown;
   id?: string;
   createdAt?: number;
-}): AgentRunInput {
+}): Promise<AgentRunInput> {
+  if (shouldRouteWrites()) return writeDb<AgentRunInput>("enqueueAgentRunInput", [input]);
   return getDb().transaction((tx) => {
     const latest = tx
       .select({ sequence: agentRunInputs.sequence })
@@ -942,11 +1041,13 @@ export function enqueueAgentRunInput(input: {
   });
 }
 
-export function consumeAgentRunInputs(
+export async function consumeAgentRunInputs(
   runId: string,
   kind: AgentRunInputKind,
   now = Date.now(),
-): AgentRunInput[] {
+): Promise<AgentRunInput[]> {
+  if (shouldRouteWrites())
+    return writeDb<AgentRunInput[]>("consumeAgentRunInputs", [runId, kind, now]);
   return getDb().transaction((tx) => {
     const rows = tx
       .select()
@@ -970,7 +1071,12 @@ export function consumeAgentRunInputs(
   });
 }
 
-export function discardAgentRunInputs(runId: string, reason: string, now = Date.now()): number {
+export async function discardAgentRunInputs(
+  runId: string,
+  reason: string,
+  now = Date.now(),
+): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("discardAgentRunInputs", [runId, reason, now]);
   return getDb()
     .update(agentRunInputs)
     .set({ status: "discarded", consumed_at: now, discarded_reason: reason.slice(0, 240) })
@@ -988,7 +1094,7 @@ export function listRuntimeSteps(limit = 200): RuntimeStep[] {
     .map(toRuntimeStep);
 }
 
-export function createRuntimeStep(input: {
+export async function createRuntimeStep(input: {
   id?: string;
   run_id: string;
   agent_id?: string | null;
@@ -1001,7 +1107,8 @@ export function createRuntimeStep(input: {
   started_at?: number;
   finished_at?: number | null;
   error?: string | null;
-}): RuntimeStep {
+}): Promise<RuntimeStep> {
+  if (shouldRouteWrites()) return writeDb<RuntimeStep>("createRuntimeStep", [input]);
   const row: NewRuntimeStep = {
     id: input.id ?? randomUUID(),
     run_id: input.run_id,
@@ -1019,10 +1126,11 @@ export function createRuntimeStep(input: {
   return toRuntimeStep(row as DbRuntimeStep);
 }
 
-export function updateRuntimeStep(
+export async function updateRuntimeStep(
   id: string,
   patch: Partial<Omit<RuntimeStep, "id" | "run_id" | "started_at">> & { detail?: unknown },
-): RuntimeStep | null {
+): Promise<RuntimeStep | null> {
+  if (shouldRouteWrites()) return writeDb<RuntimeStep | null>("updateRuntimeStep", [id, patch]);
   const existing = getDb().select().from(runtimeSteps).where(eq(runtimeSteps.id, id)).get();
   if (!existing) return null;
   getDb()
@@ -1109,11 +1217,22 @@ export function insertRuntimeEvent(input: {
     sequence: input.sequence ?? null,
     created_at: input.created_at ?? Date.now(),
   };
-  getDb().insert(runtimeEvents).values(row).run();
+  if (row.status === "running" && row.severity !== "error") {
+    if (isDbWriterWorker || !writesThroughWorker) getDb().insert(runtimeEvents).values(row).run();
+    else enqueueLowPriorityRuntimeEvent(row);
+  } else {
+    if (isDbWriterWorker || !writesThroughWorker) getDb().insert(runtimeEvents).values(row).run();
+    else void writeDb("insertRuntimeEvent", [input]);
+  }
   return toRuntimeEvent(row as DbRuntimeEvent);
 }
 
-export function saveAgentInstance(record: AgentInstanceRecord): AgentInstanceRecord {
+export async function flushDb(): Promise<void> {
+  await flushDbWriter();
+}
+
+export async function saveAgentInstance(record: AgentInstanceRecord): Promise<AgentInstanceRecord> {
+  if (shouldRouteWrites()) return writeDb<AgentInstanceRecord>("saveAgentInstance", [record]);
   getDb()
     .insert(agentInstances)
     .values(record)
@@ -1144,9 +1263,11 @@ export function listAgentInstances(limit = 300): AgentInstanceRecord[] {
     .map((row: DbAgentInstance) => row as AgentInstanceRecord);
 }
 
-export function saveCollaborationMessage(
+export async function saveCollaborationMessage(
   message: AgentCollaborationMessage,
-): AgentCollaborationMessage {
+): Promise<AgentCollaborationMessage> {
+  if (shouldRouteWrites())
+    return writeDb<AgentCollaborationMessage>("saveCollaborationMessage", [message]);
   getDb()
     .insert(collaborationMessages)
     .values(message)
@@ -1168,9 +1289,11 @@ export function listCollaborationMessages(limit = 500): AgentCollaborationMessag
     .map((row: DbCollaborationMessage) => row as AgentCollaborationMessage);
 }
 
-export function createContextCheckpoint(
+export async function createContextCheckpoint(
   checkpoint: AgentContextCheckpoint,
-): AgentContextCheckpoint {
+): Promise<AgentContextCheckpoint> {
+  if (shouldRouteWrites())
+    return writeDb<AgentContextCheckpoint>("createContextCheckpoint", [checkpoint]);
   getDb().insert(contextCheckpoints).values(checkpoint).run();
   return checkpoint;
 }
@@ -1295,7 +1418,11 @@ export function listMemories(options?: {
   return options?.limit && options.limit > 0 ? query.limit(options.limit).all() : query.all();
 }
 
-export function saveMemory(memory: MemoryRecord, options?: { queueSync?: boolean }): void {
+export async function saveMemory(
+  memory: MemoryRecord,
+  options?: { queueSync?: boolean },
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("saveMemory", [memory, options]);
   const row = normalizeMemoryRecord(memory);
   if (options?.queueSync !== false) row.sync_status = "pending";
   getDb()
@@ -1331,7 +1458,7 @@ export function saveMemory(memory: MemoryRecord, options?: { queueSync?: boolean
 
   // 同步更新 Mem0 向量索引；失败不阻断主流程
   if (options?.queueSync !== false) {
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "sync",
       agentId: row.agent_id,
       idempotencyKey: `memory:${row.id}:upsert`,
@@ -1340,13 +1467,14 @@ export function saveMemory(memory: MemoryRecord, options?: { queueSync?: boolean
   }
 }
 
-export function deleteMemory(id: string): void {
+export async function deleteMemory(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteMemory", [id]);
   const existing = getMemoryById(id);
   getDb().delete(memories).where(eq(memories.id, id)).run();
 
   // 同步删除 Mem0 向量索引；失败不阻断主流程
   if (existing) {
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "sync",
       agentId: existing.agent_id,
       idempotencyKey: `memory:${id}:delete`,
@@ -1363,10 +1491,11 @@ export function getMemoryByMem0Id(mem0Id: string): MemoryRecord | null {
   return getDb().select().from(memories).where(eq(memories.mem0_id, mem0Id)).get() ?? null;
 }
 
-export function updateMemorySyncState(
+export async function updateMemorySyncState(
   id: string,
   patch: { mem0Id?: string | null; status: "pending" | "synced" | "failed" },
-): void {
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("updateMemorySyncState", [id, patch]);
   getDb()
     .update(memories)
     .set({
@@ -1390,7 +1519,7 @@ export function listMemoryObservations(options?: {
   return options?.limit && options.limit > 0 ? query.limit(options.limit).all() : query.all();
 }
 
-export function saveMemoryObservation(input: {
+export async function saveMemoryObservation(input: {
   id?: string;
   dedupeKey: string;
   title: string;
@@ -1402,7 +1531,8 @@ export function saveMemoryObservation(input: {
   confidence: number;
   evidence?: unknown;
   expiresAt: number;
-}): MemoryObservation {
+}): Promise<MemoryObservation> {
+  if (shouldRouteWrites()) return writeDb<MemoryObservation>("saveMemoryObservation", [input]);
   const now = Date.now();
   const existing = getDb()
     .select()
@@ -1468,12 +1598,14 @@ export function saveMemoryObservation(input: {
   return row as MemoryObservation;
 }
 
-export function updateMemoryObservation(
+export async function updateMemoryObservation(
   id: string,
   patch: Partial<
     Pick<MemoryObservation, "status" | "promoted_memory_id" | "confidence" | "expires_at">
   >,
-): MemoryObservation | null {
+): Promise<MemoryObservation | null> {
+  if (shouldRouteWrites())
+    return writeDb<MemoryObservation | null>("updateMemoryObservation", [id, patch]);
   getDb()
     .update(memoryObservations)
     .set({ ...patch, updated_at: Date.now() })
@@ -1484,7 +1616,8 @@ export function updateMemoryObservation(
   );
 }
 
-export function expireMemoryObservations(now = Date.now()): number {
+export async function expireMemoryObservations(now = Date.now()): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("expireMemoryObservations", [now]);
   return getDb()
     .update(memoryObservations)
     .set({ status: "expired", updated_at: now })
@@ -1545,7 +1678,8 @@ function normalizeJsonArrayText(raw: string | undefined): string {
   }
 }
 
-export function markMemoriesUsed(ids: string[]): number {
+export async function markMemoriesUsed(ids: string[]): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("markMemoriesUsed", [ids]);
   const uniqueIds = [...new Set(ids.filter(Boolean))];
   if (uniqueIds.length === 0) return 0;
   const now = Date.now();
@@ -1574,7 +1708,83 @@ export function markMemoriesUsed(ids: string[]): number {
   return updated;
 }
 
-export function queueMemoryJob(input: {
+export async function ensureBuiltinCatalogSources(
+  sources: Array<typeof catalogSources.$inferInsert>,
+  now: number,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("ensureBuiltinCatalogSources", [sources, now]);
+  getDb().transaction((tx) => {
+    for (const source of sources) {
+      tx.insert(catalogSources)
+        .values({ ...source, created_at: now, updated_at: now })
+        .onConflictDoUpdate({
+          target: catalogSources.id,
+          set: {
+            name: source.name,
+            kind: source.kind,
+            url: source.url,
+            enabled: 1,
+            builtin: 1,
+            updated_at: now,
+          },
+        })
+        .run();
+    }
+  });
+}
+
+export async function cacheCatalogItems(
+  rows: Array<typeof catalogItems.$inferInsert>,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("cacheCatalogItems", [rows]);
+  getDb().transaction((tx) => {
+    for (const row of rows) {
+      tx.insert(catalogItems)
+        .values(row)
+        .onConflictDoUpdate({
+          target: catalogItems.id,
+          set: { ...row, id: undefined, source_id: undefined, external_id: undefined },
+        })
+        .run();
+    }
+  });
+}
+
+export async function updateCatalogSource(
+  id: string,
+  patch: Partial<typeof catalogSources.$inferInsert>,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("updateCatalogSource", [id, patch]);
+  getDb().update(catalogSources).set(patch).where(eq(catalogSources.id, id)).run();
+}
+
+export async function upsertArtifactInstallation(
+  row: typeof artifactInstallations.$inferInsert,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("upsertArtifactInstallation", [row]);
+  getDb()
+    .insert(artifactInstallations)
+    .values(row)
+    .onConflictDoUpdate({ target: artifactInstallations.id, set: { ...row, id: undefined } })
+    .run();
+}
+
+export async function updateArtifactInstallation(
+  id: string,
+  patch: Partial<typeof artifactInstallations.$inferInsert>,
+): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("updateArtifactInstallation", [id, patch]);
+  getDb().update(artifactInstallations).set(patch).where(eq(artifactInstallations.id, id)).run();
+}
+
+export async function deleteArtifactInstallation(id: string): Promise<boolean> {
+  if (shouldRouteWrites()) return writeDb<boolean>("deleteArtifactInstallation", [id]);
+  return (
+    getDb().delete(artifactInstallations).where(eq(artifactInstallations.id, id)).run().changes > 0
+  );
+}
+
+export async function queueMemoryJob(input: {
   kind: MemoryJobKind;
   idempotencyKey?: string | null;
   conversationId?: string | null;
@@ -1582,7 +1792,8 @@ export function queueMemoryJob(input: {
   runId?: string | null;
   payload?: unknown;
   scheduledAt?: number;
-}): MemoryJob {
+}): Promise<MemoryJob> {
+  if (shouldRouteWrites()) return writeDb<MemoryJob>("queueMemoryJob", [input]);
   const now = Date.now();
   const scheduledAt = input.scheduledAt ?? now;
   const payloadJson = JSON.stringify(input.payload ?? {});
@@ -1642,7 +1853,8 @@ export function queueMemoryJob(input: {
   return row as MemoryJob;
 }
 
-export function claimNextMemoryJob(now = Date.now()): MemoryJob | null {
+export async function claimNextMemoryJob(now = Date.now()): Promise<MemoryJob | null> {
+  if (shouldRouteWrites()) return writeDb<MemoryJob | null>("claimNextMemoryJob", [now]);
   const row = getDb()
     .select()
     .from(memoryJobs)
@@ -1665,11 +1877,12 @@ export function claimNextMemoryJob(now = Date.now()): MemoryJob | null {
   return getMemoryJobById(row.id);
 }
 
-export function finishMemoryJob(
+export async function finishMemoryJob(
   id: string,
   status: Extract<MemoryJobStatus, "succeeded" | "failed" | "cancelled">,
   error?: string | null,
-): MemoryJob | null {
+): Promise<MemoryJob | null> {
+  if (shouldRouteWrites()) return writeDb<MemoryJob | null>("finishMemoryJob", [id, status, error]);
   const existing = getMemoryJobById(id);
   if (!existing) return null;
   const now = Date.now();
@@ -1699,7 +1912,8 @@ export function listMemoryJobs(limit = 100): MemoryJob[] {
   return getDb().select().from(memoryJobs).orderBy(desc(memoryJobs.updated_at)).limit(limit).all();
 }
 
-export function deleteMemoriesBatch(ids: string[]): number {
+export async function deleteMemoriesBatch(ids: string[]): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("deleteMemoriesBatch", [ids]);
   if (ids.length === 0) return 0;
   const uniqueIds = [...new Set(ids)];
   const existing = uniqueIds
@@ -1716,7 +1930,7 @@ export function deleteMemoriesBatch(ids: string[]): number {
 
   // 事务提交后同步删除向量索引
   for (const memory of existing) {
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "sync",
       agentId: memory.agent_id,
       idempotencyKey: `memory:${memory.id}:delete`,
@@ -1731,10 +1945,11 @@ export function deleteMemoriesBatch(ids: string[]): number {
   return deleted;
 }
 
-export function updateMemoriesBatch(
+export async function updateMemoriesBatch(
   ids: string[],
   patch: Partial<Pick<MemoryRecord, "pinned" | "salience" | "kind" | "scope">>,
-): number {
+): Promise<number> {
+  if (shouldRouteWrites()) return writeDb<number>("updateMemoriesBatch", [ids, patch]);
   if (ids.length === 0) return 0;
   const setPatch: Partial<Record<string, unknown>> = {};
   if (patch.pinned !== undefined) setPatch.pinned = patch.pinned;
@@ -1760,7 +1975,7 @@ export function updateMemoriesBatch(
   for (const id of uniqueIds) {
     const memory = getMemoryById(id);
     if (!memory) continue;
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "sync",
       agentId: memory.agent_id,
       idempotencyKey: `memory:${id}:upsert`,
@@ -2308,6 +2523,127 @@ export function setToolSecret(input: ToolSecretInput): ToolSecretPublic {
   return publicToolSecret(row as DbToolSecret);
 }
 
+// Async write facades keep privileged callers off the main-process SQLite connection.
+export async function createToolServerAsync(input: ToolServerInput): Promise<ToolServer> {
+  return shouldRouteWrites()
+    ? writeDb<ToolServer>("createToolServer", [input])
+    : createToolServer(input);
+}
+export async function updateToolServerAsync(
+  id: string,
+  input: Partial<ToolServerInput>,
+): Promise<ToolServer> {
+  return shouldRouteWrites()
+    ? writeDb<ToolServer>("updateToolServer", [id, input])
+    : updateToolServer(id, input);
+}
+export async function deleteToolServerAsync(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteToolServer", [id]);
+  deleteToolServer(id);
+}
+export async function restoreToolServerAsync(id: string): Promise<ToolServer> {
+  return shouldRouteWrites()
+    ? writeDb<ToolServer>("restoreToolServer", [id])
+    : restoreToolServer(id);
+}
+export async function permanentlyDeleteToolServerAsync(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("permanentlyDeleteToolServer", [id]);
+  permanentlyDeleteToolServer(id);
+}
+export async function permanentlyDeleteToolServersAsync(ids: string[]): Promise<number> {
+  return shouldRouteWrites()
+    ? writeDb<number>("permanentlyDeleteToolServers", [ids])
+    : permanentlyDeleteToolServers(ids);
+}
+export async function purgeExpiredDeletedToolServersAsync(now = Date.now()): Promise<number> {
+  return shouldRouteWrites()
+    ? writeDb<number>("purgeExpiredDeletedToolServers", [now])
+    : purgeExpiredDeletedToolServers(now);
+}
+export async function setToolServerEnabledAsync(id: string, enabled: boolean): Promise<ToolServer> {
+  return shouldRouteWrites()
+    ? writeDb<ToolServer>("setToolServerEnabled", [id, enabled])
+    : setToolServerEnabled(id, enabled);
+}
+export async function updateToolServerStatusAsync(
+  id: string,
+  patch: Pick<Partial<ToolServer>, "status" | "last_error" | "last_connected_at">,
+): Promise<ToolServer | null> {
+  return shouldRouteWrites()
+    ? writeDb<ToolServer | null>("updateToolServerStatus", [id, patch])
+    : updateToolServerStatus(id, patch);
+}
+export const updateMcpServerStatusAsync = updateToolServerStatusAsync;
+export async function upsertMcpToolDefinitionsAsync(
+  serverId: string,
+  definitions: Parameters<typeof upsertMcpToolDefinitions>[1],
+): Promise<ToolRecord[]> {
+  return shouldRouteWrites()
+    ? writeDb<ToolRecord[]>("upsertMcpToolDefinitions", [serverId, definitions])
+    : upsertMcpToolDefinitions(serverId, definitions);
+}
+export async function updateToolRecordAsync(
+  id: string,
+  patch: Parameters<typeof updateToolRecord>[1],
+): Promise<ToolRecord> {
+  return shouldRouteWrites()
+    ? writeDb<ToolRecord>("updateToolRecord", [id, patch])
+    : updateToolRecord(id, patch);
+}
+export async function createSkillToolAsync(input: ToolSkillInput): Promise<ToolSkill> {
+  return shouldRouteWrites()
+    ? writeDb<ToolSkill>("createSkillTool", [input])
+    : createSkillTool(input);
+}
+export async function updateSkillToolAsync(
+  id: string,
+  input: Partial<ToolSkillInput>,
+): Promise<ToolSkill> {
+  return shouldRouteWrites()
+    ? writeDb<ToolSkill>("updateSkillTool", [id, input])
+    : updateSkillTool(id, input);
+}
+export async function deleteSkillToolAsync(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteSkillTool", [id]);
+  deleteSkillTool(id);
+}
+export async function restoreSkillToolAsync(id: string): Promise<ToolSkill> {
+  return shouldRouteWrites() ? writeDb<ToolSkill>("restoreSkillTool", [id]) : restoreSkillTool(id);
+}
+export async function permanentlyDeleteSkillToolAsync(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("permanentlyDeleteSkillTool", [id]);
+  permanentlyDeleteSkillTool(id);
+}
+export async function permanentlyDeleteSkillToolsAsync(ids: string[]): Promise<number> {
+  return shouldRouteWrites()
+    ? writeDb<number>("permanentlyDeleteSkillTools", [ids])
+    : permanentlyDeleteSkillTools(ids);
+}
+export async function purgeExpiredDeletedSkillToolsAsync(now = Date.now()): Promise<number> {
+  return shouldRouteWrites()
+    ? writeDb<number>("purgeExpiredDeletedSkillTools", [now])
+    : purgeExpiredDeletedSkillTools(now);
+}
+export async function setSkillToolEnabledAsync(id: string, enabled: boolean): Promise<ToolSkill> {
+  return shouldRouteWrites()
+    ? writeDb<ToolSkill>("setSkillToolEnabled", [id, enabled])
+    : setSkillToolEnabled(id, enabled);
+}
+export async function markSkillToolRunAsync(id: string, at = Date.now()): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("markSkillToolRun", [id, at]);
+  markSkillToolRun(id, at);
+}
+export async function setToolSecretAsync(input: ToolSecretInput): Promise<ToolSecretPublic> {
+  return shouldRouteWrites()
+    ? writeDb<ToolSecretPublic>("setToolSecret", [input])
+    : setToolSecret(input);
+}
+
+export async function deleteToolSecretAsync(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteToolSecret", [id]);
+  deleteToolSecret(id);
+}
+
 export function listToolSecretsPublic(
   ownerType?: ToolSecretOwnerType,
   ownerId?: string,
@@ -2443,6 +2779,20 @@ export function updateDesktopPetConfig(patch: DesktopPetConfigPatch): DesktopPet
   return getDesktopPetSnapshot();
 }
 
+export async function setDesktopPetEnabledAsync(enabled: boolean): Promise<DesktopPetSnapshot> {
+  return shouldRouteWrites()
+    ? writeDb<DesktopPetSnapshot>("setDesktopPetEnabled", [enabled])
+    : setDesktopPetEnabled(enabled);
+}
+
+export async function updateDesktopPetConfigAsync(
+  patch: DesktopPetConfigPatch,
+): Promise<DesktopPetSnapshot> {
+  return shouldRouteWrites()
+    ? writeDb<DesktopPetSnapshot>("updateDesktopPetConfig", [patch])
+    : updateDesktopPetConfig(patch);
+}
+
 export function getSyncState(): SyncState {
   return ensureSyncProfile();
 }
@@ -2535,6 +2885,12 @@ export function upsertSandboxSession(input: NewSandboxSession): SandboxSession {
   return getDb().select().from(sandboxSessions).where(eq(sandboxSessions.id, input.id)).get()!;
 }
 
+export async function upsertSandboxSessionAsync(input: NewSandboxSession): Promise<SandboxSession> {
+  return shouldRouteWrites()
+    ? writeDb<SandboxSession>("upsertSandboxSession", [input])
+    : upsertSandboxSession(input);
+}
+
 export function listSandboxSnapshots(limit = 100): SandboxSnapshot[] {
   return getDb()
     .select()
@@ -2556,6 +2912,14 @@ export function insertSandboxSnapshot(
   };
   getDb().insert(sandboxSnapshots).values(row).run();
   return row as SandboxSnapshot;
+}
+
+export async function insertSandboxSnapshotAsync(
+  input: Parameters<typeof insertSandboxSnapshot>[0],
+): Promise<SandboxSnapshot> {
+  return shouldRouteWrites()
+    ? writeDb<SandboxSnapshot>("insertSandboxSnapshot", [input])
+    : insertSandboxSnapshot(input);
 }
 
 export function getSandboxSnapshot(id: string): SandboxSnapshot | null {
@@ -2585,6 +2949,14 @@ export function insertSandboxArtifact(
   };
   getDb().insert(sandboxArtifacts).values(row).run();
   return row as SandboxArtifact;
+}
+
+export async function insertSandboxArtifactAsync(
+  input: Parameters<typeof insertSandboxArtifact>[0],
+): Promise<SandboxArtifact> {
+  return shouldRouteWrites()
+    ? writeDb<SandboxArtifact>("insertSandboxArtifact", [input])
+    : insertSandboxArtifact(input);
 }
 
 function seedDefaults(): void {

@@ -139,7 +139,7 @@ void describe("provider helpers", () => {
     assert.equal(new Set(providers.map((provider) => provider.id)).size, providers.length);
   });
 
-  void it("lets a legacy custom collision override and update its built-in slot", () => {
+  void it("lets a legacy custom collision override and update its built-in slot", async () => {
     const modelId = "Qwen/Qwen3-8B";
     const catalog: ModelCatalogSettings = {
       providers: [
@@ -173,7 +173,7 @@ void describe("provider helpers", () => {
     };
     settings.set(SettingKey.ModelCatalog, JSON.stringify(catalog));
 
-    providerHelpers.saveModelApiKey("siliconflow-cn", modelId, "legacy-model-key");
+    await providerHelpers.saveModelApiKey("siliconflow-cn", modelId, "legacy-model-key");
     let provider = providerHelpers.getProviderConfig("siliconflow-cn");
     assert.equal(provider?.source, "custom");
     assert.equal(provider?.label, "Legacy SiliconFlow");
@@ -185,8 +185,8 @@ void describe("provider helpers", () => {
     assert.equal(provider?.hasProviderApiKey, false);
     assert.equal(provider?.hasApiKey, true);
 
-    providerHelpers.saveProviderApiKey("siliconflow-cn", "provider-key");
-    provider = providerHelpers.upsertCustomProvider({
+    await providerHelpers.saveProviderApiKey("siliconflow-cn", "provider-key");
+    provider = await providerHelpers.upsertCustomProvider({
       id: "siliconflow-cn",
       label: "Updated SiliconFlow",
       baseUrl: "https://updated.example/v1/",
@@ -209,22 +209,21 @@ void describe("provider helpers", () => {
       7,
     );
     assert.equal(new Set(providers.map((item) => item.id)).size, providers.length);
-    assert.throws(
-      () =>
-        providerHelpers.upsertCustomProvider({
-          id: "xiaomi",
-          label: "Custom Xiaomi",
-          baseUrl: "https://custom-xiaomi.example/v1",
-        }),
+    await assert.rejects(
+      providerHelpers.upsertCustomProvider({
+        id: "xiaomi",
+        label: "Custom Xiaomi",
+        baseUrl: "https://custom-xiaomi.example/v1",
+      }),
       /Built-in providers cannot be overwritten/,
     );
 
-    providerHelpers.clearProviderApiKey("siliconflow-cn");
+    await providerHelpers.clearProviderApiKey("siliconflow-cn");
     provider = providerHelpers.getProviderConfig("siliconflow-cn");
     assert.equal(provider?.hasProviderApiKey, false);
     assert.equal(provider?.hasApiKey, true);
 
-    providerHelpers.deleteCustomProvider("siliconflow-cn");
+    await providerHelpers.deleteCustomProvider("siliconflow-cn");
     provider = providerHelpers.getProviderConfig("siliconflow-cn");
     assert.equal(provider?.source, "builtin");
     assert.equal(provider?.label, "硅基流动");
@@ -235,7 +234,7 @@ void describe("provider helpers", () => {
   });
 
   void it("syncs compatible models with Bearer auth and preserves namespaced IDs", async () => {
-    providerHelpers.saveProviderApiKey("siliconflow-cn", "silicon-key");
+    await providerHelpers.saveProviderApiKey("siliconflow-cn", "silicon-key");
     const previousFetch = globalThis.fetch;
     let requestedUrl = "";
     let authorization: string | null = null;
@@ -263,9 +262,9 @@ void describe("provider helpers", () => {
       assert.equal(result.provider.models[0]?.enabled, false);
 
       const modelRef = "siliconflow-cn/Qwen/Qwen3-8B";
-      providerHelpers.updateModelEnabled("siliconflow-cn", "Qwen/Qwen3-8B", true);
+      await providerHelpers.updateModelEnabled("siliconflow-cn", "Qwen/Qwen3-8B", true);
       settings.set(SettingKey.SelectedModel, modelRef);
-      providerHelpers.updateModelEnabled("siliconflow-cn", "Qwen/Qwen3-8B", true);
+      await providerHelpers.updateModelEnabled("siliconflow-cn", "Qwen/Qwen3-8B", true);
       assert.equal(settings.get(SettingKey.SelectedModel), modelRef);
       const resolved = providerHelpers.resolveModel(modelRef);
       assert.equal(resolved.providerId, "siliconflow-cn");

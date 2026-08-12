@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, protocol } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
-import { initDb, closeDb } from "./lib/db";
+import { initDbWriter, closeDb } from "./lib/db";
 import { scheduleMemoryFileConsolidation } from "./lib/agent-memory-files";
 import { startMemoryWorker } from "./lib/agent-learning";
 import { startServer, stopServer } from "./server";
@@ -44,6 +44,7 @@ protocol.registerSchemesAsPrivileged([
 let mainWindowRef: BrowserWindow | null = null;
 let desktopPetControllerRef: DesktopPetWindowController | null = null;
 let desktopPetTrayRef: DesktopPetTrayController | null = null;
+let isCleaningUpBeforeQuit = false;
 let isQuittingFromTray = false;
 
 function getPreloadPath(): string {
@@ -157,9 +158,9 @@ void app.whenReady().then(async () => {
   // 1. 初始化数据库（better-sqlite3 + drizzle-orm）
   //    迁移文件位于 apps/desktop/drizzle，生产环境从 process.resourcesPath/drizzle 读取
   try {
-    initDb();
-    migrateProviderApiKeysToModelKeys();
-    ensureBuiltinCatalogSources();
+    await initDbWriter();
+    await migrateProviderApiKeysToModelKeys();
+    await ensureBuiltinCatalogSources();
     scheduleMemoryFileConsolidation();
     startMemoryWorker();
     console.log("[main] 数据库已初始化");
@@ -245,13 +246,18 @@ app.on("window-all-closed", () => {
 });
 
 // 应用退出前清理资源
-app.on("before-quit", () => {
-  agentLoopSessions.interruptAll();
+app.on("before-quit", (event) => {
+  if (isCleaningUpBeforeQuit) return;
+  event.preventDefault();
+  isCleaningUpBeforeQuit = true;
   desktopPetControllerRef?.prepareForAppQuit();
   desktopPetTrayRef?.dispose();
   stopCronScheduler();
   stopServer();
-  closeDb();
+  void agentLoopSessions
+    .interruptAll()
+    .then(() => closeDb())
+    .finally(() => app.quit());
 });
 
 // 其余 main 进程代码可以拆分到独立文件并在此 require

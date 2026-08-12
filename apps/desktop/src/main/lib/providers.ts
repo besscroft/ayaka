@@ -255,10 +255,10 @@ function readCatalog(): ModelCatalogSettings {
   }
 }
 
-function writeCatalog(catalog: ModelCatalogSettings): void {
+async function writeCatalog(catalog: ModelCatalogSettings): Promise<void> {
   const normalized = normalizeCatalog(catalog);
-  setSetting(SettingKey.ModelCatalog, JSON.stringify(normalized));
-  clearInvalidSelectedModel(normalized);
+  await setSetting(SettingKey.ModelCatalog, JSON.stringify(normalized));
+  await clearInvalidSelectedModel(normalized);
 }
 
 function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSettings {
@@ -586,10 +586,10 @@ function isSelectedModelValid(catalog: ModelCatalogSettings, selectedModel: stri
   return !!model && isModelEnabled(catalog, providerId, modelId);
 }
 
-function clearInvalidSelectedModel(catalog = readCatalog()): void {
+async function clearInvalidSelectedModel(catalog = readCatalog()): Promise<void> {
   const selectedModel = getSetting(SettingKey.SelectedModel);
   if (selectedModel && !isSelectedModelValid(catalog, selectedModel)) {
-    setSetting(SettingKey.SelectedModel, "");
+    await setSetting(SettingKey.SelectedModel, "");
   }
 }
 
@@ -703,7 +703,7 @@ export function getProviderConfig(providerId: string): ProviderInfo | null {
   return listProviders().find((provider) => provider.id === providerId) ?? null;
 }
 
-export function upsertCustomProvider(input: CustomProviderInput): ProviderInfo {
+export async function upsertCustomProvider(input: CustomProviderInput): Promise<ProviderInfo> {
   const catalog = readCatalog();
   const id = normalizeProviderId(input.id ?? input.label);
   if (!id) throw new Error("Provider id is required");
@@ -735,14 +735,14 @@ export function upsertCustomProvider(input: CustomProviderInput): ProviderInfo {
   catalog.providers = existing
     ? catalog.providers.map((provider) => (provider.id === id ? nextProvider : provider))
     : [...catalog.providers, nextProvider];
-  writeCatalog(catalog);
+  await writeCatalog(catalog);
 
   const saved = getProviderConfig(id);
   if (!saved) throw new Error("Failed to save provider");
   return saved;
 }
 
-export function deleteCustomProvider(providerId: string): void {
+export async function deleteCustomProvider(providerId: string): Promise<void> {
   const id = normalizeProviderId(providerId);
   const catalog = readCatalog();
   const existing = catalog.providers.find((provider) => provider.id === id);
@@ -751,21 +751,21 @@ export function deleteCustomProvider(providerId: string): void {
   catalog.providers = catalog.providers.filter((provider) => provider.id !== id);
   catalog.models = catalog.models.filter((model) => model.providerId !== id);
   catalog.modelStates = catalog.modelStates.filter((state) => state.providerId !== id);
-  writeCatalog(catalog);
-  deleteApiKey(id);
-  deleteModelApiKeysForProvider(id);
+  await writeCatalog(catalog);
+  await deleteApiKey(id);
+  await deleteModelApiKeysForProvider(id);
 }
 
-export function saveProviderApiKey(providerId: string, apiKey: string): void {
+export async function saveProviderApiKey(providerId: string, apiKey: string): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const key = apiKey.trim();
   if (!key) throw new Error("API key is required");
   assertKnownProvider(normalizedProviderId);
-  setApiKey(normalizedProviderId, key);
+  await setApiKey(normalizedProviderId, key);
 }
 
-export function clearProviderApiKey(providerId: string): void {
-  deleteApiKey(normalizeProviderId(providerId));
+export async function clearProviderApiKey(providerId: string): Promise<void> {
+  await deleteApiKey(normalizeProviderId(providerId));
 }
 
 export function resolveProviderApiKeyFallback({
@@ -1303,7 +1303,7 @@ export async function syncAvailableModels(providerId: string): Promise<ProviderM
 
   const remoteModels = await fetchRemoteModels(provider, apiKey);
   const result = mergeRemoteModelsIntoCatalog(readCatalog(), id, remoteModels);
-  writeCatalog(result.catalog);
+  await writeCatalog(result.catalog);
   const saved = getProviderConfig(id);
   if (!saved) throw new Error("Failed to save provider");
   return {
@@ -1315,7 +1315,7 @@ export async function syncAvailableModels(providerId: string): Promise<ProviderM
   };
 }
 
-export function upsertCustomModel(input: CustomModelInput): ProviderInfo {
+export async function upsertCustomModel(input: CustomModelInput): Promise<ProviderInfo> {
   const providerId = normalizeProviderId(input.providerId);
   assertKnownProvider(providerId);
 
@@ -1375,37 +1375,45 @@ export function upsertCustomModel(input: CustomModelInput): ProviderInfo {
       )
     : [...catalog.models, nextModel];
   setModelState(catalog, providerId, modelId, nextModel.enabled);
-  writeCatalog(catalog);
+  await writeCatalog(catalog);
 
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error("Failed to save model");
   return provider;
 }
 
-export function updateModelEnabled(providerId: string, modelId: string, enabled: boolean): void {
+export async function updateModelEnabled(
+  providerId: string,
+  modelId: string,
+  enabled: boolean,
+): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedModelId = modelId.trim();
   assertKnownModel(normalizedProviderId, normalizedModelId);
 
   const catalog = readCatalog();
   setModelState(catalog, normalizedProviderId, normalizedModelId, enabled);
-  writeCatalog(catalog);
+  await writeCatalog(catalog);
 }
 
-export function saveModelApiKey(providerId: string, modelId: string, apiKey: string): void {
+export async function saveModelApiKey(
+  providerId: string,
+  modelId: string,
+  apiKey: string,
+): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedModelId = modelId.trim();
   const key = apiKey.trim();
   if (!key) throw new Error("API key is required");
   assertKnownModel(normalizedProviderId, normalizedModelId);
-  setModelApiKey(normalizedProviderId, normalizedModelId, key);
+  await setModelApiKey(normalizedProviderId, normalizedModelId, key);
 }
 
-export function clearModelApiKey(providerId: string, modelId: string): void {
-  deleteModelApiKey(normalizeProviderId(providerId), modelId.trim());
+export async function clearModelApiKey(providerId: string, modelId: string): Promise<void> {
+  await deleteModelApiKey(normalizeProviderId(providerId), modelId.trim());
 }
 
-export function deleteCustomModel(providerId: string, modelId: string): void {
+export async function deleteCustomModel(providerId: string, modelId: string): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedModelId = modelId.trim();
   const catalog = readCatalog();
@@ -1415,17 +1423,17 @@ export function deleteCustomModel(providerId: string, modelId: string): void {
   );
   if (catalog.models.length === before) throw new Error("Custom model not found");
   removeModelState(catalog, normalizedProviderId, normalizedModelId);
-  writeCatalog(catalog);
-  deleteModelApiKey(normalizedProviderId, normalizedModelId);
+  await writeCatalog(catalog);
+  await deleteModelApiKey(normalizedProviderId, normalizedModelId);
 }
 
-export function migrateProviderApiKeysToModelKeys(): void {
+export async function migrateProviderApiKeysToModelKeys(): Promise<void> {
   for (const provider of listProviders()) {
     if (getApiKey(provider.id)) continue;
     const legacyKey = getProviderOrLegacyModelApiKey(provider.id);
-    if (legacyKey) setApiKey(provider.id, legacyKey);
+    if (legacyKey) await setApiKey(provider.id, legacyKey);
   }
-  clearInvalidSelectedModel();
+  await clearInvalidSelectedModel();
 }
 
 export function resolveMediaModel(

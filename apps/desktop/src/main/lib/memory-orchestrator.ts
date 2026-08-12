@@ -72,7 +72,7 @@ export class MemoryOrchestrator {
     const candidates = extractObservationCandidates(latestUser.content);
     const observations: MemoryObservation[] = [];
     for (const candidate of candidates) {
-      const observation = saveMemoryObservation({
+      const observation = await saveMemoryObservation({
         dedupeKey: observationKey(candidate.content, candidate.kind),
         title: titleFromContent(candidate.content),
         content: candidate.content,
@@ -105,7 +105,7 @@ export class MemoryOrchestrator {
     }
 
     if (observations.length > 0) {
-      queueMemoryJob({
+      await queueMemoryJob({
         kind: "consolidate",
         agentId: input.agentId ?? DEFAULT_AGENT_ID,
         idempotencyKey: `consolidate:${input.conversationId}`,
@@ -161,8 +161,8 @@ export class MemoryOrchestrator {
       .sort((a, b) => rankMemory(b.memory, b.semantic) - rankMemory(a.memory, a.semantic))
       .slice(0, limit)
       .map((item) => item.memory);
-    markMemoriesUsed(selected.map((memory) => memory.id));
-    insertRuntimeEvent({
+    await markMemoriesUsed(selected.map((memory) => memory.id));
+    void insertRuntimeEvent({
       kind: "memory",
       title: "Memory retrieval completed",
       status: "succeeded",
@@ -175,7 +175,7 @@ export class MemoryOrchestrator {
     return selected;
   }
 
-  saveExplicit(input: ExplicitMemoryInput): MemoryRecord {
+  async saveExplicit(input: ExplicitMemoryInput): Promise<MemoryRecord> {
     const now = Date.now();
     const scope = input.scope ?? "global";
     const memory: MemoryRecord = {
@@ -210,12 +210,12 @@ export class MemoryOrchestrator {
       updated_at: now,
     };
     if (!memory.title || !memory.content) throw new Error("title and content are required.");
-    saveMemory(memory);
+    await saveMemory(memory);
     void incorporateMemoryFile(memory);
     return memory;
   }
 
-  update(id: string, patch: Partial<MemoryRecord>): MemoryRecord {
+  async update(id: string, patch: Partial<MemoryRecord>): Promise<MemoryRecord> {
     const existing = getMemoryById(id);
     if (!existing) throw new Error(`Memory not found: ${id}`);
     const next: MemoryRecord = {
@@ -239,16 +239,16 @@ export class MemoryOrchestrator {
       sync_status: "pending",
       updated_at: Date.now(),
     };
-    saveMemory(next);
+    await saveMemory(next);
     return next;
   }
 
-  remove(id: string): void {
-    deleteMemory(id);
+  async remove(id: string): Promise<void> {
+    await deleteMemory(id);
   }
 
   async consolidate(agentId = DEFAULT_AGENT_ID): Promise<number> {
-    expireMemoryObservations();
+    await expireMemoryObservations();
     const pending = listMemoryObservations({ status: "pending", limit: 100 });
     let promoted = 0;
     for (const observation of pending) {
@@ -276,7 +276,7 @@ export class MemoryOrchestrator {
     return promoted;
   }
 
-  decay(now = Date.now()): number {
+  async decay(now = Date.now()): Promise<number> {
     let archived = 0;
     for (const memory of listMemories()) {
       if (isDecayProtected(memory)) continue;
@@ -285,7 +285,7 @@ export class MemoryOrchestrator {
       const factor = Math.pow(0.5, ageMs / (halfLifeDays * 24 * 60 * 60 * 1_000));
       const strength = clamp(Math.round((memory.strength ?? memory.salience) * factor), 1, 100);
       const status = strength < DECAY_ARCHIVE_THRESHOLD ? "archived" : memory.status;
-      saveMemory({ ...memory, strength, status, updated_at: now });
+      await saveMemory({ ...memory, strength, status, updated_at: now });
       if (status === "archived") archived += 1;
     }
     return archived;
@@ -304,17 +304,17 @@ export class MemoryOrchestrator {
     try {
       if (memory.status !== "active") {
         await deleteMemoryFromMem0(memory.mem0_id);
-        updateMemorySyncState(memory.id, { mem0Id: null, status: "synced" });
+        await updateMemorySyncState(memory.id, { mem0Id: null, status: "synced" });
         return;
       }
       const mem0Id = await upsertMemoryInMem0(memory);
       if (!mem0Id) throw new Error("Mem0 is unavailable; memory sync will retry.");
-      updateMemorySyncState(memory.id, {
+      await updateMemorySyncState(memory.id, {
         mem0Id,
         status: "synced",
       });
     } catch (error) {
-      updateMemorySyncState(memory.id, { mem0Id: memory.mem0_id, status: "failed" });
+      await updateMemorySyncState(memory.id, { mem0Id: memory.mem0_id, status: "failed" });
       throw error;
     }
   }
@@ -326,7 +326,7 @@ export class MemoryOrchestrator {
     for (const memory of listMemories()) {
       const mem0Id = await upsertMemoryInMem0({ ...memory, mem0_id: null });
       if (!mem0Id) continue;
-      updateMemorySyncState(memory.id, { mem0Id, status: "synced" });
+      await updateMemorySyncState(memory.id, { mem0Id, status: "synced" });
       restored += 1;
     }
     insertRuntimeEvent({
@@ -355,8 +355,8 @@ export class MemoryOrchestrator {
         last_reinforced_at: Date.now(),
         updated_at: Date.now(),
       };
-      saveMemory(reinforced);
-      updateMemoryObservation(observation.id, {
+      await saveMemory(reinforced);
+      await updateMemoryObservation(observation.id, {
         status: "promoted",
         promoted_memory_id: reinforced.id,
       });
@@ -365,7 +365,7 @@ export class MemoryOrchestrator {
 
     const superseded = correction ? findCorrectionTarget(observation) : null;
     if (superseded) {
-      saveMemory({ ...superseded, status: "superseded", updated_at: Date.now() });
+      await saveMemory({ ...superseded, status: "superseded", updated_at: Date.now() });
     }
     const now = Date.now();
     const memory: MemoryRecord = {
@@ -393,9 +393,9 @@ export class MemoryOrchestrator {
       created_at: now,
       updated_at: now,
     };
-    saveMemory(memory);
+    await saveMemory(memory);
     await incorporateMemoryFile(memory);
-    updateMemoryObservation(observation.id, {
+    await updateMemoryObservation(observation.id, {
       status: "promoted",
       promoted_memory_id: memory.id,
     });

@@ -1060,18 +1060,18 @@ async function executeCronTool(input: CronToolInput): Promise<unknown> {
     case "get":
       return getCronJob(requireCronId(input));
     case "create":
-      return createCronJob(requireCronCreateJob(input));
+      return await createCronJob(requireCronCreateJob(input));
     case "update":
       if (!input.job) throw new Error("job is required for cron.update");
-      return updateCronJob(requireCronId(input), input.job);
+      return await updateCronJob(requireCronId(input), input.job);
     case "pause":
-      return setCronJobPaused(requireCronId(input), true);
+      return await setCronJobPaused(requireCronId(input), true);
     case "resume":
-      return setCronJobPaused(requireCronId(input), false);
+      return await setCronJobPaused(requireCronId(input), false);
     case "run":
       return await getCronScheduler().runNow(requireCronId(input));
     case "delete":
-      return { deleted: deleteCronJob(requireCronId(input)) };
+      return { deleted: await deleteCronJob(requireCronId(input)) };
   }
 }
 
@@ -1343,7 +1343,7 @@ async function saveChatMemory(
   conversationId: string | undefined,
   agentId: string | null | undefined,
 ): Promise<unknown> {
-  const memory = memoryOrchestrator.saveExplicit({
+  const memory = await memoryOrchestrator.saveExplicit({
     title: input.title,
     content: input.content,
     scope: input.scope ?? "global",
@@ -1366,7 +1366,7 @@ async function saveChatMemory(
 }
 
 async function updateChatMemory(input: MemoryUpdateInput): Promise<unknown> {
-  const memory = memoryOrchestrator.update(input.id, {
+  const memory = await memoryOrchestrator.update(input.id, {
     title: input.title?.trim().slice(0, 120),
     content: input.content?.trim().slice(0, 4_000),
     scope: input.scope,
@@ -1388,7 +1388,7 @@ async function updateChatMemory(input: MemoryUpdateInput): Promise<unknown> {
 async function deleteChatMemory(input: { id: string }): Promise<unknown> {
   const existing = getMemoryById(input.id);
   if (!existing) throw new Error(`Memory not found: ${input.id}`);
-  memoryOrchestrator.remove(input.id);
+  await memoryOrchestrator.remove(input.id);
   return { success: true, id: input.id };
 }
 

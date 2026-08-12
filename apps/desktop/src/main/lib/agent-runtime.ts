@@ -207,7 +207,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
   const resolved = applyRuntimeConfig(rootResolved, rootRuntimeConfig);
   const modelContext = toChatToolModelContext(rootModelRef, resolved);
   const runId = options.runId ?? randomUUID();
-  const session = agentLoopSessions.start({
+  const session = await agentLoopSessions.start({
     runId,
     conversationId: options.conversationId,
     rootAgentId: DEFAULT_AGENT_ID,
@@ -219,11 +219,11 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     messages: options.messages,
   });
   if (options.abortSignal) {
-    if (options.abortSignal.aborted) session.cancel("request_aborted");
+    if (options.abortSignal.aborted) void session.cancel("request_aborted");
     else {
       options.abortSignal.addEventListener(
         "abort",
-        () => session.cancel(String(options.abortSignal?.reason ?? "request_aborted")),
+        () => void session.cancel(String(options.abortSignal?.reason ?? "request_aborted")),
         { once: true },
       );
     }
@@ -240,7 +240,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     "abort",
     () => {
       coordinator.interruptAll();
-      session.cancel("request_aborted");
+      void session.cancel("request_aborted");
     },
     { once: true },
   );
@@ -252,7 +252,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       conversationId: options.conversationId,
       summary: rootAgent.name + " is planning",
     });
-    createRuntimeStep({
+    void createRuntimeStep({
       run_id: runId,
       agent_id: DEFAULT_AGENT_ID,
       kind: "guardrail",
@@ -383,7 +383,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    finishRun(context, "failed", { error: message });
+    await finishRun(context, "failed", { error: message });
     throw error;
   }
 }
@@ -444,7 +444,7 @@ async function streamRootAgentLoop({
           lastText = await finalResult.text;
           lastUsage = await finalResult.usage;
           firstEpoch = false;
-          finishRun(context, "succeeded", {
+          await finishRun(context, "succeeded", {
             execution: tracker.finalize(lastFinishReason, lastUsage),
             outputSummary: lastText,
           });
@@ -458,7 +458,7 @@ async function streamRootAgentLoop({
           }
           modelMessages = await appendQueuedMessages(
             modelMessages,
-            context.session.drain("steering"),
+            await context.session.drain("steering"),
             agent.tools,
           );
           let result: Awaited<ReturnType<typeof agent.stream>>;
@@ -506,7 +506,7 @@ async function streamRootAgentLoop({
           firstEpoch = false;
 
           if (context.approvalRequested) {
-            finishRun(context, "succeeded");
+            await finishRun(context, "succeeded");
             break;
           }
           if (budgetReason) {
@@ -515,19 +515,19 @@ async function streamRootAgentLoop({
           }
           if (toolCalls.length > 0) continue;
 
-          const steering = context.session.drain("steering");
+          const steering = await context.session.drain("steering");
           if (steering.length > 0) {
             context.messages.push(...steering);
             modelMessages = await appendQueuedMessages(modelMessages, steering, agent.tools);
             continue;
           }
-          const followUps = context.session.drain("follow_up");
+          const followUps = await context.session.drain("follow_up");
           if (followUps.length > 0) {
             modelMessages = await appendQueuedMessages(modelMessages, followUps, agent.tools);
             continue;
           }
 
-          finishRun(context, "succeeded", {
+          await finishRun(context, "succeeded", {
             execution: tracker.finalize(lastFinishReason, lastUsage),
             outputSummary: lastText,
           });
@@ -548,7 +548,7 @@ async function streamRootAgentLoop({
           abortSignal: context.session.signal,
         });
         if (classification.code === "cancelled") {
-          if (context.session.isActive) finishRun(context, "cancelled");
+          if (context.session.isActive) await finishRun(context, "cancelled");
           writer.write({
             type: "abort",
             reason: String(context.session.signal.reason ?? "cancelled"),
@@ -556,7 +556,7 @@ async function streamRootAgentLoop({
           return;
         }
         if (context.session.isActive) {
-          finishRun(context, "failed", {
+          await finishRun(context, "failed", {
             error: classification.error,
             errorCode: classification.code,
             diagnostic: classification.diagnostic,
@@ -806,7 +806,7 @@ function createToolLoopAgent({
         ? async ({ messages: stepMessages }) => {
             let messages = stepMessages;
             if (injectSteering && protocol) {
-              const steering = protocol.context.session.drain("steering");
+              const steering = await protocol.context.session.drain("steering");
               if (steering.length > 0) {
                 protocol.context.messages.push(...steering);
                 const converted = await convertToModelMessages(steering, { tools: agentTools });
@@ -898,7 +898,7 @@ async function runChildAgent(
 ): Promise<Record<string, unknown>> {
   const started = Date.now();
   const task = input.taskSummary ?? input.task ?? "";
-  const step = createRuntimeStep({
+  const step = await createRuntimeStep({
     run_id: context.runId,
     agent_id: child.id,
     kind: mode,
@@ -912,7 +912,7 @@ async function runChildAgent(
     taskName: child.name,
     message: task,
     execute: async ({ instance: runningInstance, abortSignal }) => {
-      saveAgentInstance(runningInstance);
+      void saveAgentInstance(runningInstance);
       const childModelRef = child.model_ref || context.modelRef;
       const childResolved = applyRuntimeConfig(
         child.model_ref ? context.resolveModel(childModelRef) : context.resolved,
@@ -959,7 +959,7 @@ async function runChildAgent(
       return summarizeText(result.text, 6_000);
     },
   });
-  saveAgentInstance(instance);
+  void saveAgentInstance(instance);
   if (mode === "handoff") {
     context.finalAgentId = child.id;
     context.coordinator.transferOwnership(instance.agent_path);
@@ -984,7 +984,7 @@ async function runChildAgent(
   try {
     const output = await context.coordinator.waitAgent(instance.agent_path);
     persistCoordinatorState(context);
-    updateRuntimeStep(step.id, {
+    await updateRuntimeStep(step.id, {
       status: "succeeded",
       detail: { input, output, durationMs: Date.now() - started },
       finished_at: Date.now(),
@@ -1015,7 +1015,7 @@ async function runChildAgent(
   } catch (error) {
     persistCoordinatorState(context);
     const message = error instanceof Error ? error.message : String(error);
-    updateRuntimeStep(step.id, {
+    await updateRuntimeStep(step.id, {
       status: "failed",
       error: message,
       detail: { input, error: message },
@@ -1252,7 +1252,7 @@ async function runSandboxStep<T>(
   action: (sandbox: SandboxContext) => Promise<T> | T,
 ): Promise<T> {
   const sandbox = getSandboxSessionOrThrow(context.sandbox);
-  const step = createRuntimeStep({
+  const step = await createRuntimeStep({
     run_id: context.runId,
     agent_id: DEFAULT_AGENT_ID,
     kind: "sandbox",
@@ -1273,7 +1273,7 @@ async function runSandboxStep<T>(
   });
   try {
     const result = await action(sandbox);
-    updateRuntimeStep(step.id, {
+    await updateRuntimeStep(step.id, {
       status: "succeeded",
       detail: {
         sessionId: sandbox.session.id,
@@ -1303,7 +1303,7 @@ async function runSandboxStep<T>(
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    updateRuntimeStep(step.id, {
+    await updateRuntimeStep(step.id, {
       status: "failed",
       error: message,
       detail: { error: message },
@@ -1324,7 +1324,7 @@ function createGuardrailApproval(
   toolApprovalToolNames = new Set<string>(),
   builtinToolNames = new Set<string>(),
 ): ToolApprovalConfiguration<ToolSet, unknown> {
-  return ({ toolCall }) => {
+  return async ({ toolCall }) => {
     const toolName = String(toolCall.toolName);
     const input = (toolCall as { input?: unknown }).input;
     const decision = evaluateToolGuardrail(
@@ -1334,7 +1334,7 @@ function createGuardrailApproval(
       toolApprovalToolNames,
       builtinToolNames,
     );
-    const step = createRuntimeStep({
+    const step = await createRuntimeStep({
       run_id: context.runId,
       agent_id: DEFAULT_AGENT_ID,
       kind: decision.decision === "require_review" ? "approval" : "tool",
@@ -1434,7 +1434,7 @@ function evaluateToolGuardrail(
   return { decision: "allow", risk: "low", reason: "Allowed by policy." };
 }
 
-function finishRun(
+async function finishRun(
   context: RuntimeContext,
   status: "succeeded" | "failed" | "cancelled",
   extra: {
@@ -1444,23 +1444,23 @@ function finishRun(
     execution?: ChatMessageMetadata["execution"];
     outputSummary?: string;
   } = {},
-): void {
+): Promise<void> {
   const finishedAt = Date.now();
   const failed = status === "failed";
   const finalStatus =
     context.approvalRequested && status === "succeeded" ? "waiting_approval" : status;
   if (finalStatus === "waiting_approval") {
-    context.session.markWaitingApproval();
-    updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
+    await context.session.markWaitingApproval();
+    await updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
   } else if (status === "failed") {
-    context.session.fail(extra.error ?? "Agent run failed");
+    await context.session.fail(extra.error ?? "Agent run failed");
   } else if (status === "cancelled") {
-    context.session.cancel(extra.error ?? "cancelled");
+    await context.session.cancel(extra.error ?? "cancelled");
   } else {
-    context.session.complete(extra.outputSummary, extra.execution);
-    updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
+    await context.session.complete(extra.outputSummary, extra.execution);
+    await updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
   }
-  createRuntimeStep({
+  await createRuntimeStep({
     run_id: context.runId,
     agent_id: context.finalAgentId,
     kind: failed ? "error" : status === "cancelled" ? "diagnostic" : "output_guardrail",
@@ -1594,7 +1594,7 @@ function createExecutionTracker({
     messageMetadata,
     recordModelStep: () => {
       stepCount += 1;
-      createRuntimeStep({
+      void createRuntimeStep({
         run_id: runId,
         agent_id: agentId,
         kind: "model",
@@ -1991,8 +1991,8 @@ function createContextManager(
 }
 
 function persistCoordinatorState(context: RuntimeContext): void {
-  for (const instance of context.coordinator.listAgents()) saveAgentInstance(instance);
-  for (const message of context.coordinator.listMessages()) saveCollaborationMessage(message);
+  for (const instance of context.coordinator.listAgents()) void saveAgentInstance(instance);
+  for (const message of context.coordinator.listMessages()) void saveCollaborationMessage(message);
 }
 
 function createProtocolRecorder(

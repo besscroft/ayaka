@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, isNull, lte } from "drizzle-orm";
 import type { CronJob, CronJobInput, CronPayload, CronRun, CronSchedule } from "../../shared/types";
-import { createConversation, getDb } from "./db";
+import { createConversation, getDb, isDbWriterEnabled } from "./db";
+import { isDbWriterWorker, writeDb } from "./db-writer";
 import { cronJobs, cronRuns } from "./schema";
 import { nextRunForSchedule, normalizeCronSchedule } from "./cron-schedule";
 
@@ -15,12 +16,15 @@ export interface ClaimedCronRun {
   manual: boolean;
 }
 
-export function createCronJob(input: CronJobInput, now = Date.now()): CronJob {
+export async function createCronJob(input: CronJobInput, now = Date.now()): Promise<CronJob> {
+  if (isDbWriterEnabled() && !isDbWriterWorker) {
+    return writeDb<CronJob>("createCronJob", [input, now]);
+  }
   const schedule = normalizeCronSchedule(input.schedule);
   const payload = normalizeCronPayload(input.payload);
   const id = randomUUID();
   const conversationId = randomUUID();
-  createConversation(conversationId, `Automation: ${normalizeName(input.name)}`);
+  await createConversation(conversationId, `Automation: ${normalizeName(input.name)}`);
   const row: typeof cronJobs.$inferInsert = {
     id,
     name: normalizeName(input.name),
@@ -55,7 +59,13 @@ export function getCronJob(id: string): CronJob | null {
   return row ? toCronJob(row) : null;
 }
 
-export function updateCronJob(id: string, patch: Partial<CronJobInput>, now = Date.now()): CronJob {
+export async function updateCronJob(
+  id: string,
+  patch: Partial<CronJobInput>,
+  now = Date.now(),
+): Promise<CronJob> {
+  if (isDbWriterEnabled() && !isDbWriterWorker)
+    return writeDb<CronJob>("updateCronJob", [id, patch, now]);
   const current = getDb().select().from(cronJobs).where(eq(cronJobs.id, id)).get();
   if (!current) throw new Error("Cron job does not exist.");
   if (current.claimed_at) throw new Error("Cron job is currently running.");
@@ -85,7 +95,13 @@ export function updateCronJob(id: string, patch: Partial<CronJobInput>, now = Da
   return getCronJob(id)!;
 }
 
-export function setCronJobPaused(id: string, paused: boolean, now = Date.now()): CronJob {
+export async function setCronJobPaused(
+  id: string,
+  paused: boolean,
+  now = Date.now(),
+): Promise<CronJob> {
+  if (isDbWriterEnabled() && !isDbWriterWorker)
+    return writeDb<CronJob>("setCronJobPaused", [id, paused, now]);
   const current = getDb().select().from(cronJobs).where(eq(cronJobs.id, id)).get();
   if (!current) throw new Error("Cron job does not exist.");
   if (current.claimed_at) throw new Error("Cron job is currently running.");
@@ -102,7 +118,8 @@ export function setCronJobPaused(id: string, paused: boolean, now = Date.now()):
   return getCronJob(id)!;
 }
 
-export function deleteCronJob(id: string): boolean {
+export async function deleteCronJob(id: string): Promise<boolean> {
+  if (isDbWriterEnabled() && !isDbWriterWorker) return writeDb<boolean>("deleteCronJob", [id]);
   return getDb().delete(cronJobs).where(eq(cronJobs.id, id)).run().changes > 0;
 }
 
@@ -117,7 +134,9 @@ export function listCronRuns(jobId: string, limit = 100): CronRun[] {
     .map(toCronRun);
 }
 
-export function claimDueCronJobs(now = Date.now(), limit = 2): ClaimedCronRun[] {
+export async function claimDueCronJobs(now = Date.now(), limit = 2): Promise<ClaimedCronRun[]> {
+  if (isDbWriterEnabled() && !isDbWriterWorker)
+    return writeDb<ClaimedCronRun[]>("claimDueCronJobs", [now, limit]);
   const db = getDb();
   return db.transaction((tx) => {
     const due = tx
@@ -169,7 +188,9 @@ export function claimDueCronJobs(now = Date.now(), limit = 2): ClaimedCronRun[] 
   });
 }
 
-export function claimCronJobNow(id: string, now = Date.now()): ClaimedCronRun {
+export async function claimCronJobNow(id: string, now = Date.now()): Promise<ClaimedCronRun> {
+  if (isDbWriterEnabled() && !isDbWriterWorker)
+    return writeDb<ClaimedCronRun>("claimCronJobNow", [id, now]);
   const db = getDb();
   return db.transaction((tx) => {
     const row = tx.select().from(cronJobs).where(eq(cronJobs.id, id)).get();
@@ -204,11 +225,15 @@ export function claimCronJobNow(id: string, now = Date.now()): ClaimedCronRun {
   });
 }
 
-export function completeCronRun(
+export async function completeCronRun(
   claim: ClaimedCronRun,
   result: { output?: string; error?: string; transient?: boolean; runtimeRunId?: string },
   now = Date.now(),
-): void {
+): Promise<void> {
+  if (isDbWriterEnabled() && !isDbWriterWorker) {
+    await writeDb<void>("completeCronRun", [claim, result, now]);
+    return;
+  }
   const db = getDb();
   db.transaction((tx) => {
     const row = tx.select().from(cronJobs).where(eq(cronJobs.id, claim.job.id)).get();
@@ -258,7 +283,11 @@ export function completeCronRun(
   });
 }
 
-export function recoverCronJobs(now = Date.now()): void {
+export async function recoverCronJobs(now = Date.now()): Promise<void> {
+  if (isDbWriterEnabled() && !isDbWriterWorker) {
+    await writeDb<void>("recoverCronJobs", [now]);
+    return;
+  }
   const db = getDb();
   db.transaction((tx) => {
     tx.update(cronRuns)

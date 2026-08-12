@@ -328,7 +328,7 @@ export async function incorporateNewMemories(records: MemoryRecord[]): Promise<v
     (kind) => readCached(kind).content.length >= MEMORY_FILE_LIMITS[kind] * 0.9,
   );
   if (shouldDream) {
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "consolidate",
       agentId: null,
       payload: { reason: "memory-file-near-limit" },
@@ -530,7 +530,7 @@ export function scheduleMemoryFileConsolidation(): void {
     () => {
       for (const kind of MEMORY_FILE_KINDS) {
         if (readCached(kind).content.length >= MEMORY_FILE_LIMITS[kind] * 0.8) {
-          queueMemoryJob({
+          void queueMemoryJob({
             kind: "consolidate",
             agentId: null,
             payload: { reason: "scheduled-file-pressure" },

@@ -15,8 +15,8 @@ import {
   listMcpServers,
   listMcpTools,
   resolveToolSecretReferences,
-  updateMcpServerStatus,
-  upsertMcpToolDefinitions,
+  updateMcpServerStatusAsync,
+  upsertMcpToolDefinitionsAsync,
 } from "./db";
 import type { ChatToolModelContext } from "./chat-tools";
 
@@ -138,7 +138,7 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
       inputSchema: definition.inputSchema,
       outputSchema: getOptionalValue(definition, "outputSchema"),
     }));
-    const tools = upsertMcpToolDefinitions(server.id, definitions);
+    const tools = await upsertMcpToolDefinitionsAsync(server.id, definitions);
     const [resources, resourceTemplates, prompts] = await Promise.all([
       countSafely(() => client?.listResources()),
       countSafely(() => client?.listResourceTemplates()),
@@ -146,11 +146,11 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
     ]);
     const connectedAt = Date.now();
     const nextServer =
-      updateMcpServerStatus(server.id, {
+      (await updateMcpServerStatusAsync(server.id, {
         status: server.enabled ? "ready" : "disabled",
         last_error: null,
         last_connected_at: connectedAt,
-      }) ?? server;
+      })) ?? server;
     insertRuntimeEvent({
       kind: "tool",
       title: "MCP discovered: " + server.name,
@@ -170,7 +170,8 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const nextServer =
-      updateMcpServerStatus(server.id, { status: "error", last_error: message }) ?? server;
+      (await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message })) ??
+      server;
     insertRuntimeEvent({
       kind: "error",
       title: "MCP discovery failed: " + server.name,
@@ -260,7 +261,7 @@ async function executeMcpTool({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await closeMcpClient(server.id);
-    updateMcpServerStatus(server.id, { status: "error", last_error: message });
+    await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message });
     insertRuntimeEvent({
       kind: "error",
       title: "MCP tool failed: " + mcpTool.name,

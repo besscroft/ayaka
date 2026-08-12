@@ -6,10 +6,10 @@ import path from "node:path";
 import { app } from "electron";
 import {
   getSandboxSnapshot,
-  insertSandboxArtifact,
-  insertSandboxSnapshot,
+  insertSandboxArtifactAsync as insertSandboxArtifact,
+  insertSandboxSnapshotAsync as insertSandboxSnapshot,
   listSandboxArtifacts,
-  upsertSandboxSession,
+  upsertSandboxSessionAsync as upsertSandboxSession,
 } from "./db";
 import type { SandboxArtifact, SandboxSession, SandboxSnapshot } from "../../shared/types";
 
@@ -59,7 +59,7 @@ export async function getOrCreateSandboxSession(input: {
   await mkdir(rootPath, { recursive: true });
   await mkdir(path.join(rootPath, SNAPSHOT_DIRNAME), { recursive: true });
   const now = Date.now();
-  const session = upsertSandboxSession({
+  const session = await upsertSandboxSession({
     id: sessionId,
     conversation_id: input.conversationId ?? null,
     run_id: input.runId ?? null,
@@ -396,10 +396,10 @@ export function listSandboxSessionArtifacts(session: SandboxSession): SandboxArt
   return listSandboxArtifacts().filter((artifact) => artifact.session_id === session.id);
 }
 
-export function registerSandboxPreviewPort(
+export async function registerSandboxPreviewPort(
   session: SandboxSession,
   input: { port: number; label?: string },
-): SandboxArtifact {
+): Promise<SandboxArtifact> {
   const port = Math.floor(input.port);
   if (!Number.isFinite(port) || port < 1 || port > 65_535) throw new Error("Invalid port.");
   return insertSandboxArtifact({

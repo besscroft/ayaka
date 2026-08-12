@@ -18,7 +18,7 @@ let intervalTimer: NodeJS.Timeout | null = null;
 let workerActive = false;
 
 export function queueAgentLearning(conversationId: string): void {
-  queueMemoryJob({
+  void queueMemoryJob({
     kind: "learn",
     conversationId,
     agentId: DEFAULT_AGENT_ID,
@@ -31,21 +31,21 @@ export function queueAgentLearning(conversationId: string): void {
 
 export function startMemoryWorker(): void {
   if (intervalTimer) return;
-  queueMemoryJob({
+  void queueMemoryJob({
     kind: "rehydrate",
     agentId: DEFAULT_AGENT_ID,
     idempotencyKey: "rehydrate:startup",
     payload: { reason: "startup" },
     scheduledAt: Date.now() + 5_000,
   });
-  queueMemoryJob({
+  void queueMemoryJob({
     kind: "consolidate",
     agentId: DEFAULT_AGENT_ID,
     idempotencyKey: "consolidate:startup",
     payload: { reason: "startup" },
     scheduledAt: Date.now() + 15_000,
   });
-  queueMemoryJob({
+  void queueMemoryJob({
     kind: "decay",
     agentId: DEFAULT_AGENT_ID,
     idempotencyKey: "decay:daily",
@@ -69,16 +69,16 @@ export async function runMemoryWorkerOnce(): Promise<boolean> {
   workerActive = true;
   let hadJob = false;
   try {
-    const job = claimNextMemoryJob();
+    const job = await claimNextMemoryJob();
     if (!job) return false;
     hadJob = true;
     try {
       await runJob(job);
-      finishMemoryJob(job.id, "succeeded");
+      await finishMemoryJob(job.id, "succeeded");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      finishMemoryJob(job.id, "failed", message);
-      insertRuntimeEvent({
+      await finishMemoryJob(job.id, "failed", message);
+      void insertRuntimeEvent({
         kind: "memory",
         title: "Memory job failed",
         status: "failed",
@@ -101,14 +101,14 @@ async function runJob(job: MemoryJob): Promise<void> {
   }
   if (job.kind === "sync") return memoryOrchestrator.syncJob(payload);
   if (job.kind === "decay") {
-    const archived = memoryOrchestrator.decay();
-    insertRuntimeEvent({
+    const archived = await memoryOrchestrator.decay();
+    void insertRuntimeEvent({
       kind: "memory",
       title: "Memory decay completed",
       status: "succeeded",
       detail: { archived },
     });
-    queueMemoryJob({
+    void queueMemoryJob({
       kind: "decay",
       agentId: DEFAULT_AGENT_ID,
       idempotencyKey: "decay:daily",

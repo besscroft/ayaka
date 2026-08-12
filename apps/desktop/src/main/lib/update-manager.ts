@@ -1,12 +1,10 @@
 import { app } from "electron";
 import type { BrowserWindow } from "electron";
-import {
-  autoUpdater,
-  type ProgressInfo,
-  type UpdateCheckResult,
-  type UpdateInfo,
-} from "electron-updater";
+import electronUpdater from "electron-updater";
+import type { ProgressInfo, UpdateCheckResult, UpdateInfo } from "electron-updater";
 import type { UpdateErrorCode, UpdateState, UpdateStatus } from "../../shared/types";
+
+const { autoUpdater } = electronUpdater;
 
 export const UPDATE_FEED_URL = "https://ai.zzzvoid.com/api/updates/win32/x64/";
 

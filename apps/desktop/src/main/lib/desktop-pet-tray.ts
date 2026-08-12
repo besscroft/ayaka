@@ -1,6 +1,10 @@
 import { app, Menu, type MenuItemConstructorOptions, Tray, nativeImage } from "electron";
 import { join } from "path";
-import { isDesktopPetEnabled, setDesktopPetEnabled, getDesktopPetSnapshot } from "./db";
+import {
+  isDesktopPetEnabled,
+  setDesktopPetEnabledAsync as setDesktopPetEnabled,
+  getDesktopPetSnapshot,
+} from "./db";
 
 export const DESKTOP_PET_TRAY_SET_ENABLED_CHANNEL = "desktopPet:tray:setEnabled";
 export const DESKTOP_PET_TRAY_OPEN_SETTINGS_CHANNEL = "desktopPet:tray:openSettings";
@@ -108,14 +112,14 @@ export class DesktopPetTrayController {
 
   private togglePetVisibility(): void {
     const next = !isDesktopPetEnabled();
-    setDesktopPetEnabled(next);
+    void setDesktopPetEnabled(next);
     // 立即同步菜单（其他窗口监听不到，需要自己重建）
     this.syncMenu();
   }
 
   private showPet(): void {
     if (!isDesktopPetEnabled()) {
-      setDesktopPetEnabled(true);
+      void setDesktopPetEnabled(true);
       this.syncMenu();
     }
   }
