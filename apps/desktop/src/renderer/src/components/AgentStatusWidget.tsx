@@ -1,11 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AgentInstanceRecord, RuntimeRun, RuntimeSnapshot, RuntimeStep } from "@shared/types";
+import type {
+  AgentProfile,
+  ChatReasoningLevel,
+  ChatToolSelectionRequest,
+  ProviderInfo,
+  RuntimeRun,
+  RuntimeSnapshot,
+  RuntimeStep,
+  ToolsSnapshot,
+} from "@shared/types";
+import { DEFAULT_AGENT_ID } from "@shared/types";
 import { motion, useReducedMotion } from "motion/react";
 import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
+import {
+  buildAgentActivityItems,
+  buildAgentTree,
+  createAgentToolGroups,
+  getAgentExpectedOutput,
+  getAgentInstructions,
+  getAgentToolPolicy,
+  type AgentActivityItem,
+  type AgentTreeNode,
+} from "../lib/agent-drawer-model";
+import {
+  AnimatedDisclosure,
+  AnimatedDisclosureChevron,
+  AnimatedDisclosureContent,
+  AnimatedDisclosureTrigger,
+} from "./ai-elements/animated-disclosure";
 import { Button } from "./ui";
 import {
   IconBrain,
+  IconCheck,
+  IconChevronDown,
   IconCircleCheck,
   IconCircleDashed,
   IconCircleX,
@@ -26,6 +54,12 @@ type RuntimeSnapshotSubset = Pick<
 interface AgentStatusWidgetProps {
   conversationId: string;
   snapshot: RuntimeSnapshotSubset | null;
+  profiles: AgentProfile[];
+  providers: ProviderInfo[];
+  selectedModel: string | null;
+  reasoningLevel: ChatReasoningLevel;
+  toolSelection: ChatToolSelectionRequest;
+  tools: ToolsSnapshot | null;
   chatStatus: "submitted" | "streaming" | "ready" | "stopped" | "error";
   isChatActive: boolean;
   open: boolean;
@@ -87,6 +121,12 @@ export function resolveAgentPanelStatus({
 export function AgentStatusWidget({
   conversationId,
   snapshot,
+  profiles,
+  providers,
+  selectedModel,
+  reasoningLevel,
+  toolSelection,
+  tools,
   chatStatus,
   isChatActive,
   open,
@@ -95,7 +135,9 @@ export function AgentStatusWidget({
 }: AgentStatusWidgetProps): React.JSX.Element {
   const { t } = useT();
   const reduceMotion = useReducedMotion();
-  const [, setClock] = useState(0);
+  const [clock, setClock] = useState(0);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(["/root"]));
+
   const run = useMemo(
     () => selectLatestConversationRun(snapshot?.runtimeRuns ?? [], conversationId),
     [conversationId, snapshot],
@@ -103,7 +145,7 @@ export function AgentStatusWidget({
   const conversationState = snapshot?.conversationAgentStates.find(
     (state) => state.conversation_id === conversationId,
   );
-  const children = useMemo(
+  const instances = useMemo(
     () =>
       (snapshot?.agentInstances ?? [])
         .filter((item) => item.run_id === run?.id)
@@ -114,6 +156,17 @@ export function AgentStatusWidget({
     () => getRecentRuntimeSteps(snapshot?.runtimeSteps ?? [], run?.id, Number.MAX_SAFE_INTEGER),
     [run?.id, snapshot?.runtimeSteps],
   );
+  const conversationCurrentStep = conversationState?.current_step_id
+    ? snapshot?.runtimeSteps.find((step) => step.id === conversationState.current_step_id)
+    : undefined;
+  const rootProfile = useMemo(
+    () =>
+      profiles.find((item) => item.id === (run?.root_agent_id ?? DEFAULT_AGENT_ID)) ??
+      profiles[0] ??
+      null,
+    [profiles, run?.root_agent_id],
+  );
+  const activeProfile = rootProfile;
   const turns = steps.filter((item) => item.kind === "model");
   const toolCalls = steps.filter((item) => item.kind === "tool");
   const queuedInputs = (snapshot?.agentRunInputs ?? []).filter(
@@ -130,12 +183,60 @@ export function AgentStatusWidget({
     conversationStatus: conversationState?.status,
   });
   const summary = conversationState?.summary || run?.output_summary || run?.input_summary;
-  const currentStep = conversationState?.current_step_id
-    ? snapshot?.runtimeSteps.find((step) => step.id === conversationState.current_step_id)
-    : undefined;
   const elapsed = run?.started_at
     ? formatElapsed((run.finished_at ?? Date.now()) - run.started_at)
     : null;
+  const effectiveModel = run?.model_ref ?? activeProfile?.model_ref ?? selectedModel;
+  const runtimeReasoning = getRuntimeReasoning(activeProfile, reasoningLevel);
+  const tree = useMemo(
+    () =>
+      buildAgentTree({
+        run,
+        instances,
+        conversationState,
+        currentStep: conversationCurrentStep,
+        profiles,
+        rootName: activeProfile?.name || t("agentStatus.rootAgent"),
+        rootStatus: status,
+        rootSummary: summary ?? null,
+        rootError: run?.error ?? null,
+      }),
+    [
+      activeProfile?.name,
+      conversationCurrentStep,
+      conversationState,
+      instances,
+      profiles,
+      run,
+      status,
+      summary,
+      t,
+    ],
+  );
+  const toolGroups = useMemo(
+    () =>
+      createAgentToolGroups({
+        selectedModel: effectiveModel,
+        providers,
+        tools,
+        selection: toolSelection,
+        policy: getAgentToolPolicy(activeProfile),
+      }),
+    [activeProfile, effectiveModel, providers, toolSelection, tools],
+  );
+  const activeAgentId = conversationCurrentStep?.agent_id ?? conversationState?.active_agent_id;
+  const activityItems = useMemo(
+    () =>
+      buildAgentActivityItems({
+        runId: run?.id,
+        activeAgentPath: tree.activePath,
+        steps: activeAgentId ? steps.filter((step) => step.agent_id === activeAgentId) : steps,
+        events: snapshot?.runtimeEvents ?? [],
+        limit: 6,
+        now: Date.now(),
+      }),
+    [activeAgentId, clock, run?.id, snapshot?.runtimeEvents, steps, tree.activePath],
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -143,13 +244,21 @@ export function AgentStatusWidget({
     return () => window.clearInterval(timer);
   }, [active]);
 
+  useEffect(() => {
+    setExpandedPaths((current) => {
+      const next = new Set(current);
+      addPathPrefixes(next, tree.activePath);
+      return next;
+    });
+  }, [tree.activePath]);
+
   const title = waiting
     ? t("agentStatus.waitingApproval")
     : waitingHandoff
       ? t("agentStatus.status.waitingHandoff")
       : active
         ? t("agentStatus.running", {
-            count: children.filter((item) => ACTIVE_INSTANCE_STATUSES.has(item.status)).length + 1,
+            count: instances.filter((item) => ACTIVE_INSTANCE_STATUSES.has(item.status)).length + 1,
           })
         : failed
           ? t("agentStatus.failed")
@@ -180,12 +289,15 @@ export function AgentStatusWidget({
       {open ? (
         <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
-            <IconBrain className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <AgentAvatar profile={activeProfile} fallback={t("agentStatus.rootAgent")} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground/85">
-                {t("agentStatus.panel")}
+              <p className="truncate text-sm font-medium text-foreground/90">
+                {activeProfile?.name || t("agentStatus.rootAgent")}
               </p>
-              <p className="truncate text-[11px] text-foreground/45">{title}</p>
+              <p className="truncate text-[11px] text-foreground/50">
+                {activeProfile?.role || t("agentStatus.roleFallback")} ·{" "}
+                {formatModel(effectiveModel, t)}
+              </p>
             </div>
             <button
               type="button"
@@ -199,98 +311,75 @@ export function AgentStatusWidget({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <section className="border-b border-border pb-3" aria-labelledby="agent-status-current">
-              <p
-                id="agent-status-current"
-                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
-              >
-                {t("agentStatus.current")}
-              </p>
-              <div className="mt-2 flex items-start gap-2">
-                <StatusIcon status={status} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground/85">{title}</p>
-                  {currentStep ? (
-                    <p className="mt-1 truncate text-xs text-foreground/60">{currentStep.title}</p>
-                  ) : null}
-                  {summary ? (
-                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-foreground/50">
-                      {summary}
-                    </p>
-                  ) : null}
-                </div>
-                <span className="shrink-0 text-xs tabular-nums text-foreground/45">
-                  {elapsed ?? t("agentStatus.ready")}
-                </span>
-              </div>
-            </section>
-
-            <section className="border-b border-border py-3" aria-labelledby="agent-status-agents">
-              <div className="flex items-center justify-between gap-2">
-                <p
-                  id="agent-status-agents"
-                  className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
-                >
-                  {t("agentStatus.agents")}
-                </p>
-                <span className="text-[10px] tabular-nums text-foreground/40">
-                  {children.length + 1}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-col gap-1">
-                <AgentRow
-                  name={t("agentStatus.rootAgent")}
-                  path="/root"
-                  status={status}
-                  summary={summary ?? null}
-                  error={run?.error ?? null}
-                />
-                {children.map((item) => (
-                  <InstanceRow key={item.id} instance={item} />
-                ))}
-              </div>
-            </section>
-
-            <section
-              className="border-b border-border py-3"
-              aria-labelledby="agent-status-activity"
-            >
-              <p
-                id="agent-status-activity"
-                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
-              >
-                {t("agentStatus.activity")}
-              </p>
-              {steps.length === 0 ? (
-                <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
-              ) : (
-                <div className="mt-2 flex flex-col gap-1">
-                  {steps.slice(0, 6).map((step) => (
-                    <ActivityRow key={step.id} step={step} />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="py-3" aria-labelledby="agent-status-metrics">
-              <p
-                id="agent-status-metrics"
-                className="text-[10px] font-medium uppercase tracking-wide text-foreground/40"
-              >
-                {t("agentStatus.metrics")}
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
-                <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
-                <Metric label={t("agentStatus.metric.pendingInputs")} value={queuedInputs.length} />
-              </div>
-            </section>
-
-            {!run ? (
-              <p className="border-t border-border pt-3 text-xs text-foreground/45">
-                {t("agentStatus.noRun")}
-              </p>
+            {run && (active || waiting || failed) ? (
+              <AttentionBar status={status} title={title} error={run.error} elapsed={elapsed} />
             ) : null}
+
+            {run ? (
+              <>
+                <section
+                  className="border-b border-border py-3"
+                  aria-labelledby="agent-status-agents"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <SectionLabel id="agent-status-agents" label={t("agentStatus.agents")} />
+                    <span className="text-[10px] tabular-nums text-foreground/40">
+                      {instances.length + 1}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-0.5">
+                    <AgentTree
+                      node={tree.root}
+                      expandedPaths={expandedPaths}
+                      onToggle={(path) => setExpandedPaths((current) => togglePath(current, path))}
+                      t={t}
+                    />
+                  </div>
+                </section>
+
+                <section
+                  className="border-b border-border py-3"
+                  aria-labelledby="agent-status-activity"
+                >
+                  <SectionLabel id="agent-status-activity" label={t("agentStatus.activity")} />
+                  {activityItems.length === 0 ? (
+                    <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
+                  ) : (
+                    <div className="mt-2 flex flex-col gap-1">
+                      {activityItems.map((item) => (
+                        <ActivityRow key={item.id} item={item} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  className="border-b border-border py-3"
+                  aria-labelledby="agent-status-metrics"
+                >
+                  <SectionLabel id="agent-status-metrics" label={t("agentStatus.metrics")} />
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
+                    <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
+                    <Metric
+                      label={t("agentStatus.metric.pendingInputs")}
+                      value={queuedInputs.length}
+                    />
+                  </div>
+                </section>
+              </>
+            ) : null}
+
+            <ConfigurationSection
+              profile={activeProfile}
+              effectiveModel={effectiveModel}
+              reasoning={runtimeReasoning}
+              instructions={getAgentInstructions(activeProfile)}
+              expectedOutput={getAgentExpectedOutput(activeProfile)}
+              toolGroups={toolGroups}
+              toolsUnavailable={tools === null}
+              t={t}
+            />
           </div>
 
           {active && run ? (
@@ -319,65 +408,312 @@ export function AgentStatusWidget({
   );
 }
 
-function AgentRow({
-  name,
-  path,
-  status,
-  summary,
-  error,
+function ConfigurationSection({
+  profile,
+  effectiveModel,
+  reasoning,
+  instructions,
+  expectedOutput,
+  toolGroups,
+  toolsUnavailable,
+  t,
 }: {
-  name: string;
-  path: string;
-  status: string;
-  summary: string | null;
-  error: string | null;
+  profile: AgentProfile | null;
+  effectiveModel: string | null;
+  reasoning: string;
+  instructions: string;
+  expectedOutput: string;
+  toolGroups: ReturnType<typeof createAgentToolGroups>;
+  toolsUnavailable: boolean;
+  t: ReturnType<typeof useT>["t"];
 }): React.JSX.Element {
-  const { t } = useT();
   return (
-    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-2 hover:bg-muted">
-      <StatusIcon status={status} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-xs font-medium text-foreground/80">{name}</span>
-          <span className="truncate font-mono text-[10px] text-foreground/35">{path}</span>
-        </div>
-        {summary ? (
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-foreground/50">{summary}</p>
-        ) : null}
-        {error ? <p className="mt-0.5 line-clamp-2 text-[11px] text-danger">{error}</p> : null}
-      </div>
-      <span className="shrink-0 text-[10px] text-foreground/40">{statusLabel(status, t)}</span>
+    <div className="divide-y divide-border">
+      <AnimatedDisclosure defaultOpen active={false} className="py-3">
+        <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
+          <SectionLabel label={t("agentStatus.configuration")} />
+          <AnimatedDisclosureChevron className="text-foreground/40">
+            <IconChevronDown className="size-4" />
+          </AnimatedDisclosureChevron>
+        </AnimatedDisclosureTrigger>
+        <AnimatedDisclosureContent innerClassName="pt-3">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+            <span className="text-foreground/40">{t("agentStatus.model")}</span>
+            <span className="truncate text-right text-foreground/75">
+              {formatModel(effectiveModel, t)}
+            </span>
+            <span className="text-foreground/40">{t("agentStatus.reasoning")}</span>
+            <span className="text-right text-foreground/75">{reasoning}</span>
+            <span className="text-foreground/40">{t("agentStatus.role")}</span>
+            <span className="truncate text-right text-foreground/75">
+              {profile?.role || t("agentStatus.roleFallback")}
+            </span>
+          </div>
+        </AnimatedDisclosureContent>
+      </AnimatedDisclosure>
+
+      <AnimatedDisclosure defaultOpen active={false} className="py-3">
+        <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
+          <SectionLabel label={t("agentStatus.instructions")} />
+          <AnimatedDisclosureChevron className="text-foreground/40">
+            <IconChevronDown className="size-4" />
+          </AnimatedDisclosureChevron>
+        </AnimatedDisclosureTrigger>
+        <AnimatedDisclosureContent innerClassName="pt-2">
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/65">
+            {instructions || t("agentStatus.notConfigured")}
+          </p>
+        </AnimatedDisclosureContent>
+      </AnimatedDisclosure>
+
+      <AnimatedDisclosure className="py-3">
+        <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
+          <div className="flex min-w-0 items-center gap-2">
+            <SectionLabel label={t("agentStatus.tools")} />
+            <span className="text-[10px] tabular-nums text-foreground/40">
+              {toolGroups.reduce((total, group) => total + group.tools.length, 0)}
+            </span>
+          </div>
+          <AnimatedDisclosureChevron className="text-foreground/40">
+            <IconChevronDown className="size-4" />
+          </AnimatedDisclosureChevron>
+        </AnimatedDisclosureTrigger>
+        <AnimatedDisclosureContent innerClassName="pt-2">
+          {toolsUnavailable ? (
+            <p className="text-xs text-foreground/45">{t("agentStatus.toolsUnavailable")}</p>
+          ) : toolGroups.length === 0 ? (
+            <p className="text-xs text-foreground/45">{t("agentStatus.noTools")}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {toolGroups.map((group) => (
+                <ToolGroup key={group.category} group={group} t={t} />
+              ))}
+            </div>
+          )}
+        </AnimatedDisclosureContent>
+      </AnimatedDisclosure>
+
+      <AnimatedDisclosure className="py-3">
+        <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
+          <SectionLabel label={t("agentStatus.expectedOutput")} />
+          <AnimatedDisclosureChevron className="text-foreground/40">
+            <IconChevronDown className="size-4" />
+          </AnimatedDisclosureChevron>
+        </AnimatedDisclosureTrigger>
+        <AnimatedDisclosureContent innerClassName="pt-2">
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/65">
+            {expectedOutput}
+          </p>
+        </AnimatedDisclosureContent>
+      </AnimatedDisclosure>
     </div>
   );
 }
 
-function InstanceRow({ instance }: { instance: AgentInstanceRecord }): React.JSX.Element {
+function ToolGroup({
+  group,
+  t,
+}: {
+  group: ReturnType<typeof createAgentToolGroups>[number];
+  t: ReturnType<typeof useT>["t"];
+}): React.JSX.Element {
   return (
-    <AgentRow
-      name={instance.task_name || instance.agent_id}
-      path={instance.agent_path}
-      status={instance.status}
-      summary={instance.task_summary || instance.last_message}
-      error={instance.error}
-    />
+    <AnimatedDisclosure>
+      <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted">
+        <span className="text-[10px] font-medium text-foreground/65">
+          {t(`agentStatus.toolCategory.${group.category}`)}
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-foreground/40">
+          {group.tools.length}
+          <AnimatedDisclosureChevron>
+            <IconChevronDown className="size-3" />
+          </AnimatedDisclosureChevron>
+        </span>
+      </AnimatedDisclosureTrigger>
+      <AnimatedDisclosureContent innerClassName="pt-1">
+        <div className="flex flex-col gap-1">
+          {group.tools.map((tool) => (
+            <div key={tool.id} className="rounded-md px-2 py-1.5 hover:bg-muted">
+              <div className="flex min-w-0 items-center gap-2">
+                {tool.active ? (
+                  <IconCheck className="size-3 shrink-0 text-success" aria-hidden="true" />
+                ) : (
+                  <span
+                    className="size-3 shrink-0 rounded-full border border-foreground/25"
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground/75">
+                  {tool.label}
+                </span>
+                {tool.approvalRequired ? (
+                  <span className="shrink-0 text-[10px] text-warning">
+                    {t("agentStatus.approval")}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 line-clamp-2 pl-5 text-[10px] leading-relaxed text-foreground/45">
+                {tool.description}
+              </p>
+              <p className="mt-0.5 pl-5 text-[10px] text-foreground/35">
+                {tool.available ? t("agentStatus.toolAvailable") : t("agentStatus.toolUnavailable")}
+                {tool.sourceName ? ` · ${tool.sourceName}` : ""}
+              </p>
+            </div>
+          ))}
+        </div>
+      </AnimatedDisclosureContent>
+    </AnimatedDisclosure>
   );
 }
 
-function ActivityRow({ step }: { step: RuntimeStep }): React.JSX.Element {
+function AgentTree({
+  node,
+  expandedPaths,
+  onToggle,
+  t,
+}: {
+  node: AgentTreeNode;
+  expandedPaths: Set<string>;
+  onToggle: (path: string) => void;
+  t: ReturnType<typeof useT>["t"];
+}): React.JSX.Element {
+  const hasChildren = node.children.length > 0;
+  const expanded = expandedPaths.has(node.path);
+  return (
+    <div>
+      <div
+        className={cn(
+          "flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-muted",
+          node.active && "bg-accent/10",
+          node.depth > 0 && "ml-4 border-l border-border rounded-l-none",
+        )}
+      >
+        <StatusIcon status={node.status} />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-xs font-medium text-foreground/80">{node.name}</span>
+            <span className="truncate font-mono text-[10px] text-foreground/35">{node.path}</span>
+          </div>
+          {node.summary ? (
+            <p className="mt-0.5 line-clamp-2 text-[11px] text-foreground/50">{node.summary}</p>
+          ) : null}
+          {node.error ? (
+            <p className="mt-0.5 line-clamp-2 text-[11px] text-danger">{node.error}</p>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-[10px] text-foreground/40">
+          {statusLabel(node.status, t)}
+        </span>
+        {hasChildren ? (
+          <button
+            type="button"
+            className="flex size-5 shrink-0 items-center justify-center rounded text-foreground/45 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            aria-label={expanded ? t("agentStatus.collapseBranch") : t("agentStatus.expandBranch")}
+            aria-expanded={expanded}
+            onClick={() => onToggle(node.path)}
+          >
+            <motion.span
+              animate={{ rotate: expanded ? 180 : 0 }}
+              transition={{ duration: 0.16 }}
+              className="flex"
+            >
+              <IconChevronDown className="size-3" aria-hidden="true" />
+            </motion.span>
+          </button>
+        ) : null}
+      </div>
+      {hasChildren && expanded ? (
+        <div>
+          {node.children.map((child) => (
+            <AgentTree
+              key={child.id}
+              node={child}
+              expandedPaths={expandedPaths}
+              onToggle={onToggle}
+              t={t}
+            />
+          ))}
+        </div>
+      ) : null}
+      {!expanded && hasChildren ? (
+        <p className="ml-10 text-[10px] text-foreground/35">
+          {t("agentStatus.collapsedAgents", { count: node.descendantCount })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AttentionBar({
+  status,
+  title,
+  error,
+  elapsed,
+}: {
+  status: string;
+  title: string;
+  error: string | null;
+  elapsed: string | null;
+}): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "mb-3 flex items-start gap-2 rounded-md border px-2.5 py-2",
+        status === "failed"
+          ? "border-danger/30 bg-danger/5"
+          : status === "waiting_approval" || status === "waiting_handoff"
+            ? "border-warning/30 bg-warning/5"
+            : "border-primary/25 bg-primary/5",
+      )}
+    >
+      <StatusIcon status={status} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-foreground/80">{title}</p>
+        {error ? <p className="mt-1 line-clamp-3 text-[11px] text-danger">{error}</p> : null}
+      </div>
+      {elapsed ? (
+        <span className="shrink-0 pt-0.5 text-xs tabular-nums text-foreground/45">{elapsed}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function SectionLabel({ id, label }: { id?: string; label: string }): React.JSX.Element {
+  return (
+    <p id={id} className="text-[10px] font-medium uppercase tracking-wide text-foreground/40">
+      {label}
+    </p>
+  );
+}
+
+function AgentAvatar({
+  profile,
+  fallback,
+}: {
+  profile: AgentProfile | null;
+  fallback: string;
+}): React.JSX.Element {
+  const label = profile?.avatar || profile?.name?.slice(0, 1) || fallback.slice(0, 1);
+  return (
+    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground">
+      {label}
+    </div>
+  );
+}
+
+function ActivityRow({ item }: { item: AgentActivityItem }): React.JSX.Element {
   const { t } = useT();
-  const duration = step.finished_at
-    ? step.finished_at - step.started_at
-    : Date.now() - step.started_at;
   return (
     <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
-      <StatusIcon status={step.status} />
+      <StatusIcon status={item.status} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs text-foreground/75">{step.title}</p>
+        <p className="truncate text-xs text-foreground/75">{item.title}</p>
         <p className="mt-0.5 truncate text-[10px] text-foreground/40">
-          {t(`runtime.kind.${step.kind}`)} · {formatElapsed(duration)}
+          {t(`runtime.kind.${item.kind}`)} · {formatElapsed(item.durationMs)}
         </p>
       </div>
-      <span className="shrink-0 text-[10px] text-foreground/40">{statusLabel(step.status, t)}</span>
+      <span className="shrink-0 text-[10px] text-foreground/40">{statusLabel(item.status, t)}</span>
     </div>
   );
 }
@@ -400,7 +736,9 @@ export function StatusIcon({ status }: { status: string }): React.JSX.Element {
     return <IconCircleDashed className="mt-0.5 size-4 shrink-0 text-foreground/40" />;
   }
   if (status === "waiting_approval" || status === "waiting_handoff" || status === "reviewing") {
-    return <IconBrain className="mt-0.5 size-4 shrink-0 animate-pulse text-warning" />;
+    return (
+      <IconBrain className="mt-0.5 size-4 shrink-0 animate-pulse text-warning motion-reduce:animate-none" />
+    );
   }
   return (
     <span
@@ -433,9 +771,41 @@ function statusLabel(status: string, t: ReturnType<typeof useT>["t"]): string {
   return t(`agentStatus.status.${key}`);
 }
 
-function formatElapsed(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1_000));
+function togglePath(current: Set<string>, path: string): Set<string> {
+  const next = new Set(current);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  return next;
+}
+
+function addPathPrefixes(paths: Set<string>, path: string): void {
+  const parts = path.split("/").filter(Boolean);
+  let current = "";
+  for (const part of parts) {
+    current += `/${part}`;
+    paths.add(current);
+  }
+}
+
+function formatModel(model: string | null, t: ReturnType<typeof useT>["t"]): string {
+  return model || t("agentStatus.modelInherited");
+}
+
+function getRuntimeReasoning(profile: AgentProfile | null, fallback: ChatReasoningLevel): string {
+  try {
+    const raw = profile?.runtime_config_json ? JSON.parse(profile.runtime_config_json) : null;
+    return typeof raw?.reasoning === "string" ? raw.reasoning : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function formatElapsed(ms: number): string {
+  const milliseconds = Math.max(0, Math.round(ms));
+  if (milliseconds < 1_000) return milliseconds === 0 ? "<1ms" : `${milliseconds}ms`;
+
+  const seconds = milliseconds / 1_000;
   return seconds < 60
-    ? `${seconds}s`
-    : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    ? `${seconds < 10 ? seconds.toFixed(1) : Math.floor(seconds)}s`
+    : `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }

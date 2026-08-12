@@ -837,7 +837,7 @@ function createToolLoopAgent({
             "tool.result",
             protocol.agentPath,
             protocol.parentAgentPath,
-            toolOutput.type === "tool-error" ? "error" : "progress",
+            toolOutput.type === "tool-error" ? "error" : "end",
             {
               toolCallId: toolCall.toolCallId,
               toolName: toolCall.toolName,

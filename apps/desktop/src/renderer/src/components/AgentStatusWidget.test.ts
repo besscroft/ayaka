@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { RuntimeRun, RuntimeStep } from "@shared/types";
 import {
   getRecentRuntimeSteps,
+  formatElapsed,
   resolveAgentPanelStatus,
   selectLatestConversationRun,
   StatusIcon,
@@ -70,6 +71,13 @@ void describe("agent status widget runtime helpers", () => {
       getRecentRuntimeSteps(steps, "run-1", 2).map((step) => step.id),
       ["newest", "middle"],
     );
+  });
+
+  void it("keeps sub-second runtime durations visible", () => {
+    assert.equal(formatElapsed(0), "<1ms");
+    assert.equal(formatElapsed(245), "245ms");
+    assert.equal(formatElapsed(1_250), "1.3s");
+    assert.equal(formatElapsed(61_200), "1:01");
   });
 
   void it("keeps approval and failure states ahead of streaming state", () => {

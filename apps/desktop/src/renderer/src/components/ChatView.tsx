@@ -62,8 +62,10 @@ import {
   withChatToolSelectionForConversation,
   type ChatReasoningLevel,
   type ChatToolSelectionRequest,
+  type AgentProfile,
   type LocalServerInfo,
   type ProviderInfo,
+  type ToolsSnapshot,
 } from "@shared/types";
 
 interface ChatViewProps {
@@ -123,6 +125,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [isStopped, setIsStopped] = useState(false);
   const [runtimePanelOpen, setRuntimePanelOpen] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
+  const [toolsSnapshot, setToolsSnapshot] = useState<ToolsSnapshot | null>(null);
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<Pick<
     RuntimeSnapshot,
     | "runtimeRuns"
@@ -321,6 +325,20 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       cancelled = true;
     };
   }, [selectedModel]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.allSettled([api.agents.list(), api.tools.snapshot()]).then(
+      ([agentsResult, toolsResult]) => {
+        if (cancelled) return;
+        if (agentsResult.status === "fulfilled") setAgentProfiles(agentsResult.value);
+        if (toolsResult.status === "fulfilled") setToolsSnapshot(toolsResult.value);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     selectedModelRef.current = selectedModel;
@@ -993,6 +1011,12 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         <AgentStatusWidget
           conversationId={conversationId}
           snapshot={runtimeSnapshot}
+          profiles={agentProfiles}
+          providers={providers}
+          selectedModel={selectedModel}
+          reasoningLevel={reasoningLevel}
+          toolSelection={toolSelection}
+          tools={toolsSnapshot}
           chatStatus={statusKind}
           isChatActive={isChatLoading}
           open={runtimePanelOpen}
