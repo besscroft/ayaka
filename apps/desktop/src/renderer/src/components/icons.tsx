@@ -21,6 +21,7 @@ import {
   DollarSign,
   GitFork,
   Globe,
+  FolderOpen,
   Image,
   Info,
   Key,
@@ -101,6 +102,7 @@ export const IconSliders = fromLucide(SlidersHorizontal);
 export const IconCpu = fromLucide(Cpu);
 export const IconRotateCcw = fromLucide(RotateCcw);
 export const IconGlobe = fromLucide(Globe);
+export const IconFolderOpen = fromLucide(FolderOpen);
 export const IconClock = fromLucide(Clock);
 export const IconDatabase = fromLucide(Database);
 export const IconType = fromLucide(Type);

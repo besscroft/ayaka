@@ -36,16 +36,17 @@ export function writeMediaAsset({
   kind: MediaGenerationKind;
   filename?: string;
 }): MediaGenerationFile {
+  const tool = toolForMediaType(mediaType, kind);
+  const normalizedFilename = normalizeFilename(filename, kind, tool);
   const dir = getMediaDir();
   mkdirSync(dir, { recursive: true });
-  const tool = toolForMediaType(mediaType, kind);
   const storedName = `${Date.now()}-${randomUUID()}.${tool}`;
   const filePath = join(dir, storedName);
   writeFileSync(filePath, data);
   return {
     type: "file",
     mediaType,
-    filename: normalizeFilename(filename, kind, tool),
+    filename: normalizedFilename,
     url: toVoidMediaUrl(storedName),
     size: statSync(filePath).size,
   };

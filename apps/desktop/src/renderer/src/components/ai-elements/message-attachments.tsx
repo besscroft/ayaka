@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { useT } from "../../lib/i18n";
+import { api } from "../../lib/api";
 import { AttachmentChip } from "./attachment-chip";
 import type { AttachmentItem } from "./attachment-chip";
 import { sanitizeRichContentUrl } from "./rich-content-utils";
@@ -14,23 +15,61 @@ export interface FilePartLike {
 }
 
 interface MessageAttachmentsProps {
+  conversationId?: string;
   parts: FilePartLike[];
   className?: string;
 }
 
 export function MessageAttachments({
+  conversationId,
   parts,
   className,
 }: MessageAttachmentsProps): React.JSX.Element | null {
   const { t } = useT();
   if (parts.length === 0) return null;
 
+  const [workspaceUrls, setWorkspaceUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const created: string[] = [];
+    setWorkspaceUrls({});
+    void Promise.all(
+      parts.map(async (part, index): Promise<[string, string] | null> => {
+        const url = part.url ?? part.data;
+        if (!conversationId || !url?.startsWith("workspace://")) return null;
+        const content = await api.workspace.read({
+          conversationId,
+          path: url.slice("workspace://".length),
+        });
+        const blobUrl = URL.createObjectURL(
+          new Blob([new Uint8Array(content.data)], { type: content.mediaType }),
+        );
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return null;
+        }
+        created.push(blobUrl);
+        return [`${part.type}-${index}`, blobUrl];
+      }),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setWorkspaceUrls(Object.fromEntries(entries.filter((entry) => entry !== null)));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      created.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [conversationId, parts]);
+
   const items: AttachmentItem[] = parts.map((p, i) => ({
     id: `${p.type}-${i}`,
     name: p.filename ?? t("attachment.file"),
     mediaType: p.mediaType ?? "application/octet-stream",
     size: 0,
-    url: p.url ?? p.data,
+    url: workspaceUrls[`${p.type}-${i}`] ?? p.url ?? p.data,
     variant: p.mediaType?.startsWith("image/")
       ? "image"
       : p.mediaType?.startsWith("video/")

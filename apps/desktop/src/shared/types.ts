@@ -1845,6 +1845,7 @@ export type MediaGenerationRequest =
       model: string;
       prompt: string;
       options?: Pick<MediaGenerationOptions, "size" | "aspectRatio" | "count" | "seed">;
+      conversationId?: string;
     }
   | {
       kind: "speech";
@@ -1854,6 +1855,7 @@ export type MediaGenerationRequest =
         MediaGenerationOptions,
         "voice" | "outputFormat" | "speed" | "language" | "instructions"
       >;
+      conversationId?: string;
     }
   | {
       kind: "transcription";
@@ -1864,6 +1866,7 @@ export type MediaGenerationRequest =
         filename?: string;
       };
       options?: Pick<MediaGenerationOptions, "language">;
+      conversationId?: string;
     }
   | {
       kind: "video";
@@ -1873,6 +1876,7 @@ export type MediaGenerationRequest =
         MediaGenerationOptions,
         "aspectRatio" | "resolution" | "duration" | "fps" | "generateAudio" | "count" | "seed"
       >;
+      conversationId?: string;
     };
 
 export interface MediaGenerationResponse {
@@ -1928,6 +1932,7 @@ export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
     },
   },
 };
+
 /**
  * 搴旂敤璁剧疆閿悕鏋氫妇锛堥伩鍏嶆嫾鍐欓敊璇級
  *
@@ -1983,9 +1988,37 @@ export const SettingKey = {
   ActiveConversationId: "active_conversation_id",
   /** 褰撳墠鏅鸿兘浣?ID */
   ActiveAgentId: "active_agent_id",
+  WorkspaceParentDirectory: "workspace_parent_directory",
 } as const;
 
 export type SettingKeyType = (typeof SettingKey)[keyof typeof SettingKey];
+
+export type WorkspaceStatus = "active" | "orphaned";
+
+export interface WorkspaceInfo {
+  conversationId: string;
+  relativePath: string;
+  status: WorkspaceStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkspaceOrphan {
+  id: string;
+  name: string;
+  modifiedAt: number;
+}
+
+export interface WorkspaceFileRef {
+  path: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+}
+
+export interface WorkspaceFileContent extends WorkspaceFileRef {
+  data: Uint8Array;
+}
 
 // ============================================================
 // 璁剧疆椤圭被鍨嬪畾涔?

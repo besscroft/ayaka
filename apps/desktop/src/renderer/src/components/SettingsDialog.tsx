@@ -49,6 +49,7 @@ import {
   IconPlus,
   IconInfo,
   IconSearch,
+  IconFolderOpen,
 } from "./icons";
 import {
   CHAT_REASONING_LEVELS,
@@ -87,7 +88,14 @@ interface SettingsDialogProps {
 }
 
 /** Tab 瀹氫箟 */
-export type SettingsTabId = "appearance" | "pets" | "model" | "diagnostics" | "trash" | "about";
+export type SettingsTabId =
+  | "appearance"
+  | "pets"
+  | "model"
+  | "workspace"
+  | "diagnostics"
+  | "trash"
+  | "about";
 
 /**
  * 璁剧疆寮圭獥锛堝垎 Tab 缁撴瀯锛?
@@ -164,6 +172,7 @@ export function SettingsDialog({
     { id: "appearance", label: t("settings.tab.appearance"), Icon: IconPalette },
     { id: "pets", label: t("settings.tab.pets"), Icon: IconSparkles },
     { id: "model", label: t("settings.tab.model"), Icon: IconCpu },
+    { id: "workspace", label: t("settings.tab.workspace"), Icon: IconFolderOpen },
     { id: "diagnostics", label: t("settings.tab.diagnostics"), Icon: IconSliders },
     { id: "trash", label: t("settings.tab.trash"), Icon: IconTrash },
     { id: "about", label: t("settings.tab.about"), Icon: IconInfo, pinned: true },
@@ -231,6 +240,7 @@ export function SettingsDialog({
               )}
               {tab === "pets" && <DesktopPetSection />}
               {tab === "model" && <ModelTab settings={settings} update={update} />}
+              {tab === "workspace" && <WorkspaceTab />}
               {tab === "diagnostics" && <DiagnosticsTab />}
               {tab === "trash" && <TrashTab />}
               {tab === "about" && <AboutSettings />}
@@ -670,6 +680,116 @@ function AppearanceTab({
           />
         </SettingSection>
       </div>
+    </section>
+  );
+}
+
+function WorkspaceTab(): React.JSX.Element {
+  const { t, locale } = useT();
+  const [parent, setParent] = useState("");
+  const [orphans, setOrphans] = useState<import("@shared/types").WorkspaceOrphan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback((): void => {
+    setLoading(true);
+    void Promise.all([api.workspace.getParentState(), api.workspace.listOrphans()])
+      .then(([state, found]) => {
+        setParent(state.configured ? "configured" : "");
+        setOrphans(found);
+      })
+      .catch((error) => notify.error(t("workspace.loadFailed"), error, locale))
+      .finally(() => setLoading(false));
+  }, [locale, t]);
+
+  useEffect(() => refresh(), [refresh]);
+
+  const chooseParent = (): void => {
+    void api.workspace
+      .selectParent()
+      .then((selected) => {
+        if (selected) setParent("configured");
+      })
+      .catch((error) => notify.error(t("workspace.selectFailed"), error, locale));
+  };
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-5">
+      <div>
+        <h2 className="text-base font-semibold">{t("workspace.title")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t("workspace.description")}</p>
+      </div>
+      <SettingSection
+        title={t("workspace.defaultParent")}
+        desc={t("workspace.defaultParentDesc")}
+        icon={<IconFolderOpen className="size-3.5" />}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded border border-border bg-muted px-3 py-2 text-xs">
+            {parent ? t("workspace.customParent") : t("workspace.appDefault")}
+          </code>
+          <Button variant="secondary" size="sm" onPress={chooseParent}>
+            <IconFolderOpen data-icon="inline-start" />
+            {t("workspace.choose")}
+          </Button>
+          <Button
+            variant="tertiary"
+            size="sm"
+            onPress={() => void api.settings.set("workspace_parent_directory", "").then(refresh)}
+          >
+            {t("workspace.clear")}
+          </Button>
+          <Button
+            variant="tertiary"
+            size="sm"
+            onPress={() => void api.workspace.openDefaultParent()}
+          >
+            {t("workspace.open")}
+          </Button>
+        </div>
+      </SettingSection>
+      <SettingSection
+        title={t("workspace.orphans")}
+        desc={t("workspace.orphansDesc")}
+        icon={<IconFolderOpen className="size-3.5" />}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm text-muted-foreground">
+            {loading ? t("common.loading") : t("workspace.orphanCount", { count: orphans.length })}
+          </span>
+          <Button variant="tertiary" size="sm" onPress={refresh}>
+            {t("common.refresh")}
+          </Button>
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
+          {orphans.map((orphan) => (
+            <div
+              key={orphan.id}
+              className="flex items-center gap-2 rounded border border-border px-3 py-2"
+            >
+              <span className="min-w-0 flex-1 truncate text-xs">{orphan.name}</span>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="tertiary"
+                onPress={() => void api.workspace.openOrphan(orphan.id)}
+                aria-label={t("workspace.open")}
+              >
+                <IconFolderOpen />
+              </Button>
+              <Button
+                size="sm"
+                variant="tertiary"
+                onPress={() => void api.workspace.removeOrphan(orphan.id).then(refresh)}
+              >
+                {t("common.delete")}
+              </Button>
+            </div>
+          ))}
+          {!loading && orphans.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t("workspace.noOrphans")}</p>
+          )}
+        </div>
+      </SettingSection>
     </section>
   );
 }

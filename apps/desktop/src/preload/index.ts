@@ -41,6 +41,21 @@ const api = {
     saveBatch: (msgs: unknown[]) => ipcRenderer.invoke("messages:saveBatch", msgs),
     applyPatch: (patch: unknown) => ipcRenderer.invoke("messages:applyPatch", patch),
   },
+  workspace: {
+    get: (conversationId: string) => ipcRenderer.invoke("workspace:get", conversationId),
+    prepare: (conversationId: string, title?: string) =>
+      ipcRenderer.invoke("workspace:prepare", conversationId, title),
+    open: (conversationId: string) => ipcRenderer.invoke("workspace:open", conversationId),
+    selectParent: () => ipcRenderer.invoke("workspace:selectParent"),
+    openDefaultParent: () => ipcRenderer.invoke("workspace:openDefaultParent"),
+    getParentState: () => ipcRenderer.invoke("workspace:getParentState"),
+    listOrphans: () => ipcRenderer.invoke("workspace:listOrphans"),
+    openOrphan: (id: string) => ipcRenderer.invoke("workspace:openOrphan", id),
+    removeOrphan: (id: string) => ipcRenderer.invoke("workspace:removeOrphan", id),
+    saveAttachments: (input: unknown) => ipcRenderer.invoke("workspace:saveAttachments", input),
+    read: (input: unknown) => ipcRenderer.invoke("workspace:read", input),
+    rollback: (conversationId: string) => ipcRenderer.invoke("workspace:rollback", conversationId),
+  },
   cron: {
     list: () => ipcRenderer.invoke("cron:list"),
     get: (id: string) => ipcRenderer.invoke("cron:get", id),

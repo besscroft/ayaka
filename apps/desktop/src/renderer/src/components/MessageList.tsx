@@ -65,6 +65,7 @@ import {
 import { IconCopy } from "./icons";
 
 interface MessageListProps {
+  conversationId?: string;
   messages: UIMessage[];
   isLoading: boolean;
   status: ConversationStatusKind;
@@ -98,6 +99,7 @@ export function isMessageStreaming(isLoading: boolean, index: number, lastIndex:
 }
 
 export function MessageList({
+  conversationId,
   messages,
   isLoading,
   status,
@@ -198,6 +200,7 @@ export function MessageList({
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
             <MemoMessageItem
+              conversationId={conversationId}
               message={message}
               isLastMessage={index === messages.length - 1}
               isStreaming={isMessageStreaming(isLoading, index, messages.length - 1)}
@@ -525,6 +528,7 @@ export function getReasoningDisplay(
 }
 
 export interface MessageItemProps {
+  conversationId?: string;
   message: UIMessage;
   isLastMessage: boolean;
   isStreaming: boolean;
@@ -542,6 +546,7 @@ export interface MessageItemProps {
  *  - 编辑态：整个替换为 EditableMessage
  */
 function MessageItem({
+  conversationId,
   message,
   isLastMessage,
   isStreaming,
@@ -794,7 +799,9 @@ function MessageItem({
           </ChainOfThought>
         )}
 
-        {fileParts.length > 0 && <MessageAttachments parts={fileParts} />}
+        {fileParts.length > 0 && (
+          <MessageAttachments conversationId={conversationId} parts={fileParts} />
+        )}
 
         {parts.map((part, index) => {
           const key = message.id + "-" + index;
@@ -860,7 +867,9 @@ function MessageItem({
                     />
                   </ToolContent>
                 </Tool>
-                {mediaResult ? <MediaToolResult response={mediaResult} /> : null}
+                {mediaResult ? (
+                  <MediaToolResult conversationId={conversationId} response={mediaResult} />
+                ) : null}
               </Fragment>
             );
           }
@@ -927,6 +936,7 @@ export function areMessageItemPropsEqual(
 ): boolean {
   return (
     previous.message === next.message &&
+    previous.conversationId === next.conversationId &&
     previous.isLastMessage === next.isLastMessage &&
     previous.isStreaming === next.isStreaming &&
     previous.onEdit === next.onEdit &&
@@ -1017,7 +1027,13 @@ function isToolPart(part: MessagePart): part is MessagePart & RenderableToolPart
   return part.type === "dynamic-tool" || part.type.startsWith("tool-");
 }
 
-function MediaToolResult({ response }: { response: MediaGenerationResponse }): React.JSX.Element {
+function MediaToolResult({
+  conversationId,
+  response,
+}: {
+  conversationId?: string;
+  response: MediaGenerationResponse;
+}): React.JSX.Element {
   const files: FilePartLike[] = response.files.map((file) => ({
     type: "file",
     mediaType: file.mediaType,
@@ -1029,7 +1045,9 @@ function MediaToolResult({ response }: { response: MediaGenerationResponse }): R
       {(response.kind === "transcription" || files.length === 0) && response.text.trim() ? (
         <MessageResponse>{response.text.trim()}</MessageResponse>
       ) : null}
-      {files.length > 0 ? <MessageAttachments parts={files} /> : null}
+      {files.length > 0 ? (
+        <MessageAttachments conversationId={conversationId} parts={files} />
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,48 @@ import type { AppLanguage } from "@shared/types";
 export type Dict = Record<string, string>;
 
 const entries = {
+  "common.refresh": { zh: "\u5237\u65b0", en: "Refresh" },
+  "settings.tab.workspace": { zh: "\u5de5\u4f5c\u533a", en: "Workspace" },
+  "workspace.title": { zh: "\u5bf9\u8bdd\u5de5\u4f5c\u533a", en: "Conversation workspaces" },
+  "workspace.description": {
+    zh: "\u6bcf\u4e2a\u5bf9\u8bdd\u4f7f\u7528\u72ec\u7acb\u5de5\u4f5c\u76ee\u5f55\uff0c\u9644\u4ef6\u548c\u751f\u6210\u7269\u90fd\u4fdd\u5b58\u5728\u5176\u4e2d\u3002",
+    en: "Each task gets an isolated folder for attachments and generated files.",
+  },
+  "workspace.defaultParent": { zh: "\u9ed8\u8ba4\u7236\u76ee\u5f55", en: "Default parent folder" },
+  "workspace.defaultParentDesc": {
+    zh: "\u53ea\u5f71\u54cd\u4e4b\u540e\u65b0\u5efa\u7684\u5bf9\u8bdd\uff0c\u4e0d\u4f1a\u8fc1\u79fb\u5df2\u6709\u5de5\u4f5c\u533a\u3002",
+    en: "Only future tasks use this folder; existing workspaces are not moved.",
+  },
+  "workspace.appDefault": { zh: "\u5e94\u7528\u9ed8\u8ba4\u76ee\u5f55", en: "Application default" },
+  "workspace.customParent": { zh: "已配置的目录", en: "Custom folder configured" },
+  "workspace.choose": { zh: "\u9009\u62e9", en: "Choose" },
+  "workspace.clear": { zh: "\u6e05\u9664", en: "Clear" },
+  "workspace.open": { zh: "\u6253\u5f00\u5de5\u4f5c\u76ee\u5f55", en: "Open workspace" },
+  "workspace.orphans": { zh: "\u5b64\u7acb\u5de5\u4f5c\u533a", en: "Orphaned workspaces" },
+  "workspace.orphansDesc": {
+    zh: "\u627e\u5230\u6ca1\u6709\u5bf9\u8bdd\u6620\u5c04\u7684\u5de5\u4f5c\u76ee\u5f55\uff0c\u53ef\u4ee5\u6253\u5f00\u6216\u6e05\u7406\u3002",
+    en: "Folders without a conversation mapping can be opened or removed here.",
+  },
+  "workspace.orphanCount": {
+    zh: "{count} \u4e2a\u5b64\u7acb\u5de5\u4f5c\u533a",
+    en: "{count} orphaned workspaces",
+  },
+  "workspace.noOrphans": {
+    zh: "\u6ca1\u6709\u5b64\u7acb\u5de5\u4f5c\u533a",
+    en: "No orphaned workspaces",
+  },
+  "workspace.notCreated": {
+    zh: "\u53d1\u9001\u9996\u6761\u6d88\u606f\u540e\u521b\u5efa",
+    en: "Created after the first message",
+  },
+  "workspace.loadFailed": {
+    zh: "\u52a0\u8f7d\u5de5\u4f5c\u533a\u5931\u8d25",
+    en: "Failed to load workspaces",
+  },
+  "workspace.selectFailed": {
+    zh: "\u9009\u62e9\u5de5\u4f5c\u533a\u7236\u76ee\u5f55\u5931\u8d25",
+    en: "Failed to choose workspace folder",
+  },
   "about.action.documentation": { zh: "\u6587\u6863", en: "Documentation" },
   "about.action.issues": { zh: "\u95ee\u9898\u53cd\u9988", en: "Issue tracker" },
   "agents.value.untilComplete": { zh: "直到任务完成或手动停止", en: "Until complete or stopped" },

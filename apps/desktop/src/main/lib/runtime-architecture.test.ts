@@ -66,11 +66,11 @@ void describe("runtime architecture", () => {
     assert.equal(migration.includes("ALTER TABLE"), false);
   });
 
-  void it("keeps the greenfield database history to one migration", () => {
+  void it("keeps the greenfield database history ordered and explicit", () => {
     const migrations = readdirSync(path.join(process.cwd(), "drizzle")).filter((file) =>
       file.endsWith(".sql"),
     );
-    assert.deepEqual(migrations, ["0000_initial.sql"]);
+    assert.deepEqual(migrations, ["0000_initial.sql", "0001_romantic_blob.sql"]);
   });
 
   void it("defines default seed data for agents and tools", () => {

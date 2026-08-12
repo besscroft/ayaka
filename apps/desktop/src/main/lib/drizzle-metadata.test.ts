@@ -19,13 +19,18 @@ void describe("drizzle metadata", () => {
     }
   });
 
-  void it("tracks only the consolidated initial migration", () => {
+  void it("tracks the checked-in migration history", () => {
     const journal = JSON.parse(
       readFileSync(path.join(process.cwd(), "drizzle", "meta", "_journal.json"), "utf8"),
     ) as { entries: Array<{ idx: number; tag: string }> };
 
-    assert.equal(journal.entries.length, 1);
-    assert.equal(journal.entries[0]?.idx, 0);
-    assert.equal(journal.entries[0]?.tag, "0000_initial");
+    assert.equal(journal.entries.length, 2);
+    assert.deepEqual(
+      journal.entries.map((entry) => [entry.idx, entry.tag]),
+      [
+        [0, "0000_initial"],
+        [1, "0001_romantic_blob"],
+      ],
+    );
   });
 });

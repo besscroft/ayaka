@@ -54,6 +54,10 @@ import type {
   AgentRunInputKind,
   AgentRunInputSource,
   UpdateState,
+  WorkspaceFileRef,
+  WorkspaceFileContent,
+  WorkspaceInfo,
+  WorkspaceOrphan,
 } from "../shared/types";
 import type { UIMessage } from "ai";
 
@@ -92,6 +96,23 @@ export interface VoidAIApi {
     save: (msg: MessageRow) => Promise<boolean>;
     saveBatch: (msgs: MessageRow[]) => Promise<boolean>;
     applyPatch: (patch: MessagePatch) => Promise<MessagePatchResult>;
+  };
+  workspace: {
+    get: (conversationId: string) => Promise<WorkspaceInfo | null>;
+    prepare: (conversationId: string, title?: string) => Promise<WorkspaceInfo>;
+    open: (conversationId: string) => Promise<boolean>;
+    selectParent: () => Promise<boolean>;
+    openDefaultParent: () => Promise<boolean>;
+    getParentState: () => Promise<{ configured: boolean }>;
+    listOrphans: () => Promise<WorkspaceOrphan[]>;
+    openOrphan: (id: string) => Promise<boolean>;
+    removeOrphan: (id: string) => Promise<boolean>;
+    saveAttachments: (input: {
+      conversationId: string;
+      attachments: Array<{ filename?: string; mediaType?: string; dataUrl: string }>;
+    }) => Promise<WorkspaceFileRef[]>;
+    read: (input: { conversationId: string; path: string }) => Promise<WorkspaceFileContent>;
+    rollback: (conversationId: string) => Promise<void>;
   };
   cron: {
     list: () => Promise<CronJob[]>;

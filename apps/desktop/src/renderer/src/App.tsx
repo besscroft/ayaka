@@ -50,10 +50,9 @@ function AppContent(): React.JSX.Element {
 
   const createNewConversation = useCallback(async (): Promise<void> => {
     const id = crypto.randomUUID();
-    const conv = await api.conversations.create(id, t("shell.newConversation"));
-    setActiveId(conv.id);
+    setActiveId(id);
     setActiveView("chat");
-    await api.settings.set(SettingKey.ActiveConversationId, conv.id);
+    await api.settings.set(SettingKey.ActiveConversationId, id);
   }, [t]);
 
   useEffect(() => {
@@ -99,7 +98,7 @@ function AppContent(): React.JSX.Element {
         setActiveId(list[0].id);
         return;
       }
-      await createNewConversation();
+      void createNewConversation();
     })();
   }, [createNewConversation]);
 

@@ -20,6 +20,7 @@ import {
 } from "ai";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { IconFolderOpen } from "./icons";
 import { getModelReasoningDefault } from "./ReasoningSelector";
 import { Button, LoadingIndicator } from "./ui";
 import { api, type RuntimeSnapshot } from "../lib/api";
@@ -118,6 +119,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     DEFAULT_SETTINGS.chatReasoningLevel,
   );
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+  const [isPersistedConversation, setIsPersistedConversation] = useState(false);
+  const [workspace, setWorkspace] = useState<import("@shared/types").WorkspaceInfo | null>(null);
   const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "error">("loading");
   const [hydrationRetry, setHydrationRetry] = useState(0);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -413,9 +416,25 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     // 涓嶉噸缃?titledRef锛氫繚鐣欒法浼氳瘽璁板綍锛岄伩鍏嶉噸澶嶇敓鎴愶紙鍒囨崲鍥炲埌鏃у璇濅篃涓嶉噸鐢熸垚锛?
 
     let cancelled = false;
-    void api.messages
-      .list(conversationId)
+    let loadedConversationTitle: string | null = null;
+    void api.conversations
+      .get(conversationId)
+      .then((conversation) => {
+        if (!conversation) {
+          if (cancelled) return;
+          setInitialMessages([]);
+          setIsPersistedConversation(false);
+          setHydrationState("ready");
+          hydrationStateRef.current = "ready";
+          return null;
+        }
+        loadedConversationTitle = conversation.title;
+        setIsPersistedConversation(true);
+        void api.workspace.get(conversationId).then(setWorkspace);
+        return api.messages.list(conversationId);
+      })
       .then((snapshot) => {
+        if (!snapshot) return;
         if (cancelled) return;
         const rows = snapshot.messages;
         const hydratedMessages = rows.map(hydrateStoredMessage);
@@ -426,11 +445,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         setHydrationState("ready");
         hydrationStateRef.current = "ready";
         // 濡傛灉鍘嗗彶涓凡缁忔湁鏍囬锛圖B 宸叉湁锛夛紝鏍囪涓哄凡鐢熸垚锛岄伩鍏嶅啀娆¤Е鍙?
-        void api.conversations.get(conversationId).then((conv) => {
-          if (hasMeaningfulConversationTitle(conv?.title)) {
-            titledRef.current.add(conversationId);
-          }
-        });
+        if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
+          titledRef.current.add(conversationId);
+        }
       })
       .catch((error) => {
         if (cancelled) return;
@@ -708,9 +725,41 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }): Promise<void> => {
     // 发送新消息时清空旧的追问建议
     setFollowupSuggestions([]);
-    const finalFiles = toFileUIParts(files);
+    let finalFiles = toFileUIParts(files);
 
     if (!selectedModel) return;
+
+    const wasTemporary = !isPersistedConversation;
+    try {
+      if (wasTemporary) {
+        const prepared = await api.workspace.prepare(conversationId, t("shell.newConversation"));
+        setWorkspace(prepared);
+      } else {
+        const workspace = await api.workspace.get(conversationId);
+        if (!workspace) setWorkspace(await api.workspace.prepare(conversationId));
+      }
+      const dataFiles = finalFiles.filter((file) => file.url.startsWith("data:"));
+      if (dataFiles.length > 0) {
+        const refs = await api.workspace.saveAttachments({
+          conversationId,
+          attachments: dataFiles.map((file) => ({
+            filename: file.filename,
+            mediaType: file.mediaType,
+            dataUrl: file.url,
+          })),
+        });
+        let refIndex = 0;
+        finalFiles = finalFiles.map((file) =>
+          file.url.startsWith("data:")
+            ? { ...file, url: `workspace://${refs[refIndex++]?.path}` }
+            : file,
+        );
+      }
+    } catch (error) {
+      if (wasTemporary) await api.workspace.rollback(conversationId).catch(() => undefined);
+      reportChatError("prepare workspace", error);
+      return;
+    }
 
     const messageId = crypto.randomUUID();
     let userMessage: UIMessage;
@@ -718,9 +767,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     try {
       userMessage = buildUserMessage({ id: messageId, text, files: finalFiles });
     } catch {
+      if (wasTemporary) await api.workspace.rollback(conversationId).catch(() => undefined);
       return;
     }
-
     setChatError(null);
     setChatErrorRetryable(false);
     setIsStopped(false);
@@ -768,9 +817,22 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     runModeRef.current = "start";
     reconciliationRef.current = { runId: runIdRef.current, attempts: 0, timer: null };
     latestMessagesRef.current = pendingMessages;
-    void persistAndTouch(pendingMessages).catch((err) => {
-      console.error("[chat] failed to pre-save user message:", err);
-    });
+    try {
+      const persisted = await persistAndTouch(pendingMessages);
+      if (!persisted) throw new Error("Conversation is not ready to save messages.");
+    } catch (err) {
+      runIdRef.current = null;
+      runModeRef.current = "start";
+      reconciliationRef.current = { runId: null, attempts: 0, timer: null };
+      if (wasTemporary) {
+        await api.workspace.rollback(conversationId).catch(() => undefined);
+        setIsPersistedConversation(false);
+        setWorkspace(null);
+      }
+      reportChatError("save user message", err);
+      return;
+    }
+    if (wasTemporary) setIsPersistedConversation(true);
     void chat.sendMessage(userMessage).catch((err) => {
       reportChatError("send", err, { persistSnapshot: pendingMessages });
     });
@@ -959,7 +1021,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <ChatHeader status={statusKind} />
+      <ChatHeader status={statusKind} workspace={workspace} />
 
       <div className="relative flex min-h-0 flex-1">
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -973,6 +1035,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
             />
           ) : (
             <MessageList
+              conversationId={conversationId}
               messages={chat.messages}
               isLoading={isLoading}
               status={statusKind}
@@ -1032,12 +1095,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
 interface ChatHeaderProps {
   status: ConversationStatusKind;
+  workspace: import("@shared/types").WorkspaceInfo | null;
 }
 
 /**
  * 澶撮儴鍙睍绀?瀵硅瘽鍚?+ 鐘舵€佸窘绔?锛涗笂涓嬫枃鐢ㄩ噺宸茶縼鑷宠緭鍏ユ鐨?ContextPopover銆?
  */
-function ChatHeader({ status }: ChatHeaderProps): React.JSX.Element {
+function ChatHeader({ status, workspace }: ChatHeaderProps): React.JSX.Element {
   const { t } = useT();
   return (
     <header
@@ -1051,6 +1115,20 @@ function ChatHeader({ status }: ChatHeaderProps): React.JSX.Element {
         />
         <h1 className="shrink-0 text-sm font-medium text-foreground">{t("chat.header.title")}</h1>
         <ConversationStatus status={status} />
+        {workspace ? (
+          <Button
+            variant="tertiary"
+            size="sm"
+            className="ml-1 max-w-64 truncate text-xs"
+            onPress={() => void api.workspace.open(workspace.conversationId)}
+            aria-label={t("workspace.open")}
+          >
+            <IconFolderOpen data-icon="inline-start" />
+            {workspace.relativePath}
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">{t("workspace.notCreated")}</span>
+        )}
       </div>
     </header>
   );

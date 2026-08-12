@@ -129,6 +129,18 @@ import {
   uninstallArtifact,
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
+import {
+  getConversationWorkspaceInfo,
+  getWorkspaceParentState,
+  listWorkspaceOrphans,
+  openConversationWorkspace,
+  openWorkspaceOrphan,
+  openWorkspaceParent,
+  prepareConversationWorkspace,
+  removeWorkspaceOrphan,
+  rollbackConversationWorkspacePreparation,
+  selectWorkspaceParent,
+} from "../lib/conversation-workspace";
 import { updateManager } from "../lib/update-manager";
 
 /**
@@ -204,6 +216,44 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("conversations:purgeExpired", () => purgeExpiredDeletedConversations());
+
+  ipcMain.handle("workspace:get", (_e, conversationId: string) =>
+    getConversationWorkspaceInfo(conversationId),
+  );
+  ipcMain.handle("workspace:prepare", (_e, conversationId: string, title?: string) =>
+    prepareConversationWorkspace(conversationId, title),
+  );
+  ipcMain.handle("workspace:open", (_e, conversationId: string) =>
+    openConversationWorkspace(conversationId),
+  );
+  ipcMain.handle("workspace:selectParent", async () => {
+    return selectWorkspaceParent();
+  });
+  ipcMain.handle("workspace:openDefaultParent", () => openWorkspaceParent());
+  ipcMain.handle("workspace:getParentState", () => getWorkspaceParentState());
+  ipcMain.handle("workspace:listOrphans", () => listWorkspaceOrphans());
+  ipcMain.handle("workspace:openOrphan", (_e, id: string) => openWorkspaceOrphan(id));
+  ipcMain.handle("workspace:removeOrphan", (_e, id: string) => removeWorkspaceOrphan(id));
+  ipcMain.handle(
+    "workspace:saveAttachments",
+    (
+      _e,
+      input: {
+        conversationId: string;
+        attachments: Array<{ filename?: string; mediaType?: string; dataUrl: string }>;
+      },
+    ) =>
+      import("../lib/conversation-workspace").then(({ saveWorkspaceAttachments }) =>
+        saveWorkspaceAttachments(input.conversationId, input.attachments),
+      ),
+  );
+  ipcMain.handle("workspace:read", async (_e, input: { conversationId: string; path: string }) => {
+    const { readWorkspaceFileContent } = await import("../lib/conversation-workspace");
+    return readWorkspaceFileContent(input.conversationId, input.path);
+  });
+  ipcMain.handle("workspace:rollback", (_e, conversationId: string) =>
+    rollbackConversationWorkspacePreparation(conversationId),
+  );
 
   // ---------- 娑堟伅 ----------
   ipcMain.handle("messages:list", (_e, conversationId: string) =>

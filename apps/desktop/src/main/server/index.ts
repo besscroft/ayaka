@@ -116,6 +116,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         await executeMediaGeneration(request, {
           resolveMediaModel: options.resolveMediaModel,
           writeMediaAsset: options.writeMediaAsset,
+          conversationId: request.conversationId,
         }),
       );
     } catch (err) {
@@ -170,6 +171,11 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     }
 
     try {
+      const materializedMessages = body.conversationId
+        ? await (
+            await import("../lib/conversation-workspace")
+          ).materializeWorkspaceFileReferences(body.conversationId, messages)
+        : messages;
       const resolveModel = options.resolveModel ?? (await import("../lib/providers")).resolveModel;
       const buildAgentSystemPrompt =
         options.buildAgentSystemPrompt ?? (await import("../lib/db")).buildAgentSystemPrompt;
@@ -178,7 +184,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       const runAgentChat =
         options.runAgentChat ?? (await import("../lib/agent-runtime")).runAgentChat;
       return await runAgentChat({
-        messages,
+        messages: materializedMessages,
         modelRef: body.model,
         resolved,
         conversationId: body.conversationId,

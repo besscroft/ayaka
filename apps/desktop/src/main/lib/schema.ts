@@ -705,6 +705,21 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
 });
 
+export const conversationWorkspaces = sqliteTable(
+  "conversation_workspaces",
+  {
+    conversation_id: text("conversation_id").primaryKey(),
+    parent_path: text("parent_path").notNull(),
+    root_path: text("root_path").notNull().unique(),
+    status: text("status", { enum: ["active", "orphaned"] })
+      .notNull()
+      .default("active"),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [index("idx_conversation_workspaces_status").on(table.status)],
+);
+
 export const modelProviders = sqliteTable("model_providers", {
   id: text("id").primaryKey(),
   label: text("label").notNull(),
@@ -846,6 +861,7 @@ export const schema = {
   memoryObservations,
   memoryJobs,
   settings,
+  conversationWorkspaces,
   modelProviders,
   modelApiKeys,
   apiKeys,
@@ -900,6 +916,8 @@ export type NewMemoryJob = typeof memoryJobs.$inferInsert;
 export type InteractionProfile = typeof interactionProfiles.$inferSelect;
 export type SyncProfile = typeof syncProfiles.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
+export type ConversationWorkspace = typeof conversationWorkspaces.$inferSelect;
+export type NewConversationWorkspace = typeof conversationWorkspaces.$inferInsert;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type ModelApiKey = typeof modelApiKeys.$inferSelect;
 export type ModelProvider = typeof modelProviders.$inferSelect;

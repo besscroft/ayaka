@@ -10,6 +10,7 @@ import {
   SettingKey,
   type ManagedModelInfo,
   type MediaGenerationErrorResponse,
+  type MediaGenerationFile,
   type MediaGenerationKind,
   type MediaGenerationOptions,
   type MediaGenerationRequest,
@@ -17,10 +18,12 @@ import {
   type MediaGenerationSettings,
   type MediaGenerationToolInput,
 } from "../../shared/types";
+import { writeWorkspaceOutput } from "./conversation-workspace";
 
 export interface MediaGenerationDependencies {
   resolveMediaModel?: typeof import("./providers").resolveMediaModel;
   writeMediaAsset?: typeof import("./media-assets").writeMediaAsset;
+  conversationId?: string;
 }
 
 export interface MediaGenerationToolRequestDependencies {
@@ -48,13 +51,15 @@ export async function executeMediaGeneration(
         seed: normalizeInteger(request.options?.seed),
         providerOptions: resolved.providerOptions,
       });
-      const files = result.images.map((image, index) =>
-        write({
-          data: image.uint8Array,
-          mediaType: image.mediaType,
-          kind: "image",
-          filename: `image-${index + 1}`,
-        }),
+      const files = await Promise.all(
+        result.images.map((image, index) =>
+          writeGeneratedAsset(write, dependencies.conversationId, {
+            data: image.uint8Array,
+            mediaType: image.mediaType,
+            kind: "image",
+            filename: `image-${index + 1}`,
+          }),
+        ),
       );
       return {
         kind: "image",
@@ -75,7 +80,7 @@ export async function executeMediaGeneration(
         instructions: normalizeOptionalText(request.options?.instructions),
         providerOptions: resolved.providerOptions,
       });
-      const file = write({
+      const file = await writeGeneratedAsset(write, dependencies.conversationId, {
         data: result.audio.uint8Array,
         mediaType: result.audio.mediaType,
         kind: "speech",
@@ -128,13 +133,15 @@ export async function executeMediaGeneration(
             : undefined,
         providerOptions: resolved.providerOptions,
       });
-      const files = result.videos.map((video, index) =>
-        write({
-          data: video.uint8Array,
-          mediaType: video.mediaType,
-          kind: "video",
-          filename: `video-${index + 1}`,
-        }),
+      const files = await Promise.all(
+        result.videos.map((video, index) =>
+          writeGeneratedAsset(write, dependencies.conversationId, {
+            data: video.uint8Array,
+            mediaType: video.mediaType,
+            kind: "video",
+            filename: `video-${index + 1}`,
+          }),
+        ),
       );
       return {
         kind: "video",
@@ -144,6 +151,28 @@ export async function executeMediaGeneration(
       };
     }
   }
+}
+
+async function writeGeneratedAsset(
+  fallback: NonNullable<MediaGenerationDependencies["writeMediaAsset"]>,
+  conversationId: string | undefined,
+  input: { data: Uint8Array; mediaType: string; kind: MediaGenerationKind; filename: string },
+): Promise<MediaGenerationFile> {
+  if (conversationId) {
+    const ref = await writeWorkspaceOutput(conversationId, {
+      data: input.data,
+      mediaType: input.mediaType,
+      filename: input.filename,
+    });
+    return {
+      type: "file",
+      mediaType: ref.mediaType,
+      filename: ref.filename,
+      url: `workspace://${ref.path}`,
+      size: ref.size,
+    };
+  }
+  return fallback(input);
 }
 
 /** Build a media request from hidden-tool input, global defaults, and chat attachments. */

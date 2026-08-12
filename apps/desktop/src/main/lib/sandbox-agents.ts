@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, rm, stat, writeFile, cp } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import {
@@ -11,6 +11,7 @@ import {
   listSandboxArtifacts,
   upsertSandboxSessionAsync as upsertSandboxSession,
 } from "./db";
+import { getConversationWorkspace } from "./db";
 import type { SandboxArtifact, SandboxSession, SandboxSnapshot } from "../../shared/types";
 
 const DATA_DIRNAME = "data";
@@ -55,7 +56,15 @@ export async function getOrCreateSandboxSession(input: {
   const sessionId = input.runId ? "sandbox-" + safeId(input.runId) : randomUUID();
   const dockerAvailable = await detectDockerAvailable();
   const isolationMode = input.preferredMode === "docker" && dockerAvailable ? "docker" : "local";
-  const rootPath = path.join(resolveSandboxBaseDir(), sessionId);
+  const workspaceRoot = input.conversationId
+    ? getConversationWorkspace(input.conversationId)?.root_path
+    : undefined;
+  if (input.conversationId && !workspaceRoot) {
+    throw new Error("A conversation workspace is required before starting a sandbox.");
+  }
+  const rootPath = workspaceRoot
+    ? path.join(workspaceRoot, ".sandbox", sessionId)
+    : path.join(resolveSandboxBaseDir(), sessionId);
   await mkdir(rootPath, { recursive: true });
   await mkdir(path.join(rootPath, SNAPSHOT_DIRNAME), { recursive: true });
   const now = Date.now();
@@ -425,7 +434,32 @@ export function resolveSandboxPath(rootPath: string, relativePath = "."): string
   if (relative.split(path.sep).includes(SNAPSHOT_DIRNAME)) {
     throw new Error("Snapshot internals are not directly accessible.");
   }
+  assertSandboxRealPath(rootPath, resolved);
   return resolved;
+}
+
+function assertSandboxRealPath(rootPath: string, resolvedPath: string): void {
+  const rootRealPath = existingRealPath(rootPath);
+  let cursor = resolvedPath;
+  const suffix: string[] = [];
+  while (!existsSync(cursor)) {
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    suffix.unshift(path.basename(cursor));
+    cursor = parent;
+  }
+  const candidateRealPath = path.resolve(existingRealPath(cursor), ...suffix);
+  const relative = path.relative(rootRealPath, candidateRealPath);
+  if (
+    relative &&
+    (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
+  ) {
+    throw new Error("Sandbox path escapes the sandbox root.");
+  }
+}
+
+function existingRealPath(value: string): string {
+  return existsSync(value) ? realpathSync.native(value) : path.resolve(value);
 }
 
 async function detectDockerAvailable(): Promise<boolean> {

@@ -737,7 +737,9 @@ function createMediaGenerationTool(context: RuntimeContext): ToolSet[string] {
       additionalProperties: false,
     }),
     execute: async (input) =>
-      executeMediaGeneration(await buildMediaGenerationToolRequest(input, context.messages)),
+      executeMediaGeneration(await buildMediaGenerationToolRequest(input, context.messages), {
+        conversationId: context.conversationId,
+      }),
   });
 }
 

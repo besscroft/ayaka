@@ -18,6 +18,7 @@ import {
   agents,
   apiKeys,
   conversations,
+  conversationWorkspaces,
   collaborationMessages,
   contextCheckpoints,
   interactionProfiles,
@@ -59,6 +60,8 @@ import {
   type NewToolRecord,
   type NewToolSecret,
   type NewToolServer,
+  type ConversationWorkspace,
+  type NewConversationWorkspace,
   type RuntimeEvent as DbRuntimeEvent,
   type RuntimeRun as DbRuntimeRun,
   type RuntimeStep as DbRuntimeStep,
@@ -159,6 +162,7 @@ export type {
   ToolRecord,
   ToolServer,
   ToolSkill,
+  ConversationWorkspace,
 };
 
 // 重新导出 schema 供其他模块直接引用（统一来源）。
@@ -361,6 +365,67 @@ export function getConversation(id: string): Conversation | null {
   return getDb().select().from(conversations).where(eq(conversations.id, id)).get() ?? null;
 }
 
+export function getConversationWorkspace(conversationId: string): ConversationWorkspace | null {
+  return (
+    getDb()
+      .select()
+      .from(conversationWorkspaces)
+      .where(eq(conversationWorkspaces.conversation_id, conversationId))
+      .get() ?? null
+  );
+}
+
+export async function createConversationWorkspace(
+  input: NewConversationWorkspace,
+): Promise<ConversationWorkspace> {
+  if (shouldRouteWrites()) {
+    return writeDb<ConversationWorkspace>("createConversationWorkspace", [input]);
+  }
+  getDb().insert(conversationWorkspaces).values(input).onConflictDoNothing().run();
+  const row = getConversationWorkspace(input.conversation_id);
+  if (!row) throw new Error("Conversation workspace could not be created.");
+  return row;
+}
+
+export async function deleteConversationWorkspace(conversationId: string): Promise<void> {
+  if (shouldRouteWrites()) {
+    return writeDb<void>("deleteConversationWorkspace", [conversationId]);
+  }
+  getDb()
+    .delete(conversationWorkspaces)
+    .where(eq(conversationWorkspaces.conversation_id, conversationId))
+    .run();
+}
+
+export async function setConversationWorkspaceStatus(
+  conversationId: string,
+  status: "active" | "orphaned",
+): Promise<void> {
+  if (shouldRouteWrites()) {
+    return writeDb<void>("setConversationWorkspaceStatus", [conversationId, status]);
+  }
+  getDb()
+    .update(conversationWorkspaces)
+    .set({ status, updated_at: Date.now() })
+    .where(eq(conversationWorkspaces.conversation_id, conversationId))
+    .run();
+}
+
+export async function rollbackConversationPreparation(conversationId: string): Promise<void> {
+  if (shouldRouteWrites()) {
+    return writeDb<void>("rollbackConversationPreparation", [conversationId]);
+  }
+  getDb()
+    .delete(conversationWorkspaces)
+    .where(eq(conversationWorkspaces.conversation_id, conversationId))
+    .run();
+  getDb().delete(conversations).where(eq(conversations.id, conversationId)).run();
+}
+
+export function listConversationWorkspaces(): ConversationWorkspace[] {
+  return getDb().select().from(conversationWorkspaces).all();
+}
+
 export async function touchConversation(id: string, title?: string): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("touchConversation", [id, title]);
   const patch: Partial<Conversation> = { updated_at: Date.now() };
@@ -371,32 +436,49 @@ export async function touchConversation(id: string, title?: string): Promise<voi
 export async function deleteConversation(id: string): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("deleteConversation", [id]);
   const now = Date.now();
-  getDb()
-    .update(conversations)
-    .set({ deleted_at: now, purge_after_at: now + TRASH_RETENTION_MS, updated_at: now })
-    .where(eq(conversations.id, id))
-    .run();
+  getDb().transaction((tx) => {
+    tx.update(conversations)
+      .set({ deleted_at: now, purge_after_at: now + TRASH_RETENTION_MS, updated_at: now })
+      .where(eq(conversations.id, id))
+      .run();
+    tx.update(conversationWorkspaces)
+      .set({ status: "orphaned", updated_at: now })
+      .where(eq(conversationWorkspaces.conversation_id, id))
+      .run();
+  });
 }
 
 export async function restoreConversation(id: string): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("restoreConversation", [id]);
-  getDb()
-    .update(conversations)
-    .set({ deleted_at: null, purge_after_at: null, updated_at: Date.now() })
-    .where(eq(conversations.id, id))
-    .run();
+  const now = Date.now();
+  getDb().transaction((tx) => {
+    tx.update(conversations)
+      .set({ deleted_at: null, purge_after_at: null, updated_at: now })
+      .where(eq(conversations.id, id))
+      .run();
+    tx.update(conversationWorkspaces)
+      .set({ status: "active", updated_at: now })
+      .where(eq(conversationWorkspaces.conversation_id, id))
+      .run();
+  });
 }
 
 export async function permanentlyDeleteConversation(id: string): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("permanentlyDeleteConversation", [id]);
-  getDb().delete(conversations).where(eq(conversations.id, id)).run();
+  getDb().transaction((tx) => {
+    tx.delete(conversationWorkspaces).where(eq(conversationWorkspaces.conversation_id, id)).run();
+    tx.delete(conversations).where(eq(conversations.id, id)).run();
+  });
 }
 
 export async function permanentlyDeleteConversations(ids: string[]): Promise<number> {
   if (shouldRouteWrites()) return writeDb<number>("permanentlyDeleteConversations", [ids]);
   let deleted = 0;
   for (const id of ids) {
-    const result = getDb().delete(conversations).where(eq(conversations.id, id)).run();
+    const result = getDb().transaction((tx) => {
+      tx.delete(conversationWorkspaces).where(eq(conversationWorkspaces.conversation_id, id)).run();
+      return tx.delete(conversations).where(eq(conversations.id, id)).run();
+    });
     deleted += result.changes;
   }
   return deleted;
@@ -404,10 +486,20 @@ export async function permanentlyDeleteConversations(ids: string[]): Promise<num
 
 export async function purgeExpiredDeletedConversations(now = Date.now()): Promise<number> {
   if (shouldRouteWrites()) return writeDb<number>("purgeExpiredDeletedConversations", [now]);
-  return getDb()
-    .delete(conversations)
+  const expired = getDb()
+    .select({ id: conversations.id })
+    .from(conversations)
     .where(and(isNotNull(conversations.purge_after_at), lt(conversations.purge_after_at, now)))
-    .run().changes;
+    .all();
+  if (expired.length === 0) return 0;
+  const ids = expired.map((conversation) => conversation.id);
+  return getDb().transaction((tx) => {
+    tx.update(conversationWorkspaces)
+      .set({ status: "orphaned", updated_at: now })
+      .where(inArray(conversationWorkspaces.conversation_id, ids))
+      .run();
+    return tx.delete(conversations).where(inArray(conversations.id, ids)).run().changes;
+  });
 }
 
 export async function saveMessage(msg: MessageRow): Promise<void> {

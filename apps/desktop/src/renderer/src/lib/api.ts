@@ -53,6 +53,10 @@ import type {
   AgentRunInputSource,
   RuntimeSnapshot,
   UpdateState,
+  WorkspaceFileRef,
+  WorkspaceFileContent,
+  WorkspaceInfo,
+  WorkspaceOrphan,
 } from "@shared/types";
 import type { UIMessage } from "ai";
 
@@ -112,6 +116,27 @@ export const api = {
     saveBatch: (msgs: MessageRow[]): Promise<boolean> => assertApi().messages.saveBatch(msgs),
     applyPatch: (patch: MessagePatch): Promise<MessagePatchResult> =>
       assertApi().messages.applyPatch(patch),
+  },
+  workspace: {
+    get: (conversationId: string): Promise<WorkspaceInfo | null> =>
+      assertApi().workspace.get(conversationId),
+    prepare: (conversationId: string, title?: string): Promise<WorkspaceInfo> =>
+      assertApi().workspace.prepare(conversationId, title),
+    open: (conversationId: string): Promise<boolean> => assertApi().workspace.open(conversationId),
+    selectParent: (): Promise<boolean> => assertApi().workspace.selectParent(),
+    openDefaultParent: (): Promise<boolean> => assertApi().workspace.openDefaultParent(),
+    getParentState: (): Promise<{ configured: boolean }> => assertApi().workspace.getParentState(),
+    listOrphans: (): Promise<WorkspaceOrphan[]> => assertApi().workspace.listOrphans(),
+    openOrphan: (id: string): Promise<boolean> => assertApi().workspace.openOrphan(id),
+    removeOrphan: (id: string): Promise<boolean> => assertApi().workspace.removeOrphan(id),
+    saveAttachments: (input: {
+      conversationId: string;
+      attachments: Array<{ filename?: string; mediaType?: string; dataUrl: string }>;
+    }): Promise<WorkspaceFileRef[]> => assertApi().workspace.saveAttachments(input),
+    read: (input: { conversationId: string; path: string }): Promise<WorkspaceFileContent> =>
+      assertApi().workspace.read(input),
+    rollback: (conversationId: string): Promise<void> =>
+      assertApi().workspace.rollback(conversationId),
   },
   cron: {
     list: (): Promise<CronJob[]> => assertApi().cron.list(),
