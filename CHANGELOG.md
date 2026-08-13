@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.19] - 2026-08-13
+
+### 中文
+
+#### 变更
+
+- 优化工作区设置页面，直接显示当前工作区父目录，并在选择新目录后自动刷新状态。
+- 优化确认对话框的样式扩展能力，改善设置页面中的交互体验。
+
+#### 移除
+
+- 移除桌面桌宠功能及其相关的数据库配置、资源、界面、文档和测试代码。
+- 启动时清理旧版桌宠数据，避免已移除功能遗留无效配置。
+
+### English
+
+#### Changed
+
+- Improved the workspace settings page by displaying the current parent directory and refreshing the state after a new directory is selected.
+- Improved confirmation dialog styling support for a smoother settings experience.
+
+#### Removed
+
+- Removed the desktop pet feature and its related database configuration, assets, UI, documentation, and tests.
+- Added startup cleanup for legacy desktop pet data to prevent stale configuration from remaining after the feature removal.
+
 ## [0.1.18] - 2026-08-13
 
 ### 中文
