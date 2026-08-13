@@ -99,6 +99,7 @@ import {
   COMPLETE_TASK_TOOL_NAME,
   type CompletionController,
 } from "./agent-completion";
+import { reconcileToolResults, removeIncompleteToolParts } from "./agent-tool-results";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -191,6 +192,7 @@ const consultInputSchema = jsonSchema<{ task: string; expectedOutput?: string }>
 });
 
 export async function runAgentChat(options: RunAgentChatOptions): Promise<Response> {
+  const initialMessages = removeIncompleteToolParts(options.messages);
   const resolveModel = options.resolveModel ?? (await import("./providers")).resolveModel;
   const agentGraph = loadAgentGraph(DEFAULT_AGENT_ID);
   const { rootAgent, enabledChildren } = agentGraph;
@@ -223,8 +225,8 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     origin: options.origin ?? "chat",
     mode: options.mode ?? "start",
     runtimeConfig: rootRuntimeConfig,
-    inputSummary: summarizeText(extractTranscript(options.messages, 6), 1_000),
-    messages: options.messages,
+    inputSummary: summarizeText(extractTranscript(initialMessages, 6), 1_000),
+    messages: initialMessages,
   });
   if (options.abortSignal) {
     if (options.abortSignal.aborted) void session.cancel("request_aborted");
@@ -266,7 +268,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       kind: "guardrail",
       status: "succeeded",
       title: "Input guardrails passed",
-      detail: { conversationId: options.conversationId, messageCount: options.messages.length },
+      detail: { conversationId: options.conversationId, messageCount: initialMessages.length },
       finished_at: Date.now(),
     });
     insertRuntimeEvent({
@@ -284,7 +286,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
   }
 
   auditChatToolApprovalResponses({
-    messages: options.messages,
+    messages: initialMessages,
     model: modelContext,
     conversationId: options.conversationId,
     agentId: DEFAULT_AGENT_ID,
@@ -299,7 +301,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     modelRef: rootModelRef,
     resolved,
     modelContext,
-    messages: options.messages,
+    messages: initialMessages,
     conversationId: options.conversationId,
     preferredAgentId,
     reasoning: rootRuntimeConfig.reasoning
@@ -355,7 +357,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       modelRef: rootModelRef,
       resolved,
       instructions: rootInstructions,
-      messages: options.messages,
+      messages: initialMessages,
       runtimeConfig: rootRuntimeConfig,
       reasoning: context.reasoning,
       toolRuntime,
@@ -372,7 +374,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       context,
       tracker,
       contextEngine,
-      initialMessages: options.messages,
+      initialMessages,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -455,9 +457,10 @@ async function streamRootAgentLoop({
           });
           for await (const chunk of uiStream) writer.write(chunk);
 
+          const responseMessages = (await result.responseMessages) as ModelMessage[];
           modelMessages.push(
             ...context.preparedSteering.splice(0),
-            ...((await result.responseMessages) as ModelMessage[]),
+            ...reconcileToolResults(responseMessages, await result.toolResults),
           );
           const toolCalls = await result.toolCalls;
           const toolResults = await result.toolResults;
