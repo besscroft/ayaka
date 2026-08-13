@@ -252,7 +252,6 @@ export function InstalledSkillsPanel(): React.JSX.Element {
                 t("tools.toast.saved"),
               )
             }
-            onRun={(skill) => runAction(() => api.tools.skills.run(skill.id), t("tools.toast.ran"))}
             onDetail={(skill) => setDetailTarget({ type: "skill", item: skill })}
           />
         )}
@@ -400,7 +399,6 @@ function SkillsSection({
   onDelete,
   onToggle,
   onApprovalChange,
-  onRun,
   onDetail,
 }: {
   skills: ToolSkill[];
@@ -408,7 +406,6 @@ function SkillsSection({
   onDelete: (skill: ToolSkill) => void;
   onToggle: (skill: ToolSkill, enabled: boolean) => void;
   onApprovalChange: (skill: ToolSkill, requiresApproval: boolean) => void;
-  onRun: (skill: ToolSkill) => void;
   onDetail: (skill: ToolSkill) => void;
 }): React.JSX.Element {
   const { t } = useT();
@@ -425,7 +422,6 @@ function SkillsSection({
           onDelete={() => onDelete(skill)}
           onToggle={(enabled) => onToggle(skill, enabled)}
           onApprovalChange={(requiresApproval) => onApprovalChange(skill, requiresApproval)}
-          onRun={() => onRun(skill)}
           onDetail={() => onDetail(skill)}
         />
       ))}
@@ -439,7 +435,6 @@ function SkillCard({
   onDelete,
   onToggle,
   onApprovalChange,
-  onRun,
   onDetail,
 }: {
   skill: ToolSkill;
@@ -447,7 +442,6 @@ function SkillCard({
   onDelete: () => void;
   onToggle: (enabled: boolean) => void;
   onApprovalChange: (requiresApproval: boolean) => void;
-  onRun: () => void;
   onDetail: () => void;
 }): React.JSX.Element {
   const { t, f } = useT();
@@ -500,10 +494,6 @@ function SkillCard({
             </Switch>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onPress={onRun} isDisabled={busy}>
-              <IconSparkles className="size-4" />
-              {t("tools.action.run")}
-            </Button>
             <Button size="sm" variant="secondary" onPress={onDetail} isDisabled={busy}>
               <IconEye className="size-4" />
               {t("tools.detail")}
