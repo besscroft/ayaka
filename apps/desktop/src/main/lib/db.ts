@@ -196,14 +196,17 @@ function resolveDataDir(): string {
 }
 
 function resolveMigrationsFolder(): string {
+  const sourceCandidates = [
+    join(__dirname, "..", "..", "drizzle"),
+    join(__dirname, "..", "..", "..", "drizzle"),
+  ];
   if (process.env.VOID_AI_DEV === "1") {
-    const candidates = [
-      join(__dirname, "..", "..", "drizzle"),
-      join(__dirname, "..", "..", "..", "drizzle"),
-    ];
-    return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
+    return sourceCandidates.find((candidate) => existsSync(candidate)) ?? sourceCandidates[0]!;
   }
-  return join(process.resourcesPath, "drizzle");
+  const packaged = join(process.resourcesPath ?? "", "drizzle");
+  return existsSync(packaged)
+    ? packaged
+    : (sourceCandidates.find((candidate) => existsSync(candidate)) ?? packaged);
 }
 
 export interface DbInitOptions {
@@ -1081,6 +1084,8 @@ export async function updateRuntimeRun(
         patch.output_summary === undefined ? existing.output_summary : patch.output_summary,
       error: patch.error === undefined ? existing.error : patch.error,
       usage_json: patch.usage_json === undefined ? existing.usage_json : patch.usage_json,
+      metadata_json:
+        patch.metadata_json === undefined ? existing.metadata_json : patch.metadata_json,
       updated_at: Date.now(),
     })
     .where(eq(runtimeRuns.id, id))

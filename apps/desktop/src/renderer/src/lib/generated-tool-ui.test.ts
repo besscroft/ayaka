@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   getToolPartName,
   getToolSummary,
+  isSilentToolPart,
   isGeneratedToolName,
   normalizeMemoryResults,
   normalizeSandboxArtifacts,
@@ -25,6 +26,9 @@ void describe("generated tool UI parsing", () => {
     );
     assert.equal(getToolPartName({ type: "dynamic-tool" }), null);
     assert.equal(getToolPartName({ type: "text" }), null);
+    assert.equal(isSilentToolPart({ type: "tool-complete_task" }), true);
+    assert.equal(isSilentToolPart({ type: "dynamic-tool", toolName: "complete_task" }), true);
+    assert.equal(isSilentToolPart({ type: "tool-web_search" }), false);
     assert.equal(isGeneratedToolName("web_open"), true);
     assert.equal(isGeneratedToolName("mcp_custom_tool"), false);
   });

@@ -4,6 +4,7 @@ import type { RunStatus } from "@shared/types";
 const TERMINAL_RUN_STATUSES: ReadonlySet<RunStatus> = new Set([
   "succeeded",
   "failed",
+  "blocked",
   "cancelled",
   "interrupted",
 ]);

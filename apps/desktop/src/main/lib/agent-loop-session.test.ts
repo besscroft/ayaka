@@ -83,6 +83,32 @@ void describe("AgentLoopSessionManager", () => {
     assert.equal(db.getRuntimeRun(runId)?.finish_reason, "cancelled");
     assert.equal(db.listAgentRunInputs(runId)[0]?.status, "discarded");
   });
+
+  void it("persists absolute limits and rejects resume after the hard cap", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    const session = await manager.start({
+      ...baseOptions(runId),
+      runtimeConfig: {
+        maxTurns: 1,
+        maxDurationMs: 600_000,
+        maxToolCalls: 50,
+        absoluteMaxDurationMs: 60_000,
+        absoluteMaxToolCalls: 1,
+        maxNoProgressRounds: 3,
+      },
+    });
+    assert.equal(session.beginToolCall(), true);
+    assert.equal(session.beginToolCall(), false);
+    await session.block("absolute limit");
+    assert.equal(db.getRuntimeRun(runId)?.status, "blocked");
+    await assert.rejects(
+      manager.start({ ...baseOptions(runId), mode: "resume" }),
+      (error: unknown) =>
+        error instanceof sessionModule.AgentLoopSessionError &&
+        error.code === "absolute_limit_reached",
+    );
+  });
 });
 
 function baseOptions(runId: string) {

@@ -243,6 +243,7 @@ export type AgentRuntimeStatus =
   | "tool_calling"
   | "sandbox"
   | "learning"
+  | "blocked"
   | "failed";
 
 export function isAgentRuntimeBusy(status: AgentRuntimeStatus | null | undefined): boolean {
@@ -281,6 +282,9 @@ export interface AgentRuntimeConfig {
   maxTurns: number;
   maxDurationMs?: number;
   maxToolCalls?: number;
+  absoluteMaxDurationMs?: number;
+  absoluteMaxToolCalls?: number;
+  maxNoProgressRounds?: number;
   maxConcurrentSubagents?: number;
   totalTimeoutMs?: number;
   contextPolicy?: AgentContextPolicy;
@@ -649,6 +653,7 @@ export type RunStatus =
   | "running"
   | "waiting_approval"
   | "waiting_handoff"
+  | "blocked"
   | "succeeded"
   | "failed"
   | "cancelled"
@@ -659,6 +664,7 @@ export type AgentRunOrigin = "chat" | "automation" | "system";
 export type AgentRunFinishReason =
   | "natural"
   | "budget_exhausted"
+  | "absolute_limit"
   | "cancelled"
   | "interrupted"
   | "error";
@@ -677,6 +683,27 @@ export interface AgentRunInput {
   created_at: number;
   consumed_at: number | null;
   discarded_reason: string | null;
+}
+
+export interface AgentCompletionCandidate {
+  result: string;
+  completedItems: string[];
+  verificationEvidence: string[];
+  remainingItems: string[];
+  blockingReason?: string;
+  submittedAt: number;
+}
+
+export interface AgentLoopControlMetadata {
+  windowCount: number;
+  totalTurns: number;
+  totalToolCalls: number;
+  noProgressRounds: number;
+  absoluteDeadline: number;
+  completionCandidate?: AgentCompletionCandidate;
+  blockedReason?: string;
+  resumable: boolean;
+  windowStartedAt?: number;
 }
 
 export interface RuntimeEvent {
@@ -1088,6 +1115,9 @@ export const DEFAULT_AGENT_RUNTIME_CONFIG: AgentRuntimeConfig = {
   maxTurns: 8,
   maxDurationMs: 600_000,
   maxToolCalls: 50,
+  absoluteMaxDurationMs: 3_600_000,
+  absoluteMaxToolCalls: 250,
+  maxNoProgressRounds: 3,
   maxConcurrentSubagents: 3,
   totalTimeoutMs: 120_000,
   contextPolicy: {
@@ -1166,6 +1196,25 @@ export function normalizeAgentRuntimeConfig(
     ),
     maxToolCalls: Math.round(
       clampFiniteNumber(value?.maxToolCalls, fallback.maxToolCalls ?? 50, 1, 500),
+    ),
+    absoluteMaxDurationMs: Math.round(
+      clampFiniteNumber(
+        value?.absoluteMaxDurationMs,
+        fallback.absoluteMaxDurationMs ?? 3_600_000,
+        60_000,
+        86_400_000,
+      ),
+    ),
+    absoluteMaxToolCalls: Math.round(
+      clampFiniteNumber(
+        value?.absoluteMaxToolCalls,
+        fallback.absoluteMaxToolCalls ?? 250,
+        10,
+        10_000,
+      ),
+    ),
+    maxNoProgressRounds: Math.round(
+      clampFiniteNumber(value?.maxNoProgressRounds, fallback.maxNoProgressRounds ?? 3, 1, 20),
     ),
     maxConcurrentSubagents: normalizeMaxConcurrentSubagents(
       value?.maxConcurrentSubagents,

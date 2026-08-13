@@ -93,6 +93,12 @@ import { RunToolScheduler, scheduleToolSet } from "./run-tool-scheduler";
 import { buildMediaGenerationToolRequest, executeMediaGeneration } from "./media-generation";
 import { addAgentManagementTools } from "./agent-management-tools";
 import { classifyChatError } from "./chat-errors";
+import {
+  createCompletionController,
+  hideCompletionToolStream,
+  COMPLETE_TASK_TOOL_NAME,
+  type CompletionController,
+} from "./agent-completion";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -141,6 +147,8 @@ interface RuntimeContext {
   session: AgentLoopSession;
   toolScheduler: RunToolScheduler;
   preparedSteering: ModelMessage[];
+  completionController?: CompletionController;
+  recentToolError: boolean;
 }
 
 const DEFAULT_MODEL_CAPABILITIES: ModelCapabilities = {
@@ -313,7 +321,15 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
     session,
     toolScheduler,
     preparedSteering: [],
+    recentToolError: false,
   };
+  context.completionController = createCompletionController(() => ({
+    hasPendingApproval: context.approvalRequested,
+    hasRunningSubagents: context.coordinator
+      .listAgents()
+      .some((instance) => instance.status === "running" || instance.status === "queued"),
+    hasRecentToolError: context.recentToolError,
+  }));
   emitProtocol(context, "agent.lifecycle", "/root", null, "start", { status: "running" });
 
   try {
@@ -348,33 +364,10 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       protocol: { context, agentPath: "/root", parentAgentPath: null },
       singleStep: true,
       injectSteering: true,
+      completionController: context.completionController,
     });
-    const finalAgent = createToolLoopAgent({
-      id: DEFAULT_AGENT_ID + "-finalize",
-      modelRef: rootModelRef,
-      resolved,
-      instructions:
-        rootInstructions +
-        "\n\nThe run budget is exhausted. Do not call tools. Summarize completed work, unresolved items, and the reason execution stopped.",
-      messages: options.messages,
-      runtimeConfig: rootRuntimeConfig,
-      reasoning: context.reasoning,
-      toolRuntime: {
-        ...toolRuntime,
-        tools: {},
-        activeTools: [],
-        toolChoice: "none",
-        toolApproval: undefined,
-      },
-      messageStepRecorder: tracker.recordModelStep,
-      contextManager: contextEngine,
-      protocol: { context, agentPath: "/root", parentAgentPath: null },
-      singleStep: true,
-    });
-
     return await streamRootAgentLoop({
       agent,
-      finalAgent,
       toolRuntime,
       context,
       tracker,
@@ -390,13 +383,11 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
 
 async function streamRootAgentLoop({
   agent,
-  finalAgent,
   context,
   tracker,
   initialMessages,
 }: {
   agent: ToolLoopAgent<never, ToolSet>;
-  finalAgent: ToolLoopAgent<never, ToolSet>;
   toolRuntime: ChatToolRuntimeConfig;
   context: RuntimeContext;
   tracker: ReturnType<typeof createExecutionTracker>;
@@ -413,48 +404,18 @@ async function streamRootAgentLoop({
     originalMessages: initialMessages as UIMessage<ChatMessageMetadata>[],
     execute: async ({ writer }) => {
       try {
-        const finalizeBudget = async (budgetReason: string): Promise<void> => {
-          const finalizationPrompt: ModelMessage = {
-            role: "user",
-            content: `Execution budget exhausted (${budgetReason}). Provide the final status now.`,
-          };
-          const finalResult = await finalAgent.stream({
-            prompt: [...modelMessages, finalizationPrompt],
-            abortSignal: context.session.signal,
-          });
-          const finalUiStream = toUIMessageStream<ToolSet, UIMessage<ChatMessageMetadata>>({
-            stream: finalResult.stream,
-            tools: finalAgent.tools,
-            sendStart: firstEpoch,
-            sendFinish: false,
-            sendReasoning: true,
-            sendSources: true,
-            originalMessages: firstEpoch
-              ? (initialMessages as UIMessage<ChatMessageMetadata>[])
-              : undefined,
-            messageMetadata: tracker.messageMetadata,
-            onError: (error) =>
-              classifyChatError(error, {
-                phase: "stream",
-                abortSignal: context.session.signal,
-              }).error,
-          });
-          for await (const chunk of finalUiStream) writer.write(chunk);
-          lastFinishReason = await finalResult.finishReason;
-          lastText = await finalResult.text;
-          lastUsage = await finalResult.usage;
-          firstEpoch = false;
-          await finishRun(context, "succeeded", {
-            execution: tracker.finalize(lastFinishReason, lastUsage),
-            outputSummary: lastText,
-          });
-        };
-
         while (context.session.isActive) {
+          if (context.session.absoluteLimitExceededReason) {
+            await blockRun(context, "The absolute agent safety limit was reached.");
+            break;
+          }
           const existingBudgetReason = context.session.budgetExceededReason;
           if (existingBudgetReason) {
-            await finalizeBudget(existingBudgetReason);
-            break;
+            if (context.session.absoluteLimitExceededReason) {
+              await blockRun(context, "The absolute agent safety limit was reached.");
+              break;
+            }
+            context.session.beginNextWindow();
           }
           modelMessages = await appendQueuedMessages(
             modelMessages,
@@ -469,14 +430,14 @@ async function streamRootAgentLoop({
               timeout: { totalMs: context.session.remainingDurationMs },
             });
           } catch (error) {
-            if (context.session.budgetExceededReason === "max_duration") {
-              await finalizeBudget("max_duration");
+            if (context.session.absoluteLimitExceededReason) {
+              await blockRun(context, "The absolute agent safety limit was reached.");
               break;
             }
             throw error;
           }
           const uiStream = toUIMessageStream<ToolSet, UIMessage<ChatMessageMetadata>>({
-            stream: result.stream,
+            stream: hideCompletionToolStream(result.stream),
             tools: agent.tools,
             sendStart: firstEpoch,
             sendFinish: false,
@@ -499,21 +460,61 @@ async function streamRootAgentLoop({
             ...((await result.responseMessages) as ModelMessage[]),
           );
           const toolCalls = await result.toolCalls;
+          const toolResults = await result.toolResults;
           lastFinishReason = await result.finishReason;
           lastText = await result.text;
           lastUsage = await result.usage;
           const budgetReason = context.session.recordStep();
+          const hasToolError = toolResults.some((toolResult) => {
+            const value = toolResult as unknown as Record<string, unknown>;
+            return value.type === "tool-error" || value.isError === true || value.error != null;
+          });
+          context.recentToolError = hasToolError;
+          if (toolCalls.some((call) => call.toolName !== "complete_task") && !hasToolError) {
+            context.session.recordProgress();
+          }
           firstEpoch = false;
 
           if (context.approvalRequested) {
             await finishRun(context, "succeeded");
             break;
           }
-          if (budgetReason) {
-            await finalizeBudget(budgetReason);
+          const completionValidation = context.completionController?.getValidation();
+          if (completionValidation?.accepted) {
+            await finishRun(context, "succeeded", {
+              execution: tracker.finalize(lastFinishReason, lastUsage),
+              outputSummary: completionValidation.candidate.result,
+            });
             break;
           }
-          if (toolCalls.length > 0) continue;
+          if (!context.modelContext.capabilities.toolCalling && lastText) {
+            const fallback = context.completionController?.parseAndSubmit(lastText);
+            if (fallback?.accepted) {
+              await finishRun(context, "succeeded", {
+                execution: tracker.finalize(lastFinishReason, lastUsage),
+                outputSummary: fallback.candidate.result,
+              });
+              break;
+            }
+          }
+          if (budgetReason) {
+            if (context.session.absoluteLimitExceededReason) {
+              await blockRun(context, "The absolute agent safety limit was reached.");
+              break;
+            }
+            context.session.beginNextWindow();
+            continue;
+          }
+          if (toolCalls.length > 0) {
+            if (context.session.noProgressExceeded) {
+              await blockRun(
+                context,
+                "No progress was made across the configured number of rounds.",
+              );
+              break;
+            }
+            continue;
+          }
 
           const steering = await context.session.drain("steering");
           if (steering.length > 0) {
@@ -527,11 +528,17 @@ async function streamRootAgentLoop({
             continue;
           }
 
-          await finishRun(context, "succeeded", {
-            execution: tracker.finalize(lastFinishReason, lastUsage),
-            outputSummary: lastText,
+          modelMessages.push({
+            role: "user",
+            content:
+              "The task is not complete yet. Continue working, verify the result, and call complete_task only when no work remains.",
           });
-          break;
+          if (context.session.noProgressExceeded) {
+            await blockRun(context, "No progress was made across the configured number of rounds.");
+            break;
+          }
+          context.session.beginNextWindow();
+          continue;
         }
 
         if (context.session.signal.aborted) {
@@ -589,6 +596,13 @@ async function appendQueuedMessages(
   if (queued.length === 0) return current;
   const converted = await convertToModelMessages(queued, { tools });
   return [...current, ...converted];
+}
+
+async function blockRun(context: RuntimeContext, reason: string): Promise<void> {
+  await finishRun(context, "blocked", {
+    error: reason,
+    outputSummary: context.completionController?.getCandidate()?.result,
+  });
 }
 
 async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRuntimeConfig> {
@@ -756,6 +770,7 @@ function createToolLoopAgent({
   protocol,
   singleStep = false,
   injectSteering = false,
+  completionController,
 }: {
   id: string;
   modelRef: string;
@@ -769,15 +784,18 @@ function createToolLoopAgent({
   contextManager?: ContextEngine;
   singleStep?: boolean;
   injectSteering?: boolean;
+  completionController?: CompletionController;
   protocol?: {
     context: RuntimeContext;
     agentPath: string;
     parentAgentPath: string | null;
   };
 }): ToolLoopAgent<never, ToolSet> {
+  const baseTools = { ...toolRuntime.tools } as ToolSet;
+  if (completionController) baseTools.complete_task = completionController.tool;
   const agentTools = protocol
     ? scheduleToolSet(
-        toolRuntime.tools ?? {},
+        baseTools,
         protocol.context.toolScheduler,
         protocol.context.session.signal,
         () => protocol.context.session.beginToolCall(),
@@ -788,12 +806,25 @@ function createToolLoopAgent({
     model: resolved.model,
     instructions: appendReactionFeedback(instructions, messages),
     tools: agentTools,
-    activeTools: toolRuntime.activeTools,
-    toolChoice: toolRuntime.toolChoice,
+    activeTools: completionController
+      ? [...(toolRuntime.activeTools ?? []), "complete_task"]
+      : toolRuntime.activeTools,
+    toolChoice:
+      completionController && resolved.capabilities?.toolCalling !== false
+        ? // OpenAI-compatible endpoints are not required to implement the
+          // OpenAI `tool_choice: "required"` value. Keep tool selection
+          // provider-compatible and let the completion controller, rather than
+          // the provider request, enforce the strict completion contract.
+          "auto"
+        : completionController
+          ? "none"
+          : toolRuntime.toolChoice,
     toolApproval: toolRuntime.toolApproval,
     stopWhen: singleStep
       ? isStepCount(1)
-      : (toolRuntime.stopWhen ?? isStepCount(runtimeConfig.maxTurns)),
+      : (completionController?.stopWhen ??
+        toolRuntime.stopWhen ??
+        isStepCount(runtimeConfig.maxTurns)),
     temperature: runtimeConfig.temperature ?? resolved.temperature,
     topP: runtimeConfig.topP ?? resolved.topP,
     maxOutputTokens: runtimeConfig.maxOutputTokens ?? resolved.maxOutputTokens,
@@ -822,6 +853,7 @@ function createToolLoopAgent({
         : undefined,
     onToolExecutionStart: protocol
       ? ({ toolCall }) => {
+          if (toolCall.toolName === COMPLETE_TASK_TOOL_NAME) return;
           emitProtocol(
             protocol.context,
             "tool.call",
@@ -834,6 +866,7 @@ function createToolLoopAgent({
       : undefined,
     onToolExecutionEnd: protocol
       ? ({ toolCall, toolExecutionMs, toolOutput }) => {
+          if (toolCall.toolName === COMPLETE_TASK_TOOL_NAME) return;
           emitProtocol(
             protocol.context,
             "tool.result",
@@ -928,6 +961,17 @@ async function runChildAgent(
         childModelContext,
         runningInstance.agent_path,
       );
+      const childCompletionController = createCompletionController(() => ({
+        hasPendingApproval: false,
+        hasRunningSubagents: context.coordinator
+          .listAgents()
+          .some(
+            (instance) =>
+              instance.parent_agent_path === runningInstance.agent_path &&
+              (instance.status === "running" || instance.status === "queued"),
+          ),
+        hasRecentToolError: false,
+      }));
       const childAgent = createToolLoopAgent({
         id: runningInstance.agent_path,
         modelRef: childModelRef,
@@ -952,13 +996,20 @@ async function runChildAgent(
           agentPath: runningInstance.agent_path,
           parentAgentPath: runningInstance.parent_agent_path,
         },
+        completionController: childCompletionController,
       });
-      const result = await childAgent.generate({
+      await childAgent.generate({
         prompt: createChildPrompt(context, child, mode, input),
         abortSignal,
         timeout: { totalMs: childConfig.totalTimeoutMs },
       });
-      return summarizeText(result.text, 6_000);
+      const childCompletion = childCompletionController.getValidation();
+      if (!childCompletion?.accepted) {
+        throw new Error(
+          childCompletion?.reasons.join(" ") ?? "Child agent did not submit a valid completion.",
+        );
+      }
+      return summarizeText(childCompletion.candidate.result, 6_000);
     },
   });
   void saveAgentInstance(instance);
@@ -1438,7 +1489,7 @@ function evaluateToolGuardrail(
 
 async function finishRun(
   context: RuntimeContext,
-  status: "succeeded" | "failed" | "cancelled",
+  status: "succeeded" | "failed" | "cancelled" | "blocked",
   extra: {
     error?: string;
     errorCode?: ChatErrorCode;
@@ -1458,6 +1509,8 @@ async function finishRun(
     await context.session.fail(extra.error ?? "Agent run failed");
   } else if (status === "cancelled") {
     await context.session.cancel(extra.error ?? "cancelled");
+  } else if (status === "blocked") {
+    await context.session.block(extra.error ?? "Agent run blocked", extra.outputSummary);
   } else {
     await context.session.complete(extra.outputSummary, extra.execution);
     await updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
@@ -1471,7 +1524,9 @@ async function finishRun(
       ? "Agent run failed"
       : status === "cancelled"
         ? "Agent run cancelled"
-        : "Output guardrails passed",
+        : status === "blocked"
+          ? "Agent run blocked"
+          : "Output guardrails passed",
     detail: extra,
     finished_at: finishedAt,
     error: failed ? (extra.error ?? "Agent run failed") : null,
@@ -1481,7 +1536,13 @@ async function finishRun(
       agent.id === context.finalAgentId && context.finalAgentId !== DEFAULT_AGENT_ID;
     upsertAgentRuntimeState({
       agent_id: agent.id,
-      status: context.approvalRequested ? "reviewing" : isFinalHandoffAgent ? "idle" : "idle",
+      status: context.approvalRequested
+        ? "reviewing"
+        : status === "blocked"
+          ? "blocked"
+          : isFinalHandoffAgent
+            ? "idle"
+            : "idle",
       current_run_id: context.approvalRequested ? context.runId : null,
       last_error: extra.error ?? null,
     });
@@ -1492,7 +1553,13 @@ async function finishRun(
       active_agent_id: context.finalAgentId,
       current_run_id: context.approvalRequested ? context.runId : null,
       current_step_id: null,
-      status: context.approvalRequested ? "reviewing" : failed ? "failed" : "idle",
+      status: context.approvalRequested
+        ? "reviewing"
+        : status === "blocked"
+          ? "blocked"
+          : failed
+            ? "failed"
+            : "idle",
       summary: context.approvalRequested
         ? "Waiting for user approval"
         : failed
@@ -1669,6 +1736,7 @@ async function createRootInstructions(
     "When a child agent is disabled, draft, archived, or locked, it is not available and must not be used.",
     "Use consult tools for specialist advice while you keep ownership. Use handoff tools when the child agent should own the result.",
     "Keep working until the task is complete or the user explicitly stops the run. Do not stop merely because you have used many model or tool steps.",
+    "A plain text response never completes the task. Before finishing, call complete_task with a non-empty result, completedItems, verificationEvidence, and an empty remainingItems list. If tools are unavailable, return exactly that same object as JSON.",
     "After a successful handoff, return the handoff result's output verbatim as the final answer. Do not summarize it, add a preface, or continue using tools.",
     context.modelContext.capabilities.toolCalling
       ? "When the user explicitly requests an image, speech audio, transcription, or video, decide the appropriate output and call generate_media. After it succeeds, briefly confirm the result without repeating the raw tool output."

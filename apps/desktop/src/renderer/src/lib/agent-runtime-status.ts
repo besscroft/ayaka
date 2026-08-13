@@ -2,6 +2,7 @@ import type { AgentRuntimeStatus } from "@shared/types";
 import type { TranslationKey } from "./i18n.messages";
 
 export const AGENT_RUNTIME_STATUS_KEYS: Record<AgentRuntimeStatus, TranslationKey> = {
+  blocked: "status.run.blocked",
   failed: "status.run.failed",
   handoff: "status.AgentRuntime.handoff",
   idle: "status.sync.idle",

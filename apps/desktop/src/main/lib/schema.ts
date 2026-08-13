@@ -223,7 +223,7 @@ export const runtimeRuns = sqliteTable(
       .notNull()
       .default("chat"),
     finish_reason: text("finish_reason", {
-      enum: ["natural", "budget_exhausted", "cancelled", "interrupted", "error"],
+      enum: ["natural", "budget_exhausted", "absolute_limit", "cancelled", "interrupted", "error"],
     }),
     status: text("status", {
       enum: [
@@ -231,6 +231,7 @@ export const runtimeRuns = sqliteTable(
         "running",
         "waiting_approval",
         "waiting_handoff",
+        "blocked",
         "succeeded",
         "failed",
         "cancelled",
@@ -396,6 +397,7 @@ export const runtimeSteps = sqliteTable(
         "running",
         "waiting_approval",
         "waiting_handoff",
+        "blocked",
         "succeeded",
         "failed",
         "cancelled",
@@ -452,6 +454,7 @@ export const runtimeEvents = sqliteTable(
         "running",
         "waiting_approval",
         "waiting_handoff",
+        "blocked",
         "succeeded",
         "failed",
         "cancelled",

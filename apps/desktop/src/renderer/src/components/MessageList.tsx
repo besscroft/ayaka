@@ -59,6 +59,7 @@ import { GeneratedToolResult } from "./GeneratedToolResult";
 import {
   getToolPartName,
   getToolSummary,
+  isSilentToolPart,
   normalizeToolState,
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
@@ -434,7 +435,8 @@ export interface ExecutionSummary {
 }
 
 export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary {
-  const toolParts = parts.filter(isToolPart);
+  const visibleParts = parts.filter((part) => !isSilentToolPart(part));
+  const toolParts = visibleParts.filter(isToolPart);
   const activeToolCount = toolParts.filter(
     (part) => part.state !== undefined && isActiveToolState(normalizeToolState(part.state)),
   ).length;
@@ -442,11 +444,11 @@ export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary
     (part) => part.state !== undefined && isToolErrorState(normalizeToolState(part.state)),
   ).length;
   const pendingToolCount = toolParts.filter((part) => part.state === undefined).length;
-  const sourceCount = parts.filter(isSourcePart).length;
-  const compactionCount = parts.filter(
+  const sourceCount = visibleParts.filter(isSourcePart).length;
+  const compactionCount = visibleParts.filter(
     (part) => part.type === "custom" && (part as { kind?: unknown }).kind === "openai.compaction",
   ).length;
-  const imageCount = parts.filter(isAttachmentPart).filter((part) => {
+  const imageCount = visibleParts.filter(isAttachmentPart).filter((part) => {
     return (part.mediaType ?? "").startsWith("image/");
   }).length;
   const hasActivity =
@@ -476,7 +478,7 @@ export function getMessageActivityStatus(
 
   const lastMessage = messages.at(-1);
   if (!lastMessage || lastMessage.role !== "assistant") return "thinking";
-  const parts = lastMessage.parts ?? [];
+  const parts = (lastMessage.parts ?? []).filter((part) => !isSilentToolPart(part));
   const lastVisiblePart = [...parts]
     .reverse()
     .find((part) => isTextPart(part) || isReasoningPart(part) || isToolPart(part));
@@ -501,7 +503,7 @@ export function shouldShowLiveThinking(
   if (getMessageActivityStatus(messages, isLoading, status) === null) return false;
   const lastMessage = messages.at(-1);
   if (!lastMessage || lastMessage.role !== "assistant") return true;
-  const parts = lastMessage.parts ?? [];
+  const parts = (lastMessage.parts ?? []).filter((part) => !isSilentToolPart(part));
   return getReasoningDisplay(parts, isLoading) === null && !getExecutionSummary(parts).hasActivity;
 }
 
@@ -562,7 +564,7 @@ function MessageItem({
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const parts = message.parts ?? [];
+  const parts = (message.parts ?? []).filter((part) => !isSilentToolPart(part));
   const messageStreaming = isLastMessage && isStreaming;
   const executionSummary = getExecutionSummary(parts);
   const reasoningDisplay = getReasoningDisplay(parts, messageStreaming);

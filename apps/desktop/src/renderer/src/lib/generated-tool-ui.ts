@@ -31,6 +31,8 @@ export interface ToolSummary {
   params?: Record<string, string | number>;
 }
 
+export const SILENT_TOOL_NAME = "complete_task";
+
 export interface WebSearchResult {
   title: string;
   url: string;
@@ -80,6 +82,14 @@ export function getToolPartName(part: RenderableToolPart): string | null {
   if (part.type === "dynamic-tool") return readString(part.toolName) ?? null;
   if (part.type.startsWith("tool-")) return part.type.slice("tool-".length) || null;
   return null;
+}
+
+export function isSilentToolPart(part: unknown): boolean {
+  return (
+    !!part &&
+    typeof part === "object" &&
+    getToolPartName(part as RenderableToolPart) === SILENT_TOOL_NAME
+  );
 }
 
 export function normalizeToolState(raw: string | undefined): GeneratedToolState {

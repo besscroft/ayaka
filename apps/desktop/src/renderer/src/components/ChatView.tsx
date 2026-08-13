@@ -786,7 +786,30 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
             ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
         )
       : false;
-    if (activeRunId && (isChatLoading || activeRuntimeRun)) {
+    const blockedRun = activeRunId
+      ? runtimeSnapshot?.runtimeRuns.find(
+          (item) => item.id === activeRunId && item.status === "blocked",
+        )
+      : undefined;
+    if (blockedRun) {
+      const resumable = (() => {
+        try {
+          const metadata = JSON.parse(blockedRun.metadata_json ?? "{}");
+          return metadata.resumable !== false;
+        } catch {
+          return false;
+        }
+      })();
+      if (!resumable) {
+        reportChatError(
+          "resume blocked run",
+          new Error(blockedRun.error ?? "Agent run is blocked."),
+        );
+        return;
+      }
+    }
+    if (activeRunId && (isChatLoading || activeRuntimeRun || !!blockedRun)) {
+      runModeRef.current = blockedRun ? "resume" : runModeRef.current;
       void api.runtime
         .enqueueInput({
           runId: activeRunId,

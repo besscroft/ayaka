@@ -6,6 +6,8 @@ import {
   type AgentRunInputSource,
   type AgentRunOrigin,
   type AgentRuntimeConfig,
+  type AgentLoopControlMetadata,
+  type AgentCompletionCandidate,
   type RuntimeRun,
 } from "../../shared/types";
 import {
@@ -28,6 +30,7 @@ const ACTIVE_STATUSES = new Set<RuntimeRun["status"]>([
 
 export type AgentLoopMode = "start" | "resume";
 export type AgentLoopBudgetReason = "max_turns" | "max_duration" | "max_tool_calls";
+export type AgentLoopAbsoluteLimitReason = "absolute_duration" | "absolute_tool_calls";
 
 export class AgentLoopSessionError extends Error {
   constructor(
@@ -36,7 +39,8 @@ export class AgentLoopSessionError extends Error {
       | "run_not_found"
       | "run_not_active"
       | "conversation_mismatch"
-      | "conversation_busy",
+      | "conversation_busy"
+      | "absolute_limit_reached",
     message: string,
   ) {
     super(message);
@@ -67,10 +71,19 @@ export class AgentLoopSession {
   private readonly maxTurns: number;
   private readonly maxDurationMs: number;
   private readonly maxToolCalls: number;
+  private readonly absoluteMaxDurationMs: number;
+  private readonly absoluteMaxToolCalls: number;
+  private readonly maxNoProgressRounds: number;
+  private readonly persistedResumable: boolean;
+  private windowCount = 0;
+  private windowStartedAt: number;
+  private noProgressRounds = 0;
   private turnCount = 0;
   private toolCallCount = 0;
   private closed = false;
   private budgetReason: AgentLoopBudgetReason | null = null;
+  private absoluteLimitReason: AgentLoopAbsoluteLimitReason | null = null;
+  private completionCandidate: AgentCompletionCandidate | undefined;
   runtimeHandles: { coordinator: unknown; recorder: unknown } | null = null;
 
   constructor(
@@ -86,6 +99,17 @@ export class AgentLoopSession {
     this.maxTurns = runtimeConfig.maxTurns;
     this.maxDurationMs = runtimeConfig.maxDurationMs ?? 600_000;
     this.maxToolCalls = runtimeConfig.maxToolCalls ?? 50;
+    this.absoluteMaxDurationMs = runtimeConfig.absoluteMaxDurationMs ?? 3_600_000;
+    this.absoluteMaxToolCalls = runtimeConfig.absoluteMaxToolCalls ?? 250;
+    this.maxNoProgressRounds = runtimeConfig.maxNoProgressRounds ?? 3;
+    const metadata = parseControlMetadata(run.metadata_json);
+    this.persistedResumable = metadata.resumable;
+    this.windowCount = metadata.windowCount;
+    this.windowStartedAt = metadata.windowStartedAt ?? Date.now();
+    this.turnCount = metadata.totalTurns;
+    this.toolCallCount = metadata.totalToolCalls;
+    this.noProgressRounds = metadata.noProgressRounds;
+    this.completionCandidate = metadata.completionCandidate;
     this.appendMessages(initialMessages);
   }
 
@@ -102,6 +126,28 @@ export class AgentLoopSession {
     return this.budgetReason;
   }
 
+  get absoluteLimitExceededReason(): AgentLoopAbsoluteLimitReason | null {
+    this.absoluteLimitReason ??= this.checkAbsoluteLimit();
+    return this.absoluteLimitReason;
+  }
+
+  get isResumable(): boolean {
+    return this.persistedResumable && this.absoluteLimitExceededReason === null;
+  }
+
+  get controlMetadata(): AgentLoopControlMetadata {
+    return {
+      windowCount: this.windowCount,
+      totalTurns: this.turnCount,
+      totalToolCalls: this.toolCallCount,
+      noProgressRounds: this.noProgressRounds,
+      absoluteDeadline: this.startedAt + this.absoluteMaxDurationMs,
+      windowStartedAt: this.windowStartedAt,
+      completionCandidate: this.completionCandidate,
+      resumable: this.isResumable,
+    };
+  }
+
   get usage(): { turnCount: number; toolCallCount: number; elapsedMs: number } {
     return {
       turnCount: this.turnCount,
@@ -111,7 +157,13 @@ export class AgentLoopSession {
   }
 
   get remainingDurationMs(): number {
-    return Math.max(1, this.maxDurationMs - (Date.now() - this.startedAt));
+    return Math.max(
+      1,
+      Math.min(
+        this.maxDurationMs - (Date.now() - this.windowStartedAt),
+        this.absoluteMaxDurationMs - (Date.now() - this.startedAt),
+      ),
+    );
   }
 
   async enqueue(
@@ -120,6 +172,7 @@ export class AgentLoopSession {
     message: UIMessage,
   ): Promise<AgentRunInput> {
     this.assertActive();
+    this.clearCompletionCandidate();
     this.appendMessages([message]);
     const queued = await enqueueAgentRunInput({ runId: this.runId, kind, source, message });
     insertRuntimeEvent({
@@ -151,15 +204,49 @@ export class AgentLoopSession {
 
   recordStep(): AgentLoopBudgetReason | null {
     this.turnCount += 1;
+    this.noProgressRounds += 1;
     this.budgetReason = this.checkBudget();
+    void this.persistControlMetadata();
     return this.budgetReason;
   }
 
   beginToolCall(): boolean {
-    if (this.toolCallCount >= this.maxToolCalls || !this.isActive) return false;
+    if (this.absoluteLimitExceededReason || !this.isActive) return false;
+    if (this.toolCallCount >= this.absoluteMaxToolCalls) {
+      this.absoluteLimitReason = "absolute_tool_calls";
+      void this.persistControlMetadata();
+      return false;
+    }
     this.toolCallCount += 1;
     this.budgetReason = this.checkBudget();
+    void this.persistControlMetadata();
     return true;
+  }
+
+  recordProgress(): void {
+    this.noProgressRounds = 0;
+    this.budgetReason = null;
+    void this.persistControlMetadata();
+  }
+
+  get noProgressExceeded(): boolean {
+    return this.noProgressRounds >= this.maxNoProgressRounds;
+  }
+
+  setCompletionCandidate(candidate: AgentCompletionCandidate | undefined): void {
+    this.completionCandidate = candidate;
+    void this.persistControlMetadata();
+  }
+
+  clearCompletionCandidate(): void {
+    this.setCompletionCandidate(undefined);
+  }
+
+  beginNextWindow(): void {
+    this.windowCount += 1;
+    this.windowStartedAt = Date.now();
+    this.budgetReason = null;
+    void this.persistControlMetadata();
   }
 
   async markWaitingApproval(): Promise<void> {
@@ -207,6 +294,10 @@ export class AgentLoopSession {
     );
   }
 
+  async block(reason: string, outputSummary?: string): Promise<void> {
+    await this.close("blocked", "absolute_limit", reason, outputSummary);
+  }
+
   async fail(error: string): Promise<void> {
     await this.close("failed", "error", error);
   }
@@ -214,8 +305,20 @@ export class AgentLoopSession {
   private checkBudget(): AgentLoopBudgetReason | null {
     if (this.turnCount >= this.maxTurns) return "max_turns";
     if (this.toolCallCount >= this.maxToolCalls) return "max_tool_calls";
-    if (Date.now() - this.startedAt >= this.maxDurationMs) return "max_duration";
+    if (Date.now() - this.windowStartedAt >= this.maxDurationMs) return "max_duration";
     return null;
+  }
+
+  private checkAbsoluteLimit(): AgentLoopAbsoluteLimitReason | null {
+    if (Date.now() - this.startedAt >= this.absoluteMaxDurationMs) return "absolute_duration";
+    if (this.toolCallCount >= this.absoluteMaxToolCalls) return "absolute_tool_calls";
+    return null;
+  }
+
+  private async persistControlMetadata(blockedReason?: string): Promise<void> {
+    await updateRuntimeRun(this.runId, {
+      metadata_json: JSON.stringify({ ...this.controlMetadata, blockedReason }),
+    });
   }
 
   private assertActive(): void {
@@ -225,7 +328,7 @@ export class AgentLoopSession {
   }
 
   private async close(
-    status: "succeeded" | "failed" | "cancelled" | "interrupted",
+    status: "succeeded" | "failed" | "cancelled" | "interrupted" | "blocked",
     finishReason: NonNullable<RuntimeRun["finish_reason"]>,
     detail?: string,
     outputSummary?: string,
@@ -239,21 +342,68 @@ export class AgentLoopSession {
       status,
       finish_reason: finishReason,
       output_summary: outputSummary,
-      error: status === "failed" ? (detail ?? "Agent run failed") : null,
+      error:
+        status === "failed" || status === "blocked"
+          ? (detail ?? (status === "blocked" ? "Agent run blocked" : "Agent run failed"))
+          : null,
       usage_json: usage === undefined ? undefined : JSON.stringify(usage),
+      metadata_json: JSON.stringify({ ...this.controlMetadata, blockedReason: detail }),
       finished_at: now,
     });
-    if (finishReason === "budget_exhausted") {
+    if (finishReason === "budget_exhausted" || finishReason === "absolute_limit") {
       insertRuntimeEvent({
         runId: this.runId,
         conversationId: this.conversationId,
         kind: "budget",
         status: "succeeded",
-        title: "Agent run budget exhausted",
+        title:
+          finishReason === "absolute_limit"
+            ? "Agent run blocked by absolute limit"
+            : "Agent run budget window exhausted",
         detail: { reason: detail, ...this.usage },
       });
     }
     this.onClosed(this.runId);
+  }
+}
+
+function parseControlMetadata(raw: string | undefined): AgentLoopControlMetadata & {
+  windowStartedAt?: number;
+} {
+  if (!raw) {
+    return {
+      windowCount: 0,
+      totalTurns: 0,
+      totalToolCalls: 0,
+      noProgressRounds: 0,
+      absoluteDeadline: 0,
+      resumable: true,
+    };
+  }
+  try {
+    const value = JSON.parse(raw) as Partial<AgentLoopControlMetadata> & {
+      windowStartedAt?: number;
+    };
+    return {
+      windowCount: typeof value.windowCount === "number" ? value.windowCount : 0,
+      totalTurns: typeof value.totalTurns === "number" ? value.totalTurns : 0,
+      totalToolCalls: typeof value.totalToolCalls === "number" ? value.totalToolCalls : 0,
+      noProgressRounds: typeof value.noProgressRounds === "number" ? value.noProgressRounds : 0,
+      absoluteDeadline: typeof value.absoluteDeadline === "number" ? value.absoluteDeadline : 0,
+      completionCandidate: value.completionCandidate,
+      blockedReason: value.blockedReason,
+      resumable: value.resumable !== false,
+      windowStartedAt: value.windowStartedAt,
+    };
+  } catch {
+    return {
+      windowCount: 0,
+      totalTurns: 0,
+      totalToolCalls: 0,
+      noProgressRounds: 0,
+      absoluteDeadline: 0,
+      resumable: true,
+    };
   }
 }
 
@@ -277,6 +427,7 @@ export class AgentLoopSessionManager {
         );
       }
       await active.markRunning();
+      active.clearCompletionCandidate();
       active.appendMessages(options.messages ?? []);
       return active;
     }
@@ -289,10 +440,27 @@ export class AgentLoopSessionManager {
           `Agent run '${options.runId}' was not found.`,
         );
       }
-      throw new AgentLoopSessionError(
-        "run_not_active",
-        `Agent run '${options.runId}' cannot be resumed after its process ended.`,
+      if (existing.status !== "blocked") {
+        throw new AgentLoopSessionError(
+          "run_not_active",
+          `Agent run '${options.runId}' cannot be resumed after its process ended.`,
+        );
+      }
+      const resumed = new AgentLoopSession(
+        existing,
+        options.runtimeConfig ?? DEFAULT_AGENT_RUNTIME_CONFIG,
+        (runId) => this.sessions.delete(runId),
+        options.messages,
       );
+      if (!resumed.isResumable) {
+        throw new AgentLoopSessionError(
+          "absolute_limit_reached",
+          `Agent run '${options.runId}' reached its absolute safety limit.`,
+        );
+      }
+      await resumed.markRunning();
+      this.sessions.set(existing.id, resumed);
+      return resumed;
     }
 
     if (getRuntimeRun(options.runId)) {

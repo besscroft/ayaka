@@ -113,6 +113,7 @@ export function resolveAgentPanelStatus({
     return "waiting_approval";
   }
   if (runStatus === "waiting_handoff") return "waiting_handoff";
+  if (runStatus === "blocked") return "blocked";
   if (chatStatus === "error" || runStatus === "failed") return "failed";
   if (isChatActive || (runStatus ? ACTIVE_RUN_STATUSES.has(runStatus) : false)) return "running";
   return runStatus ?? "idle";
@@ -176,6 +177,7 @@ export function AgentStatusWidget({
   const waiting = run?.status === "waiting_approval" || conversationState?.status === "reviewing";
   const waitingHandoff = run?.status === "waiting_handoff";
   const failed = chatStatus === "error" || run?.status === "failed";
+  const blocked = run?.status === "blocked";
   const status = resolveAgentPanelStatus({
     chatStatus,
     isChatActive,
@@ -183,6 +185,7 @@ export function AgentStatusWidget({
     conversationStatus: conversationState?.status,
   });
   const summary = conversationState?.summary || run?.output_summary || run?.input_summary;
+  const blockedReason = blocked ? run?.error : null;
   const elapsed = run?.started_at
     ? formatElapsed((run.finished_at ?? Date.now()) - run.started_at)
     : null;
@@ -252,23 +255,26 @@ export function AgentStatusWidget({
     });
   }, [tree.activePath]);
 
-  const title = waiting
-    ? t("agentStatus.waitingApproval")
-    : waitingHandoff
-      ? t("agentStatus.status.waitingHandoff")
-      : active
-        ? t("agentStatus.running", {
-            count: instances.filter((item) => ACTIVE_INSTANCE_STATUSES.has(item.status)).length + 1,
-          })
-        : failed
-          ? t("agentStatus.failed")
-          : run
-            ? t(
-                run.status === "cancelled" || run.status === "interrupted"
-                  ? "agentStatus.interrupted"
-                  : "agentStatus.completed",
-              )
-            : t("agentStatus.ready");
+  const title = blocked
+    ? t("agentStatus.blocked")
+    : waiting
+      ? t("agentStatus.waitingApproval")
+      : waitingHandoff
+        ? t("agentStatus.status.waitingHandoff")
+        : active
+          ? t("agentStatus.running", {
+              count:
+                instances.filter((item) => ACTIVE_INSTANCE_STATUSES.has(item.status)).length + 1,
+            })
+          : failed
+            ? t("agentStatus.failed")
+            : run
+              ? t(
+                  run.status === "cancelled" || run.status === "interrupted"
+                    ? "agentStatus.interrupted"
+                    : "agentStatus.completed",
+                )
+              : t("agentStatus.ready");
 
   return (
     <motion.aside
@@ -311,8 +317,13 @@ export function AgentStatusWidget({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            {run && (active || waiting || failed) ? (
-              <AttentionBar status={status} title={title} error={run.error} elapsed={elapsed} />
+            {run && (active || waiting || failed || blocked) ? (
+              <AttentionBar
+                status={status}
+                title={title}
+                error={blockedReason ?? run.error}
+                elapsed={elapsed}
+              />
             ) : null}
 
             {run ? (
