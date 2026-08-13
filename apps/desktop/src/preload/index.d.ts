@@ -15,13 +15,6 @@ import type {
   CronRun,
   CustomModelInput,
   CustomProviderInput,
-  DesktopPetConfigPatch,
-  DesktopPetSelector,
-  DesktopPetSnapshot,
-  InstalledPet,
-  PetImportCandidate,
-  StorePetPage,
-  StorePetQuery,
   MemoryFileKind,
   SkillDraftRequest,
   SkillDraftResult,
@@ -221,26 +214,6 @@ export interface VoidAIApi {
   interactions: {
     list: () => Promise<InteractionProfile[]>;
   };
-  desktopPet: {
-    getSnapshot: () => Promise<DesktopPetSnapshot>;
-    listPets: () => Promise<InstalledPet[]>;
-    listStore: (query: StorePetQuery) => Promise<StorePetPage>;
-    select: (selector: DesktopPetSelector) => Promise<DesktopPetSnapshot>;
-    installStore: (id: string, replace?: boolean) => Promise<InstalledPet>;
-    beginLocalImport: (mode: "zip" | "folder") => Promise<PetImportCandidate | null>;
-    commitLocalImport: (token: string, replace?: boolean) => Promise<InstalledPet>;
-    delete: (selector: DesktopPetSelector) => Promise<DesktopPetSnapshot>;
-    setEnabled: (enabled: boolean) => Promise<DesktopPetSnapshot>;
-    updateWindow: (patch: DesktopPetConfigPatch["window"]) => Promise<DesktopPetSnapshot>;
-    show: () => Promise<DesktopPetSnapshot>;
-    hide: () => Promise<DesktopPetSnapshot>;
-    resetPosition: () => Promise<DesktopPetSnapshot>;
-    moveWindowBy: (delta: { dx: number; dy: number }) => Promise<boolean>;
-    showContextMenu: () => Promise<boolean>;
-    getLookDirection: () => Promise<number | null>;
-    setIgnoreMouseEvents: (ignore: boolean) => Promise<boolean>;
-    onSnapshotApplied: (handler: (snapshot: DesktopPetSnapshot) => void) => () => void;
-  };
   sync: {
     get: () => Promise<SyncState>;
   };
@@ -310,8 +283,6 @@ export interface VoidAIApi {
     locale: () => Promise<string>;
     version: () => Promise<string>;
     changelog: () => Promise<string>;
-    onPetOpenSettings: (handler: () => void) => () => void;
-    onPetOpenAbout: (handler: () => void) => () => void;
   };
   updates: {
     getState: () => Promise<UpdateState>;

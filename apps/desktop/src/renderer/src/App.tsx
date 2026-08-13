@@ -144,22 +144,6 @@ function AppContent(): React.JSX.Element {
     return () => window.removeEventListener("void-ai:open-conversation", handleOpenConversation);
   }, []);
 
-  // 托盘 / 桌宠右键菜单触发的"打开设置"
-  useEffect(() => {
-    const offSettings = api.system.onPetOpenSettings(() => {
-      setSettingsInitialTab("pets");
-      setSettingsOpen(true);
-    });
-    const offAbout = api.system.onPetOpenAbout(() => {
-      setSettingsInitialTab("about");
-      setSettingsOpen(true);
-    });
-    return () => {
-      offSettings?.();
-      offAbout?.();
-    };
-  }, []);
-
   return (
     <>
       <AppShell

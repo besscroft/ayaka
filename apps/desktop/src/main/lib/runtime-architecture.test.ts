@@ -70,7 +70,11 @@ void describe("runtime architecture", () => {
     const migrations = readdirSync(path.join(process.cwd(), "drizzle")).filter((file) =>
       file.endsWith(".sql"),
     );
-    assert.deepEqual(migrations, ["0000_initial.sql", "0001_romantic_blob.sql"]);
+    assert.deepEqual(migrations, [
+      "0000_initial.sql",
+      "0001_romantic_blob.sql",
+      "0002_remove_desktop_pet.sql",
+    ]);
   });
 
   void it("defines default seed data for agents and tools", () => {

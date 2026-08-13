@@ -77,14 +77,10 @@ import {
   DEFAULT_AGENT_ID as SHARED_DEFAULT_AGENT_ID,
   DEFAULT_AGENT_RUNTIME_CONFIG,
   DEFAULT_AGENT_TOOL_POLICY,
-  DEFAULT_DESKTOP_PET_CONFIG,
-  DESKTOP_PET_PROFILE_ID,
   isAgentRuntimeBusy,
-  mergeDesktopPetConfig,
   normalizeAgentHandoffConfig,
   normalizeAgentRuntimeConfig,
   normalizeAgentToolPolicy,
-  normalizeDesktopPetConfig,
   type AgentInput,
   type AgentRunInput,
   type AgentRunInputKind,
@@ -97,8 +93,6 @@ import {
   type AgentRuntimeStatus,
   type Conversation,
   type ConversationAgentState,
-  type DesktopPetConfigPatch,
-  type DesktopPetSnapshot,
   type InteractionProfile,
   type MemoryKind,
   type MemoryJob,
@@ -130,8 +124,6 @@ import {
   type ToolSkillInput,
   type ToolsSnapshot,
 } from "../../shared/types";
-import { resolveDesktopPet } from "./desktop-pet-resolver";
-import { applyDesktopPetIdleTimeout, resolveDesktopPetActivity } from "./desktop-pet-activity";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
 import { resolveUserDataDir } from "./runtime-paths";
 import {
@@ -2819,75 +2811,8 @@ export function getToolsSnapshot(): ToolsSnapshot {
   };
 }
 
-let desktopPetIdleSince = Date.now();
-let desktopPetHadActivity = false;
-
 export function listInteractionProfiles(): InteractionProfile[] {
-  ensureDesktopPetProfile();
   return getDb().select().from(interactionProfiles).orderBy(interactionProfiles.kind).all();
-}
-
-export function isDesktopPetEnabled(): boolean {
-  return ensureDesktopPetProfile().enabled !== 0;
-}
-
-export function getDesktopPetSnapshot(): DesktopPetSnapshot {
-  const profile = ensureDesktopPetProfile();
-  const config = normalizeDesktopPetConfig(profile.config_json);
-  const mainAgentState = listagentRuntimeStates().find(
-    (state) => state.agent_id === DEFAULT_AGENT_ID,
-  );
-  const resolution = resolveDesktopPetActivity(listRuntimeRuns(), mainAgentState);
-  const now = Date.now();
-  let activity = resolution.activity;
-  if (activity.kind === "idle") {
-    if (desktopPetHadActivity) desktopPetIdleSince = now;
-    desktopPetHadActivity = false;
-    activity = applyDesktopPetIdleTimeout(activity, desktopPetIdleSince, now);
-  } else {
-    desktopPetHadActivity = true;
-    desktopPetIdleSince = now;
-  }
-  const pet = resolveDesktopPet(config.selectedPet);
-  return {
-    profile,
-    enabled: profile.enabled === 1,
-    config,
-    pet,
-    activity,
-    pendingActivityCount: resolution.pendingCount,
-    assetError:
-      pet?.error ??
-      (profile.enabled === 1 && (!pet || !pet.available)
-        ? "Pet asset is not available yet."
-        : null),
-  };
-}
-
-export function setDesktopPetEnabled(enabled: boolean): DesktopPetSnapshot {
-  updateDesktopPetProfile({ enabled: enabled ? 1 : 0 });
-  return getDesktopPetSnapshot();
-}
-
-export function updateDesktopPetConfig(patch: DesktopPetConfigPatch): DesktopPetSnapshot {
-  const profile = ensureDesktopPetProfile();
-  const current = normalizeDesktopPetConfig(profile.config_json);
-  updateDesktopPetProfile({ config_json: JSON.stringify(mergeDesktopPetConfig(current, patch)) });
-  return getDesktopPetSnapshot();
-}
-
-export async function setDesktopPetEnabledAsync(enabled: boolean): Promise<DesktopPetSnapshot> {
-  return shouldRouteWrites()
-    ? writeDb<DesktopPetSnapshot>("setDesktopPetEnabled", [enabled])
-    : setDesktopPetEnabled(enabled);
-}
-
-export async function updateDesktopPetConfigAsync(
-  patch: DesktopPetConfigPatch,
-): Promise<DesktopPetSnapshot> {
-  return shouldRouteWrites()
-    ? writeDb<DesktopPetSnapshot>("updateDesktopPetConfig", [patch])
-    : updateDesktopPetConfig(patch);
 }
 
 export function getSyncState(): SyncState {
@@ -3091,7 +3016,6 @@ function seedDefaults(): void {
   }
 
   seedBuiltinTools(now);
-  ensureDesktopPetProfile();
   ensureSyncProfile();
   ensureAllagentRuntimeStates();
 }
@@ -3446,53 +3370,6 @@ function getRequiredToolRecord(id: string): DbToolRecord {
   const row = getDb().select().from(tools).where(eq(tools.id, id)).get();
   if (!row) throw new Error("Tool not found.");
   return row;
-}
-
-function ensureDesktopPetProfile(): InteractionProfile {
-  const existing = getDb()
-    .select()
-    .from(interactionProfiles)
-    .where(eq(interactionProfiles.id, DESKTOP_PET_PROFILE_ID))
-    .get();
-  if (existing) {
-    const normalizedConfig = JSON.stringify(normalizeDesktopPetConfig(existing.config_json));
-    if (existing.status !== "ready" || existing.config_json !== normalizedConfig) {
-      getDb()
-        .update(interactionProfiles)
-        .set({ status: "ready", config_json: normalizedConfig, updated_at: Date.now() })
-        .where(eq(interactionProfiles.id, DESKTOP_PET_PROFILE_ID))
-        .run();
-      return getDb()
-        .select()
-        .from(interactionProfiles)
-        .where(eq(interactionProfiles.id, DESKTOP_PET_PROFILE_ID))
-        .get() as InteractionProfile;
-    }
-    return existing;
-  }
-  const row: InteractionProfile = {
-    id: DESKTOP_PET_PROFILE_ID,
-    kind: "desktop_pet",
-    label: "Desktop companion",
-    enabled: 0,
-    status: "ready",
-    config_json: JSON.stringify(DEFAULT_DESKTOP_PET_CONFIG),
-    updated_at: Date.now(),
-  };
-  getDb().insert(interactionProfiles).values(row).run();
-  return row;
-}
-
-function updateDesktopPetProfile(
-  patch: Partial<Pick<InteractionProfile, "enabled" | "status" | "config_json">>,
-): InteractionProfile {
-  ensureDesktopPetProfile();
-  getDb()
-    .update(interactionProfiles)
-    .set({ ...patch, updated_at: Date.now() })
-    .where(eq(interactionProfiles.id, DESKTOP_PET_PROFILE_ID))
-    .run();
-  return ensureDesktopPetProfile();
 }
 
 function ensureSyncProfile(): SyncState {

@@ -759,7 +759,7 @@ export const apiKeys = sqliteTable("api_keys", {
 
 export const interactionProfiles = sqliteTable("interaction_profiles", {
   id: text("id").primaryKey(),
-  kind: text("kind", { enum: ["chat", "voice", "video", "mouse", "desktop_pet"] }).notNull(),
+  kind: text("kind", { enum: ["chat", "voice", "video", "mouse"] }).notNull(),
   label: text("label").notNull(),
   enabled: integer("enabled").notNull().default(0),
   status: text("status", { enum: ["ready", "prototype", "blocked"] }).notNull(),

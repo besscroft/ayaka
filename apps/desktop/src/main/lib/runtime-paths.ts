@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 
 export function resolveUserDataDir(): string {
@@ -10,4 +11,14 @@ export function resolveUserDataDir(): string {
 
 export function resolveAppPath(): string {
   return process.env.VOID_AI_APP_PATH || process.cwd();
+}
+
+/** Remove data owned by the retired animated companion feature. */
+export function removeLegacyCompanionData(userDataDir = resolveUserDataDir()): void {
+  const legacyDataPath = join(userDataDir, "data", "pets");
+  try {
+    rmSync(legacyDataPath, { recursive: true, force: true });
+  } catch (error) {
+    console.warn(`[main] Failed to remove legacy companion data at ${legacyDataPath}:`, error);
+  }
 }

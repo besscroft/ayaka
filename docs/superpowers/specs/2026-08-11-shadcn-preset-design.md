@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make `b1s8zoQt6` (nova, neutral, lucide, Inter, default radius) the renderer's visual source of truth. Provide `white`, `black`, and `ocean` skins while preserving the app's existing renderer behavior, IPC flows, chat runtime, and desktop-pet window behavior.
+Make `b1s8zoQt6` (nova, neutral, lucide, Inter, default radius) the renderer's visual source of truth. Provide `white`, `black`, and `ocean` skins while preserving the app's existing renderer behavior, IPC flows, and chat runtime.
 
 ## Theme Contract
 
@@ -25,13 +25,13 @@ Make `b1s8zoQt6` (nova, neutral, lucide, Inter, default radius) the renderer's v
 2. Add or update the required shadcn Base UI components and migrate the shared component imports.
 3. Migrate AppShell, navigation, conversation list, ChatView, MessageList, MessageInput, model selection, reasoning, and tool selection.
 4. Migrate SettingsDialog and the three skin previews.
-5. Migrate Agents, Tools, MCP, Skills, Automations, Memory, About, Desktop Pets settings, and all confirmation/edit dialogs.
+5. Migrate Agents, Tools, MCP, Skills, Automations, Memory, About, and all confirmation/edit dialogs.
 6. Remove unused custom primitives and legacy skin/style copy while keeping i18n in both Chinese and English.
 
 ## Invariants
 
 - Data loading, IPC calls, streaming, attachments, tool calls, editing, deletion, retry behavior, and persistence do not change.
-- Reduced-motion behavior, title-bar drag regions, and transparent desktop-pet windows do not regress.
+- Reduced-motion behavior and title-bar drag regions do not regress.
 - Dialogs and overlays retain accessible titles, keyboard dismissal, focus behavior, and modal semantics.
 - The main window keeps its current information architecture and responsive relationships; only visual hierarchy, component composition, spacing, and semantic styling change.
 

@@ -14,13 +14,6 @@ import type {
   CronRun,
   CustomModelInput,
   CustomProviderInput,
-  DesktopPetConfigPatch,
-  DesktopPetSelector,
-  DesktopPetSnapshot,
-  InstalledPet,
-  PetImportCandidate,
-  StorePetPage,
-  StorePetQuery,
   MemoryFileKind,
   SkillDraftRequest,
   SkillDraftResult,
@@ -254,37 +247,6 @@ export const api = {
   interactions: {
     list: (): Promise<InteractionProfile[]> => assertApi().interactions.list(),
   },
-  desktopPet: {
-    getSnapshot: (): Promise<DesktopPetSnapshot> => assertApi().desktopPet.getSnapshot(),
-    listPets: (): Promise<InstalledPet[]> => assertApi().desktopPet.listPets(),
-    listStore: (query: StorePetQuery): Promise<StorePetPage> =>
-      assertApi().desktopPet.listStore(query),
-    select: (selector: DesktopPetSelector): Promise<DesktopPetSnapshot> =>
-      assertApi().desktopPet.select(selector),
-    installStore: (id: string, replace = false): Promise<InstalledPet> =>
-      assertApi().desktopPet.installStore(id, replace),
-    beginLocalImport: (mode: "zip" | "folder"): Promise<PetImportCandidate | null> =>
-      assertApi().desktopPet.beginLocalImport(mode),
-    commitLocalImport: (token: string, replace = false): Promise<InstalledPet> =>
-      assertApi().desktopPet.commitLocalImport(token, replace),
-    delete: (selector: DesktopPetSelector): Promise<DesktopPetSnapshot> =>
-      assertApi().desktopPet.delete(selector),
-    setEnabled: (enabled: boolean): Promise<DesktopPetSnapshot> =>
-      assertApi().desktopPet.setEnabled(enabled),
-    updateWindow: (patch: DesktopPetConfigPatch["window"]): Promise<DesktopPetSnapshot> =>
-      assertApi().desktopPet.updateWindow(patch),
-    show: (): Promise<DesktopPetSnapshot> => assertApi().desktopPet.show(),
-    hide: (): Promise<DesktopPetSnapshot> => assertApi().desktopPet.hide(),
-    resetPosition: (): Promise<DesktopPetSnapshot> => assertApi().desktopPet.resetPosition(),
-    moveWindowBy: (delta: { dx: number; dy: number }): Promise<boolean> =>
-      assertApi().desktopPet.moveWindowBy(delta),
-    showContextMenu: (): Promise<boolean> => assertApi().desktopPet.showContextMenu(),
-    getLookDirection: (): Promise<number | null> => assertApi().desktopPet.getLookDirection(),
-    setIgnoreMouseEvents: (ignore: boolean): Promise<boolean> =>
-      assertApi().desktopPet.setIgnoreMouseEvents(ignore),
-    onSnapshotApplied: (handler: (snapshot: DesktopPetSnapshot) => void): (() => void) =>
-      assertApi().desktopPet.onSnapshotApplied(handler),
-  },
   sync: {
     get: (): Promise<SyncState> => assertApi().sync.get(),
   },
@@ -374,10 +336,6 @@ export const api = {
     locale: (): Promise<string> => assertApi().system.locale(),
     version: (): Promise<string> => assertApi().system.version(),
     changelog: (): Promise<string> => assertApi().system.changelog(),
-    onPetOpenSettings: (handler: () => void): (() => void) =>
-      assertApi().system.onPetOpenSettings(handler),
-    onPetOpenAbout: (handler: () => void): (() => void) =>
-      assertApi().system.onPetOpenAbout(handler),
   },
   updates: {
     getState: (): Promise<UpdateState> => assertApi().updates.getState(),
@@ -396,8 +354,6 @@ export type {
   Conversation,
   CustomModelInput,
   CustomProviderInput,
-  DesktopPetConfigPatch,
-  DesktopPetSnapshot,
   MemoryFileKind,
   ToolSecretInput,
   ToolSecretPublic,

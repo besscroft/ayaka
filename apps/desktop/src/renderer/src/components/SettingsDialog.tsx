@@ -32,7 +32,6 @@ import { useT, LANGUAGE_OPTIONS, type TranslationKey } from "../lib/i18n";
 import { cn } from "../lib/utils";
 
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DesktopPetsSettings } from "./DesktopPetsSettings";
 import { AboutSettings } from "./AboutSettings";
 import {
   IconClose,
@@ -43,7 +42,6 @@ import {
   IconRotateCcw,
   IconRefresh,
   IconSliders,
-  IconSparkles,
   IconZap,
   IconTrash,
   IconPlus,
@@ -91,7 +89,6 @@ interface SettingsDialogProps {
 /** Tab 瀹氫箟 */
 export type SettingsTabId =
   | "appearance"
-  | "pets"
   | "model"
   | "workspace"
   | "diagnostics"
@@ -171,7 +168,6 @@ export function SettingsDialog({
     pinned?: boolean;
   }[] = [
     { id: "appearance", label: t("settings.tab.appearance"), Icon: IconPalette },
-    { id: "pets", label: t("settings.tab.pets"), Icon: IconSparkles },
     { id: "model", label: t("settings.tab.model"), Icon: IconCpu },
     { id: "workspace", label: t("settings.tab.workspace"), Icon: IconFolderOpen },
     { id: "diagnostics", label: t("settings.tab.diagnostics"), Icon: IconSliders },
@@ -239,7 +235,6 @@ export function SettingsDialog({
                   resetDone={resetDoneScope === "appearance"}
                 />
               )}
-              {tab === "pets" && <DesktopPetSection />}
               {tab === "model" && <ModelTab settings={settings} update={update} />}
               {tab === "workspace" && <WorkspaceTab />}
               {tab === "diagnostics" && <DiagnosticsTab />}
@@ -823,10 +818,6 @@ function WorkspaceTab(): React.JSX.Element {
       />
     </>
   );
-}
-
-function DesktopPetSection(): React.JSX.Element {
-  return <DesktopPetsSettings />;
 }
 
 // ============================================================

@@ -8,7 +8,6 @@ Add a read-only About tab to the existing desktop settings dialog. The page pres
 
 - Add `about` to the settings tab model and place it at the bottom of the settings navigation, visually separated from configurable and maintenance tabs.
 - Keep the current settings dialog and tab-state architecture. Do not introduce a route or a second dialog.
-- Make the existing tray and desktop-pet "About Paimon" actions open the same About tab.
 - Keep the tab content in a focused `AboutSettings` component instead of expanding the already large settings dialog implementation.
 
 ## Content And Visual Design
@@ -26,7 +25,6 @@ Add a read-only About tab to the existing desktop settings dialog. The page pres
 - Add a `system:version` IPC handler backed by `app.getVersion()`.
 - Expose `system.version()` through preload types and the renderer API wrapper.
 - Load the version when the About component mounts. Display a neutral fallback if the request fails; the rest of the page remains usable.
-- Subscribe to `api.system.onPetOpenAbout` in `App.tsx`, set the initial settings tab to `about`, and open the dialog.
 - Open external resources with a new browser window request so the main-process `setWindowOpenHandler` continues to send them to the system browser.
 
 ## Accessibility And Interaction
@@ -42,7 +40,7 @@ Add a read-only About tab to the existing desktop settings dialog. The page pres
 - Extend i18n coverage for the About navigation and core labels.
 - Add a focused renderer unit test for version normalization and the three external resource definitions without introducing a DOM test framework.
 - Run `vp check`, `vp test`, `vp run desktop#test`, and the desktop web and node type checks.
-- Manually verify direct settings navigation, tray/desktop-pet About entry, external links, Chinese and English copy, light and dark themes, and the minimum supported window size.
+- Manually verify direct settings navigation, external links, Chinese and English copy, light and dark themes, and the minimum supported window size.
 
 ## Non-Goals
 

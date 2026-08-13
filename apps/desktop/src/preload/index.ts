@@ -133,37 +133,6 @@ const api = {
   interactions: {
     list: () => ipcRenderer.invoke("interactions:list"),
   },
-  desktopPet: {
-    getSnapshot: () => ipcRenderer.invoke("desktopPet:getSnapshot"),
-    listPets: () => ipcRenderer.invoke("desktopPet:listPets"),
-    listStore: (query: unknown) => ipcRenderer.invoke("desktopPet:listStore", query),
-    select: (selector: string) => ipcRenderer.invoke("desktopPet:select", selector),
-    installStore: (id: string, replace = false) =>
-      ipcRenderer.invoke("desktopPet:installStore", id, replace),
-    beginLocalImport: (mode: "zip" | "folder") =>
-      ipcRenderer.invoke("desktopPet:beginLocalImport", mode),
-    commitLocalImport: (token: string, replace = false) =>
-      ipcRenderer.invoke("desktopPet:commitLocalImport", token, replace),
-    delete: (selector: string) => ipcRenderer.invoke("desktopPet:delete", selector),
-    setEnabled: (enabled: boolean) => ipcRenderer.invoke("desktopPet:setEnabled", enabled),
-    updateWindow: (patch: unknown) => ipcRenderer.invoke("desktopPet:updateWindow", patch),
-    show: () => ipcRenderer.invoke("desktopPet:show"),
-    hide: () => ipcRenderer.invoke("desktopPet:hide"),
-    resetPosition: () => ipcRenderer.invoke("desktopPet:resetPosition"),
-    moveWindowBy: (delta: { dx: number; dy: number }) =>
-      ipcRenderer.invoke("desktopPet:moveWindowBy", delta),
-    showContextMenu: () => ipcRenderer.invoke("desktopPet:showContextMenu"),
-    getLookDirection: () => ipcRenderer.invoke("desktopPet:getLookDirection"),
-    setIgnoreMouseEvents: (ignore: boolean) =>
-      ipcRenderer.invoke("desktopPet:setIgnoreMouseEvents", ignore),
-    onSnapshotApplied: (handler: (snapshot: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, snapshot: unknown): void => {
-        handler(snapshot);
-      };
-      ipcRenderer.on("desktopPet:snapshotApplied", listener);
-      return () => ipcRenderer.removeListener("desktopPet:snapshotApplied", listener);
-    },
-  },
   sync: {
     get: () => ipcRenderer.invoke("sync:get"),
   },
@@ -237,16 +206,6 @@ const api = {
     locale: () => ipcRenderer.invoke("system:locale"),
     version: () => ipcRenderer.invoke("system:version"),
     changelog: () => ipcRenderer.invoke("system:changelog"),
-    onPetOpenSettings: (handler: () => void) => {
-      const listener = (): void => handler();
-      ipcRenderer.on("desktopPet:openSettings", listener);
-      return () => ipcRenderer.removeListener("desktopPet:openSettings", listener);
-    },
-    onPetOpenAbout: (handler: () => void) => {
-      const listener = (): void => handler();
-      ipcRenderer.on("desktopPet:openAbout", listener);
-      return () => ipcRenderer.removeListener("desktopPet:openAbout", listener);
-    },
   },
   updates: {
     getState: () => ipcRenderer.invoke("updates:getState"),

@@ -15,6 +15,13 @@
       "when": 1786529452170,
       "tag": "0001_romantic_blob",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786617600000,
+      "tag": "0002_remove_desktop_pet",
+      "breakpoints": true
     }
   ]
 }
