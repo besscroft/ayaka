@@ -145,6 +145,11 @@ void describe("translate", () => {
     assert.equal(translate("zh-CN", "trash.selectedCount", { count: 3 }), "已选择 3 项");
   });
 
+  void it("keeps the trash cleanup label free of interpolation placeholders", () => {
+    assert.equal(translate("en", "trash.purgeIn"), "Cleanup time");
+    assert.equal(translate("zh-CN", "trash.purgeIn"), "清理时间");
+  });
+
   void it("falls back to the key for unknown messages", () => {
     assert.equal(translate("en", "missing.key"), "missing.key");
   });
