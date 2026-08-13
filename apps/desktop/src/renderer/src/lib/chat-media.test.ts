@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { type ModelCapabilities, type ProviderInfo } from "@shared/types";
 import {
   getMediaCapableProviders,
+  getVisionCapableProviders,
   parseMediaGenerationSettings,
   serializeMediaGenerationSettings,
 } from "./chat-media";
@@ -43,6 +44,7 @@ void describe("chat media settings", () => {
     assert.equal(settings.defaults.image.modelRef, "mock/media");
     assert.deepEqual(settings.defaults.image.options, { count: 2, size: "1024x1024" });
     assert.deepEqual(settings.defaults.speech.options, { voice: "alloy" });
+    assert.deepEqual(settings.vision, { mode: "inherit", modelRef: null });
     assert.deepEqual(
       parseMediaGenerationSettings(serializeMediaGenerationSettings(settings)),
       settings,
@@ -63,6 +65,23 @@ void describe("chat media settings", () => {
       ["media"],
     );
     assert.deepEqual(getMediaCapableProviders(providers, "video"), []);
+  });
+
+  void it("normalizes and filters vision model settings", () => {
+    const settings = parseMediaGenerationSettings(
+      JSON.stringify({ vision: { mode: "model", modelRef: " mock/vision " } }),
+    );
+    assert.deepEqual(settings.vision, { mode: "model", modelRef: "mock/vision" });
+    const providers = [provider()];
+    providers[0]!.models.push({
+      ...providers[0]!.models[0]!,
+      id: "vision",
+      capabilities: { ...textCapabilities, vision: true },
+    });
+    assert.deepEqual(
+      getVisionCapableProviders(providers)[0]?.models.map((model) => model.id),
+      ["vision"],
+    );
   });
 });
 

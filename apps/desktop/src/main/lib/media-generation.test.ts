@@ -7,7 +7,11 @@ import {
   type MediaGenerationKind,
   type ModelCapabilities,
 } from "../../shared/types";
-import { buildMediaGenerationToolRequest } from "./media-generation";
+import {
+  buildMediaGenerationToolRequest,
+  hasVisionInput,
+  resolveConfiguredVisionModelRef,
+} from "./media-generation";
 
 const baseCapabilities: ModelCapabilities = {
   textGeneration: false,
@@ -22,6 +26,52 @@ const baseCapabilities: ModelCapabilities = {
 };
 
 void describe("media generation tool requests", () => {
+  void it("resolves a valid configured vision model only for image input", async () => {
+    const messages: UIMessage[] = [
+      {
+        id: "u1",
+        role: "user",
+        parts: [{ type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" }],
+      },
+    ];
+    const raw = JSON.stringify({ vision: { mode: "model", modelRef: "ready/vision" } });
+    assert.equal(hasVisionInput(messages), true);
+    assert.equal(
+      await resolveConfiguredVisionModelRef(
+        messages,
+        dependencies(raw, [
+          managedModel("ready/vision", "image", { vision: true, textGeneration: true }),
+        ]),
+      ),
+      "ready/vision",
+    );
+    assert.equal(await resolveConfiguredVisionModelRef([], dependencies(raw, [])), null);
+  });
+
+  void it("ignores disabled, missing-key, and non-vision configured models", async () => {
+    const messages: UIMessage[] = [
+      {
+        id: "u1",
+        role: "user",
+        parts: [{ type: "file", mediaType: "image/jpeg", url: "data:image/jpeg;base64,AA==" }],
+      },
+    ];
+    const raw = JSON.stringify({ vision: { mode: "model", modelRef: "bad/vision" } });
+    assert.equal(
+      await resolveConfiguredVisionModelRef(
+        messages,
+        dependencies(raw, [
+          managedModel("bad/vision", "image", {
+            enabled: false,
+            vision: true,
+            textGeneration: true,
+          }),
+        ]),
+      ),
+      null,
+    );
+  });
+
   void it("uses a valid configured model and lets tool options override global defaults", async () => {
     const request = await buildMediaGenerationToolRequest(
       { kind: "image", content: " draw a city ", options: { count: 3 } },
@@ -118,7 +168,8 @@ function dependencies(raw: string | null, models: ManagedModelInfo[]) {
 function managedModel(
   ref: string,
   kind: MediaGenerationKind,
-  patch: Partial<Pick<ManagedModelInfo, "enabled" | "hasApiKey">> = {},
+  patch: Partial<Pick<ManagedModelInfo, "enabled" | "hasApiKey">> &
+    Partial<Pick<ModelCapabilities, "vision" | "textGeneration">> = {},
 ): ManagedModelInfo {
   const [providerId, modelId] = ref.split("/");
   return {
@@ -144,6 +195,8 @@ function managedModel(
       speechOutput: kind === "speech",
       transcription: kind === "transcription",
       videoOutput: kind === "video",
+      vision: patch.vision ?? baseCapabilities.vision,
+      textGeneration: patch.textGeneration ?? baseCapabilities.textGeneration,
     },
     providerOptions: {},
     providerOptionsJson: "{}",

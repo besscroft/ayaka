@@ -30,6 +30,12 @@ import { notify } from "../lib/toast";
 import { useSettings, type SettingsResetScope } from "../lib/settings";
 import { useT, LANGUAGE_OPTIONS, type TranslationKey } from "../lib/i18n";
 import { cn } from "../lib/utils";
+import {
+  getMediaCapableProviders,
+  getVisionCapableProviders,
+  parseMediaGenerationSettings,
+  serializeMediaGenerationSettings,
+} from "../lib/chat-media";
 
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AboutSettings } from "./AboutSettings";
@@ -48,10 +54,13 @@ import {
   IconInfo,
   IconSearch,
   IconFolderOpen,
+  IconImage,
+  IconEye,
 } from "./icons";
 import {
   CHAT_REASONING_LEVELS,
   MODEL_CAPABILITY_KEYS,
+  SettingKey,
   type AgentProfile,
   type ChatReasoningLevel,
   FONT_PRESETS,
@@ -76,6 +85,8 @@ import {
   type ToolServer,
   type ToolSkill,
   type WorkspaceOrphan,
+  type MediaGenerationKind,
+  type MediaGenerationSettings,
 } from "@shared/types";
 
 interface SettingsDialogProps {
@@ -89,6 +100,7 @@ interface SettingsDialogProps {
 /** Tab 瀹氫箟 */
 export type SettingsTabId =
   | "appearance"
+  | "general"
   | "model"
   | "workspace"
   | "diagnostics"
@@ -168,6 +180,7 @@ export function SettingsDialog({
     pinned?: boolean;
   }[] = [
     { id: "appearance", label: t("settings.tab.appearance"), Icon: IconPalette },
+    { id: "general", label: t("settings.tab.general"), Icon: IconSliders },
     { id: "model", label: t("settings.tab.model"), Icon: IconCpu },
     { id: "workspace", label: t("settings.tab.workspace"), Icon: IconFolderOpen },
     { id: "diagnostics", label: t("settings.tab.diagnostics"), Icon: IconSliders },
@@ -235,6 +248,7 @@ export function SettingsDialog({
                   resetDone={resetDoneScope === "appearance"}
                 />
               )}
+              {tab === "general" && <GeneralSettings />}
               {tab === "model" && <ModelTab settings={settings} update={update} />}
               {tab === "workspace" && <WorkspaceTab />}
               {tab === "diagnostics" && <DiagnosticsTab />}
@@ -818,6 +832,154 @@ function WorkspaceTab(): React.JSX.Element {
         onClose={() => setPendingOrphanDelete(null)}
       />
     </>
+  );
+}
+
+function GeneralSettings(): React.JSX.Element {
+  const { t } = useT();
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [mediaSettings, setMediaSettings] = useState<MediaGenerationSettings>(() =>
+    parseMediaGenerationSettings(null),
+  );
+
+  const refresh = useCallback(async (): Promise<void> => {
+    const [raw, providerList] = await Promise.all([
+      api.settings.get(SettingKey.MediaGeneration),
+      api.providers.list(),
+    ]);
+    setMediaSettings(parseMediaGenerationSettings(raw));
+    setProviders(providerList);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const save = useCallback(async (next: MediaGenerationSettings): Promise<void> => {
+    setMediaSettings(next);
+    await api.settings.set(SettingKey.MediaGeneration, serializeMediaGenerationSettings(next));
+  }, []);
+
+  const modelOptions = (kind: MediaGenerationKind): Array<{ value: string; label: string }> => [
+    { value: "", label: t("settings.general.auto") },
+    ...getMediaCapableProviders(providers, kind).flatMap((provider) =>
+      provider.models.map((model) => ({
+        value: `${provider.id}/${model.id}`,
+        label: `${provider.label} / ${model.label ?? model.id}`,
+      })),
+    ),
+  ];
+
+  const visionOptions = [
+    { value: "", label: t("settings.general.vision.inherit") },
+    ...getVisionCapableProviders(providers).flatMap((provider) =>
+      provider.models.map((model) => ({
+        value: `${provider.id}/${model.id}`,
+        label: `${provider.label} / ${model.label ?? model.id}`,
+      })),
+    ),
+  ];
+
+  const updateKind = (kind: MediaGenerationKind, modelRef: string): void => {
+    void save({
+      ...mediaSettings,
+      defaults: {
+        ...mediaSettings.defaults,
+        [kind]: { ...mediaSettings.defaults[kind], modelRef: modelRef || null },
+      },
+    });
+  };
+
+  const updateVision = (value: string): void => {
+    void save({
+      ...mediaSettings,
+      vision: value ? { mode: "model", modelRef: value } : { mode: "inherit", modelRef: null },
+    });
+  };
+
+  const rows: Array<{
+    kind: MediaGenerationKind;
+    title: TranslationKey;
+    description: TranslationKey;
+    icon: React.ReactNode;
+  }> = [
+    {
+      kind: "image",
+      title: "settings.general.image.title",
+      description: "settings.general.image.desc",
+      icon: <IconImage className="size-3.5" />,
+    },
+    {
+      kind: "speech",
+      title: "settings.general.speech.title",
+      description: "settings.general.speech.desc",
+      icon: <IconZap className="size-3.5" />,
+    },
+    {
+      kind: "video",
+      title: "settings.general.video.title",
+      description: "settings.general.video.desc",
+      icon: <IconImage className="size-3.5" />,
+    },
+    {
+      kind: "transcription",
+      title: "settings.general.transcription.title",
+      description: "settings.general.transcription.desc",
+      icon: <IconSliders className="size-3.5" />,
+    },
+  ];
+
+  return (
+    <section className="select-none flex flex-col min-h-0 flex-1 -mx-5 -my-4">
+      <div className="shrink-0 px-5 py-4">
+        <h3 className="text-base font-semibold">{t("settings.general.title")}</h3>
+        <p className="mt-1 text-xs text-foreground/50">{t("settings.general.desc")}</p>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-4">
+        <SettingSection
+          title={t("settings.general.media.title")}
+          desc={t("settings.general.media.desc")}
+        >
+          {rows.map((row) => (
+            <SettingItem
+              key={row.kind}
+              title={t(row.title)}
+              desc={t(row.description)}
+              control={
+                <SelectField
+                  className="min-w-64"
+                  value={mediaSettings.defaults[row.kind].modelRef ?? ""}
+                  options={modelOptions(row.kind)}
+                  onChange={(value) => updateKind(row.kind, value)}
+                  ariaLabel={t(row.title)}
+                />
+              }
+            />
+          ))}
+        </SettingSection>
+        <SettingSection
+          title={t("settings.general.vision.title")}
+          desc={t("settings.general.vision.desc")}
+          icon={<IconEye className="size-3.5" />}
+        >
+          <SettingItem
+            title={t("settings.general.vision.model")}
+            desc={t("settings.general.vision.modelDesc")}
+            control={
+              <SelectField
+                className="min-w-64"
+                value={
+                  mediaSettings.vision.mode === "model" ? (mediaSettings.vision.modelRef ?? "") : ""
+                }
+                options={visionOptions}
+                onChange={updateVision}
+                ariaLabel={t("settings.general.vision.model")}
+              />
+            }
+          />
+        </SettingSection>
+      </div>
+    </section>
   );
 }
 

@@ -31,6 +31,38 @@ export interface MediaGenerationToolRequestDependencies {
   listManagedModels?: () => ManagedModelInfo[];
 }
 
+export interface VisionModelResolutionDependencies {
+  getSetting?: (key: string) => string | null;
+  listManagedModels?: () => ManagedModelInfo[];
+}
+
+export function hasVisionInput(messages: readonly UIMessage[]): boolean {
+  return messages.some(
+    (message) =>
+      message.role === "user" &&
+      message.parts.some(
+        (part) => part.type === "file" && part.mediaType?.toLowerCase().startsWith("image/"),
+      ),
+  );
+}
+
+/** Returns a configured, usable vision model or null so the caller can use its normal model. */
+export async function resolveConfiguredVisionModelRef(
+  messages: readonly UIMessage[],
+  dependencies: VisionModelResolutionDependencies = {},
+): Promise<string | null> {
+  if (!hasVisionInput(messages)) return null;
+  const getSetting = dependencies.getSetting ?? (await import("./db")).getSetting;
+  const listModels =
+    dependencies.listManagedModels ?? (await import("./providers")).listManagedModels;
+  const settings = parseMediaGenerationSettings(getSetting(SettingKey.MediaGeneration));
+  if (settings.vision.mode !== "model" || !settings.vision.modelRef) return null;
+  const model = listModels().find((item) => item.ref === settings.vision.modelRef);
+  if (!model || !model.enabled || !model.hasApiKey) return null;
+  if (!model.capabilities.textGeneration || !model.capabilities.vision) return null;
+  return model.ref;
+}
+
 /** Execute a validated media request and persist generated binary assets locally. */
 export async function executeMediaGeneration(
   request: MediaGenerationRequest,
@@ -301,7 +333,18 @@ function parseMediaGenerationSettings(raw: string | null): MediaGenerationSettin
         options: normalizeMediaOptions(rawKind.options),
       };
     }
-    return { version: 1, defaults };
+    const rawVision =
+      source.vision && typeof source.vision === "object"
+        ? (source.vision as Record<string, unknown>)
+        : {};
+    return {
+      version: 1,
+      defaults,
+      vision: {
+        mode: rawVision.mode === "model" ? "model" : "inherit",
+        modelRef: normalizeOptionalText(rawVision.modelRef) ?? null,
+      },
+    };
   } catch {
     return cloneDefaultMediaSettings();
   }

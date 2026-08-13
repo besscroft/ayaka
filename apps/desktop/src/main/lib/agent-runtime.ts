@@ -121,6 +121,8 @@ export interface RunAgentChatOptions {
   runId?: string;
   mode?: AgentLoopMode;
   origin?: AgentRunOrigin;
+  /** Use the request-selected model even when the root agent has a model override. */
+  overrideAgentModel?: boolean;
 }
 
 interface RuntimeContext {
@@ -206,7 +208,9 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       ? resolvedPreferredAgentId
       : null;
 
-  const rootModelRef = rootAgent.model_ref || options.modelRef;
+  const rootModelRef = options.overrideAgentModel
+    ? options.modelRef
+    : rootAgent.model_ref || options.modelRef;
   const rootResolved =
     rootModelRef === options.modelRef ? options.resolved : resolveModel(rootModelRef);
   const rootRuntimeConfig = readRuntimeConfig(rootAgent.runtime_config_json);

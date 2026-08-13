@@ -41,6 +41,8 @@ const SAFE_MESSAGES: Record<ChatErrorCode, string> = {
   invalid_run_id: "The chat run is invalid. Start the message again.",
   invalid_mode: "The chat run mode is invalid. Start the message again.",
   missing_model: "No available model is selected. Choose or configure a model first.",
+  vision_model_unavailable:
+    "The selected chat model cannot process image input. Choose a vision model in General settings.",
   unauthorized: "The chat session expired. Restart the app and try again.",
   configuration: "The selected model is not configured correctly. Check its provider settings.",
   network: "Unable to connect to the local chat service. Wait a few seconds and try again.",
@@ -77,6 +79,9 @@ export function classifyChatError(
       diagnostic,
       explicitCode === "run_not_found" ? 404 : 409,
     );
+  }
+  if (explicitCode === "vision_model_unavailable") {
+    return createClassification(explicitCode, phase, diagnostic, 400);
   }
 
   const lower = diagnostic.toLowerCase();

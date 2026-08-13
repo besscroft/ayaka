@@ -728,6 +728,10 @@ const entries = {
     zh: "还没有选择可用模型。请先选择或配置一个模型。",
     en: "No available model is selected. Choose or configure a model first.",
   },
+  "error.chat.visionModelUnavailable": {
+    zh: "当前模型无法处理图片输入。请在通用设置中选择视觉模型。",
+    en: "The selected chat model cannot process image input. Choose a vision model in General settings.",
+  },
   "error.chat.network": {
     zh: "无法连接到本地聊天服务。请稍等几秒后重试，或重启应用。",
     en: "Unable to connect to the local chat service. Wait a few seconds and try again, or restart the app.",
@@ -1084,6 +1088,37 @@ const entries = {
   "settings.tab.diagnostics": { zh: "诊断", en: "Diagnostics" },
   "settings.tab.model": { zh: "模型", en: "Model" },
   "settings.media.auto": { zh: "自动选择", en: "Automatic" },
+  "settings.tab.general": { zh: "通用", en: "General" },
+  "settings.general.title": { zh: "通用设置", en: "General settings" },
+  "settings.general.desc": {
+    zh: "选择各类媒体和视觉输入使用的默认模型。",
+    en: "Choose the default models for media generation and visual input.",
+  },
+  "settings.general.media.title": { zh: "媒体模型", en: "Media models" },
+  "settings.general.media.desc": {
+    zh: "未指定时自动选择已启用且具备对应能力的模型。",
+    en: "Automatic selection uses an enabled model with the matching capability.",
+  },
+  "settings.general.auto": { zh: "自动选择", en: "Automatic" },
+  "settings.general.image.title": { zh: "图片生成模型", en: "Image generation model" },
+  "settings.general.image.desc": { zh: "用于生成图片。", en: "Used to generate images." },
+  "settings.general.speech.title": { zh: "语音模型", en: "Speech model" },
+  "settings.general.speech.desc": { zh: "用于语音合成。", en: "Used for speech synthesis." },
+  "settings.general.video.title": { zh: "视频模型", en: "Video model" },
+  "settings.general.video.desc": { zh: "用于生成视频。", en: "Used to generate videos." },
+  "settings.general.transcription.title": { zh: "转录模型", en: "Transcription model" },
+  "settings.general.transcription.desc": { zh: "用于语音转录。", en: "Used for transcription." },
+  "settings.general.vision.title": { zh: "视觉模型", en: "Vision model" },
+  "settings.general.vision.desc": {
+    zh: "处理图片附件时使用；默认继承当前聊天模型。",
+    en: "Used for image attachments; defaults to the current chat model.",
+  },
+  "settings.general.vision.model": { zh: "视觉输入模型", en: "Visual input model" },
+  "settings.general.vision.modelDesc": {
+    zh: "仅显示同时支持文本生成和视觉理解的模型。",
+    en: "Only models supporting both text generation and vision are shown.",
+  },
+  "settings.general.vision.inherit": { zh: "继承聊天模型", en: "Inherit chat model" },
   "settings.media.desc": {
     zh: "智能体决定输出类型；这里配置各类媒体使用的默认模型和参数。",
     en: "The agent chooses the output type; configure default models and parameters here.",

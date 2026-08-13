@@ -997,6 +997,7 @@ export type ChatErrorCode =
   | "invalid_run_id"
   | "invalid_mode"
   | "missing_model"
+  | "vision_model_unavailable"
   | "unauthorized"
   | "configuration"
   | "network"
@@ -1750,6 +1751,14 @@ export interface MediaGenerationKindSettings {
 export interface MediaGenerationSettings {
   version: 1;
   defaults: Record<MediaGenerationKind, MediaGenerationKindSettings>;
+  vision: VisionModelSettings;
+}
+
+export type VisionModelMode = "inherit" | "model";
+
+export interface VisionModelSettings {
+  mode: VisionModelMode;
+  modelRef: string | null;
 }
 
 export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
@@ -1771,6 +1780,10 @@ export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
       modelRef: null,
       options: {},
     },
+  },
+  vision: {
+    mode: "inherit",
+    modelRef: null,
   },
 };
 

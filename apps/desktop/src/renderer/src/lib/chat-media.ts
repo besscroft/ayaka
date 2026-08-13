@@ -5,6 +5,7 @@ import {
   type MediaGenerationOptions,
   type MediaGenerationSettings,
   type ProviderInfo,
+  type VisionModelSettings,
 } from "@shared/types";
 
 export const MEDIA_GENERATION_KINDS: readonly MediaGenerationKind[] = [
@@ -44,7 +45,16 @@ export function normalizeMediaGenerationSettings(value: unknown): MediaGeneratio
     };
   }
 
-  return { version: 1, defaults };
+  const rawVision =
+    source.vision && typeof source.vision === "object"
+      ? (source.vision as Partial<VisionModelSettings>)
+      : {};
+  const vision: VisionModelSettings = {
+    mode: rawVision.mode === "model" ? "model" : "inherit",
+    modelRef: normalizeOptionalString(rawVision.modelRef) ?? null,
+  };
+
+  return { version: 1, defaults, vision };
 }
 
 export function serializeMediaGenerationSettings(settings: MediaGenerationSettings): string {
@@ -65,6 +75,17 @@ export function getMediaCapableProviders(
     .filter((provider) => provider.models.length > 0);
 }
 
+export function getVisionCapableProviders(providers: readonly ProviderInfo[]): ProviderInfo[] {
+  return providers
+    .map((provider) => ({
+      ...provider,
+      models: provider.models.filter(
+        (model) => model.enabled && model.capabilities.textGeneration && model.capabilities.vision,
+      ),
+    }))
+    .filter((provider) => provider.models.length > 0);
+}
+
 function cloneDefaultMediaSettings(): MediaGenerationSettings {
   return {
     version: 1,
@@ -77,6 +98,7 @@ function cloneDefaultMediaSettings(): MediaGenerationSettings {
       },
       video: { modelRef: DEFAULT_MEDIA_GENERATION_SETTINGS.defaults.video.modelRef, options: {} },
     },
+    vision: { ...DEFAULT_MEDIA_GENERATION_SETTINGS.vision },
   };
 }
 

@@ -17,6 +17,8 @@ import type { ResolvedChatModel } from "../lib/chat-agent";
 import {
   classifyMediaGenerationError,
   executeMediaGeneration,
+  hasVisionInput,
+  resolveConfiguredVisionModelRef,
   mediaErrorStatus,
   validateMediaGenerationRequest,
 } from "../lib/media-generation";
@@ -32,6 +34,7 @@ interface CreateAppOptions {
   sessionToken?: string;
   getAssignedPort?: () => number;
   resolveModel?: (modelRef: string) => ResolvedChatModel;
+  resolveConfiguredVisionModelRef?: typeof resolveConfiguredVisionModelRef;
   resolveMediaModel?: typeof import("../lib/providers").resolveMediaModel;
   writeMediaAsset?: typeof import("../lib/media-assets").writeMediaAsset;
   buildAgentSystemPrompt?: (agentId?: string | null, conversationId?: string) => Promise<string>;
@@ -179,13 +182,27 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       const resolveModel = options.resolveModel ?? (await import("../lib/providers")).resolveModel;
       const buildAgentSystemPrompt =
         options.buildAgentSystemPrompt ?? (await import("../lib/db")).buildAgentSystemPrompt;
-      const resolved = resolveModel(body.model);
+      const configuredVisionModel = await (options.resolveConfiguredVisionModelRef
+        ? options.resolveConfiguredVisionModelRef(materializedMessages)
+        : options.resolveModel
+          ? null
+          : resolveConfiguredVisionModelRef(materializedMessages));
+      const requestedModel = configuredVisionModel ?? body.model;
+      const resolved = resolveModel(requestedModel);
+      if (hasVisionInput(materializedMessages) && !resolved.capabilities?.vision) {
+        const error = Object.assign(
+          new Error("The selected chat model cannot process image input."),
+          { code: "vision_model_unavailable" },
+        );
+        throw error;
+      }
       const reasoning = parsedReasoning;
       const runAgentChat =
         options.runAgentChat ?? (await import("../lib/agent-runtime")).runAgentChat;
       return await runAgentChat({
         messages: materializedMessages,
-        modelRef: body.model,
+        modelRef: requestedModel,
+        overrideAgentModel: hasVisionInput(materializedMessages),
         resolved,
         conversationId: body.conversationId,
         preferredAgentId: body.agentId,

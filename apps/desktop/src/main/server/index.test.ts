@@ -247,6 +247,91 @@ void describe("local chat server", () => {
     );
   });
 
+  void it("routes image input through the configured vision model", async () => {
+    const model = new MockLanguageModelV4({});
+    const captured: { value?: RunAgentChatOptions } = {};
+    const app = createApp({
+      sessionToken: token,
+      resolveConfiguredVisionModelRef: async (messages) => {
+        assert.equal(messages[0]?.parts[0]?.type, "file");
+        return "mock/vision";
+      },
+      resolveModel: (modelRef) => {
+        assert.equal(modelRef, "mock/vision");
+        return {
+          model,
+          providerId: "mock",
+          modelId: "vision",
+          capabilities: { ...mediaCapabilities, textGeneration: true, vision: true },
+          temperature: 0.7,
+          topP: 1,
+          maxOutputTokens: 256,
+        };
+      },
+      buildAgentSystemPrompt: async () => "test",
+      runAgentChat: async (options) => {
+        captured.value = options;
+        return agentRuntimeResponse("vision-stream");
+      },
+    });
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({
+        model: "mock/chat",
+        messages: [
+          {
+            id: "u-vision",
+            role: "user",
+            parts: [{ type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" }],
+          },
+        ],
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "vision-stream");
+    assert.equal(captured.value?.modelRef, "mock/vision");
+    assert.equal(captured.value?.overrideAgentModel, true);
+  });
+
+  void it("rejects image input when the inherited chat model lacks vision", async () => {
+    const app = createApp({
+      sessionToken: token,
+      resolveConfiguredVisionModelRef: async () => null,
+      resolveModel: () => ({
+        model: new MockLanguageModelV4({}),
+        capabilities: { ...mediaCapabilities, textGeneration: true, vision: false },
+        temperature: 0.7,
+        topP: 1,
+        maxOutputTokens: 256,
+      }),
+      buildAgentSystemPrompt: async () => "test",
+      runAgentChat: async () => agentRuntimeResponse("should-not-run"),
+    });
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({
+        model: "mock/chat",
+        messages: [
+          {
+            id: "u-vision",
+            role: "user",
+            parts: [{ type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" }],
+          },
+        ],
+      }),
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, "vision_model_unavailable");
+  });
+
   void it("returns stable run conflict codes", async () => {
     const model = new MockLanguageModelV4({});
     const app = createApp({
