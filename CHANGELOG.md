@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.1.17] - 2026-08-13
+
+### 中文
+
+#### 新增
+
+- 新增应用更新日志页面，可在关于设置中查看版本记录。
+- 新增任务阻塞状态和任务完成限制，完善任务完成工具流。
+
+#### 变更
+
+- 改进智能体工具结果补全和历史清理逻辑，提升运行状态的一致性。
+
+#### 修复
+
+- 修复回收站清理时间提示中的插值占位符问题。
+
+### English
+
+#### Added
+
+- Added an in-app update log page for viewing release notes from About settings.
+- Added blocked-task status and completion limits, improving the task completion tool flow.
+
+#### Changed
+
+- Improved agent tool-result reconciliation and history cleanup for more consistent runtime state.
+
+#### Fixed
+
+- Fixed interpolation placeholders in the recycle-bin cleanup time message.
+
 ## [0.1.16] - 2026-08-12
 
 ### 中文
