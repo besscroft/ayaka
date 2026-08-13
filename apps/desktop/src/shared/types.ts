@@ -1871,7 +1871,8 @@ export interface WorkspaceFileRef {
 }
 
 export interface WorkspaceFileContent extends WorkspaceFileRef {
-  data: Uint8Array;
+  /** ArrayBuffer is used across the Electron contextBridge boundary. */
+  data: ArrayBuffer;
 }
 
 // ============================================================

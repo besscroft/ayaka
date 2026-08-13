@@ -123,7 +123,7 @@ void describe("conversation workspaces", () => {
     assert.equal(second.filename, "image-1.png");
     const content = await workspace.readWorkspaceFileContent(id, second.path);
     assert.equal(content.mediaType, "image/png");
-    assert.deepEqual(Array.from(content.data), [2]);
+    assert.deepEqual(Array.from(new Uint8Array(content.data)), [2]);
     await assert.rejects(workspace.readWorkspaceFileContent(id, "../outside"), /escapes/);
   });
 

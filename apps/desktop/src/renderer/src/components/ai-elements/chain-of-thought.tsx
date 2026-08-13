@@ -32,6 +32,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../../lib/utils";
+import { useMediaResourceStates } from "../../lib/media-resource";
 import { useT } from "../../lib/i18n";
 import {
   IconBrain,
@@ -317,6 +318,7 @@ interface ChainOfThoughtImageProps extends HTMLAttributes<HTMLDivElement> {
   src: string;
   alt?: string;
   caption?: ReactNode;
+  conversationId?: string;
 }
 
 /** 推理过程中引用的图片（带说明文字） */
@@ -324,22 +326,35 @@ export function ChainOfThoughtImage({
   src,
   alt,
   caption,
+  conversationId,
   className,
   ...rest
 }: ChainOfThoughtImageProps): React.JSX.Element {
-  const safeSrc = sanitizeRichContentUrl(src, "image");
+  const { t } = useT();
+  const { states, markFailed } = useMediaResourceStates(conversationId, [
+    { type: "chain-of-thought-image", filename: alt, mediaType: "image/*", url: src },
+  ]);
+  const state = states["chain-of-thought-image-0"];
+  const safeSrc = state?.url ? sanitizeRichContentUrl(state.url, "image") : null;
   return (
     <figure
       data-slot="chain-of-thought-image"
       className={cn("overflow-hidden rounded-md border border-border bg-background/60", className)}
       {...rest}
     >
-      {safeSrc ? (
+      {state?.error ? (
+        <div className="px-2 py-3 text-[10.5px] text-danger">
+          {t("attachment.loadFailed", { name: alt ?? t("attachment.file") })}
+        </div>
+      ) : state?.loading ? (
+        <div className="px-2 py-3 text-[10.5px] text-muted-foreground">{alt ?? ""}</div>
+      ) : safeSrc ? (
         <img
           src={safeSrc}
           alt={alt ?? ""}
           loading="lazy"
           className="block max-h-48 w-full object-cover"
+          onError={() => markFailed("chain-of-thought-image-0")}
         />
       ) : (
         <div className="px-2 py-3 text-[10.5px] text-muted-foreground">{alt ?? ""}</div>

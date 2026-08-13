@@ -310,12 +310,14 @@ export async function readWorkspaceFileContent(
   if (!info.isFile()) throw new Error("Workspace path is not a file.");
   const data = await readFile(safePath);
   const filename = path.basename(safePath);
+  const bytes = new Uint8Array(data.byteLength);
+  bytes.set(data);
   return {
     path: path.relative(workspace.root_path, safePath).split(path.sep).join("/"),
     filename,
     mediaType: guessMediaType(filename),
     size: data.byteLength,
-    data: new Uint8Array(data),
+    data: bytes.buffer,
   };
 }
 

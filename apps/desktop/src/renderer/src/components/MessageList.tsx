@@ -793,6 +793,7 @@ function MessageItem({
                       key={i}
                       src={p.url || p.data || ""}
                       alt={p.filename || t("msg.cot.imageAlt")}
+                      conversationId={conversationId}
                     />
                   ))}
                 </div>

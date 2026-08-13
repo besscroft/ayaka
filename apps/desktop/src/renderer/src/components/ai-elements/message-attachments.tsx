@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { useT } from "../../lib/i18n";
-import { api } from "../../lib/api";
+import { useMediaResourceStates } from "../../lib/media-resource";
 import { AttachmentChip } from "./attachment-chip";
 import type { AttachmentItem } from "./attachment-chip";
 import { sanitizeRichContentUrl } from "./rich-content-utils";
@@ -26,50 +26,15 @@ export function MessageAttachments({
   className,
 }: MessageAttachmentsProps): React.JSX.Element | null {
   const { t } = useT();
+  const { states, markFailed } = useMediaResourceStates(conversationId, parts);
   if (parts.length === 0) return null;
-
-  const [workspaceUrls, setWorkspaceUrls] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    const created: string[] = [];
-    setWorkspaceUrls({});
-    void Promise.all(
-      parts.map(async (part, index): Promise<[string, string] | null> => {
-        const url = part.url ?? part.data;
-        if (!conversationId || !url?.startsWith("workspace://")) return null;
-        const content = await api.workspace.read({
-          conversationId,
-          path: url.slice("workspace://".length),
-        });
-        const blobUrl = URL.createObjectURL(
-          new Blob([new Uint8Array(content.data)], { type: content.mediaType }),
-        );
-        if (cancelled) {
-          URL.revokeObjectURL(blobUrl);
-          return null;
-        }
-        created.push(blobUrl);
-        return [`${part.type}-${index}`, blobUrl];
-      }),
-    )
-      .then((entries) => {
-        if (cancelled) return;
-        setWorkspaceUrls(Object.fromEntries(entries.filter((entry) => entry !== null)));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-      created.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [conversationId, parts]);
 
   const items: AttachmentItem[] = parts.map((p, i) => ({
     id: `${p.type}-${i}`,
     name: p.filename ?? t("attachment.file"),
     mediaType: p.mediaType ?? "application/octet-stream",
     size: 0,
-    url: workspaceUrls[`${p.type}-${i}`] ?? p.url ?? p.data,
+    url: states[`${p.type}-${i}`]?.url,
     variant: p.mediaType?.startsWith("image/")
       ? "image"
       : p.mediaType?.startsWith("video/")
@@ -100,7 +65,14 @@ export function MessageAttachments({
           )}
         >
           {images.map((img) => (
-            <ImageTile key={img.id} item={img} />
+            <ImageTile
+              key={img.id}
+              item={img}
+              loading={states[img.id]?.loading === true}
+              error={states[img.id]?.error === true}
+              onError={() => markFailed(img.id)}
+              errorText={t("attachment.loadFailed", { name: img.name })}
+            />
           ))}
         </div>
       )}
@@ -108,7 +80,14 @@ export function MessageAttachments({
       {audio.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {audio.map((item) => (
-            <AudioAttachment key={item.id} item={item} />
+            <AudioAttachment
+              key={item.id}
+              item={item}
+              loading={states[item.id]?.loading === true}
+              error={states[item.id]?.error === true}
+              onError={() => markFailed(item.id)}
+              errorText={t("attachment.loadFailed", { name: item.name })}
+            />
           ))}
         </div>
       )}
@@ -116,7 +95,14 @@ export function MessageAttachments({
       {videos.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
           {videos.map((item) => (
-            <VideoAttachment key={item.id} item={item} />
+            <VideoAttachment
+              key={item.id}
+              item={item}
+              loading={states[item.id]?.loading === true}
+              error={states[item.id]?.error === true}
+              onError={() => markFailed(item.id)}
+              errorText={t("attachment.loadFailed", { name: item.name })}
+            />
           ))}
         </div>
       )}
@@ -132,8 +118,26 @@ export function MessageAttachments({
   );
 }
 
-function ImageTile({ item }: { item: AttachmentItem }): ReactNode {
+function ImageTile({
+  item,
+  loading,
+  error,
+  onError,
+  errorText,
+}: {
+  item: AttachmentItem;
+  loading: boolean;
+  error: boolean;
+  onError: () => void;
+  errorText: string;
+}): ReactNode {
   const src = item.url ? sanitizeRichContentUrl(item.url, "image") : null;
+  if (error) {
+    return <MediaError text={errorText} square />;
+  }
+  if (loading) {
+    return <MediaLoading name={item.name} square />;
+  }
   if (!src) {
     return (
       <div className="flex aspect-square items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
@@ -154,26 +158,55 @@ function ImageTile({ item }: { item: AttachmentItem }): ReactNode {
         alt={item.name}
         className="size-full object-cover transition group-hover/tile:scale-105"
         loading="lazy"
+        onError={onError}
       />
     </a>
   );
 }
 
-function AudioAttachment({ item }: { item: AttachmentItem }): React.JSX.Element {
+function AudioAttachment({
+  item,
+  loading,
+  error,
+  onError,
+  errorText,
+}: {
+  item: AttachmentItem;
+  loading: boolean;
+  error: boolean;
+  onError: () => void;
+  errorText: string;
+}): React.JSX.Element {
   const src = item.url ? sanitizeRichContentUrl(item.url, "media") : null;
+  if (error) return <MediaError text={errorText} />;
+  if (loading) return <MediaLoading name={item.name} />;
   if (!src) return <AttachmentChip item={item} compact />;
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-2">
       <div className="mb-1 truncate text-xs font-medium text-foreground" title={item.name}>
         {item.name}
       </div>
-      <audio controls src={src} className="w-full" preload="metadata" />
+      <audio controls src={src} className="w-full" preload="metadata" onError={onError} />
     </div>
   );
 }
 
-function VideoAttachment({ item }: { item: AttachmentItem }): React.JSX.Element {
+function VideoAttachment({
+  item,
+  loading,
+  error,
+  onError,
+  errorText,
+}: {
+  item: AttachmentItem;
+  loading: boolean;
+  error: boolean;
+  onError: () => void;
+  errorText: string;
+}): React.JSX.Element {
   const src = item.url ? sanitizeRichContentUrl(item.url, "media") : null;
+  if (error) return <MediaError text={errorText} />;
+  if (loading) return <MediaLoading name={item.name} />;
   if (!src) return <AttachmentChip item={item} compact />;
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-muted/30" title={item.name}>
@@ -182,8 +215,47 @@ function VideoAttachment({ item }: { item: AttachmentItem }): React.JSX.Element 
         src={src}
         className="aspect-video w-full bg-black object-contain"
         preload="metadata"
+        onError={onError}
       />
       <div className="truncate px-2 py-1.5 text-xs font-medium text-foreground">{item.name}</div>
+    </div>
+  );
+}
+
+function MediaLoading({
+  name,
+  square = false,
+}: {
+  name: string;
+  square?: boolean;
+}): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-lg bg-muted px-3 text-center text-xs text-muted-foreground",
+        square ? "aspect-square" : "rounded-lg border border-border bg-muted/30 py-2",
+      )}
+    >
+      {name}
+    </div>
+  );
+}
+
+function MediaError({
+  text,
+  square = false,
+}: {
+  text: string;
+  square?: boolean;
+}): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-lg border border-danger/30 bg-danger/10 px-3 text-center text-xs text-danger",
+        square ? "aspect-square" : "py-2",
+      )}
+    >
+      {text}
     </div>
   );
 }
