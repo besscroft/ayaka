@@ -118,7 +118,8 @@ export const api = {
     open: (conversationId: string): Promise<boolean> => assertApi().workspace.open(conversationId),
     selectParent: (): Promise<boolean> => assertApi().workspace.selectParent(),
     openDefaultParent: (): Promise<boolean> => assertApi().workspace.openDefaultParent(),
-    getParentState: (): Promise<{ configured: boolean }> => assertApi().workspace.getParentState(),
+    getParentState: (): Promise<{ configured: boolean; path: string }> =>
+      assertApi().workspace.getParentState(),
     listOrphans: (): Promise<WorkspaceOrphan[]> => assertApi().workspace.listOrphans(),
     openOrphan: (id: string): Promise<boolean> => assertApi().workspace.openOrphan(id),
     removeOrphan: (id: string): Promise<boolean> => assertApi().workspace.removeOrphan(id),

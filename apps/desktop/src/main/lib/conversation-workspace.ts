@@ -178,9 +178,12 @@ export async function openWorkspaceParent(): Promise<boolean> {
   return true;
 }
 
-export async function getWorkspaceParentState(): Promise<{ configured: boolean }> {
+export async function getWorkspaceParentState(): Promise<{ configured: boolean; path: string }> {
   const { getSetting } = await import("./db");
-  return { configured: Boolean(getSetting("workspace_parent_directory")?.trim()) };
+  return {
+    configured: Boolean(getSetting("workspace_parent_directory")?.trim()),
+    path: await getWorkspaceParent(),
+  };
 }
 
 export async function saveWorkspaceAttachment(

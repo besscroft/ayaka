@@ -54,6 +54,12 @@ void describe("conversation workspaces", () => {
     );
   });
 
+  void it("returns the absolute configured workspace parent", async () => {
+    const state = await workspace.getWorkspaceParentState();
+    assert.equal(state.configured, true);
+    assert.equal(state.path, path.join(root, "parent"));
+  });
+
   void it("creates a dated workspace only when prepared", async () => {
     const id = "12345678-abcd-efgh";
     assert.equal(db.getConversation(id), null);

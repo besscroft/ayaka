@@ -96,7 +96,7 @@ export interface VoidAIApi {
     open: (conversationId: string) => Promise<boolean>;
     selectParent: () => Promise<boolean>;
     openDefaultParent: () => Promise<boolean>;
-    getParentState: () => Promise<{ configured: boolean }>;
+    getParentState: () => Promise<{ configured: boolean; path: string }>;
     listOrphans: () => Promise<WorkspaceOrphan[]>;
     openOrphan: (id: string) => Promise<boolean>;
     removeOrphan: (id: string) => Promise<boolean>;

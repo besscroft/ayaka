@@ -9,6 +9,7 @@ import {
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import { useT } from "../lib/i18n";
+import { cn } from "../lib/utils";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  className?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -28,6 +30,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger = false,
+  className,
   onConfirm,
   onClose,
 }: ConfirmDialogProps): React.JSX.Element {
@@ -36,7 +39,7 @@ export function ConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
       <AlertDialogOverlay />
-      <AlertDialogContent>
+      <AlertDialogContent className={cn(className)}>
         <div className="flex flex-col gap-2">
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{message}</AlertDialogDescription>

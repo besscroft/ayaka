@@ -691,7 +691,7 @@ function WorkspaceTab(): React.JSX.Element {
     setLoading(true);
     void Promise.all([api.workspace.getParentState(), api.workspace.listOrphans()])
       .then(([state, found]) => {
-        setParent(state.configured ? "configured" : "");
+        setParent(state.path);
         setOrphans(found);
       })
       .catch((error) => notify.error(t("workspace.loadFailed"), error, locale))
@@ -704,7 +704,7 @@ function WorkspaceTab(): React.JSX.Element {
     void api.workspace
       .selectParent()
       .then((selected) => {
-        if (selected) setParent("configured");
+        if (selected) refresh();
       })
       .catch((error) => notify.error(t("workspace.selectFailed"), error, locale));
   };
@@ -731,7 +731,7 @@ function WorkspaceTab(): React.JSX.Element {
 
   return (
     <>
-      <section className="flex min-h-0 flex-1 flex-col gap-5">
+      <section className="flex min-h-0 flex-1 select-none flex-col gap-5">
         <div>
           <h2 className="text-base font-semibold">{t("workspace.title")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t("workspace.description")}</p>
@@ -743,7 +743,7 @@ function WorkspaceTab(): React.JSX.Element {
         >
           <div className="flex flex-wrap items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded border border-border bg-muted px-3 py-2 text-xs">
-              {parent ? t("workspace.customParent") : t("workspace.appDefault")}
+              {parent || (loading ? t("common.loading") : t("workspace.appDefault"))}
             </code>
             <Button variant="secondary" size="sm" onPress={chooseParent}>
               <IconFolderOpen data-icon="inline-start" />
@@ -812,6 +812,7 @@ function WorkspaceTab(): React.JSX.Element {
         title={t("workspace.delete.title")}
         message={t("workspace.delete.message", { name: pendingOrphanDelete?.name ?? "" })}
         danger
+        className="select-none"
         confirmLabel={t("common.delete")}
         onConfirm={removeOrphan}
         onClose={() => setPendingOrphanDelete(null)}
