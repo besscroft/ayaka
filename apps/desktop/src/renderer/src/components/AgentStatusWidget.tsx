@@ -296,7 +296,7 @@ export function AgentStatusWidget({
         <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
             <AgentAvatar profile={activeProfile} fallback={t("agentStatus.rootAgent")} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 select-none">
               <p className="truncate text-sm font-medium text-foreground/90">
                 {activeProfile?.name || t("agentStatus.rootAgent")}
               </p>
@@ -332,13 +332,13 @@ export function AgentStatusWidget({
                   className="border-b border-border py-3"
                   aria-labelledby="agent-status-agents"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 select-none">
                     <SectionLabel id="agent-status-agents" label={t("agentStatus.agents")} />
                     <span className="text-[10px] tabular-nums text-foreground/40">
                       {instances.length + 1}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-col gap-0.5">
+                  <div className="mt-2 flex flex-col gap-0.5 select-none">
                     <AgentTree
                       node={tree.root}
                       expandedPaths={expandedPaths}
@@ -349,7 +349,7 @@ export function AgentStatusWidget({
                 </section>
 
                 <section
-                  className="border-b border-border py-3"
+                  className="border-b border-border py-3 select-none"
                   aria-labelledby="agent-status-activity"
                 >
                   <SectionLabel id="agent-status-activity" label={t("agentStatus.activity")} />
@@ -394,7 +394,7 @@ export function AgentStatusWidget({
           </div>
 
           {active && run ? (
-            <div className="shrink-0 border-t border-border px-3 py-3">
+            <div className="shrink-0 border-t border-border px-3 py-3 select-none">
               <Button size="sm" variant="tertiary" className="w-full" onPress={onStop}>
                 {t("input.stop")}
               </Button>
@@ -404,7 +404,7 @@ export function AgentStatusWidget({
       ) : (
         <button
           type="button"
-          className="flex h-full w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+          className="flex h-full select-none w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
           onClick={() => onOpenChange(true)}
           aria-label={t("agentStatus.open")}
           aria-expanded={false}
@@ -439,7 +439,7 @@ function ConfigurationSection({
   t: ReturnType<typeof useT>["t"];
 }): React.JSX.Element {
   return (
-    <div className="divide-y divide-border">
+    <div className="divide-y divide-border select-none">
       <AnimatedDisclosure defaultOpen active={false} className="py-3">
         <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
           <SectionLabel label={t("agentStatus.configuration")} />
@@ -463,7 +463,7 @@ function ConfigurationSection({
         </AnimatedDisclosureContent>
       </AnimatedDisclosure>
 
-      <AnimatedDisclosure defaultOpen active={false} className="py-3">
+      <AnimatedDisclosure active={false} className="py-3">
         <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 text-left">
           <SectionLabel label={t("agentStatus.instructions")} />
           <AnimatedDisclosureChevron className="text-foreground/40">
@@ -530,7 +530,7 @@ function ToolGroup({
 }): React.JSX.Element {
   return (
     <AnimatedDisclosure>
-      <AnimatedDisclosureTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted">
+      <AnimatedDisclosureTrigger className="flex w-full select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted">
         <span className="text-[10px] font-medium text-foreground/65">
           {t(`agentStatus.toolCategory.${group.category}`)}
         </span>
@@ -595,7 +595,7 @@ function AgentTree({
     <div>
       <div
         className={cn(
-          "flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-muted",
+          "flex select-none min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-muted",
           node.active && "bg-accent/10",
           node.depth > 0 && "ml-4 border-l border-border rounded-l-none",
         )}
@@ -670,7 +670,7 @@ function AttentionBar({
   return (
     <div
       className={cn(
-        "mb-3 flex items-start gap-2 rounded-md border px-2.5 py-2",
+        "mb-3 flex items-start gap-2 rounded-md border px-2.5 py-2 select-none",
         status === "failed"
           ? "border-danger/30 bg-danger/5"
           : status === "waiting_approval" || status === "waiting_handoff"
@@ -692,7 +692,10 @@ function AttentionBar({
 
 function SectionLabel({ id, label }: { id?: string; label: string }): React.JSX.Element {
   return (
-    <p id={id} className="text-[10px] font-medium uppercase tracking-wide text-foreground/40">
+    <p
+      id={id}
+      className="text-[10px] font-medium uppercase tracking-wide text-foreground/40 select-none"
+    >
       {label}
     </p>
   );
@@ -707,7 +710,7 @@ function AgentAvatar({
 }): React.JSX.Element {
   const label = profile?.avatar || profile?.name?.slice(0, 1) || fallback.slice(0, 1);
   return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground">
+    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground select-none">
       {label}
     </div>
   );
@@ -716,7 +719,7 @@ function AgentAvatar({
 function ActivityRow({ item }: { item: AgentActivityItem }): React.JSX.Element {
   const { t } = useT();
   return (
-    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+    <div className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted select-none">
       <StatusIcon status={item.status} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-foreground/75">{item.title}</p>
@@ -731,7 +734,7 @@ function ActivityRow({ item }: { item: AgentActivityItem }): React.JSX.Element {
 
 function Metric({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
-    <div className="min-w-0 rounded-md border border-border px-2 py-2">
+    <div className="min-w-0 rounded-md border border-border px-2 py-2 select-none">
       <p className="truncate text-[10px] text-foreground/40">{label}</p>
       <p className="mt-1 text-sm font-medium tabular-nums text-foreground/75">{value}</p>
     </div>
