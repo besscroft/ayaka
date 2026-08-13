@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.18] - 2026-08-13
+
+### 中文
+
+#### 变更
+
+- 优化智能体状态面板交互体验，避免非编辑内容被意外选中。
+- 调整智能体状态面板中指令区域的默认折叠状态，减少初始信息占用。
+- 移除技能卡片上无实际用途的运行按钮及相关代码逻辑。
+
+### English
+
+#### Changed
+
+- Improved the agent status panel interaction by preventing accidental selection of non-editable content.
+- Updated the instructions section in the agent status panel to be collapsed by default, reducing the initial information density.
+- Removed the unused run button and related logic from skill cards.
+
 ## [0.1.17] - 2026-08-13
 
 ### 中文
