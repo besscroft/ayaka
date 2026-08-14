@@ -165,8 +165,10 @@ export function McpPanel(): React.JSX.Element {
   return (
     <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">{t("main.title.mcp")}</h1>
+        <div className="min-w-0 select-none">
+          <h1 className="text-xl font-semibold tracking-tight select-none">
+            {t("main.title.mcp")}
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           <MetricCard
@@ -199,7 +201,7 @@ export function McpPanel(): React.JSX.Element {
         </Tabs>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto select-none">
         {tab === "marketplace" ? (
           <McpMarketplacePanel
             onInstalled={(installation, item, savedSecretKeys) => {

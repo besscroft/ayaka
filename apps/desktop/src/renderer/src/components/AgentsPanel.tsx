@@ -440,7 +440,7 @@ export function AgentsPanel({
           {visibleAgents.length === 0 ? (
             <EmptyState title={t("agents.empty")} />
           ) : (
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto pr-1">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto pr-1 select-none">
               <div className="grid min-w-0 auto-rows-max gap-3 md:grid-cols-2">
                 {visibleAgents.map((agent) => (
                   <AgentCard

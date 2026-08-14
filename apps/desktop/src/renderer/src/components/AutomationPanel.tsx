@@ -174,7 +174,7 @@ export function AutomationPanel(): React.JSX.Element {
 
   return (
     <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex items-start justify-between gap-4 select-none">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{t("automation.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("automation.subtitle")}</p>
@@ -182,12 +182,12 @@ export function AutomationPanel(): React.JSX.Element {
         <Button onPress={beginCreate}>{t("automation.new")}</Button>
       </header>
 
-      <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+      <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground select-none">
         {t("automation.runningNotice")}
       </p>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(18rem,0.8fr)_minmax(24rem,1.2fr)] gap-4 overflow-hidden">
-        <section className="min-h-0 overflow-y-auto" aria-label={t("automation.jobs")}>
+        <section className="min-h-0 overflow-y-auto select-none" aria-label={t("automation.jobs")}>
           {jobs.length === 0 ? (
             <Card>
               <Card.Header>
@@ -235,7 +235,7 @@ export function AutomationPanel(): React.JSX.Element {
           )}
         </section>
 
-        <section className="min-h-0 overflow-y-auto">
+        <section className="min-h-0 overflow-y-auto select-none">
           {editing ? (
             <AutomationEditor
               draft={draft}
@@ -389,7 +389,7 @@ function AutomationEditor({
   const update = <K extends keyof Draft>(key: K, value: Draft[K]): void =>
     setDraft((current) => ({ ...current, [key]: value }));
   return (
-    <Card>
+    <Card className="select-none">
       <Card.Header>
         <Card.Title>{t("automation.editorTitle")}</Card.Title>
         <Card.Description>{preview}</Card.Description>

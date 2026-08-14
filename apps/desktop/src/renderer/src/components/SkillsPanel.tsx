@@ -12,7 +12,7 @@ export function SkillsPanel(): React.JSX.Element {
     <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">{t("skills.title")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight select-none">{t("skills.title")}</h1>
         </div>
         <Tabs
           value={tab}

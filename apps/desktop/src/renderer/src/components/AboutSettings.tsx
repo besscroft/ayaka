@@ -108,7 +108,7 @@ export function AboutSettings(): React.JSX.Element {
       : (version ?? t("about.version.unavailable"));
 
   return (
-    <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center py-8">
+    <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center py-8 select-none">
       <header className="flex items-center gap-5">
         <img
           src={appIcon}
@@ -260,7 +260,7 @@ export function AboutSettings(): React.JSX.Element {
         </div>
       ) : null}
 
-      <p className="mt-8 text-xs text-muted-foreground">Copyright (c) 2026 ZZZVoid</p>
+      <p className="mt-8 text-xs text-muted-foreground">Copyright © 2026 ZZZVoid</p>
 
       <Dialog
         open={changelogOpen}
@@ -271,7 +271,7 @@ export function AboutSettings(): React.JSX.Element {
           }
         }}
       >
-        <DialogContent className="max-h-[calc(100vh-32px)] w-[min(760px,calc(100vw-24px))] max-w-none p-0">
+        <DialogContent className="max-h-[calc(100vh-32px)] w-[min(760px,calc(100vw-24px))] max-w-none p-0 select-none">
           <DialogHeader>
             <DialogTitle>{t("about.changelog.title")}</DialogTitle>
             <DialogDescription>{t("about.description")}</DialogDescription>

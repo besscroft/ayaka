@@ -113,7 +113,9 @@ export function ToolsPanel(): React.JSX.Element {
   return (
     <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">{t("main.title.tools")}</h1>
+        <h1 className="text-xl font-semibold tracking-tight select-none">
+          {t("main.title.tools")}
+        </h1>
         <div className="flex items-center gap-3">
           <MetricCard
             label={t("tools.metric.tools")}
@@ -128,7 +130,7 @@ export function ToolsPanel(): React.JSX.Element {
       </div>
 
       {snapshot ? (
-        <div className="grid shrink-0 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px]">
+        <div className="grid shrink-0 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px] select-none">
           <label className="relative min-w-0 select-none">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
             <Input
@@ -162,7 +164,7 @@ export function ToolsPanel(): React.JSX.Element {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto select-none">
         {loading && !snapshot ? (
           <div className="rounded-md border border-dashed border-border px-4 py-16">
             <LoadingIndicator label={t("main.loading")} />
@@ -216,7 +218,7 @@ export function InstalledSkillsPanel(): React.JSX.Element {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 select-none">
       <div className="flex shrink-0 items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {t("skills.installedCount", { count: snapshot?.skills.length ?? 0 })}
@@ -868,9 +870,9 @@ export function MetricCard({
   const { f } = useT();
   if (orientation === "horizontal") {
     return (
-      <div className="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm">
+      <div className="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm select-none">
         <span className="font-semibold tabular-nums">{f.number(value)}</span>
-        <span className="truncate text-xs text-foreground/45">{label}</span>
+        <span className="truncate text-xs text-foreground/45 select-none">{label}</span>
       </div>
     );
   }
@@ -1073,7 +1075,7 @@ export function CatalogDiscover(): React.JSX.Element {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
+    <div className="flex h-full flex-col gap-4 overflow-hidden select-none">
       <div className="flex shrink-0 flex-col gap-3">
         <div className="flex flex-col gap-2 md:flex-row">
           <label className="relative min-w-0 flex-1">
@@ -1093,7 +1095,7 @@ export function CatalogDiscover(): React.JSX.Element {
             </TabsList>
           </Tabs>
         </div>
-        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground select-none">
           <span>
             {source === "modelscope-skills"
               ? t("catalog.modelscopeDescription")
