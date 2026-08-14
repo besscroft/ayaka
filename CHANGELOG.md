@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.21] - 2026-08-14
+
+### 中文
+
+#### 新增
+
+- 新增 OpenAI 兼容模型的图片输入适配，支持将图片数据转换为兼容的图片 URL 格式。
+
+#### 变更
+
+- 优化对话执行摘要展示，将工具调用、搜索和图片等执行信息移到助手消息气泡外，提升长回复的阅读体验。
+- 优化对话自动滚动，展开或折叠执行详情时保持当前滚动位置，减少内容跳动。
+- 优化对话重试流程，在运行状态过期或无法继续时自动切换到新的运行。
+
+#### 修复
+
+- 修复工作区图片、Data URL 和网络图片输入的校验与处理问题，并在附件图片无法读取时显示明确的错误提示。
+- 修复推理模型请求中传入不受支持的采样参数导致请求失败的问题。
+
+### English
+
+#### Added
+
+- Added image-input support for OpenAI-compatible models by converting image data to compatible image URLs.
+
+#### Changed
+
+- Moved execution summaries for tool calls, searches, and images outside assistant message bubbles to improve readability for long responses.
+- Improved conversation auto-scrolling so expanding or collapsing execution details preserves the current scroll position and reduces layout jumps.
+- Improved conversation retry handling by automatically starting a new run when the previous run is stale or cannot be resumed.
+
+#### Fixed
+
+- Fixed validation and handling for workspace images, data URLs, and remote image URLs, with a clear error when an attached image cannot be read.
+- Fixed request failures caused by sending unsupported sampling parameters to reasoning models.
+
 ## [0.1.20] - 2026-08-14
 
 ### 中文
