@@ -99,6 +99,34 @@ void describe("local chat server", () => {
     assert.equal((await response.json()).code, "invalid_request");
   });
 
+  void it("rejects invalid media references as a structured non-retryable error", async () => {
+    const app = createApp({ sessionToken: token });
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            id: "image-1",
+            role: "user",
+            parts: [{ type: "file", mediaType: "image/png", url: "blob:local-image" }],
+          },
+        ],
+        model: "mock/chat",
+      }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "The attached image could not be read. Choose it again and try again.",
+      code: "invalid_media_input",
+      retryable: false,
+    });
+  });
+
   void it("rejects requests without a model reference", async () => {
     const app = createApp({ sessionToken: token });
 

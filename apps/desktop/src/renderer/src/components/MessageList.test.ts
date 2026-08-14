@@ -13,6 +13,7 @@ import {
   isMessageStreaming,
   LiveThinkingPanel,
   readMediaToolResult,
+  shouldRenderExecutionSummary,
   shouldShowLiveThinking,
 } from "./MessageList";
 import {
@@ -261,6 +262,12 @@ void describe("reasoning display", () => {
 });
 
 void describe("execution summary", () => {
+  void it("only renders for assistant messages", () => {
+    assert.equal(shouldRenderExecutionSummary("user", true), false);
+    assert.equal(shouldRenderExecutionSummary("assistant", true), true);
+    assert.equal(shouldRenderExecutionSummary("assistant", false), false);
+  });
+
   void it("aggregates activity counts and blocking states", () => {
     const summary = getExecutionSummary([
       {

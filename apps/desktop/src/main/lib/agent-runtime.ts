@@ -100,6 +100,7 @@ import {
   type CompletionController,
 } from "./agent-completion";
 import { reconcileToolResults, removeIncompleteToolParts } from "./agent-tool-results";
+import { getChatSamplingSettings } from "./chat-model-settings";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -832,8 +833,11 @@ function createToolLoopAgent({
       : (completionController?.stopWhen ??
         toolRuntime.stopWhen ??
         isStepCount(runtimeConfig.maxTurns)),
-    temperature: runtimeConfig.temperature ?? resolved.temperature,
-    topP: runtimeConfig.topP ?? resolved.topP,
+    ...getChatSamplingSettings({
+      reasoningModel: resolved.capabilities?.reasoning === true,
+      temperature: runtimeConfig.temperature ?? resolved.temperature,
+      topP: runtimeConfig.topP ?? resolved.topP,
+    }),
     maxOutputTokens: runtimeConfig.maxOutputTokens ?? resolved.maxOutputTokens,
     providerOptions: contextManager
       ? (contextManager.withProviderOptions(

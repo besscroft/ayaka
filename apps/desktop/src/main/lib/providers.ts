@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
+import { wrapOpenAICompatibleChatModel } from "./openai-compatible-model";
 import type {
   experimental_generateVideo,
   ImageModel,
@@ -1643,7 +1644,9 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
       return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id })(modelId);
     case "openai-compatible":
       if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
-      return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id }).chat(modelId);
+      return wrapOpenAICompatibleChatModel(
+        createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id }).chat(modelId),
+      );
     case "anthropic":
       return createAnthropic({ apiKey })(modelId);
     case "google":

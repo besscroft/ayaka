@@ -467,6 +467,13 @@ export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary
   };
 }
 
+export function shouldRenderExecutionSummary(
+  role: UIMessage["role"],
+  hasActivity: boolean,
+): boolean {
+  return role === "assistant" && hasActivity;
+}
+
 export function getMessageActivityStatus(
   messages: UIMessage[],
   isLoading: boolean,
@@ -681,6 +688,15 @@ function MessageItem({
 
   return (
     <Message from={message.role}>
+      {shouldRenderExecutionSummary(message.role, executionSummary.hasActivity) ? (
+        <ExecutionSummaryPanel
+          conversationId={conversationId}
+          executionSummary={executionSummary}
+          messageStreaming={messageStreaming}
+          sourceParts={sourceParts}
+          imageParts={imageParts}
+        />
+      ) : null}
       {/* 气泡本体：思维链、附件、各类 part */}
       <MessageContent data-from={message.role}>
         {reasoningDisplay ? (
@@ -707,100 +723,6 @@ function MessageItem({
             </ReasoningContent>
           </Reasoning>
         ) : null}
-
-        {executionSummary.hasActivity && (
-          <ChainOfThought
-            active={messageStreaming}
-            keepOpen={executionSummary.hasAttention}
-            defaultOpen={messageStreaming || executionSummary.hasAttention}
-            title={messageStreaming ? t("msg.cot.activityActive") : t("msg.cot.activity")}
-          >
-            {executionSummary.toolCount > 0 ? (
-              <ChainOfThoughtStep
-                icon="tool"
-                status={
-                  executionSummary.errorToolCount > 0
-                    ? "error"
-                    : executionSummary.activeToolCount > 0
-                      ? "active"
-                      : executionSummary.pendingToolCount > 0
-                        ? "pending"
-                        : "complete"
-                }
-                label={
-                  executionSummary.errorToolCount > 0
-                    ? t("msg.cot.toolsFailed", {
-                        count: f.number(executionSummary.errorToolCount),
-                      })
-                    : executionSummary.activeToolCount > 0
-                      ? t("msg.cot.toolsActive", {
-                          count: f.number(executionSummary.toolCount),
-                        })
-                      : executionSummary.pendingToolCount > 0
-                        ? t("msg.cot.toolsPending", {
-                            count: f.number(executionSummary.pendingToolCount),
-                          })
-                        : t("msg.cot.tools", { count: f.number(executionSummary.toolCount) })
-                }
-              />
-            ) : null}
-
-            {executionSummary.compactionCount > 0 ? (
-              <ChainOfThoughtStep
-                icon="think"
-                status="complete"
-                label={t("msg.cot.contextCompacted", {
-                  count: f.number(executionSummary.compactionCount),
-                })}
-              />
-            ) : null}
-
-            {executionSummary.sourceCount > 0 ? (
-              <ChainOfThoughtStep
-                icon="search"
-                status="complete"
-                label={t("msg.cot.search", { count: f.number(executionSummary.sourceCount) })}
-              >
-                <ChainOfThoughtSearchResults>
-                  {sourceParts.map((source) => {
-                    const label =
-                      source.type === "source-url" ? source.title || source.url : source.title;
-                    const key = source.type + "-" + source.sourceId;
-                    return (
-                      <ChainOfThoughtSearchResult
-                        key={key}
-                        href={source.type === "source-url" ? source.url : undefined}
-                        title={label}
-                        description={
-                          source.type === "source-url" ? source.url : t("msg.cot.document")
-                        }
-                      />
-                    );
-                  })}
-                </ChainOfThoughtSearchResults>
-              </ChainOfThoughtStep>
-            ) : null}
-
-            {executionSummary.imageCount > 0 ? (
-              <ChainOfThoughtStep
-                icon="image"
-                status="complete"
-                label={t("msg.cot.image", { count: f.number(executionSummary.imageCount) })}
-              >
-                <div className="grid grid-cols-2 gap-1.5">
-                  {imageParts.map((p, i) => (
-                    <ChainOfThoughtImage
-                      key={i}
-                      src={p.url || p.data || ""}
-                      alt={p.filename || t("msg.cot.imageAlt")}
-                      conversationId={conversationId}
-                    />
-                  ))}
-                </div>
-              </ChainOfThoughtStep>
-            ) : null}
-          </ChainOfThought>
-        )}
 
         {fileParts.length > 0 && (
           <MessageAttachments conversationId={conversationId} parts={fileParts} />
@@ -932,6 +854,116 @@ function MessageItem({
 }
 
 /* ---------- 类型守卫 ---------- */
+
+interface ExecutionSummaryPanelProps {
+  conversationId?: string;
+  executionSummary: ExecutionSummary;
+  messageStreaming: boolean;
+  sourceParts: SourcePart[];
+  imageParts: FilePartLike[];
+}
+
+function ExecutionSummaryPanel({
+  conversationId,
+  executionSummary,
+  messageStreaming,
+  sourceParts,
+  imageParts,
+}: ExecutionSummaryPanelProps): React.JSX.Element {
+  const { t, f } = useT();
+
+  return (
+    <ChainOfThought
+      active={messageStreaming}
+      keepOpen={executionSummary.hasAttention}
+      defaultOpen={messageStreaming || executionSummary.hasAttention}
+      title={messageStreaming ? t("msg.cot.activityActive") : t("msg.cot.activity")}
+    >
+      {executionSummary.toolCount > 0 ? (
+        <ChainOfThoughtStep
+          icon="tool"
+          status={
+            executionSummary.errorToolCount > 0
+              ? "error"
+              : executionSummary.activeToolCount > 0
+                ? "active"
+                : executionSummary.pendingToolCount > 0
+                  ? "pending"
+                  : "complete"
+          }
+          label={
+            executionSummary.errorToolCount > 0
+              ? t("msg.cot.toolsFailed", {
+                  count: f.number(executionSummary.errorToolCount),
+                })
+              : executionSummary.activeToolCount > 0
+                ? t("msg.cot.toolsActive", {
+                    count: f.number(executionSummary.toolCount),
+                  })
+                : executionSummary.pendingToolCount > 0
+                  ? t("msg.cot.toolsPending", {
+                      count: f.number(executionSummary.pendingToolCount),
+                    })
+                  : t("msg.cot.tools", { count: f.number(executionSummary.toolCount) })
+          }
+        />
+      ) : null}
+
+      {executionSummary.compactionCount > 0 ? (
+        <ChainOfThoughtStep
+          icon="think"
+          status="complete"
+          label={t("msg.cot.contextCompacted", {
+            count: f.number(executionSummary.compactionCount),
+          })}
+        />
+      ) : null}
+
+      {executionSummary.sourceCount > 0 ? (
+        <ChainOfThoughtStep
+          icon="search"
+          status="complete"
+          label={t("msg.cot.search", { count: f.number(executionSummary.sourceCount) })}
+        >
+          <ChainOfThoughtSearchResults>
+            {sourceParts.map((source) => {
+              const label =
+                source.type === "source-url" ? source.title || source.url : source.title;
+              const key = source.type + "-" + source.sourceId;
+              return (
+                <ChainOfThoughtSearchResult
+                  key={key}
+                  href={source.type === "source-url" ? source.url : undefined}
+                  title={label}
+                  description={source.type === "source-url" ? source.url : t("msg.cot.document")}
+                />
+              );
+            })}
+          </ChainOfThoughtSearchResults>
+        </ChainOfThoughtStep>
+      ) : null}
+
+      {executionSummary.imageCount > 0 ? (
+        <ChainOfThoughtStep
+          icon="image"
+          status="complete"
+          label={t("msg.cot.image", { count: f.number(executionSummary.imageCount) })}
+        >
+          <div className="grid grid-cols-2 gap-1.5">
+            {imageParts.map((part, index) => (
+              <ChainOfThoughtImage
+                key={index}
+                src={part.url || part.data || ""}
+                alt={part.filename || t("msg.cot.imageAlt")}
+                conversationId={conversationId}
+              />
+            ))}
+          </div>
+        </ChainOfThoughtStep>
+      ) : null}
+    </ChainOfThought>
+  );
+}
 
 export function areMessageItemPropsEqual(
   previous: MessageItemProps,

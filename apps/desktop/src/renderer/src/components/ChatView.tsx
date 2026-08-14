@@ -43,6 +43,11 @@ import {
   type MessagePersistenceRequest,
 } from "../lib/chat-persistence";
 import { reconcileChatMessages, shouldReconcileCompletedRun } from "../lib/chat-reconciliation";
+import {
+  isResumableBlockedRun,
+  selectChatRetryRun,
+  shouldFallbackToFreshRun,
+} from "../lib/chat-retry";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import {
@@ -169,6 +174,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const learningQueueKeyRef = useRef<string | null>(null);
   const chatFailureRef = useRef(false);
   const errorReportedRef = useRef(false);
+  const retryFallbackRef = useRef({ active: false, attempted: false });
   const persistenceQueue = useMemo(
     () =>
       createSnapshotPersistenceQueue<MessagePersistenceRequest>(
@@ -405,6 +411,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setIsStopped(false);
     chatFailureRef.current = false;
     errorReportedRef.current = false;
+    retryFallbackRef.current = { active: false, attempted: false };
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
     runIdRef.current = null;
     runModeRef.current = "start";
@@ -472,7 +479,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     experimental_throttle: 50,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: ({ messages, isError, isAbort }) => {
-      if (runIdRef.current) runModeRef.current = "resume";
       if (!isError) {
         chatFailureRef.current = false;
         errorReportedRef.current = false;
@@ -508,6 +514,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       if (!isError && !isAbort) void fetchFollowupSuggestions(messages);
     },
     onError: (err) => {
+      const info = getChatErrorInfo(err, locale);
+      const retryFallback = retryFallbackRef.current;
+      if (retryFallback.active && shouldFallbackToFreshRun(info.code, retryFallback.attempted)) {
+        return;
+      }
       reportChatError("streaming", err, {
         persistSnapshot: latestMessagesRef.current,
       });
@@ -792,15 +803,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         )
       : undefined;
     if (blockedRun) {
-      const resumable = (() => {
-        try {
-          const metadata = JSON.parse(blockedRun.metadata_json ?? "{}");
-          return metadata.resumable !== false;
-        } catch {
-          return false;
-        }
-      })();
-      if (!resumable) {
+      if (!isResumableBlockedRun(blockedRun)) {
         reportChatError(
           "resume blocked run",
           new Error(blockedRun.error ?? "Agent run is blocked."),
@@ -877,6 +880,21 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const handleRetry = (): void => {
     if (!chatErrorRetryable) return;
     const snapshot = prepareFailedChatSnapshot(chat.messages);
+    const currentRunId = runIdRef.current;
+    const currentRun = currentRunId
+      ? runtimeSnapshot?.runtimeRuns.find(
+          (item) => item.id === currentRunId && item.conversation_id === conversationId,
+        )
+      : undefined;
+    const retryRun = selectChatRetryRun({
+      currentRunId,
+      currentRun,
+      newRunId: crypto.randomUUID(),
+    });
+    runIdRef.current = retryRun.runId;
+    runModeRef.current = retryRun.mode;
+    reconciliationRef.current = { runId: retryRun.runId, attempts: 0, timer: null };
+    retryFallbackRef.current = { active: true, attempted: false };
     chat.setMessages(snapshot.messages);
     latestMessagesRef.current = snapshot.messages;
     persistInBackground(snapshot.messages, "cleared failed response", snapshot.deleteIds);
@@ -886,9 +904,42 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     chatFailureRef.current = false;
     errorReportedRef.current = false;
     chat.clearError();
-    void chat.regenerate().finally(() => {
-      persistInBackground(latestMessagesRef.current, "retried response");
-    });
+    void (async () => {
+      try {
+        await chat.regenerate();
+      } catch (err) {
+        const info = getChatErrorInfo(err, locale);
+        const retryFallback = retryFallbackRef.current;
+        if (shouldFallbackToFreshRun(info.code, retryFallback.attempted)) {
+          retryFallback.attempted = true;
+          const freshRun = selectChatRetryRun({
+            currentRunId: null,
+            currentRun: null,
+            newRunId: crypto.randomUUID(),
+          });
+          runIdRef.current = freshRun.runId;
+          runModeRef.current = freshRun.mode;
+          reconciliationRef.current = { runId: freshRun.runId, attempts: 0, timer: null };
+          setChatError(null);
+          setChatErrorRetryable(false);
+          chatFailureRef.current = false;
+          errorReportedRef.current = false;
+          chat.clearError();
+          try {
+            await chat.regenerate();
+          } catch (fallbackError) {
+            reportChatError("retry", fallbackError, {
+              persistSnapshot: latestMessagesRef.current,
+            });
+          }
+          return;
+        }
+        reportChatError("retry", err, { persistSnapshot: latestMessagesRef.current });
+      } finally {
+        retryFallbackRef.current.active = false;
+        persistInBackground(latestMessagesRef.current, "retried response");
+      }
+    })();
   };
 
   const handleDismissError = (): void => {

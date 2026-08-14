@@ -994,6 +994,7 @@ export interface ChatMessageMetadata {
 
 export type ChatErrorCode =
   | "invalid_request"
+  | "invalid_media_input"
   | "invalid_run_id"
   | "invalid_mode"
   | "missing_model"

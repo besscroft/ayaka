@@ -28,6 +28,15 @@ const OUTPUTS_DIR = "outputs";
 const orphanPaths = new Map<string, string>();
 const preparations = new Map<string, Promise<WorkspaceInfo>>();
 
+export class InvalidMediaInputError extends Error {
+  readonly code = "invalid_media_input" as const;
+
+  constructor() {
+    super("Invalid media input.");
+    this.name = "InvalidMediaInputError";
+  }
+}
+
 export function resolveDefaultWorkspaceParent(): string {
   return path.join(
     process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData"),
@@ -363,31 +372,88 @@ export async function materializeWorkspaceFileReferences(
   conversationId: string,
   messages: UIMessage[],
 ): Promise<UIMessage[]> {
-  const workspace = getConversationWorkspace(conversationId);
-  if (!workspace) return messages;
+  return normalizeChatMediaInputs(conversationId, messages);
+}
+
+/**
+ * Resolves workspace media and validates every file URL before it reaches a
+ * provider serializer. Keep this at the trusted main-process request boundary
+ * so renderer-only URL schemes cannot leak into provider requests.
+ */
+export async function normalizeChatMediaInputs(
+  conversationId: string | undefined,
+  messages: UIMessage[],
+): Promise<UIMessage[]> {
   return Promise.all(
     messages.map(async (message) => ({
       ...message,
       parts: await Promise.all(
         (message.parts ?? []).map(async (part) => {
-          if (
-            part.type !== "file" ||
-            typeof part.url !== "string" ||
-            !part.url.startsWith("workspace://")
-          ) {
-            return part;
+          if (part.type !== "file") return part;
+          if (typeof part.url !== "string" || !part.url.trim()) {
+            throw new InvalidMediaInputError();
           }
-          const relativePath = part.url.slice("workspace://".length);
-          const data = await readWorkspaceFile(conversationId, relativePath);
-          const mediaType = part.mediaType || "application/octet-stream";
-          return {
-            ...part,
-            url: `data:${mediaType};base64,${Buffer.from(data).toString("base64")}`,
-          };
+
+          const url = part.url.trim();
+          if (/^workspace:\/\//i.test(url)) {
+            if (!conversationId || url.slice("workspace://".length).trim() === "") {
+              throw new InvalidMediaInputError();
+            }
+            try {
+              const content = await readWorkspaceFileContent(
+                conversationId,
+                url.slice("workspace://".length),
+              );
+              const mediaType = isMimeType(part.mediaType)
+                ? part.mediaType.trim()
+                : content.mediaType;
+              return {
+                ...part,
+                mediaType,
+                url: `data:${mediaType};base64,${Buffer.from(content.data).toString("base64")}`,
+              };
+            } catch {
+              throw new InvalidMediaInputError();
+            }
+          }
+
+          if (/^data:/i.test(url)) {
+            if (!isValidBase64DataUrl(url)) throw new InvalidMediaInputError();
+            return { ...part, url };
+          }
+
+          if (/^https?:\/\//i.test(url)) {
+            try {
+              const parsed = new URL(url);
+              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                throw new Error();
+              }
+              return { ...part, url };
+            } catch {
+              throw new InvalidMediaInputError();
+            }
+          }
+
+          throw new InvalidMediaInputError();
         }),
       ),
     })),
   );
+}
+
+function isMimeType(value: unknown): value is string {
+  return typeof value === "string" && /^[^\s/;,]+\/[^\s/;,]+$/.test(value.trim());
+}
+
+function isValidBase64DataUrl(value: string): boolean {
+  const match = /^data:([^;,\s]+\/[^;,\s]+);base64,([A-Za-z0-9+/]*={0,2})$/i.exec(value);
+  const payload = match?.[2] ?? "";
+  if (!match || payload.length === 0 || payload.length % 4 !== 0) return false;
+  try {
+    return Buffer.from(payload, "base64").byteLength > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function listWorkspaceOrphans(): Promise<WorkspaceOrphan[]> {

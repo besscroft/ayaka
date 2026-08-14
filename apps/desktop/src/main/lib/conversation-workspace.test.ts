@@ -183,6 +183,67 @@ void describe("conversation workspaces", () => {
     await assert.rejects(workspace.removeWorkspaceOrphan("missing-orphan"), /not found/);
   });
 
+  void it("normalizes workspace images and validates supported media URLs", async () => {
+    const id = "media-input-conversation";
+    await workspace.saveWorkspaceAttachment(id, {
+      filename: "pixel.png",
+      mediaType: "image/png",
+      data: new Uint8Array([0, 1, 2]),
+    });
+
+    const workspaceMessages = await workspace.normalizeChatMediaInputs(id, [
+      {
+        id: "m1",
+        role: "user",
+        parts: [{ type: "file", mediaType: "image/png", url: "workspace://attachments/pixel.png" }],
+      },
+    ]);
+    assert.equal(
+      workspaceMessages[0]?.parts[0]?.type === "file" && workspaceMessages[0].parts[0].url,
+      "data:image/png;base64,AAEC",
+    );
+
+    const supported = await workspace.normalizeChatMediaInputs(undefined, [
+      {
+        id: "m2",
+        role: "user",
+        parts: [
+          { type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" },
+          { type: "file", mediaType: "image/png", url: "https://example.com/image.png" },
+        ],
+      },
+    ]);
+    assert.equal(
+      supported[0]?.parts[0]?.type === "file" && supported[0].parts[0].url,
+      "data:image/png;base64,AA==",
+    );
+    assert.equal(
+      supported[0]?.parts[1]?.type === "file" && supported[0].parts[1].url,
+      "https://example.com/image.png",
+    );
+  });
+
+  void it("rejects unsafe or malformed media references without exposing the value", async () => {
+    for (const url of [
+      "workspace://attachments/missing.png",
+      "blob:local",
+      "file:///tmp/a.png",
+      "",
+      "data:image/png;base64,not-base64",
+    ]) {
+      await assert.rejects(
+        workspace.normalizeChatMediaInputs(undefined, [
+          { id: "m3", role: "user", parts: [{ type: "file", mediaType: "image/png", url }] },
+        ]),
+        (error: unknown) => {
+          assert.equal((error as { code?: string }).code, "invalid_media_input");
+          if (url) assert.equal((error as Error).message.includes(url), false);
+          return true;
+        },
+      );
+    }
+  });
+
   void it("exposes deleted conversation workspaces as orphans and restores ownership", async () => {
     const id = "deleted-conversation";
     await workspace.prepareConversationWorkspace(id);

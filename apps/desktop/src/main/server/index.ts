@@ -174,11 +174,9 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     }
 
     try {
-      const materializedMessages = body.conversationId
-        ? await (
-            await import("../lib/conversation-workspace")
-          ).materializeWorkspaceFileReferences(body.conversationId, messages)
-        : messages;
+      const materializedMessages = await (
+        await import("../lib/conversation-workspace")
+      ).normalizeChatMediaInputs(body.conversationId, messages);
       const resolveModel = options.resolveModel ?? (await import("../lib/providers")).resolveModel;
       const buildAgentSystemPrompt =
         options.buildAgentSystemPrompt ?? (await import("../lib/db")).buildAgentSystemPrompt;

@@ -14,6 +14,7 @@ import { useReducedMotion } from "motion/react";
 
 export const CONVERSATION_AUTO_STICK_THRESHOLD = 32;
 export const CONVERSATION_SCROLL_BUTTON_THRESHOLD = 200;
+export const CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS = 300;
 
 export interface ConversationScrollState {
   isAtLatest: boolean;
@@ -35,8 +36,15 @@ export function getConversationScrollDistance({
   return Math.max(0, scrollHeight - scrollTop - clientHeight);
 }
 
-export function shouldFollowConversationContent(autoStick: boolean): boolean {
-  return autoStick;
+export function shouldFollowConversationContent(
+  autoStick: boolean,
+  disclosureScrollLocked = false,
+): boolean {
+  return autoStick && !disclosureScrollLocked;
+}
+
+export function isConversationDisclosureScrollLocked(now: number, lockedUntil: number): boolean {
+  return now < lockedUntil;
 }
 
 export function shouldHandleConversationScroll(isProgrammaticScroll: boolean): boolean {
@@ -48,6 +56,7 @@ export interface ConversationScrollController {
   contentRef: (node: HTMLDivElement | null) => void;
   isAwayFromLatest: boolean;
   scrollToLatest: () => void;
+  preserveScrollOnDisclosure: () => void;
 }
 
 const ConversationScrollContext = createContext<ConversationScrollController | null>(null);
@@ -61,6 +70,8 @@ export function useConversationScrollController(): ConversationScrollController 
   const scrollStateFrameRef = useRef<number | null>(null);
   const followFrameRef = useRef<number | null>(null);
   const settleTimerRef = useRef<number | null>(null);
+  const disclosureScrollLockUntilRef = useRef(0);
+  const disclosureScrollLockTimerRef = useRef<number | null>(null);
   const reducedMotion = Boolean(useReducedMotion());
 
   const updateScrollState = useCallback((): void => {
@@ -79,7 +90,14 @@ export function useConversationScrollController(): ConversationScrollController 
   }, []);
 
   const scheduleFollow = useCallback((): void => {
-    if (!shouldFollowConversationContent(autoStickRef.current)) return;
+    if (
+      !shouldFollowConversationContent(
+        autoStickRef.current,
+        isConversationDisclosureScrollLocked(Date.now(), disclosureScrollLockUntilRef.current),
+      )
+    ) {
+      return;
+    }
     if (followFrameRef.current !== null) return;
 
     followFrameRef.current = window.requestAnimationFrame(() => {
@@ -87,7 +105,10 @@ export function useConversationScrollController(): ConversationScrollController 
       const node = containerRef.current;
       if (
         !node ||
-        !shouldFollowConversationContent(autoStickRef.current) ||
+        !shouldFollowConversationContent(
+          autoStickRef.current,
+          isConversationDisclosureScrollLocked(Date.now(), disclosureScrollLockUntilRef.current),
+        ) ||
         programmaticScrollRef.current
       ) {
         return;
@@ -119,6 +140,19 @@ export function useConversationScrollController(): ConversationScrollController 
     updateScrollState();
   }, [updateScrollState]);
 
+  const preserveScrollOnDisclosure = useCallback((): void => {
+    cancelProgrammaticScroll();
+    updateScrollState();
+    disclosureScrollLockUntilRef.current = Date.now() + CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS;
+    if (disclosureScrollLockTimerRef.current !== null) {
+      window.clearTimeout(disclosureScrollLockTimerRef.current);
+    }
+    disclosureScrollLockTimerRef.current = window.setTimeout(() => {
+      disclosureScrollLockTimerRef.current = null;
+      disclosureScrollLockUntilRef.current = 0;
+    }, CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS);
+  }, [cancelProgrammaticScroll, updateScrollState]);
+
   const scrollToLatest = useCallback((): void => {
     const node = containerRef.current;
     if (!node) return;
@@ -147,7 +181,10 @@ export function useConversationScrollController(): ConversationScrollController 
     if (!node) return;
 
     const handleScroll = (): void => updateScrollState();
-    const handleUserInteraction = (): void => cancelProgrammaticScroll();
+    const handleUserInteraction = (): void => {
+      cancelProgrammaticScroll();
+      updateScrollState();
+    };
     const handleScrollEnd = (): void => finishProgrammaticScroll();
 
     node.addEventListener("scroll", handleScroll, { passive: true });
@@ -189,12 +226,21 @@ export function useConversationScrollController(): ConversationScrollController 
         window.cancelAnimationFrame(followFrameRef.current);
       }
       if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+      if (disclosureScrollLockTimerRef.current !== null) {
+        window.clearTimeout(disclosureScrollLockTimerRef.current);
+      }
     };
   }, []);
 
   return useMemo(
-    () => ({ containerRef, contentRef, isAwayFromLatest, scrollToLatest }),
-    [contentRef, isAwayFromLatest, scrollToLatest],
+    () => ({
+      containerRef,
+      contentRef,
+      isAwayFromLatest,
+      preserveScrollOnDisclosure,
+      scrollToLatest,
+    }),
+    [contentRef, isAwayFromLatest, preserveScrollOnDisclosure, scrollToLatest],
   );
 }
 
@@ -212,4 +258,8 @@ export function useConversationScroll(): ConversationScrollController {
   const value = useContext(ConversationScrollContext);
   if (!value) throw new Error("useConversationScroll must be used inside Conversation");
   return value;
+}
+
+export function useConversationScrollOptional(): ConversationScrollController | null {
+  return useContext(ConversationScrollContext);
 }

@@ -20,6 +20,7 @@ type ErrorLike = Error & {
 
 const CHAT_CODES = new Set<ChatErrorCode>([
   "invalid_request",
+  "invalid_media_input",
   "invalid_run_id",
   "invalid_mode",
   "missing_model",
@@ -212,6 +213,8 @@ function messageForChatCode(code: ChatErrorCode, locale: ErrorLocale): string {
       return text(locale, "error.chat.missingModel");
     case "vision_model_unavailable":
       return text(locale, "error.chat.visionModelUnavailable");
+    case "invalid_media_input":
+      return text(locale, "error.chat.invalidMediaInput");
     case "unauthorized":
       return text(locale, "error.chat.unauthorized");
     case "configuration":
@@ -266,6 +269,11 @@ function classifyUnstructuredChatError(error: unknown, locale: ErrorLocale): Cha
     code = "missing_model";
   } else if (lower.includes("cannot process image input") || lower.includes("vision model")) {
     code = "vision_model_unavailable";
+  } else if (
+    lower.includes("attached image could not be read") ||
+    lower.includes("invalid media input")
+  ) {
+    code = "invalid_media_input";
   } else if (lower.includes("rate limiting") || lower.includes("rate limit") || status === 429) {
     code = "rate_limited";
   } else if (

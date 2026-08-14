@@ -17,6 +17,7 @@ import type {
 import type { ChatToolRuntimeConfig } from "./chat-tools";
 import type { NativeChatTool } from "./providers";
 import type { ExactTokenCountInput } from "./context-engine";
+import { getChatSamplingSettings } from "./chat-model-settings";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -70,8 +71,11 @@ export function buildChatAgent({
     model: resolved.model,
     instructions: appendReactionFeedback(instructions, messages),
     tools: toolRuntime.tools ?? {},
-    temperature: resolved.temperature,
-    topP: resolved.topP,
+    ...getChatSamplingSettings({
+      reasoningModel: resolved.capabilities?.reasoning === true,
+      temperature: resolved.temperature,
+      topP: resolved.topP,
+    }),
     maxOutputTokens: resolved.maxOutputTokens,
     providerOptions: resolved.providerOptions,
     onStepEnd: (event) => {

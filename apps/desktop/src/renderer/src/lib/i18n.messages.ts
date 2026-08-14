@@ -751,6 +751,10 @@ const entries = {
     zh: "当前模型无法处理图片输入。请在通用设置中选择视觉模型。",
     en: "The selected chat model cannot process image input. Choose a vision model in General settings.",
   },
+  "error.chat.invalidMediaInput": {
+    zh: "\u65e0\u6cd5\u8bfb\u53d6\u9644\u4ef6\u56fe\u7247\u3002\u8bf7\u91cd\u65b0\u9009\u62e9\u540e\u518d\u8bd5\u3002",
+    en: "The attached image could not be read. Choose it again and try again.",
+  },
   "error.chat.network": {
     zh: "无法连接到本地聊天服务。请稍等几秒后重试，或重启应用。",
     en: "Unable to connect to the local chat service. Wait a few seconds and try again, or restart the app.",

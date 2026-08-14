@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "../../lib/utils";
+import { useConversationScrollOptional } from "./use-conversation-scroll";
 
 interface AnimatedDisclosureContextValue {
   contentId: string;
@@ -88,10 +89,12 @@ interface AnimatedDisclosureTriggerProps extends ButtonHTMLAttributes<HTMLButton
 export function AnimatedDisclosureTrigger({
   className,
   children,
+  onPointerDown,
   onClick,
   ...rest
 }: AnimatedDisclosureTriggerProps): React.JSX.Element {
   const { contentId, isOpen, setOpen } = useAnimatedDisclosure();
+  const conversationScroll = useConversationScrollOptional();
   return (
     <button
       type="button"
@@ -99,9 +102,16 @@ export function AnimatedDisclosureTrigger({
       aria-expanded={isOpen}
       aria-controls={contentId}
       className={className}
+      onPointerDown={(event) => {
+        onPointerDown?.(event);
+        if (!event.defaultPrevented) conversationScroll?.preserveScrollOnDisclosure();
+      }}
       onClick={(event) => {
         onClick?.(event);
-        if (!event.defaultPrevented) setOpen(!isOpen);
+        if (!event.defaultPrevented) {
+          conversationScroll?.preserveScrollOnDisclosure();
+          setOpen(!isOpen);
+        }
       }}
       {...rest}
     >

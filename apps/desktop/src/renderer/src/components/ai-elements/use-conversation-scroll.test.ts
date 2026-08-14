@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AnimatedDisclosure, AnimatedDisclosureTrigger } from "./animated-disclosure";
 import {
   CONVERSATION_AUTO_STICK_THRESHOLD,
+  CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS,
   CONVERSATION_SCROLL_BUTTON_THRESHOLD,
   getConversationScrollDistance,
   getConversationScrollState,
+  isConversationDisclosureScrollLocked,
   shouldFollowConversationContent,
   shouldHandleConversationScroll,
 } from "./use-conversation-scroll";
@@ -46,6 +51,29 @@ void describe("conversation scroll state", () => {
   void it("follows content changes only while attached", () => {
     assert.equal(shouldFollowConversationContent(true), true);
     assert.equal(shouldFollowConversationContent(false), false);
+  });
+
+  void it("suppresses auto-follow during disclosure layout changes", () => {
+    const now = 1_000;
+    const lockedUntil = now + CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS;
+
+    assert.equal(isConversationDisclosureScrollLocked(now, lockedUntil), true);
+    assert.equal(shouldFollowConversationContent(true, true), false);
+    assert.equal(isConversationDisclosureScrollLocked(lockedUntil, lockedUntil), false);
+    assert.equal(shouldFollowConversationContent(true, false), true);
+  });
+
+  void it("keeps disclosure triggers usable outside a Conversation", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        AnimatedDisclosure,
+        null,
+        createElement(AnimatedDisclosureTrigger, null, "Toggle"),
+      ),
+    );
+
+    assert.match(html, /data-slot="animated-disclosure-trigger"/);
+    assert.match(html, /aria-expanded="false"/);
   });
 
   void it("ignores intermediate programmatic scroll events", () => {

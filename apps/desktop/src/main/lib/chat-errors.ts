@@ -38,6 +38,7 @@ const RUNTIME_CODES = new Set<ChatErrorCode>([
 
 const SAFE_MESSAGES: Record<ChatErrorCode, string> = {
   invalid_request: "The chat request is invalid. Check the message and try again.",
+  invalid_media_input: "The attached image could not be read. Choose it again and try again.",
   invalid_run_id: "The chat run is invalid. Start the message again.",
   invalid_mode: "The chat run mode is invalid. Start the message again.",
   missing_model: "No available model is selected. Choose or configure a model first.",
@@ -79,6 +80,9 @@ export function classifyChatError(
       diagnostic,
       explicitCode === "run_not_found" ? 404 : 409,
     );
+  }
+  if (explicitCode === "invalid_media_input") {
+    return createClassification(explicitCode, phase, "Invalid media input.", 400);
   }
   if (explicitCode === "vision_model_unavailable") {
     return createClassification(explicitCode, phase, diagnostic, 400);
