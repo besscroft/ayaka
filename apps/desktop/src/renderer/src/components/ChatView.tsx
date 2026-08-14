@@ -1265,7 +1265,7 @@ function tryAutoTitle(
     .then((title) => {
       // 閫氱煡渚ф爮鍒锋柊锛堟惡甯︽渶鏂?title锛岄伩鍏嶉噸鏂版媺鍙栨暣寮犲垪琛級
       window.dispatchEvent(
-        new CustomEvent("void-ai:conversation-renamed", {
+        new CustomEvent("ayaka:conversation-renamed", {
           detail: { id: conversationId, title },
         }),
       );

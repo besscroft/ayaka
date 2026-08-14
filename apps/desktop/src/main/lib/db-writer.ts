@@ -25,7 +25,7 @@ let lowPriorityEvents: NewRuntimeEvent[] = [];
 let lowPriorityTimer: ReturnType<typeof setTimeout> | null = null;
 const pending = new Map<number, Pending>();
 
-export const isDbWriterWorker = process.env.VOID_AI_DB_WRITER_WORKER === "1";
+export const isDbWriterWorker = process.env.AYAKA_DB_WRITER_WORKER === "1";
 
 export function isDbWriterStarted(): boolean {
   return worker !== null && startup !== null;
@@ -33,7 +33,7 @@ export function isDbWriterStarted(): boolean {
 
 function resolveDbPath(): string {
   const userData = resolveUserDataDir();
-  return join(userData, "data", "void-ai.db");
+  return join(userData, "data", "ayaka.db");
 }
 
 export function startDbWriter(options: {

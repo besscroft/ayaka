@@ -19,7 +19,7 @@ import {
 
 const profile = (overrides: Partial<AgentProfile> = {}): AgentProfile => ({
   id: "root-agent",
-  name: "Paimon",
+  name: "Ayaka",
   role: "General assistant",
   instructions: "Follow the user's task and report the next useful step.",
   persona: "",
@@ -268,7 +268,7 @@ void describe("agent drawer model", () => {
         error: null,
       },
       profiles: [profile()],
-      rootName: "Paimon",
+      rootName: "Ayaka",
       rootStatus: "running",
       rootSummary: "Researching",
       rootError: null,

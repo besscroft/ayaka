@@ -239,7 +239,7 @@ async function fetchMcpSoHtml(urlValue: string): Promise<string> {
   const url = new URL(urlValue);
   assertMcpSoOrigin(url);
   const response = await fetch(url, {
-    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "VoidAI/1.0" },
+    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Ayaka/1.0" },
     redirect: "follow",
   });
   const resolved = new URL(response.url || url.href);

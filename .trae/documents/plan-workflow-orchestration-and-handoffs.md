@@ -1,6 +1,6 @@
 # 工作流模块（Orchestration + Handoffs）设计与实现
 
-> 范围：基于 OpenAI Agents orchestration 范式（Handoffs / Agents-as-tools），在 void-ai 中交付一个真正可执行的工作流引擎。后端完整，渲染层只做只读可视化与历史查看；触发方式以「Void 工具」为主。
+> 范围：基于 OpenAI Agents orchestration 范式（Handoffs / Agents-as-tools），在 ayaka 中交付一个真正可执行的工作流引擎。后端完整，渲染层只做只读可视化与历史查看；触发方式以「Ayaka 工具」为主。
 
 ## 1. Summary
 
@@ -12,7 +12,7 @@
 - **Handoffs 落地**：`handoff` 节点直接桥接到现有 `agent-runtime.runChildAgent(... handoff)`，复用 OpenAI 范式中"控制权转移给子代理"的语义。
 - **状态共享**：`WorkflowRun.contextJson` 承载节点间共享的 KV 上下文，前置节点 output 自动注入到下游 `prompt` / `tool` / `branch`。
 - **可观测性**：每次状态迁移写入 `workflow_transitions` 表 + `runtime_events`，与现有 `runtime_steps` 关联。
-- **触发**：注册为 Void 的 `run_workflow` 工具，由 Void 决定何时调用；同时保留手动 IPC 入口。
+- **触发**：注册为 Ayaka 的 `run_workflow` 工具，由 Ayaka 决定何时调用；同时保留手动 IPC 入口。
 
 不引入新第三方依赖，不动 `package.json`，不打破现有 chat / skill 行为。
 
@@ -47,7 +47,7 @@
 5. Handoffs 在工作流节点级别的落地
 6. 工作流运行的实时状态可见（步骤进度、迁移历史、输出）
 7. 工作流管理 IPC + HTTP API
-8. Void 工具：让主代理主动调度工作流
+8. Ayaka 工具：让主代理主动调度工作流
 9. 任何针对工作流引擎的单元测试
 
 ## 3. Proposed Changes
@@ -140,7 +140,7 @@ export interface WorkflowDefinition {
   name: string;
   description: string;
   status: WorkflowStatus; // "enabled" | "paused" | "draft"
-  trigger: string; // "manual" | "void-tool" | "skill:<id>" ...
+  trigger: string; // "manual" | "ayaka-tool" | "skill:<id>" ...
   version: number;
   entryNodeId: string;
   nodes: WorkflowNode[]; // 取代/并列于旧的 steps_json
@@ -186,7 +186,7 @@ export interface WorkflowRun {
   context_json: string; // 节点间共享 KV
   started_at: number;
   finished_at: number | null;
-  triggered_by: "void-tool" | "manual" | "schedule" | "skill";
+  triggered_by: "ayaka-tool" | "manual" | "schedule" | "skill";
   triggered_by_agent_id: string | null;
   conversation_id: string | null;
 }
@@ -264,20 +264,20 @@ const executors: Record<WorkflowNodeKind, StepExecutor> = {
 - `executeHandoff` 通过 `agent-runtime` 暴露的 `runChildAgent(ctx, child, "handoff", { task, reason, expectedOutput })`，把 child output 写入 `context.outputs[nodeId]`。
 - `executeTool` 复用 `chat-tools.ts` 的 `createSkillToolSet` / `createChatToolDescriptors`，按 `node.config.toolRef` 调度。
 
-### 3.6 Void 工具：作为触发入口（修改 `agent-runtime.ts`）
+### 3.6 Ayaka 工具：作为触发入口（修改 `agent-runtime.ts`）
 
 在 `buildRootToolRuntime` 中追加：
 
-- `run_workflow` 工具（仅当 `agentId === root` 即 Void 时注册，child 不挂）：
+- `run_workflow` 工具（仅当 `agentId === root` 即 Ayaka 时注册，child 不挂）：
   - `description: "Run a saved workflow by id. Use when a multi-step process fits the user's request better than direct orchestration."`
   - `inputSchema`: `{ workflowId: string, input: JsonObject }`
-  - `execute`: `executeWorkflow({ ... , triggeredBy: "void-tool", triggeredByAgentId: rootAgent.id, conversationId, runtimeRunId })`
-  - 输出首个 yield 后的 `engine.started` + runId + 节点清单（控制流回到 Void 时 Void 可读 run 状态）。
-- 把它放进 `executors` 后，Void 在 chat 中就能主动 "用 workflow X 跑一遍"，符合项目约束"主代理统一选人"。
+  - `execute`: `executeWorkflow({ ... , triggeredBy: "ayaka-tool", triggeredByAgentId: rootAgent.id, conversationId, runtimeRunId })`
+  - 输出首个 yield 后的 `engine.started` + runId + 节点清单（控制流回到 Ayaka 时 Ayaka 可读 run 状态）。
+- 把它放进 `executors` 后，Ayaka 在 chat 中就能主动 "用 workflow X 跑一遍"，符合项目约束"主代理统一选人"。
 
 ### 3.7 Hono HTTP 端点（修改 `server/index.ts`）
 
-新增路由（均需 `x-void-ai-session` 鉴权）：
+新增路由（均需 `x-ayaka-session` 鉴权）：
 
 - `GET  /api/workflows` → 列表
 - `GET  /api/workflows/:id` → 详情（含 nodes）
@@ -382,7 +382,7 @@ const executors: Record<WorkflowNodeKind, StepExecutor> = {
 - **DAG 而非自由嵌套 FSM**：和 OpenAI agents 的「handoff 接管一段对话」模型匹配，复杂度可控。如未来需要子工作流，节点 `kind=workflow` 引用另一个 `workflowId`。
 - **不使用三方状态机库**（如 xstate）：项目偏好"项目已有依赖优先"，且手写状态机 ~300 行内可控。
 - **不引入 DAG 画布 UI**：按用户选择，渲染层只做只读可视化。
-- **不引入新事件总线 / cron**：触发以 Void 工具为主，IPC 手动为辅，schedule 留接口但 v1 不实现。
+- **不引入新事件总线 / cron**：触发以 Ayaka 工具为主，IPC 手动为辅，schedule 留接口但 v1 不实现。
 - **Handoff 节点语义**：按用户选择 = 转交控制权给子代理；不实现"挂起等待用户"。
 - **approval 节点**：用户没选此项但 skill-runtime 已有 `approval` 占位，保留并完善（实现为异步等待，IPC 提供 resolve）。
 - **不破坏现有 `ToolSkillStep` 占位**：`createSkillTool` 仍然走 `runToolSkill` 路径，迁移时 `db.ts` 内的 `ensureSkillWorkflow` 把旧 `steps_json` 升级为新 `nodes` 结构（一次性脚本）。
@@ -397,7 +397,7 @@ const executors: Record<WorkflowNodeKind, StepExecutor> = {
 3. `vp test`：所有 vitest 套件通过，重点看 `workflow-dag.test.ts` / `workflow-engine.test.ts` / `workflow-runs.test.ts`
 4. 手动冒烟（开发态 `vp dev`）：
    - 在 `WorkflowsPanel` 创建一条工作流 `wf-smoke`（节点 A：prompt，节点 B：tool `web_search`，节点 C：handoff `agent-researcher`，边 A→B→C）
-   - 在主聊天里说"用 wf-smoke 跑一遍：foo bar"，Void 应能调起 `run_workflow`
+   - 在主聊天里说"用 wf-smoke 跑一遍：foo bar"，Ayaka 应能调起 `run_workflow`
    - 在 `WorkflowRunsPanel` 看到 run 出现、状态变化、节点逐步 succeeded
    - 打开 `WorkflowRunDetail` 检查 context.outputs、step_runs、transitions
 5. 异常路径：

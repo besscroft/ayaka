@@ -6,7 +6,7 @@
  *  - `pnpm db:studio`：可视化数据库浏览器
  *
  * 注意：
- *  - 运行时数据库路径是动态的（app.getPath('userData')/data/void-ai.db），
+ *  - 运行时数据库路径是动态的（app.getPath('userData')/data/ayaka.db），
  *    这里给 drizzle-kit 用的固定路径仅用于本地开发/迁移生成时的 schema 推断。
  *  - 迁移文件落地后会被 vite 打包进 main 进程，运行时通过 migrate() 应用。
  */

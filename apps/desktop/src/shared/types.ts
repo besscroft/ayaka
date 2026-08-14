@@ -920,7 +920,7 @@ export interface ToolsSnapshot {
   runtimeEvents: RuntimeEvent[];
 }
 
-export const CHAT_SESSION_HEADER = "x-void-ai-session";
+export const CHAT_SESSION_HEADER = "x-ayaka-session";
 
 export interface LocalServerInfo {
   port: number;
@@ -1436,7 +1436,7 @@ function clampFiniteNumber(value: unknown, fallback: number, min: number, max: n
     : fallback;
 }
 
-export const DEFAULT_AGENT_ID = "agent-void";
+export const DEFAULT_AGENT_ID = "agent-ayaka";
 
 export interface InteractionProfile {
   id: string;

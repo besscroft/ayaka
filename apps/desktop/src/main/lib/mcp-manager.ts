@@ -314,7 +314,7 @@ async function createClient(server: ToolServer): Promise<MCPClient> {
             throw new Error("Built-in tool servers do not use MCP transport");
           })();
   return createMCPClient({
-    clientName: "void-ai",
+    clientName: "ayaka",
     version: "1.0.0",
     transport,
     maxRetries: 0,

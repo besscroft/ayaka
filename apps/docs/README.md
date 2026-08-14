@@ -1,4 +1,4 @@
-# Void AI Docs
+# Ayaka Docs
 
 The documentation site is a React Router v8 SSR application deployed to Cloudflare Workers.
 

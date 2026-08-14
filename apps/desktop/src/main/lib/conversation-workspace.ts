@@ -39,7 +39,7 @@ export class InvalidMediaInputError extends Error {
 
 export function resolveDefaultWorkspaceParent(): string {
   return path.join(
-    process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData"),
+    process.env.AYAKA_USER_DATA_DIR || app.getPath("userData"),
     "data",
     DEFAULT_WORKSPACE_DIR,
   );

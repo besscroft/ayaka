@@ -1,17 +1,17 @@
 {
-  "name": "void-ai",
+  "name": "ayaka",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run -r test && vp run -r build",
-    "dev:desktop": "vp run paimon#dev",
+    "dev:desktop": "vp run ayaka-desktop#dev",
     "dev:docs": "pnpm --filter docs dev",
-    "build:desktop": "vp run paimon#build",
+    "build:desktop": "vp run ayaka-desktop#build",
     "build:docs": "vp run docs#build",
-    "build:desktop:win": "vp run paimon#build:win",
-    "build:desktop:mac": "vp run paimon#build:mac",
-    "build:desktop:linux": "vp run paimon#build:linux",
+    "build:desktop:win": "vp run ayaka-desktop#build:win",
+    "build:desktop:mac": "vp run ayaka-desktop#build:mac",
+    "build:desktop:linux": "vp run ayaka-desktop#build:linux",
     "prepare": "vp config"
   },
   "devDependencies": {

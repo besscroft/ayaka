@@ -188,8 +188,8 @@ mcp: {
 
 行 226-266 重构：
 
-- `VoidAIApi.tools.mcp`（行 232-250）移出为顶层 `VoidAIApi.mcp`
-- `VoidAIApi.tools` 保留 `snapshot` / `updateTool` / `skills`
+- `AyakaApi.tools.mcp`（行 232-250）移出为顶层 `AyakaApi.mcp`
+- `AyakaApi.tools` 保留 `snapshot` / `updateTool` / `skills`
 
 ### 8. `api.ts`（渲染层封装同步）
 
@@ -265,8 +265,8 @@ TrashTab 中 5 处调用改名：
 1. **类型检查**：
 
    ```bash
-   vp run desktop#typecheck:web
-   vp run desktop#typecheck:node
+   vp run ayaka-desktop#typecheck:web
+   vp run ayaka-desktop#typecheck:node
    ```
 
    确认 AppShell / MainPanelView / McpPanel / ToolsPanel / preload / api / SettingsDialog 全部通过。
@@ -280,7 +280,7 @@ TrashTab 中 5 处调用改名：
 3. **测试**：
 
    ```bash
-   vp run desktop#test
+   vp run ayaka-desktop#test
    ```
 
    重点关注 `ToolsPanel.test.tsx`（helper 测试，应不受影响）和 preload/api 相关测试。
@@ -288,7 +288,7 @@ TrashTab 中 5 处调用改名：
 4. **构建**：
 
    ```bash
-   vp run desktop#build
+   vp run ayaka-desktop#build
    ```
 
    确认 Electron 打包通过（preload 改名涉及 contextBridge）。

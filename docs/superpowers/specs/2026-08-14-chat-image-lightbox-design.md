@@ -30,4 +30,4 @@
 
 - 覆盖单图/多图布局、原比例、灯箱索引、键盘关闭与切换、保存和定位按钮条件。
 - 主进程覆盖保存取消、保存成功、路径越界和文件缺失。
-- 运行 `vp check`、`vp run desktop#test` 和 `vp run desktop#typecheck`。
+- 运行 `vp check`、`vp run ayaka-desktop#test` 和 `vp run ayaka-desktop#typecheck`。

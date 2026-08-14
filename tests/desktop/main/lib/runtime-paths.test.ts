@@ -7,7 +7,7 @@ import { removeLegacyCompanionData } from "@desktop-main/lib/runtime-paths";
 
 void describe("legacy companion data cleanup", () => {
   void it("removes the retired companion directory without touching sibling data", () => {
-    const root = mkdtempSync(join(tmpdir(), "void-ai-runtime-paths-"));
+    const root = mkdtempSync(join(tmpdir(), "ayaka-runtime-paths-"));
     const pets = join(root, "data", "pets");
     mkdirSync(pets, { recursive: true });
     writeFileSync(join(pets, "legacy.txt"), "legacy");
@@ -20,7 +20,7 @@ void describe("legacy companion data cleanup", () => {
   });
 
   void it("treats a missing retired companion directory as already clean", () => {
-    const root = mkdtempSync(join(tmpdir(), "void-ai-runtime-paths-"));
+    const root = mkdtempSync(join(tmpdir(), "ayaka-runtime-paths-"));
     assert.doesNotThrow(() => removeLegacyCompanionData(root));
   });
 });

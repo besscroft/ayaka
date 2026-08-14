@@ -2,7 +2,7 @@
 
 ## 摘要
 
-将 Mem0 OSS（自托管开源版）集成到 void-ai 桌面应用，替换现有的正则关键词记忆提取，引入 LLM 驱动抽取与向量语义搜索。采用"全量注入"策略：系统提示词 + memory_search 工具 + agent-learning 三条路径全部升级为 Mem0 语义化。
+将 Mem0 OSS（自托管开源版）集成到 ayaka 桌面应用，替换现有的正则关键词记忆提取，引入 LLM 驱动抽取与向量语义搜索。采用"全量注入"策略：系统提示词 + memory_search 工具 + agent-learning 三条路径全部升级为 Mem0 语义化。
 
 ## 当前状态分析
 
@@ -72,7 +72,7 @@ Mem0 OSS 无原生 SQLite 向量存储后端（支持 `memory`/qdrant/redis/pgve
 
 ### 决策3：Mem0 History 独立 DB 文件
 
-Mem0 OSS 内部用 SQLite 记录记忆变更历史（ADD/UPDATE/DELETE）。使用独立文件 `userData/data/mem0-history.db`，与主库 `void-ai.db` 隔离，避免 schema 冲突。
+Mem0 OSS 内部用 SQLite 记录记忆变更历史（ADD/UPDATE/DELETE）。使用独立文件 `userData/data/mem0-history.db`，与主库 `ayaka.db` 隔离，避免 schema 冲突。
 
 ### 决策4：全量注入——buildAgentSystemPrompt 改为 async
 
@@ -147,7 +147,7 @@ export async function getMemory(): Promise<Memory | null> {
   if (!apiKey) return null;
 
   const historyDbPath = join(
-    process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData"),
+    process.env.AYAKA_USER_DATA_DIR || app.getPath("userData"),
     "data",
     "mem0-history.db",
   );
@@ -157,7 +157,7 @@ export async function getMemory(): Promise<Memory | null> {
     embedder: { provider: "openai", config: { apiKey, model: "text-embedding-3-small" } },
     vectorStore: {
       provider: "memory",
-      config: { collectionName: "void-memories", dimension: 1536 },
+      config: { collectionName: "ayaka-memories", dimension: 1536 },
     },
     historyDbPath,
   });
@@ -317,7 +317,7 @@ async function runLearning(conversationId: string): Promise<void> {
 // 改造前
 export function buildAgentSystemPrompt(agentId?: string | null, conversationId?: string): string {
   const agent = getAgent(agentId || DEFAULT_AGENT_ID) ?? getAgent(DEFAULT_AGENT_ID);
-  if (!agent) return "You are Void, a local AI assistant.";
+  if (!agent) return "You are Ayaka, a local AI assistant.";
   const memoriesForPrompt = listMemories()
     .filter(...)
     .slice(0, 8)
@@ -332,7 +332,7 @@ export async function buildAgentSystemPrompt(
   conversationId?: string,
 ): Promise<string> {
   const agent = getAgent(agentId || DEFAULT_AGENT_ID) ?? getAgent(DEFAULT_AGENT_ID);
-  if (!agent) return "You are Void, a local AI assistant.";
+  if (!agent) return "You are Ayaka, a local AI assistant.";
 
   // 从最近用户消息提取查询词
   const recentMessages = conversationId ? listMessages(conversationId) : [];
@@ -389,7 +389,7 @@ async function createRootInstructions(
   const basePrompt = await context.buildAgentSystemPrompt(DEFAULT_AGENT_ID, context.conversationId);
   return [
     basePrompt,
-    "You are Void, the root orchestrator...",
+    "You are Ayaka, the root orchestrator...",
     // ...
   ]
     .filter(Boolean)
@@ -406,7 +406,7 @@ async function createChildInstructions(
   mode: "consult" | "handoff",
 ): Promise<string> {
   const basePrompt = await context.buildAgentSystemPrompt(child.id, context.conversationId);
-  return [basePrompt, "You are a child agent under Void...", // ...].join("\n\n");
+  return [basePrompt, "You are a child agent under Ayaka...", // ...].join("\n\n");
 }
 ```
 
@@ -439,12 +439,12 @@ buildAgentSystemPrompt: async (agentId, conversationId) =>
 ```typescript
 // 改造前
 assert.equal(
-  captured.value?.buildAgentSystemPrompt("agent-void", "c-stream"),
+  captured.value?.buildAgentSystemPrompt("agent-ayaka", "c-stream"),
   "You are a test assistant.",
 );
 // 改造后
 assert.equal(
-  await captured.value?.buildAgentSystemPrompt("agent-void", "c-stream"),
+  await captured.value?.buildAgentSystemPrompt("agent-ayaka", "c-stream"),
   "You are a test assistant.",
 );
 ```

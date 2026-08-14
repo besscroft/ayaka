@@ -37,11 +37,11 @@ function createBucket(
 function manifest(version: string, size: number): string {
   return [
     `version: ${version}`,
-    `path: paimon-${version}-setup.exe`,
+    `path: ayaka-${version}-setup.exe`,
     `sha512: ${VALID_SHA512}`,
     "releaseDate: 2026-08-08T00:00:00.000Z",
     "files:",
-    `  - url: paimon-${version}-setup.exe`,
+    `  - url: ayaka-${version}-setup.exe`,
     `    sha512: ${VALID_SHA512}`,
     `    size: ${size}`,
     "",
@@ -73,8 +73,8 @@ describe("R2 update API", () => {
         "releases/stable/v0.1.10/latest.yml": manifest("0.1.10", 240),
       },
       {
-        "releases/stable/v0.1.2/paimon-0.1.2-setup.exe": 120,
-        "releases/stable/v0.1.10/paimon-0.1.10-setup.exe": 240,
+        "releases/stable/v0.1.2/ayaka-0.1.2-setup.exe": 120,
+        "releases/stable/v0.1.10/ayaka-0.1.10-setup.exe": 240,
       },
     );
     const response = await handleUpdateRequest(
@@ -86,14 +86,14 @@ describe("R2 update API", () => {
     await expect(response?.json()).resolves.toMatchObject({
       version: "0.1.10",
       size: 240,
-      downloadUrl: "https://ai-release.zzzvoid.com/releases/stable/v0.1.10/paimon-0.1.10-setup.exe",
+      downloadUrl: "https://ai-release.zzzvoid.com/releases/stable/v0.1.10/ayaka-0.1.10-setup.exe",
     });
   });
 
   it("rewrites the standard manifest to the fixed download origin", async () => {
     const env = environment(
       { "releases/stable/v0.1.2/latest.yml": manifest("0.1.2", 120) },
-      { "releases/stable/v0.1.2/paimon-0.1.2-setup.exe": 120 },
+      { "releases/stable/v0.1.2/ayaka-0.1.2-setup.exe": 120 },
     );
     const response = await handleUpdateRequest(
       new Request("https://ai.zzzvoid.com/api/updates/win32/x64/latest.yml"),
@@ -103,10 +103,10 @@ describe("R2 update API", () => {
     expect(response?.headers.get("content-type")).toContain("text/yaml");
     const body = await response!.text();
     expect(body).toContain(
-      "path: https://ai-release.zzzvoid.com/releases/stable/v0.1.2/paimon-0.1.2-setup.exe",
+      "path: https://ai-release.zzzvoid.com/releases/stable/v0.1.2/ayaka-0.1.2-setup.exe",
     );
     expect(body).toContain(
-      "url: https://ai-release.zzzvoid.com/releases/stable/v0.1.2/paimon-0.1.2-setup.exe",
+      "url: https://ai-release.zzzvoid.com/releases/stable/v0.1.2/ayaka-0.1.2-setup.exe",
     );
   });
 
@@ -118,8 +118,8 @@ describe("R2 update API", () => {
         "releases/stable/v0.1.10/latest.yml": invalidManifest,
       },
       {
-        "releases/stable/v0.1.2/paimon-0.1.2-setup.exe": 120,
-        "releases/stable/v0.1.10/paimon-0.1.10-setup.exe": 240,
+        "releases/stable/v0.1.2/ayaka-0.1.2-setup.exe": 120,
+        "releases/stable/v0.1.10/ayaka-0.1.10-setup.exe": 240,
       },
     );
     const response = await handleUpdateRequest(

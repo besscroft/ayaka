@@ -117,7 +117,7 @@ export function sanitizeRichContentUrl(value: string, kind: UrlKind): string | n
   const trimmed = value.trim();
   if (!trimmed || hasUnsafeUrlCharacter(trimmed)) return null;
   if (kind === "link" && trimmed.startsWith("#")) return trimmed;
-  if (trimmed.startsWith("void-media://asset/")) return trimmed;
+  if (trimmed.startsWith("ayaka-media://asset/")) return trimmed;
 
   if (trimmed.startsWith("blob:")) {
     return kind === "image" || kind === "media" ? trimmed : null;

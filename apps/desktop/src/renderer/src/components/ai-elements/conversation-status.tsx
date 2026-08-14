@@ -8,7 +8,7 @@
  *  - 视觉：紧凑徽章 + 状态点（带脉冲）
  *
  * 用法：
- *   <ConversationStatus status="streaming" label="Void is thinking..." />
+ *   <ConversationStatus status="streaming" label="Ayaka is thinking..." />
  */
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/utils";

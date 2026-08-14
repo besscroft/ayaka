@@ -23,7 +23,7 @@ This is a pnpm workspace for a local-first AI desktop application.
 
 - `apps/desktop`: the production Electron app. It contains the main process, preload bridge, React renderer, SQLite/Drizzle persistence, local Hono server, agents, workflows, tools, memory, providers, and desktop pets.
 - `apps/docs`: the Nuxt documentation site.
-- `apps/desktop/drizzle`: checked-in SQLite migrations and Drizzle metadata. The runtime database is created under Electron's `userData/data/void-ai.db`, not in the repository.
+- `apps/desktop/drizzle`: checked-in SQLite migrations and Drizzle metadata. The runtime database is created under Electron's `userData/data/ayaka.db`, not in the repository.
 - `apps/desktop/resources`: packaged desktop assets, including pet resources.
 - `tests/vite-plus`: root-level Vite+ smoke tests.
 - `tests/desktop`: desktop main-process and renderer tests, kept separate from production `src` code.
@@ -43,10 +43,10 @@ The workspace currently has no shared package. Keep new reusable code in the own
 ## Data And Migrations
 
 - Define tables and relations in `apps/desktop/src/main/lib/schema.ts`.
-- Generate migrations from the desktop package with `vp run desktop#db:generate`; inspect the generated SQL and metadata before committing them. Do not hand-edit an existing migration to represent a new schema change.
-- Apply migrations through the app (`migrate()` in `src/main/lib/db.ts`). Use `vp run desktop#db:studio` only for local inspection.
+- Generate migrations from the desktop package with `vp run ayaka-desktop#db:generate`; inspect the generated SQL and metadata before committing them. Do not hand-edit an existing migration to represent a new schema change.
+- Apply migrations through the app (`migrate()` in `src/main/lib/db.ts`). Use `vp run ayaka-desktop#db:studio` only for local inspection.
 - Seed/default behavior lives with the main-process runtime defaults and database initialization. Schema changes must be tested against an empty database and the relevant seed path.
-- Tests that touch persistence should set `VOID_AI_USER_DATA_DIR` to a temporary directory. Never use a real user-data directory or commit `.drizzle-dev`, database files, keys, or generated `out` artifacts.
+- Tests that touch persistence should set `AYAKA_USER_DATA_DIR` to a temporary directory. Never use a real user-data directory or commit `.drizzle-dev`, database files, keys, or generated `out` artifacts.
 
 ## Common Commands
 
@@ -63,22 +63,22 @@ Validation and builds:
 ```bash
 vp check                         # repository formatting, lint, and type-aware checks
 vp test                          # root tests configured in vite.config.ts
-vp run desktop#test              # full desktop renderer + main-process test suite
-vp run desktop#test:renderer     # desktop renderer tests
-vp run desktop#test:main         # desktop main-process tests
-vp run desktop#test:electron     # Electron-backed desktop tests
-vp run desktop#typecheck:test    # test-only TypeScript checks
-vp run desktop#typecheck         # node and web TypeScript projects
-vp run desktop#typecheck:web
-vp run desktop#typecheck:node
-vp run desktop#build
+vp run ayaka-desktop#test              # full desktop renderer + main-process test suite
+vp run ayaka-desktop#test:renderer     # desktop renderer tests
+vp run ayaka-desktop#test:main         # desktop main-process tests
+vp run ayaka-desktop#test:electron     # Electron-backed desktop tests
+vp run ayaka-desktop#typecheck:test    # test-only TypeScript checks
+vp run ayaka-desktop#typecheck         # node and web TypeScript projects
+vp run ayaka-desktop#typecheck:web
+vp run ayaka-desktop#typecheck:node
+vp run ayaka-desktop#build
 vp run build:desktop:win         # or build:desktop:mac / build:desktop:linux
 vp run docs#build
 ```
 
-The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are stale after changing Node/Electron versions, run `vp run desktop#rebuild:native` before retrying. The package also exposes `desktop#db:generate`, `desktop#db:studio`, and `desktop#db:migrate` for Drizzle work.
+The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are stale after changing Node/Electron versions, run `vp run ayaka-desktop#rebuild:native` before retrying. The package also exposes `ayaka-desktop#db:generate`, `ayaka-desktop#db:studio`, and `ayaka-desktop#db:migrate` for Drizzle work.
 
-`vp run desktop#test` uses Node's built-in test runner through `tsx` and includes separate renderer/web, main/node, and Electron-backed groups. Tests live under `tests/desktop` and are registered through the renderer, main, and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
+`vp run ayaka-desktop#test` uses Node's built-in test runner through `tsx` and includes separate renderer/web, main/node, and Electron-backed groups. Tests live under `tests/desktop` and are registered through the renderer, main, and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
 
 ## Change Guidelines
 

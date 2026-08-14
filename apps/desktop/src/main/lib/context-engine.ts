@@ -336,7 +336,7 @@ export function createPromptCacheKey(input: {
   staticInstructions?: string;
   toolSchemas?: unknown;
 }): string {
-  return `void-ai:${createHash("sha256").update(stableStringify(input)).digest("hex").slice(0, 32)}`;
+  return `ayaka:${createHash("sha256").update(stableStringify(input)).digest("hex").slice(0, 32)}`;
 }
 
 export function estimateMessageTokens(messages: ModelMessage[]): number {

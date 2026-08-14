@@ -78,4 +78,4 @@ Focused tests cover normal, empty, malformed, unknown, approval, error, and deni
 summary extraction; safe URL handling; truncation; and provider fallback. Existing MessageList
 activity tests are extended for state-aware summaries and disclosure behavior.
 
-Final validation uses `vp check`, desktop web/node typechecks, and `vp run desktop#test`.
+Final validation uses `vp check`, desktop web/node typechecks, and `vp run ayaka-desktop#test`.

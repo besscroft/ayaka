@@ -40,5 +40,5 @@ Make `b1s8zoQt6` (nova, neutral, lucide, Inter, default radius) the renderer's v
 - Theme tests cover complete tokens, White/Ocean geometry equality, color scheme, radius, font, and legacy ID migration.
 - Renderer tests cover skin selection, settings persistence, dialogs, tabs, popovers, selects, chat input, and tool/model selection.
 - Static checks ensure business code does not rely on the legacy custom facade or core hard-coded colors.
-- Run `vp check`, `vp test`, `vp run desktop#test`, `vp run desktop#typecheck`, and `vp run desktop#build`.
+- Run `vp check`, `vp test`, `vp run ayaka-desktop#test`, `vp run ayaka-desktop#typecheck`, and `vp run ayaka-desktop#build`.
 - Manually verify White, Black, and Ocean across chat, settings, management pages, dialogs, narrow layouts, persistence, keyboard access, and reduced motion.

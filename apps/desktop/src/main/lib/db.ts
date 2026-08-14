@@ -160,7 +160,7 @@ export type {
 // 重新导出 schema 供其他模块直接引用（统一来源）。
 export { schema };
 
-const DB_FILENAME = "void-ai.db";
+const DB_FILENAME = "ayaka.db";
 const DATA_DIRNAME = "data";
 const DEFAULT_AGENT_ID = SHARED_DEFAULT_AGENT_ID;
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -192,7 +192,7 @@ function resolveMigrationsFolder(): string {
     join(__dirname, "..", "..", "drizzle"),
     join(__dirname, "..", "..", "..", "drizzle"),
   ];
-  if (process.env.VOID_AI_DEV === "1") {
+  if (process.env.AYAKA_DEV === "1") {
     return sourceCandidates.find((candidate) => existsSync(candidate)) ?? sourceCandidates[0]!;
   }
   const packaged = join(process.resourcesPath ?? "", "drizzle");
@@ -2840,7 +2840,7 @@ export function getRuntimeSnapshot(): RuntimeSnapshot {
   };
 }
 
-export function updateVoidLearningState(input: {
+export function updateAyakaLearningState(input: {
   status: AgentRuntimeStatus;
   lastLearningAt?: number;
   lastError?: string | null;
@@ -2858,7 +2858,7 @@ export async function buildAgentSystemPrompt(
   conversationId?: string,
 ): Promise<string> {
   const agent = getAgent(agentId || DEFAULT_AGENT_ID) ?? getAgent(DEFAULT_AGENT_ID);
-  if (!agent) return "You are Paimon, a capable local AI assistant and orchestrator.";
+  if (!agent) return "You are Ayaka, a capable local AI assistant and orchestrator.";
 
   // 从文件层加载有界冻结快照；首次启动时从 agent.instructions 初始化
   const { prepareInnerContext } = await import("./agent-inner-context");

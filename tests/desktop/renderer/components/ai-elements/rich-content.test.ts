@@ -45,7 +45,7 @@ const ok = true;
   void it("detects rich media URLs", () => {
     assert.equal(getMediaKindFromUrl("https://example.com/photo.webp"), "image");
     assert.equal(getMediaKindFromUrl("https://example.com/speech.mp3?download=1"), "audio");
-    assert.equal(getMediaKindFromUrl("void-media://asset/generated.mp4"), "video");
+    assert.equal(getMediaKindFromUrl("ayaka-media://asset/generated.mp4"), "video");
     assert.equal(getMediaKindFromUrl("https://example.com/page"), null);
   });
 
@@ -60,8 +60,8 @@ const ok = true;
       "data:image/png;base64,AA==",
     );
     assert.equal(
-      sanitizeRichContentUrl("void-media://asset/image.png", "image"),
-      "void-media://asset/image.png",
+      sanitizeRichContentUrl("ayaka-media://asset/image.png", "image"),
+      "ayaka-media://asset/image.png",
     );
     assert.equal(sanitizeRichContentUrl("javascript:alert(1)", "link"), null);
     assert.equal(sanitizeRichContentUrl("data:text/html;base64,PGgxPg==", "image"), null);

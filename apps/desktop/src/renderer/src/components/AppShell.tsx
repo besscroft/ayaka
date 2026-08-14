@@ -89,8 +89,8 @@ export function AppShell({
         refresh();
       }
     };
-    window.addEventListener("void-ai:conversation-renamed", handler);
-    return () => window.removeEventListener("void-ai:conversation-renamed", handler);
+    window.addEventListener("ayaka:conversation-renamed", handler);
+    return () => window.removeEventListener("ayaka:conversation-renamed", handler);
   }, []);
 
   const confirmDeleteConversation = (): void => {

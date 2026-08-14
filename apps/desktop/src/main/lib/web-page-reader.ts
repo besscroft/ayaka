@@ -89,7 +89,7 @@ export async function readWebPage(
           headers: {
             Accept: "text/html,application/xhtml+xml",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "User-Agent": "VoidAI/1.0 (+https://github.com/void-ai)",
+            "User-Agent": "Ayaka/1.0 (+https://github.com/void-ai)",
           },
         });
       } catch (error) {

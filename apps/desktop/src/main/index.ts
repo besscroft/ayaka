@@ -7,7 +7,7 @@ import { scheduleMemoryFileConsolidation } from "./lib/agent-memory-files";
 import { startMemoryWorker } from "./lib/agent-learning";
 import { startServer, stopServer } from "./server";
 import { migrateProviderApiKeysToModelKeys } from "./lib/providers";
-import { registerVoidMediaProtocol } from "./lib/media-assets";
+import { registerAyakaMediaProtocol } from "./lib/media-assets";
 import { registerIpcHandlers } from "./ipc";
 import { startCronScheduler, stopCronScheduler } from "./lib/cron-scheduler";
 import { ensureBuiltinCatalogSources } from "./lib/catalog-service";
@@ -19,7 +19,7 @@ const WINDOWS_APP_ID = "com.zzzvoid.ai";
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: "void-media",
+    scheme: "ayaka-media",
     privileges: {
       standard: true,
       secure: true,
@@ -50,7 +50,7 @@ function createWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     frame: false,
-    title: "Paimon",
+    title: "Ayaka",
     ...(process.platform === "darwin" ? {} : { icon }),
     webPreferences: {
       preload: getPreloadPath(),
@@ -90,11 +90,11 @@ function createWindow(): BrowserWindow {
 
 // 应用就绪后初始化所有子系统
 void app.whenReady().then(async () => {
-  process.env.VOID_AI_USER_DATA_DIR ??= app.getPath("userData");
-  process.env.VOID_AI_APP_PATH ??= app.getAppPath();
-  process.env.VOID_AI_DEV = is.dev ? "1" : "0";
+  process.env.AYAKA_USER_DATA_DIR ??= app.getPath("userData");
+  process.env.AYAKA_APP_PATH ??= app.getAppPath();
+  process.env.AYAKA_DEV = is.dev ? "1" : "0";
   electronApp.setAppUserModelId(WINDOWS_APP_ID);
-  app.setName("Paimon");
+  app.setName("Ayaka");
   removeLegacyCompanionData();
 
   // 默认在开发环境用 F12 打开 DevTools，生产环境忽略 Cmd/Ctrl+R
@@ -116,7 +116,7 @@ void app.whenReady().then(async () => {
     console.log("[main] 数据库初始化失败:", err);
   }
 
-  registerVoidMediaProtocol();
+  registerAyakaMediaProtocol();
 
   // 2. 启动本地 HTTP 服务（用于 AI SDK 流式通信）
   try {

@@ -78,7 +78,7 @@ void describe("runtime architecture", () => {
   });
 
   void it("defines default seed data for agents and tools", () => {
-    assert.equal(DEFAULT_ROOT_AGENT_SEED.name, "Paimon");
+    assert.equal(DEFAULT_ROOT_AGENT_SEED.name, "Ayaka");
     assert.ok(DEFAULT_ROOT_AGENT_SEED.description.trim().length > 0);
     const researcher = DEFAULT_CHILD_AGENT_SEEDS.find((agent) => agent.id === "agent-researcher");
     assert.equal(researcher?.name, "Fairy");

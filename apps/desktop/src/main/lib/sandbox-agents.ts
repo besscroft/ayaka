@@ -209,7 +209,7 @@ async function runDockerSandboxCommand(
   timeoutMs: number,
 ): Promise<Awaited<ReturnType<typeof createSandboxCommandResult>>> {
   const relativeCwd = toSandboxRelativePath(session.root_path, cwd);
-  const containerName = `void-ai-${safeId(session.id)}-${randomUUID().slice(0, 8)}`;
+  const containerName = `ayaka-${safeId(session.id)}-${randomUUID().slice(0, 8)}`;
   const dockerArgs = buildSandboxDockerArgs(
     session,
     input,
@@ -247,9 +247,9 @@ export function buildSandboxDockerArgs(
   command: string,
   args: string[],
   relativeCwd: string,
-  containerName = "void-ai-sandbox",
+  containerName = "ayaka-sandbox",
 ): string[] {
-  const image = process.env.VOID_AI_SANDBOX_DOCKER_IMAGE?.trim() || DEFAULT_DOCKER_IMAGE;
+  const image = process.env.AYAKA_SANDBOX_DOCKER_IMAGE?.trim() || DEFAULT_DOCKER_IMAGE;
   const containerCwd =
     relativeCwd === "."
       ? DOCKER_WORKSPACE_PATH
@@ -501,7 +501,7 @@ async function copySandboxTree(sourceRoot: string, targetRoot: string): Promise<
 }
 
 function resolveSandboxBaseDir(): string {
-  const userDataDir = process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData");
+  const userDataDir = process.env.AYAKA_USER_DATA_DIR || app.getPath("userData");
   return path.join(userDataDir, DATA_DIRNAME, SANDBOX_DIRNAME);
 }
 

@@ -36,7 +36,7 @@ const operationSteps = [
     number: "01",
     label: "Input",
     title: "说出任务",
-    detail: "从一句话开始，Void AI 先确认你要完成什么。",
+    detail: "从一句话开始，Ayaka 先确认你要完成什么。",
   },
   {
     number: "02",
@@ -102,12 +102,12 @@ function DownloadButton({
 function SiteHeader() {
   return (
     <header className="site-header">
-      <a className="brand-lockup" href="#top" aria-label="Void AI 首页">
+      <a className="brand-lockup" href="#top" aria-label="Ayaka 首页">
         <span className="brand-seal" aria-hidden="true">
-          V
+          A
         </span>
         <span>
-          <strong>VOID AI</strong>
+          <strong>Ayaka</strong>
           <small>LOCAL WORKSPACE</small>
         </span>
       </a>
@@ -122,7 +122,7 @@ function SiteHeader() {
 
 function ProductPreview() {
   return (
-    <div className="product-preview" aria-label="Void AI 工作台预览">
+    <div className="product-preview" aria-label="Ayaka 工作台预览">
       <div className="preview-sky-shape preview-sun" aria-hidden="true" />
       <div className="preview-sky-shape preview-cloud preview-cloud-one" aria-hidden="true" />
       <div className="preview-sky-shape preview-cloud preview-cloud-two" aria-hidden="true" />
@@ -138,7 +138,7 @@ function ProductPreview() {
         </div>
         <div className="preview-window-body">
           <aside className="preview-sidebar" aria-label="工作台导航预览">
-            <div className="preview-wordmark">VOID</div>
+            <div className="preview-wordmark">Ayaka</div>
             <div className="preview-nav-item preview-nav-active">
               <span>⌁</span> Chat
             </div>
@@ -166,7 +166,7 @@ function ProductPreview() {
               <p>整理这周的项目线索，并记住我的工作偏好。</p>
             </div>
             <div className="preview-message preview-message-agent">
-              <span className="preview-avatar avatar-agent">V</span>
+              <span className="preview-avatar avatar-agent">A</span>
               <div>
                 <p>收到。我会先检索本地记录，再把结果整理成一份可继续执行的摘要。</p>
                 <div className="preview-tool-row">
@@ -189,7 +189,7 @@ function ProductPreview() {
               </div>
             </div>
             <div className="preview-input">
-              <span>继续给 Void AI 一个任务...</span>
+              <span>继续给 Ayaka 一个任务...</span>
               <span className="input-arrow">&gt;</span>
             </div>
           </div>
@@ -220,11 +220,11 @@ function Hero({ downloadUrl }: { downloadUrl: string | null }) {
           <em>在本地醒来。</em>
         </h1>
         <p className="hero-lede">
-          Void AI 是一个本地优先的 AI
+          Ayaka 是一个本地优先的 AI
           桌面工作台。把对话、智能体、记忆和工具放在同一条可追踪的运行链路里。
         </p>
         <div className="hero-actions">
-          <DownloadButton downloadUrl={downloadUrl}>下载 Void AI</DownloadButton>
+          <DownloadButton downloadUrl={downloadUrl}>下载 Ayaka</DownloadButton>
           <a className="site-button site-button-quiet" href="#capabilities">
             查看能力档案 <span aria-hidden="true">↓</span>
           </a>
@@ -288,7 +288,7 @@ function OperationSection() {
       <SectionHeading
         code="03 / OPERATION TRACE"
         title="从一句话，到一条完整的运行记录。"
-        description="Void AI 不把过程藏在幕后。每个 Agent Loop 都有自己的轨迹，方便你知道发生了什么，也知道下一步是什么。"
+        description="Ayaka 不把过程藏在幕后。每个 Agent Loop 都有自己的轨迹，方便你知道发生了什么，也知道下一步是什么。"
       />
       <div className="operation-board">
         {operationSteps.map((step, index) => (
@@ -330,7 +330,7 @@ function PrivacySection() {
             <em>不需要先离开你的设备。</em>
           </h2>
           <p>
-            Void AI 的默认姿态是 local-first。桌面端负责文件、数据库、密钥、MCP
+            Ayaka 的默认姿态是 local-first。桌面端负责文件、数据库、密钥、MCP
             连接和运行记录；渲染层只通过明确的桥接访问它们。
           </p>
         </div>
@@ -380,9 +380,7 @@ function PetSection() {
           <br />
           桌面可以有一点魔法。
         </h2>
-        <p>
-          Paimon 是 Void AI 的桌面小向导。她不替你做决定，只在你需要的时候，让工作空间多一点回应。
-        </p>
+        <p>Ayaka 是桌面端的小向导。她不替你做决定，只在你需要的时候，让工作空间多一点回应。</p>
         <span className="pet-caption">A SMALL GUIDE FOR BIG TASKS</span>
       </div>
     </section>
@@ -396,7 +394,7 @@ function DownloadSection({ downloadUrl }: { downloadUrl: string | null }) {
         <div>
           <span className="section-code">06 / BEGIN THE OPERATION</span>
           <h2>准备好，让本地智能体开始行动。</h2>
-          <p>Void AI 仍在持续生长。下载最新构建，开始你的本地运行。</p>
+          <p>Ayaka 仍在持续生长。下载最新构建，开始你的本地运行。</p>
         </div>
         <div className="download-actions">
           <DownloadButton downloadUrl={downloadUrl}>下载最新版本</DownloadButton>
@@ -411,10 +409,10 @@ function SiteFooter() {
     <footer className="site-footer">
       <div className="footer-brand">
         <span className="brand-seal" aria-hidden="true">
-          V
+          A
         </span>
         <div>
-          <strong>VOID AI</strong>
+          <strong>Ayaka</strong>
           <span>本地优先的 AI 桌面工作台</span>
         </div>
       </div>

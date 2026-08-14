@@ -375,14 +375,14 @@ void describe("media tool output", () => {
             type: "file",
             mediaType: "image/png",
             filename: "image-1.png",
-            url: "void-media://asset/image-1.png",
+            url: "ayaka-media://asset/image-1.png",
           },
         ],
       },
     });
 
     assert.equal(result?.kind, "image");
-    assert.equal(result?.files[0]?.url, "void-media://asset/image-1.png");
+    assert.equal(result?.files[0]?.url, "ayaka-media://asset/image-1.png");
     assert.equal(readMediaToolResult({ type: "tool-web_search", output: result }), null);
   });
 });

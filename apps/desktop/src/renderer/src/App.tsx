@@ -140,8 +140,8 @@ function AppContent(): React.JSX.Element {
       setActiveView("chat");
       void api.settings.set(SettingKey.ActiveConversationId, conversationId);
     };
-    window.addEventListener("void-ai:open-conversation", handleOpenConversation);
-    return () => window.removeEventListener("void-ai:open-conversation", handleOpenConversation);
+    window.addEventListener("ayaka:open-conversation", handleOpenConversation);
+    return () => window.removeEventListener("ayaka:open-conversation", handleOpenConversation);
   }, []);
 
   return (

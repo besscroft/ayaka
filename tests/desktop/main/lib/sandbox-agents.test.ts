@@ -15,7 +15,7 @@ electronModule.loaded = true;
 electronModule.exports = {
   app: {
     isPackaged: false,
-    getPath: () => process.env.VOID_AI_USER_DATA_DIR ?? process.cwd(),
+    getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd(),
   },
 };
 require.cache[electronPath] = electronModule;
@@ -24,13 +24,13 @@ let rootPath = "";
 let sandbox: typeof import("@desktop-main/lib/sandbox-agents");
 
 before(async () => {
-  rootPath = await mkdtemp(path.join(tmpdir(), "void-ai-sandbox-test-"));
-  process.env.VOID_AI_USER_DATA_DIR = rootPath;
+  rootPath = await mkdtemp(path.join(tmpdir(), "ayaka-sandbox-test-"));
+  process.env.AYAKA_USER_DATA_DIR = rootPath;
   sandbox = await import("@desktop-main/lib/sandbox-agents");
 });
 
 after(async () => {
-  delete process.env.VOID_AI_USER_DATA_DIR;
+  delete process.env.AYAKA_USER_DATA_DIR;
   if (rootPath) await rm(rootPath, { recursive: true, force: true });
 });
 
@@ -123,14 +123,14 @@ void describe("sandbox agents", () => {
       "node",
       ["--version"],
       "work",
-      "void-ai-test-container",
+      "ayaka-test-container",
     );
 
     assert.deepEqual(args.slice(0, 12), [
       "run",
       "--rm",
       "--name",
-      "void-ai-test-container",
+      "ayaka-test-container",
       "--network",
       "none",
       "--cpus",
@@ -158,7 +158,7 @@ function makeSession(id: string): SandboxSession {
     id: "sandbox-" + id,
     conversation_id: "c-" + id,
     run_id: "run-" + id,
-    agent_id: "agent-void",
+    agent_id: "agent-ayaka",
     root_path: path.join(rootPath, id),
     isolation_mode: "local",
     status: "active",

@@ -15,7 +15,7 @@ electronModule.loaded = true;
 electronModule.exports = {
   app: {
     isPackaged: false,
-    getPath: () => process.env.VOID_AI_USER_DATA_DIR ?? process.cwd(),
+    getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd(),
   },
 };
 require.cache[electronPath] = electronModule;
@@ -31,14 +31,14 @@ before(async () => {
 
 beforeEach(async () => {
   await db.closeDb();
-  testRoot = await mkdtemp(path.join(tmpdir(), "void-ai-agent-management-"));
-  process.env.VOID_AI_USER_DATA_DIR = testRoot;
+  testRoot = await mkdtemp(path.join(tmpdir(), "ayaka-agent-management-"));
+  process.env.AYAKA_USER_DATA_DIR = testRoot;
   db.initDb();
 });
 
 afterEach(async () => {
   await db.closeDb();
-  delete process.env.VOID_AI_USER_DATA_DIR;
+  delete process.env.AYAKA_USER_DATA_DIR;
   if (testRoot) await rm(testRoot, { recursive: true, force: true });
   testRoot = "";
 });
@@ -143,7 +143,7 @@ void describe("agent management tools", () => {
       () => executeTool(rootTools.agent_update, { agentId: DEFAULT_AGENT_ID, name: "Nope" }),
       /root agent cannot be edited/i,
     );
-    assert.equal(db.getAgent(DEFAULT_AGENT_ID)?.name, "Paimon");
+    assert.equal(db.getAgent(DEFAULT_AGENT_ID)?.name, "Ayaka");
 
     await assert.rejects(
       () => executeTool(rootTools.agent_update, { agentId: "missing-agent", name: "Nope" }),

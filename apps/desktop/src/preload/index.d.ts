@@ -57,14 +57,14 @@ import type {
 import type { UIMessage } from "ai";
 
 /**
- * Paimon 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
+ * Ayaka 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
  *
  * 璁捐鍘熷垯锛?
  * - 浠呴€氳繃 contextBridge 鏆撮湶鐧藉悕鍗曟柟娉曪紝娓叉煋灞傛棤娉曠洿鎺ヨ闂?Node API
  * - API key 鏄庢枃涓嶅嚭涓昏繘绋嬶紱杩欓噷鍙彁渚?set/list锛屼笉鎻愪緵 get
  * - 鎵€鏈夋柟娉曡繑鍥?Promise锛坕pcRenderer.invoke 鐨勮涔夛級
  */
-export interface VoidAIApi {
+export interface AyakaApi {
   windowControls: {
     minimize: () => Promise<void>;
     toggleMaximize: () => Promise<boolean>;
@@ -300,6 +300,6 @@ export interface VoidAIApi {
 declare global {
   interface Window {
     electron: ElectronAPI;
-    api: VoidAIApi;
+    api: AyakaApi;
   }
 }

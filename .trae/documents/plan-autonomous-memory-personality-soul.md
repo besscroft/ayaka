@@ -2,9 +2,9 @@
 
 ## 摘要
 
-将 void-ai 从「用户确认式记忆」改造为「智能体自动管理记忆」：
+将 ayaka 从「用户确认式记忆」改造为「智能体自动管理记忆」：
 
-- **无感自动保存**：聊天结束后由 Void 自动判断并保存记忆，不再进入 pending 队列，不需要用户确认。
+- **无感自动保存**：聊天结束后由 Ayaka 自动判断并保存记忆，不再进入 pending 队列，不需要用户确认。
 - **无工具依赖**：`memory_save` / `memory_update` / `memory_delete` 不再默认启用，记忆操作由后台服务完成。
 - **有界整理**：引入 `SOUL.md` / `USER.md` / `MEMORY.md` 三层文件，带字符上限，由 LLM 定期整理、合并、去重。
 - **本地加密**：所有记忆文件使用项目已有的 AES-256-GCM 加密，满足数据本地安全约束。
@@ -33,7 +33,7 @@
 
 - `apps/desktop/src/main/lib/agent-learning.ts`：学习入口与 pending 队列（L21-L183）
 - `apps/desktop/src/main/lib/mem0-service.ts`：Mem0 OSS 封装（L1-L203）
-- `apps/desktop/src/main/lib/db.ts`：`buildAgentSystemPrompt`（L1851-L1883）、`saveMemory`（L949-L983）、`updateVoidLearningState`（L1828-L1849）
+- `apps/desktop/src/main/lib/db.ts`：`buildAgentSystemPrompt`（L1851-L1883）、`saveMemory`（L949-L983）、`updateAyakaLearningState`（L1828-L1849）
 - `apps/desktop/src/main/lib/chat-tools.ts`：工具定义 `memory_save/update/delete`（L202-L228）
 - `apps/desktop/src/main/lib/runtime-defaults.ts`：默认工具种子（L83-L103）
 - `apps/desktop/src/shared/types.ts`：`MemoryRecord`、`MemoryScope`、`MemoryKind`（L178-L207）
@@ -55,7 +55,7 @@
 ### 需要移除/改造的部分
 
 1. `pendingMemories` 队列与确认 API。
-2. `updateVoidLearningState` 中直接修改 `agent.soul_prompt` 的旁门。
+2. `updateAyakaLearningState` 中直接修改 `agent.soul_prompt` 的旁门。
 3. `memory_save/update/delete` 默认启用。
 4. 系统提示词只从 `agent.soul_prompt/personality` 加载，缺少文件层有界整理。
 
@@ -245,7 +245,7 @@ export function ensureMemoryFiles(agent: AgentProfile): void;
    - Mem0 路径：`addMemoriesFromConversation(..., persist = true)` 直接写入 SQLite + 向量索引。
    - 正则降级：`extractMemoryCandidates` + `saveMemory` 直接保存。
 3. 保存成功后调用 `incorporateNewMemories(records)` 异步更新文件层。
-4. 移除 `updateVoidLearningState` 的 `soulPromptAppend` 副作用。
+4. 移除 `updateAyakaLearningState` 的 `soulPromptAppend` 副作用。
 5. 更新 `insertRuntimeEvent` 的 `detail` 增加 `savedCount` 字段。
 
 改造后核心流程：
@@ -277,7 +277,7 @@ async function runLearning(conversationId: string): Promise<void> {
       .catch((err) => console.warn("[agent-learning] incorporate failed:", err));
   }
 
-  updateVoidLearningState({ status: "idle", lastLearningAt: Date.now() });
+  updateAyakaLearningState({ status: "idle", lastLearningAt: Date.now() });
   // ... 事件记录 ...
 }
 ```
@@ -359,14 +359,14 @@ UI 示意：
    - 语义搜索作为补充（可选，当文件层为空或需要动态召回时）。
 2. 保留 `agent.name` / `agent.role` 作为身份基础。
 3. 不再把 `agent.soul_prompt` 直接拼接到系统提示词；如果 `SOUL.md` 不存在，回退到 `agent.soul_prompt` 并初始化文件。
-4. `updateVoidLearningState` 删除 `soulPromptAppend` 参数和修改 `agent.soul_prompt` 的逻辑。
+4. `updateAyakaLearningState` 删除 `soulPromptAppend` 参数和修改 `agent.soul_prompt` 的逻辑。
 
 改造后示例：
 
 ```typescript
 export async function buildAgentSystemPrompt(agentId, conversationId): Promise<string> {
   const agent = getAgent(agentId || DEFAULT_AGENT_ID) ?? getAgent(DEFAULT_AGENT_ID);
-  if (!agent) return "You are Void, a local AI assistant.";
+  if (!agent) return "You are Ayaka, a local AI assistant.";
 
   const { buildMemoryFilePromptBlock, ensureMemoryFiles } = await import("./agent-memory-files");
   await ensureMemoryFiles(agent); // 首次从 agent 初始化 SOUL.md
@@ -530,7 +530,7 @@ export async function buildAgentSystemPrompt(agentId, conversationId): Promise<s
 | 文件层整理 LLM 调用可能失败或产生低质量内容 | 失败时保留旧文件；整理提示词包含严格格式要求；安全扫描过滤敏感信息                    |
 | SOUL.md 被 LLM 写坏                         | 写入前校验字符上限；保留上一次版本作为 `.bak`；仅在整理任务中更新，不在每轮聊天中更新 |
 | 自动保存引入噪音记忆                        | Mem0 LLM 抽取已优于正则；定期整理会合并/删除低价值条目；用户可在记忆管理页手动删除    |
-| 多 Agent 共享 SOUL/USER 文件                | 当前默认只有 Void 一个主 Agent；后续可为每个 agent 创建子目录 `{agentId}/SOUL.md`     |
+| 多 Agent 共享 SOUL/USER 文件                | 当前默认只有 Ayaka 一个主 Agent；后续可为每个 agent 创建子目录 `{agentId}/SOUL.md`    |
 | 升级后旧 `agent.soul_prompt` 不再生效       | 首次启动时从 `instructions` 初始化 `SOUL.md`，用户可在设置中查看/编辑                 |
 
 ## 验证步骤

@@ -1,13 +1,13 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "void-ai-docs",
+  "name": "ayaka-docs",
   "main": "./workers/app.ts",
   "compatibility_date": "2026-08-07",
   "compatibility_flags": ["nodejs_compat"],
   "r2_buckets": [
     {
       "binding": "RELEASES_BUCKET",
-      "bucket_name": "void-ai-releases",
+      "bucket_name": "ayaka-releases",
     },
   ],
   "vars": {

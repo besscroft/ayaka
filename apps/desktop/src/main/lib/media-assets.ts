@@ -4,7 +4,7 @@ import { join, resolve, sep } from "node:path";
 import { app, protocol } from "electron";
 import type { MediaGenerationFile, MediaGenerationKind } from "../../shared/types";
 
-const MEDIA_SCHEME = "void-media";
+const MEDIA_SCHEME = "ayaka-media";
 const MEDIA_HOST = "asset";
 let protocolRegistered = false;
 
@@ -12,10 +12,10 @@ export function getMediaDir(): string {
   return join(app.getPath("userData"), "media");
 }
 
-export function registerVoidMediaProtocol(): void {
+export function registerAyakaMediaProtocol(): void {
   if (protocolRegistered) return;
   protocol.registerFileProtocol(MEDIA_SCHEME, (request, callback) => {
-    const path = resolveVoidMediaPath(request.url);
+    const path = resolveAyakaMediaPath(request.url);
     if (!path) {
       callback({ error: -6 });
       return;
@@ -47,16 +47,16 @@ export function writeMediaAsset({
     type: "file",
     mediaType,
     filename: normalizedFilename,
-    url: toVoidMediaUrl(storedName),
+    url: toAyakaMediaUrl(storedName),
     size: statSync(filePath).size,
   };
 }
 
-export function toVoidMediaUrl(storedName: string): string {
+export function toAyakaMediaUrl(storedName: string): string {
   return `${MEDIA_SCHEME}://${MEDIA_HOST}/${encodeURIComponent(storedName)}`;
 }
 
-export function resolveVoidMediaPath(url: string): string | null {
+export function resolveAyakaMediaPath(url: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(url);

@@ -30,7 +30,7 @@
                     └─ catch → isRecoverableSchemaInitError(error) = true
                                ("no such column" 匹配 RECOVERABLE_SCHEMA_PATTERN)
                                → resetDatabaseFiles(dbPath, error)
-                                  └─ 把 void-ai.db / -wal / -shm 移到
+                                  └─ 把 ayaka.db / -wal / -shm 移到
                                      backup-before-runtime-schema-{timestamp}/
                                   → 数据库变空库 → seedDefaults 重新种默认数据
                                   → 用户数据全部丢失 ❌
@@ -98,7 +98,7 @@
 
 清理本地 userData 下的旧数据库(项目未上线,旧数据可弃):
 
-- Windows: `%APPDATA%\Paimon\data\` 目录下的 `void-ai.db`、`void-ai.db-wal`、`void-ai.db-shm` 以及所有 `backup-before-runtime-schema-*` 文件夹全部删除。
+- Windows: `%APPDATA%\Ayaka\data\` 目录下的 `ayaka.db`、`ayaka.db-wal`、`ayaka.db-shm` 以及所有 `backup-before-runtime-schema-*` 文件夹全部删除。
 - 重新启动应用,新库会正常 migrate,不再被重置。
 
 ---
@@ -203,7 +203,7 @@ function openAndMigrateDb(dbPath: string): DbInstance {
 
 3. **决策:保留 `cancelStaleRuntimeRuns` / `purgeExpiredDeletedConversations` / `seedDefaults`**。理由:它们都是幂等的启动清理/种数据操作,不会导致"全部丢失",与本次问题无关。
 
-4. **未来约束(写入项目记忆,提醒后续开发)**:schema 变更必须通过 `vp run desktop#db:generate` 生成**新的迁移文件**(如 `0001_xxx.sql`),**禁止直接修改 `0000_initial.sql`**。直接改 0000 不会对旧库生效(drizzle 不校验 hash),会重新引入本次问题。
+4. **未来约束(写入项目记忆,提醒后续开发)**:schema 变更必须通过 `vp run ayaka-desktop#db:generate` 生成**新的迁移文件**(如 `0001_xxx.sql`),**禁止直接修改 `0000_initial.sql`**。直接改 0000 不会对旧库生效(drizzle 不校验 hash),会重新引入本次问题。
 
 5. **不引入新依赖**:纯删除代码 + 注释更新,符合"优先使用项目已有依赖"。
 
@@ -222,13 +222,13 @@ function openAndMigrateDb(dbPath: string): DbInstance {
 2. **类型检查**:
 
    ```bash
-   vp run desktop#typecheck
+   vp run ayaka-desktop#typecheck
    ```
 
 3. **单元测试**:
 
    ```bash
-   vp run desktop#test
+   vp run ayaka-desktop#test
    ```
 
    重点关注:
@@ -237,10 +237,10 @@ function openAndMigrateDb(dbPath: string): DbInstance {
    - 其它涉及 db 初始化的测试(`memory-orchestrator`、`runtime-architecture` 等)应不受影响。
 
 4. **运行时验证(dev)**:
-   - 先清理 `%APPDATA%\Paimon\data\` 下的 `void-ai.db*` 和 `backup-before-runtime-schema-*`。
+   - 先清理 `%APPDATA%\Ayaka\data\` 下的 `ayaka.db*` 和 `backup-before-runtime-schema-*`。
    - `vp run dev:desktop` 启动,创建会话、配置 API key、改设置,正常使用后退出。
    - **再次启动**,确认会话/API key/设置**仍然存在**(未被重置)。
-   - 检查 `%APPDATA%\Paimon\data\` 下**不应**出现新的 `backup-before-runtime-schema-*` 目录。
+   - 检查 `%APPDATA%\Ayaka\data\` 下**不应**出现新的 `backup-before-runtime-schema-*` 目录。
 
 5. **运行时验证(打包)**:
    - `vp run build:desktop:win` 打包后安装运行,重复第 4 步的启动-使用-退出-再启动流程,确认数据持久。

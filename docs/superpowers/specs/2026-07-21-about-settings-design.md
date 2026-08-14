@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a read-only About tab to the existing desktop settings dialog. The page presents Paimon's product identity, the installed application version, the MIT license, and useful project links without turning the settings surface into a marketing page.
+Add a read-only About tab to the existing desktop settings dialog. The page presents Ayaka's product identity, the installed application version, the MIT license, and useful project links without turning the settings surface into a marketing page.
 
 ## Information Architecture
 
@@ -12,8 +12,8 @@ Add a read-only About tab to the existing desktop settings dialog. The page pres
 
 ## Content And Visual Design
 
-- Use the existing Paimon application icon as the only brand image.
-- Present `Paimon` as the product name and `Void AI` as the local-first desktop workspace identity.
+- Use the existing Ayaka application icon as the only brand image.
+- Present `Ayaka` as the product name and `Ayaka` as the local-first desktop workspace identity.
 - Show the runtime application version returned by Electron, not a renderer-side hard-coded value.
 - Show the MIT license and the current copyright holder from the repository license.
 - Provide three explicit actions: project repository, documentation, and issue reporting.
@@ -39,7 +39,7 @@ Add a read-only About tab to the existing desktop settings dialog. The page pres
 
 - Extend i18n coverage for the About navigation and core labels.
 - Add a focused renderer unit test for version normalization and the three external resource definitions without introducing a DOM test framework.
-- Run `vp check`, `vp test`, `vp run desktop#test`, and the desktop web and node type checks.
+- Run `vp check`, `vp test`, `vp run ayaka-desktop#test`, and the desktop web and node type checks.
 - Manually verify direct settings navigation, external links, Chinese and English copy, light and dark themes, and the minimum supported window size.
 
 ## Non-Goals

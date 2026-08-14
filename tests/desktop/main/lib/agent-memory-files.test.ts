@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { after, afterEach, before, describe, it, mock } from "node:test";
 import type { MemoryRecord } from "@shared/types";
 
-const testRoot = mkdtempSync(join(tmpdir(), "paimon-memory-files-"));
-process.env.VOID_AI_USER_DATA_DIR = testRoot;
+const testRoot = mkdtempSync(join(tmpdir(), "ayaka-memory-files-"));
+process.env.AYAKA_USER_DATA_DIR = testRoot;
 
 const require = createRequire(import.meta.url);
 const electronPath = require.resolve("electron");
@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 after(() => {
-  delete process.env.VOID_AI_USER_DATA_DIR;
+  delete process.env.AYAKA_USER_DATA_DIR;
   rmSync(testRoot, { recursive: true, force: true });
 });
 
@@ -86,7 +86,7 @@ void describe("agent memory files", () => {
       text: [
         "===SOUL===",
         "# SOUL",
-        "Paimon remains a capable assistant.",
+        "Ayaka remains a capable assistant.",
         "===USER===",
         "# USER",
         "- Prefers concise answers.",

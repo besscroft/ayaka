@@ -638,8 +638,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle("system:version", () => app.getVersion());
   ipcMain.handle("system:changelog", () =>
     readChangelog({
-      isDev: process.env.VOID_AI_DEV === "1",
-      appPath: process.env.VOID_AI_APP_PATH ?? app.getAppPath(),
+      isDev: process.env.AYAKA_DEV === "1",
+      appPath: process.env.AYAKA_APP_PATH ?? app.getAppPath(),
       resourcesPath: process.resourcesPath,
     }),
   );

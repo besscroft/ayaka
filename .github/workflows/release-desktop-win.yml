@@ -52,8 +52,8 @@ jobs:
           $dist = Join-Path $env:GITHUB_WORKSPACE 'apps/desktop/dist'
           $expected = @(
             (Join-Path $dist 'latest.yml'),
-            (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe"),
-            (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe.blockmap")
+            (Join-Path $dist "ayaka-$env:RELEASE_VERSION-setup.exe"),
+            (Join-Path $dist "ayaka-$env:RELEASE_VERSION-setup.exe.blockmap")
           )
           foreach ($path in $expected) {
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -94,8 +94,8 @@ jobs:
           $prefix = "releases/stable/v$env:RELEASE_VERSION"
           $objects = @(
             "$prefix/latest.yml",
-            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe",
-            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap"
+            "$prefix/ayaka-$env:RELEASE_VERSION-setup.exe",
+            "$prefix/ayaka-$env:RELEASE_VERSION-setup.exe.blockmap"
           )
           foreach ($key in $objects) {
             aws s3api head-object --bucket $env:R2_BUCKET_NAME --key $key --endpoint-url $env:AWS_ENDPOINT_URL 2>$null
@@ -108,8 +108,8 @@ jobs:
             }
           }
           aws s3 cp (Join-Path $dist 'latest.yml') "s3://$env:R2_BUCKET_NAME/$prefix/latest.yml" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'text/yaml; charset=utf-8'
-          aws s3 cp (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe") "s3://$env:R2_BUCKET_NAME/$prefix/paimon-$env:RELEASE_VERSION-setup.exe" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/vnd.microsoft.portable-executable'
-          aws s3 cp (Join-Path $dist "paimon-$env:RELEASE_VERSION-setup.exe.blockmap") "s3://$env:R2_BUCKET_NAME/$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/octet-stream'
+          aws s3 cp (Join-Path $dist "ayaka-$env:RELEASE_VERSION-setup.exe") "s3://$env:R2_BUCKET_NAME/$prefix/ayaka-$env:RELEASE_VERSION-setup.exe" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/vnd.microsoft.portable-executable'
+          aws s3 cp (Join-Path $dist "ayaka-$env:RELEASE_VERSION-setup.exe.blockmap") "s3://$env:R2_BUCKET_NAME/$prefix/ayaka-$env:RELEASE_VERSION-setup.exe.blockmap" --endpoint-url $env:AWS_ENDPOINT_URL --content-type 'application/octet-stream'
 
       - name: Verify uploaded objects
         shell: pwsh
@@ -121,8 +121,8 @@ jobs:
           $prefix = "releases/stable/v$env:RELEASE_VERSION"
           $objects = @(
             "$prefix/latest.yml",
-            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe",
-            "$prefix/paimon-$env:RELEASE_VERSION-setup.exe.blockmap"
+            "$prefix/ayaka-$env:RELEASE_VERSION-setup.exe",
+            "$prefix/ayaka-$env:RELEASE_VERSION-setup.exe.blockmap"
           )
           foreach ($key in $objects) {
             aws s3api head-object --bucket $env:R2_BUCKET_NAME --key $key --endpoint-url $env:AWS_ENDPOINT_URL | Out-Null
@@ -132,7 +132,7 @@ jobs:
         shell: pwsh
         run: |
           $releaseUri = 'https://ai.zzzvoid.com/api/releases/latest?platform=win32&arch=x64'
-          $expectedDownloadUrl = "https://ai-release.zzzvoid.com/releases/stable/v$env:RELEASE_VERSION/paimon-$env:RELEASE_VERSION-setup.exe"
+          $expectedDownloadUrl = "https://ai-release.zzzvoid.com/releases/stable/v$env:RELEASE_VERSION/ayaka-$env:RELEASE_VERSION-setup.exe"
           $release = $null
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             try {

@@ -55,7 +55,7 @@ export async function searchModelScopeSkills(
     headers: {
       Accept: "application/json, text/plain;q=0.9",
       "Content-Type": "application/json",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) VoidAI/1.0",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Ayaka/1.0",
       Origin: MODELSCOPE_ORIGIN,
       Referer: `${MODELSCOPE_ORIGIN}/skills`,
     },

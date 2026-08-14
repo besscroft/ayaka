@@ -28,7 +28,7 @@
 ## Verification
 
 - Cover publication patches, draft defaults, list movement, locked/busy rejection, archive and restore behavior, and permanent deletion without foreign-key errors or runtime-state residue.
-- Run `vp check`, `vp test`, `vp run desktop#test`, `vp run desktop#typecheck`, and `vp run desktop#build`.
+- Run `vp check`, `vp test`, `vp run ayaka-desktop#test`, `vp run ayaka-desktop#typecheck`, and `vp run ayaka-desktop#build`.
 - Manually verify publish, archive confirmation, trash restore, permanent deletion, and Chinese/English labels in the desktop app.
 
 ## Scope

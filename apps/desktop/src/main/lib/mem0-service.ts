@@ -22,7 +22,7 @@ export async function getMemory(): Promise<Memory | null> {
   if (!apiKey) return null;
 
   const historyDbPath = join(
-    process.env.VOID_AI_USER_DATA_DIR || app.getPath("userData"),
+    process.env.AYAKA_USER_DATA_DIR || app.getPath("userData"),
     "data",
     "mem0-history.db",
   );
@@ -31,7 +31,7 @@ export async function getMemory(): Promise<Memory | null> {
     embedder: { provider: "openai", config: { apiKey, model: "text-embedding-3-small" } },
     vectorStore: {
       provider: "memory",
-      config: { collectionName: "void-memories", dimension: 1536 },
+      config: { collectionName: "ayaka-memories", dimension: 1536 },
     },
     historyDbPath,
   });

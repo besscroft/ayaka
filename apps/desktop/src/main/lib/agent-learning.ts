@@ -5,7 +5,7 @@ import {
   insertRuntimeEvent,
   listMessages,
   queueMemoryJob,
-  updateVoidLearningState,
+  updateAyakaLearningState,
 } from "./db";
 import { memoryOrchestrator } from "./memory-orchestrator";
 
@@ -123,7 +123,7 @@ async function runJob(job: MemoryJob): Promise<void> {
 async function runLearningJob(job: MemoryJob): Promise<void> {
   if (!job.conversation_id) return;
   const started = Date.now();
-  updateVoidLearningState({ status: "learning" });
+  updateAyakaLearningState({ status: "learning" });
   try {
     const messages = listMessages(job.conversation_id).map((message) => ({
       id: message.id,
@@ -136,7 +136,7 @@ async function runLearningJob(job: MemoryJob): Promise<void> {
       agentId: job.agent_id ?? DEFAULT_AGENT_ID,
       messages,
     });
-    updateVoidLearningState({ status: "idle", lastLearningAt: Date.now(), lastError: null });
+    updateAyakaLearningState({ status: "idle", lastLearningAt: Date.now(), lastError: null });
     insertRuntimeEvent({
       kind: "memory",
       title: "Silent memory learning completed",
@@ -150,7 +150,7 @@ async function runLearningJob(job: MemoryJob): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    updateVoidLearningState({ status: "failed", lastLearningAt: Date.now(), lastError: message });
+    updateAyakaLearningState({ status: "failed", lastLearningAt: Date.now(), lastError: message });
     throw error;
   }
 }

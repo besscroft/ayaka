@@ -1,6 +1,6 @@
-# Void AI Architecture
+# Ayaka Architecture
 
-Void AI uses one execution model for chat, automations, skills, and child agents: an outer
+Ayaka uses one execution model for chat, automations, skills, and child agents: an outer
 `AgentLoopSessionManager` owns the run while the AI SDK `ToolLoopAgent` performs one ReAct step at
 a time.
 

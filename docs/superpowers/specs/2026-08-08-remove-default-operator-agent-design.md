@@ -11,7 +11,7 @@ the "火种" agent in the client.
 - Keep the root agent and the researcher agent unchanged.
 - Do not delete or mutate existing database records. Existing installations
   may already have this agent and should retain their data.
-- Keep runtime root-agent behavior unchanged; `agent-void` remains the
+- Keep runtime root-agent behavior unchanged; `agent-ayaka` remains the
   required default root agent.
 
 ## Implementation

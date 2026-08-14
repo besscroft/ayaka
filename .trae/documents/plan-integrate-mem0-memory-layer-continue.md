@@ -50,15 +50,15 @@ buildAgentSystemPrompt?: (agentId?: string | null, conversationId?: string) => P
 
 需改动 7 处（4 处 mock + 3 处断言）：
 
-| 行号 | 当前                                                               | 改为                                                                     |
-| ---- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| L122 | `buildAgentSystemPrompt: () => "You are a test assistant."`        | `buildAgentSystemPrompt: async () => "You are a test assistant."`        |
-| L152 | `captured.value?.buildAgentSystemPrompt("agent-void", "c-stream")` | `await captured.value?.buildAgentSystemPrompt("agent-void", "c-stream")` |
-| L183 | `buildAgentSystemPrompt: () => "Void root prompt"`                 | `buildAgentSystemPrompt: async () => "Void root prompt"`                 |
-| L193 | `options.buildAgentSystemPrompt("agent-void", "c-neutral")`        | `await options.buildAgentSystemPrompt("agent-void", "c-neutral")`        |
-| L240 | `buildAgentSystemPrompt: () => "Base instructions."`               | `buildAgentSystemPrompt: async () => "Base instructions."`               |
-| L243 | `options.buildAgentSystemPrompt("agent-void", undefined)`          | `await options.buildAgentSystemPrompt("agent-void", undefined)`          |
-| L284 | `buildAgentSystemPrompt: () => "You are a test assistant."`        | `buildAgentSystemPrompt: async () => "You are a test assistant."`        |
+| 行号 | 当前                                                                | 改为                                                                      |
+| ---- | ------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| L122 | `buildAgentSystemPrompt: () => "You are a test assistant."`         | `buildAgentSystemPrompt: async () => "You are a test assistant."`         |
+| L152 | `captured.value?.buildAgentSystemPrompt("agent-ayaka", "c-stream")` | `await captured.value?.buildAgentSystemPrompt("agent-ayaka", "c-stream")` |
+| L183 | `buildAgentSystemPrompt: () => "Ayaka root prompt"`                 | `buildAgentSystemPrompt: async () => "Ayaka root prompt"`                 |
+| L193 | `options.buildAgentSystemPrompt("agent-ayaka", "c-neutral")`        | `await options.buildAgentSystemPrompt("agent-ayaka", "c-neutral")`        |
+| L240 | `buildAgentSystemPrompt: () => "Base instructions."`                | `buildAgentSystemPrompt: async () => "Base instructions."`                |
+| L243 | `options.buildAgentSystemPrompt("agent-ayaka", undefined)`          | `await options.buildAgentSystemPrompt("agent-ayaka", undefined)`          |
+| L284 | `buildAgentSystemPrompt: () => "You are a test assistant."`         | `buildAgentSystemPrompt: async () => "You are a test assistant."`         |
 
 **注意**：L152 和 L193 处的 `buildAgentSystemPrompt` 调用本身已在 async 函数体内（`async (options) => {...}` 和外层 `async () => {...}`），可直接加 `await`。
 

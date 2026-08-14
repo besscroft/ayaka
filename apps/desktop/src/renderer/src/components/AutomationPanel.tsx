@@ -296,7 +296,7 @@ export function AutomationPanel(): React.JSX.Element {
                     variant="tertiary"
                     onPress={() =>
                       window.dispatchEvent(
-                        new CustomEvent("void-ai:open-conversation", {
+                        new CustomEvent("ayaka:open-conversation", {
                           detail: { conversationId: selected.conversationId },
                         }),
                       )

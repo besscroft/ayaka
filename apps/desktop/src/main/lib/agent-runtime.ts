@@ -625,7 +625,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     return base;
   }
 
-  // The root agent (Paimon) always has the memory tools available, independent of
+  // The root agent (Ayaka) always has the memory tools available, independent of
   // the user's chat tool selection. They remain hidden from the chat page UI.
   const memoryHostTools = createMemoryHostTools({
     model: context.modelContext,

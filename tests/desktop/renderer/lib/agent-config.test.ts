@@ -125,7 +125,7 @@ void describe("agent config normalization", () => {
   void it("keeps the default main agent visible first in the active list", () => {
     const main = agentProfile({
       id: DEFAULT_AGENT_ID,
-      name: "Paimon",
+      name: "Ayaka",
       kind: "main",
       updated_at: 1,
     });

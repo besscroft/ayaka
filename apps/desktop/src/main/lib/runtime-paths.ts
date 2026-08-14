@@ -2,15 +2,15 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 
 export function resolveUserDataDir(): string {
-  const configured = process.env.VOID_AI_USER_DATA_DIR;
+  const configured = process.env.AYAKA_USER_DATA_DIR;
   if (configured) return configured;
   const appData = process.env.APPDATA;
-  if (appData) return join(appData, "paimon");
-  return join(process.cwd(), ".void-ai");
+  if (appData) return join(appData, "ayaka");
+  return join(process.cwd(), ".ayaka");
 }
 
 export function resolveAppPath(): string {
-  return process.env.VOID_AI_APP_PATH || process.cwd();
+  return process.env.AYAKA_APP_PATH || process.cwd();
 }
 
 /** Remove data owned by the retired animated companion feature. */

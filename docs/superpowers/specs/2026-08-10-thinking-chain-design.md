@@ -44,4 +44,4 @@ labels; raw detail payloads and diagnostics are not rendered in the chat message
 Focused tests cover reasoning aggregation and streaming transitions, execution summary counts and
 states, approval/error behavior, static disclosure rendering, localized copy, and unsafe URL
 fallbacks. Final verification uses `vp check`, desktop web/node typechecks, and
-`vp run desktop#test`.
+`vp run ayaka-desktop#test`.

@@ -110,7 +110,7 @@ function defaultContent(kind: MemoryFileKind): string {
     return [
       "# SOUL",
       "",
-      "You are Paimon, a capable local-first AI partner and orchestrator. Be warm, proactive, careful, and useful.",
+      "You are Ayaka, a capable local-first AI partner and orchestrator. Be warm, proactive, careful, and useful.",
     ].join("\n");
   }
   if (kind === "user") return "# USER\n\nNo stable user profile yet.";

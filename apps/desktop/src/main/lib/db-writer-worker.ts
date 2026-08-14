@@ -8,9 +8,9 @@ const data = workerData as {
   appPath?: string;
   userDataDir: string;
 };
-process.env.VOID_AI_DB_WRITER_WORKER = "1";
-process.env.VOID_AI_USER_DATA_DIR = data.userDataDir;
-if (data.appPath) process.env.VOID_AI_APP_PATH = data.appPath;
+process.env.AYAKA_DB_WRITER_WORKER = "1";
+process.env.AYAKA_USER_DATA_DIR = data.userDataDir;
+if (data.appPath) process.env.AYAKA_APP_PATH = data.appPath;
 const [dbDomain, cronDomain] = await Promise.all([import("./db"), import("./cron-store")]);
 dbDomain.initDb({
   dbPath: data.dbPath,

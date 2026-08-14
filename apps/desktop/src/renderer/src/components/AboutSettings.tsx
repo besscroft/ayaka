@@ -120,7 +120,7 @@ export function AboutSettings(): React.JSX.Element {
         />
         <div className="min-w-0">
           <p className="text-xs font-medium text-primary">{t("about.product")}</p>
-          <h3 className="mt-1 text-2xl font-semibold leading-tight">Paimon</h3>
+          <h3 className="mt-1 text-2xl font-semibold leading-tight">Ayaka</h3>
           <Description className="mt-1">{t("shell.tagline")}</Description>
         </div>
       </header>

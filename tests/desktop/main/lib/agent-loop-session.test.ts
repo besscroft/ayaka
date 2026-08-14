@@ -16,7 +16,7 @@ electronModule.filename = electronPath;
 electronModule.paths = [];
 electronModule.loaded = true;
 electronModule.exports = {
-  app: { isPackaged: false, getPath: () => process.env.VOID_AI_USER_DATA_DIR ?? process.cwd() },
+  app: { isPackaged: false, getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd() },
 };
 require.cache[electronPath] = electronModule;
 
@@ -32,8 +32,8 @@ before(async () => {
 
 beforeEach(async () => {
   await db.closeDb();
-  testRoot = await mkdtemp(path.join(tmpdir(), "void-ai-agent-loop-"));
-  process.env.VOID_AI_USER_DATA_DIR = testRoot;
+  testRoot = await mkdtemp(path.join(tmpdir(), "ayaka-agent-loop-"));
+  process.env.AYAKA_USER_DATA_DIR = testRoot;
   db.initDb();
   conversationId = randomUUID();
   await db.createConversation(conversationId);
@@ -41,7 +41,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await db.closeDb();
-  delete process.env.VOID_AI_USER_DATA_DIR;
+  delete process.env.AYAKA_USER_DATA_DIR;
   await rm(testRoot, { recursive: true, force: true });
 });
 

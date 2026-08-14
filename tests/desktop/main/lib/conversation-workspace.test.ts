@@ -13,7 +13,7 @@ electronModule.filename = electronPath;
 electronModule.paths = [];
 electronModule.loaded = true;
 electronModule.exports = {
-  app: { isPackaged: false, getPath: () => process.env.VOID_AI_USER_DATA_DIR ?? process.cwd() },
+  app: { isPackaged: false, getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd() },
   dialog: {
     showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
     showSaveDialog: async () => saveDialogResult,
@@ -40,8 +40,8 @@ before(async () => {
 
 beforeEach(async () => {
   await db.closeDb();
-  root = await mkdtemp(path.join(tmpdir(), "void-ai-workspace-test-"));
-  process.env.VOID_AI_USER_DATA_DIR = root;
+  root = await mkdtemp(path.join(tmpdir(), "ayaka-workspace-test-"));
+  process.env.AYAKA_USER_DATA_DIR = root;
   saveDialogResult = { canceled: true };
   revealedPath = "";
   const repoRoot = path.resolve(fileURLToPath(new URL("../../../../", import.meta.url)));
@@ -53,7 +53,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await db.closeDb();
-  delete process.env.VOID_AI_USER_DATA_DIR;
+  delete process.env.AYAKA_USER_DATA_DIR;
   await rm(root, { recursive: true, force: true });
 });
 

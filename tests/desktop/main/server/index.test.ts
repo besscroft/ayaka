@@ -270,7 +270,7 @@ void describe("local chat server", () => {
     assert.equal(captured.value?.mode, "resume");
     assert.deepEqual(captured.value?.resolved.providerOptions, providerOptions);
     assert.equal(
-      await captured.value?.buildAgentSystemPrompt("agent-void", "c-stream"),
+      await captured.value?.buildAgentSystemPrompt("agent-ayaka", "c-stream"),
       "You are a test assistant.",
     );
   });
@@ -429,7 +429,7 @@ void describe("local chat server", () => {
     const app = createApp({
       sessionToken: token,
       resolveModel: () => ({ model, temperature: 0.7, topP: 1, maxOutputTokens: 256 }),
-      buildAgentSystemPrompt: async () => "Void root prompt",
+      buildAgentSystemPrompt: async () => "Ayaka root prompt",
       runAgentChat: async (options) => {
         assert.deepEqual(options.messages, validMessages);
         return agentRuntimeResponse("sanitized-stream");
@@ -478,7 +478,7 @@ void describe("local chat server", () => {
             maxOutputTokens: 256,
           };
         },
-        buildAgentSystemPrompt: async () => "Void root prompt",
+        buildAgentSystemPrompt: async () => "Ayaka root prompt",
         runAgentChat: async (options) => {
           called = true;
           assert.equal(options.modelRef, modelRef);
@@ -488,8 +488,8 @@ void describe("local chat server", () => {
           assert.deepEqual(options.toolSelection, toolSelection);
           assert.equal(options.resolved.providerKind, providerKind);
           assert.equal(
-            await options.buildAgentSystemPrompt("agent-void", "c-neutral"),
-            "Void root prompt",
+            await options.buildAgentSystemPrompt("agent-ayaka", "c-neutral"),
+            "Ayaka root prompt",
           );
           return agentRuntimeResponse("agents-stream");
         },
@@ -539,7 +539,7 @@ void describe("local chat server", () => {
       runAgentChat: async (options) => {
         assert.deepEqual(options.messages, messages);
         assert.equal(
-          await options.buildAgentSystemPrompt("agent-void", undefined),
+          await options.buildAgentSystemPrompt("agent-ayaka", undefined),
           "Base instructions.",
         );
         return agentRuntimeResponse("reaction-stream");
@@ -679,7 +679,7 @@ void describe("local chat server /api/media/generate", () => {
         type: "file" as const,
         mediaType,
         filename: `${filename ?? kind}.bin`,
-        url: `void-media://asset/${kind}.bin`,
+        url: `ayaka-media://asset/${kind}.bin`,
         size: data.byteLength,
       }),
     });
@@ -756,7 +756,7 @@ void describe("local chat server /api/media/generate", () => {
         type: "file" as const,
         mediaType,
         filename: `${filename ?? kind}.bin`,
-        url: `void-media://asset/${kind}.bin`,
+        url: `ayaka-media://asset/${kind}.bin`,
         size: data.byteLength,
       }),
     });
