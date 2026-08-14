@@ -2168,9 +2168,9 @@ function ProviderModelWorkbench({
     <section className="flex min-h-0 flex-1 flex-col gap-4 select-none">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h3 className="text-base font-semibold">{t("settings.tab.model")}</h3>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full min-w-0 items-center justify-end gap-2 lg:w-auto">
           <SelectField
-            className="h-9 min-w-64"
+            className="h-9 w-auto min-w-0 flex-1 lg:w-80 lg:flex-none"
             value={settings.selectedModel ?? ""}
             options={[
               { value: "", label: t("chat.selectModel") },
