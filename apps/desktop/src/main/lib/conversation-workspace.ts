@@ -16,6 +16,8 @@ import type {
   WorkspaceFileContent,
   WorkspaceFileRef,
   WorkspaceInfo,
+  WorkspaceMediaSaveInput,
+  WorkspaceMediaSaveResult,
   WorkspaceOrphan,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
@@ -319,6 +321,42 @@ export async function readWorkspaceFileContent(
     size: data.byteLength,
     data: bytes.buffer,
   };
+}
+
+export async function saveWorkspaceMediaAs(
+  input: WorkspaceMediaSaveInput,
+): Promise<WorkspaceMediaSaveResult> {
+  const bytes = input.data instanceof Uint8Array ? input.data : new Uint8Array(input.data);
+  if (bytes.byteLength === 0) throw new Error("Media data is empty.");
+
+  const requested = sanitizeFilename(path.basename(input.filename?.trim() || "image"));
+  const safeRequested = requested || "image";
+  const filename = path.extname(safeRequested)
+    ? safeRequested
+    : safeRequested + extensionForMediaType(input.mediaType || "application/octet-stream");
+  const result = await dialog.showSaveDialog({
+    defaultPath: filename,
+    filters: input.mediaType
+      ? [{ name: input.mediaType, extensions: [path.extname(filename).slice(1) || "bin"] }]
+      : undefined,
+  });
+  if (result.canceled || !result.filePath) return { saved: false };
+
+  await writeFile(result.filePath, bytes);
+  return { saved: true, path: result.filePath };
+}
+
+export async function revealWorkspaceFile(
+  conversationId: string,
+  relativePath: string,
+): Promise<boolean> {
+  const workspace = getConversationWorkspace(conversationId);
+  if (!workspace) throw new Error("Conversation workspace does not exist.");
+  const filePath = resolveWorkspacePath(workspace.root_path, relativePath);
+  const info = await stat(filePath);
+  if (!info.isFile()) throw new Error("Workspace path is not a file.");
+  shell.showItemInFolder(filePath);
+  return true;
 }
 
 export async function materializeWorkspaceFileReferences(

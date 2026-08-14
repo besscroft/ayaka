@@ -1,10 +1,11 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { useT } from "../../lib/i18n";
 import { useMediaResourceStates } from "../../lib/media-resource";
 import { AttachmentChip } from "./attachment-chip";
 import type { AttachmentItem } from "./attachment-chip";
 import { sanitizeRichContentUrl } from "./rich-content-utils";
+import { ImageLightbox, type ImageLightboxItem } from "./image-lightbox";
 
 export interface FilePartLike {
   type: string;
@@ -27,14 +28,18 @@ export function MessageAttachments({
 }: MessageAttachmentsProps): React.JSX.Element | null {
   const { t } = useT();
   const { states, markFailed } = useMediaResourceStates(conversationId, parts);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   if (parts.length === 0) return null;
 
-  const items: AttachmentItem[] = parts.map((p, i) => ({
+  const items: Array<AttachmentItem & { workspacePath?: string }> = parts.map((p, i) => ({
     id: `${p.type}-${i}`,
     name: p.filename ?? t("attachment.file"),
     mediaType: p.mediaType ?? "application/octet-stream",
     size: 0,
     url: states[`${p.type}-${i}`]?.url,
+    workspacePath: p.url?.startsWith("workspace://")
+      ? p.url.slice("workspace://".length)
+      : undefined,
     variant: p.mediaType?.startsWith("image/")
       ? "image"
       : p.mediaType?.startsWith("video/")
@@ -51,14 +56,29 @@ export function MessageAttachments({
     (it) => it.variant !== "image" && it.variant !== "audio" && it.variant !== "video",
   );
 
+  const lightboxImages: ImageLightboxItem[] = images.flatMap((item) => {
+    const src = item.url ? sanitizeRichContentUrl(item.url, "image") : null;
+    return src
+      ? [
+          {
+            id: item.id,
+            name: item.name,
+            mediaType: item.mediaType,
+            src,
+            workspacePath: item.workspacePath,
+          },
+        ]
+      : [];
+  });
+
   return (
     <div data-slot="message-attachments" className={cn("flex w-full flex-col gap-2", className)}>
       {images.length > 0 && (
         <div
           className={cn(
-            "grid gap-1.5",
+            "grid max-w-[420px] gap-1.5",
             images.length === 1
-              ? "grid-cols-1"
+              ? "w-fit max-w-full grid-cols-1"
               : images.length === 2
                 ? "grid-cols-2"
                 : "grid-cols-3",
@@ -71,6 +91,12 @@ export function MessageAttachments({
               loading={states[img.id]?.loading === true}
               error={states[img.id]?.error === true}
               onError={() => markFailed(img.id)}
+              onOpen={() => {
+                const index = lightboxImages.findIndex((image) => image.id === img.id);
+                if (index >= 0) setLightboxIndex(index);
+              }}
+              compact={images.length > 1}
+              openLabel={t("image.action.open", { name: img.name })}
               errorText={t("attachment.loadFailed", { name: img.name })}
             />
           ))}
@@ -114,6 +140,16 @@ export function MessageAttachments({
           ))}
         </div>
       )}
+
+      <ImageLightbox
+        open={lightboxIndex !== null}
+        conversationId={conversationId}
+        images={lightboxImages}
+        initialIndex={lightboxIndex ?? 0}
+        onOpenChange={(open) => {
+          if (!open) setLightboxIndex(null);
+        }}
+      />
     </div>
   );
 }
@@ -123,44 +159,57 @@ function ImageTile({
   loading,
   error,
   onError,
+  onOpen,
+  compact,
+  openLabel,
   errorText,
 }: {
   item: AttachmentItem;
   loading: boolean;
   error: boolean;
   onError: () => void;
+  onOpen: () => void;
+  compact: boolean;
+  openLabel: string;
   errorText: string;
 }): ReactNode {
   const src = item.url ? sanitizeRichContentUrl(item.url, "image") : null;
   if (error) {
-    return <MediaError text={errorText} square />;
+    return <MediaError text={errorText} square={compact} />;
   }
   if (loading) {
-    return <MediaLoading name={item.name} square />;
+    return <MediaLoading name={item.name} square={compact} />;
   }
   if (!src) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
+      <div className="flex min-h-20 items-center justify-center rounded-lg bg-muted px-3 text-center text-xs text-muted-foreground">
         {item.name}
       </div>
     );
   }
   return (
-    <a
-      href={src}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="group/tile relative block aspect-square overflow-hidden rounded-lg bg-muted"
+    <button
+      type="button"
+      className={cn(
+        "group/tile relative flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none",
+        compact ? "aspect-[4/3]" : "max-h-[320px] max-w-full",
+      )}
       title={item.name}
+      aria-label={openLabel}
+      onClick={onOpen}
     >
       <img
         src={src}
         alt={item.name}
-        className="size-full object-cover transition group-hover/tile:scale-105"
+        className={cn(
+          "block max-w-full object-contain",
+          compact ? "max-h-full max-w-full" : "max-h-[320px] max-w-[420px]",
+        )}
         loading="lazy"
+        draggable={false}
         onError={onError}
       />
-    </a>
+    </button>
   );
 }
 

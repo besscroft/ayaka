@@ -54,6 +54,8 @@ const api = {
     removeOrphan: (id: string) => ipcRenderer.invoke("workspace:removeOrphan", id),
     saveAttachments: (input: unknown) => ipcRenderer.invoke("workspace:saveAttachments", input),
     read: (input: unknown) => ipcRenderer.invoke("workspace:read", input),
+    saveMediaAs: (input: unknown) => ipcRenderer.invoke("workspace:saveMediaAs", input),
+    revealFile: (input: unknown) => ipcRenderer.invoke("workspace:revealFile", input),
     rollback: (conversationId: string) => ipcRenderer.invoke("workspace:rollback", conversationId),
   },
   cron: {

@@ -1875,6 +1875,17 @@ export interface WorkspaceFileContent extends WorkspaceFileRef {
   data: ArrayBuffer;
 }
 
+export interface WorkspaceMediaSaveInput {
+  filename?: string;
+  mediaType?: string;
+  data: ArrayBuffer;
+}
+
+export interface WorkspaceMediaSaveResult {
+  saved: boolean;
+  path?: string;
+}
+
 // ============================================================
 // 璁剧疆椤圭被鍨嬪畾涔?
 // ============================================================

@@ -30,3 +30,6 @@ dist-ssr
 .claude/worktrees/
 # heroui-agents-md
 .heroui-docs/
+
+# Visual brainstorming companion artifacts
+.superpowers/

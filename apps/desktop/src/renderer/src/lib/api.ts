@@ -48,6 +48,8 @@ import type {
   UpdateState,
   WorkspaceFileRef,
   WorkspaceFileContent,
+  WorkspaceMediaSaveInput,
+  WorkspaceMediaSaveResult,
   WorkspaceInfo,
   WorkspaceOrphan,
 } from "@shared/types";
@@ -129,6 +131,10 @@ export const api = {
     }): Promise<WorkspaceFileRef[]> => assertApi().workspace.saveAttachments(input),
     read: (input: { conversationId: string; path: string }): Promise<WorkspaceFileContent> =>
       assertApi().workspace.read(input),
+    saveMediaAs: (input: WorkspaceMediaSaveInput): Promise<WorkspaceMediaSaveResult> =>
+      assertApi().workspace.saveMediaAs(input),
+    revealFile: (input: { conversationId: string; path: string }): Promise<boolean> =>
+      assertApi().workspace.revealFile(input),
     rollback: (conversationId: string): Promise<void> =>
       assertApi().workspace.rollback(conversationId),
   },

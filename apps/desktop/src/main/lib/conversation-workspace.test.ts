@@ -14,14 +14,24 @@ electronModule.paths = [];
 electronModule.loaded = true;
 electronModule.exports = {
   app: { isPackaged: false, getPath: () => process.env.VOID_AI_USER_DATA_DIR ?? process.cwd() },
-  dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
-  shell: { openPath: async () => "" },
+  dialog: {
+    showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+    showSaveDialog: async () => saveDialogResult,
+  },
+  shell: {
+    openPath: async () => "",
+    showItemInFolder: (filePath: string) => {
+      revealedPath = filePath;
+    },
+  },
 };
 require.cache[electronPath] = electronModule;
 
 let db: typeof import("./db");
 let workspace: typeof import("./conversation-workspace");
 let root = "";
+let saveDialogResult: { canceled: boolean; filePath?: string } = { canceled: true };
+let revealedPath = "";
 
 before(async () => {
   db = await import("./db");
@@ -32,6 +42,8 @@ beforeEach(async () => {
   await db.closeDb();
   root = await mkdtemp(path.join(tmpdir(), "void-ai-workspace-test-"));
   process.env.VOID_AI_USER_DATA_DIR = root;
+  saveDialogResult = { canceled: true };
+  revealedPath = "";
   const repoRoot = path.resolve(fileURLToPath(new URL("../../../../../", import.meta.url)));
   db.initDb({
     migrationsFolder: path.join(repoRoot, "apps", "desktop", "drizzle"),
@@ -125,6 +137,38 @@ void describe("conversation workspaces", () => {
     assert.equal(content.mediaType, "image/png");
     assert.deepEqual(Array.from(new Uint8Array(content.data)), [2]);
     await assert.rejects(workspace.readWorkspaceFileContent(id, "../outside"), /escapes/);
+  });
+
+  void it("saves media through the native dialog and reveals workspace files safely", async () => {
+    const id = "image-actions-conversation";
+    const output = await workspace.writeWorkspaceOutput(id, {
+      filename: "generated",
+      mediaType: "image/png",
+      data: new Uint8Array([7, 8, 9]),
+    });
+    saveDialogResult = { canceled: false, filePath: path.join(root, "saved-image.png") };
+
+    const saved = await workspace.saveWorkspaceMediaAs({
+      filename: "generated.png",
+      mediaType: "image/png",
+      data: new Uint8Array([1, 2, 3]).buffer,
+    });
+    assert.equal(saved.saved, true);
+    assert.deepEqual(Array.from(await readFile(path.join(root, "saved-image.png"))), [1, 2, 3]);
+
+    saveDialogResult = { canceled: true };
+    assert.deepEqual(
+      await workspace.saveWorkspaceMediaAs({
+        filename: "cancelled.png",
+        mediaType: "image/png",
+        data: new Uint8Array([4]).buffer,
+      }),
+      { saved: false },
+    );
+
+    assert.equal(await workspace.revealWorkspaceFile(id, output.path), true);
+    assert.equal(revealedPath, path.join(db.getConversationWorkspace(id)!.root_path, output.path));
+    await assert.rejects(workspace.revealWorkspaceFile(id, "../outside.png"), /escapes/);
   });
 
   void it("finds and removes only valid orphan directories", async () => {

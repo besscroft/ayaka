@@ -50,6 +50,8 @@ import type {
   WorkspaceFileRef,
   WorkspaceFileContent,
   WorkspaceInfo,
+  WorkspaceMediaSaveInput,
+  WorkspaceMediaSaveResult,
   WorkspaceOrphan,
 } from "../shared/types";
 import type { UIMessage } from "ai";
@@ -105,6 +107,8 @@ export interface VoidAIApi {
       attachments: Array<{ filename?: string; mediaType?: string; dataUrl: string }>;
     }) => Promise<WorkspaceFileRef[]>;
     read: (input: { conversationId: string; path: string }) => Promise<WorkspaceFileContent>;
+    saveMediaAs: (input: WorkspaceMediaSaveInput) => Promise<WorkspaceMediaSaveResult>;
+    revealFile: (input: { conversationId: string; path: string }) => Promise<boolean>;
     rollback: (conversationId: string) => Promise<void>;
   };
   cron: {

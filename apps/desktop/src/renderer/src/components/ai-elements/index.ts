@@ -46,6 +46,7 @@ export {
 export { AttachmentChip, type AttachmentItem } from "./attachment-chip";
 
 export { MessageAttachments, type FilePartLike } from "./message-attachments";
+export { ImageLightbox, type ImageLightboxItem } from "./image-lightbox";
 
 export { PromptSuggestions } from "./prompt-suggestions";
 

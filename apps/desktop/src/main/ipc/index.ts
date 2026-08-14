@@ -96,6 +96,7 @@ import type {
   ToolServerInput,
   AgentRunInputKind,
   AgentRunInputSource,
+  WorkspaceMediaSaveInput,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { queueAgentLearning } from "../lib/agent-learning";
@@ -137,8 +138,10 @@ import {
   openWorkspaceOrphan,
   openWorkspaceParent,
   prepareConversationWorkspace,
+  revealWorkspaceFile,
   removeWorkspaceOrphan,
   rollbackConversationWorkspacePreparation,
+  saveWorkspaceMediaAs,
   selectWorkspaceParent,
 } from "../lib/conversation-workspace";
 import { updateManager } from "../lib/update-manager";
@@ -247,6 +250,12 @@ export function registerIpcHandlers(): void {
       import("../lib/conversation-workspace").then(({ saveWorkspaceAttachments }) =>
         saveWorkspaceAttachments(input.conversationId, input.attachments),
       ),
+  );
+  ipcMain.handle("workspace:saveMediaAs", (_e, input: WorkspaceMediaSaveInput) =>
+    saveWorkspaceMediaAs(input),
+  );
+  ipcMain.handle("workspace:revealFile", (_e, input: { conversationId: string; path: string }) =>
+    revealWorkspaceFile(input.conversationId, input.path),
   );
   ipcMain.handle("workspace:read", async (_e, input: { conversationId: string; path: string }) => {
     const { readWorkspaceFileContent } = await import("../lib/conversation-workspace");
