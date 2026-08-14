@@ -15,16 +15,17 @@ void describe("parseSettings", () => {
   void it("keeps explicit language and skin values", () => {
     const settings = parseSettings({
       [SettingKey.Language]: "zh-CN",
-      [SettingKey.Skin]: "ocean",
+      [SettingKey.Skin]: "yaka",
     } as Record<string, string | null>);
 
     assert.equal(settings.language, "zh-CN");
-    assert.equal(settings.skin, "ocean");
+    assert.equal(settings.skin, "yaka");
 
     const legacyIds = [
       ["nova-light", "white"],
       ["nova-dark", "black"],
-      ["ocean-light", "ocean"],
+      ["ocean", "white"],
+      ["ocean-light", "white"],
     ] as const;
     for (const [legacy, expected] of legacyIds) {
       const migrated = parseSettings({

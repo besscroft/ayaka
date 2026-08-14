@@ -2280,7 +2280,7 @@ function ProviderModelWorkbench({
             </div>
           ) : (
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="flex shrink-0 flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex shrink-0 flex-col gap-3 pb-4 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="truncate text-base font-semibold">{selectedProvider.label}</h4>

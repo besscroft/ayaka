@@ -100,13 +100,14 @@ void describe("applyTheme", () => {
   void it("updates skin radius and color mode when switching skins", () => {
     applyTheme(
       themeSettings({
-        skin: "ocean",
+        skin: "yaka",
         fontSize: "base",
         density: "comfortable",
       }),
     );
     assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
-    assert.equal(root.dataset.skin, "ocean");
+    assert.equal(root.dataset.skin, "yaka");
+    assert.equal(root.style.getPropertyValue("--skin-primary"), "oklch(0.42 0.12 232)");
     assert.equal(root.classList.contains("light"), true);
     assert.equal(root.classList.contains("dark"), false);
 
@@ -121,17 +122,23 @@ void describe("applyTheme", () => {
     assert.equal(root.dataset.skin, "white");
   });
 
-  void it("keeps Ocean geometry aligned with White while changing only the palette", () => {
+  void it("keeps yaka geometry aligned with White while using the yaka palette", () => {
     const white = SKIN_DEFINITIONS.find((skin) => skin.id === "white");
-    const ocean = SKIN_DEFINITIONS.find((skin) => skin.id === "ocean");
+    const yaka = SKIN_DEFINITIONS.find((skin) => skin.id === "yaka");
     assert.ok(white);
-    assert.ok(ocean);
-    assert.equal(ocean.radius, white.radius);
-    assert.equal(ocean.fontStack, white.fontStack);
-    assert.equal(ocean.monoFontStack, white.monoFontStack);
-    assert.equal(ocean.colorScheme, white.colorScheme);
-    assert.notEqual(ocean.tokens.primary, white.tokens.primary);
-    assert.notEqual(ocean.tokens.background, white.tokens.background);
+    assert.ok(yaka);
+    assert.equal(yaka.radius, white.radius);
+    assert.equal(yaka.fontStack, white.fontStack);
+    assert.equal(yaka.monoFontStack, white.monoFontStack);
+    assert.equal(yaka.colorScheme, white.colorScheme);
+    assert.equal(yaka.tokens.primary, "oklch(0.42 0.12 232)");
+    assert.equal(yaka.tokens.background, "oklch(0.96 0.02 232)");
+    assert.equal(yaka.tokens.surface, "oklch(0.975 0.018 232)");
+    assert.equal(yaka.tokens.overlay, "oklch(0.985 0.012 232)");
+    assert.equal(yaka.tokens.fieldBackground, "oklch(0.875 0.055 232)");
+    assert.notEqual(yaka.tokens.surface, "oklch(1 0 0)");
+    assert.notEqual(yaka.tokens.primary, white.tokens.primary);
+    assert.notEqual(yaka.tokens.background, white.tokens.background);
   });
 
   void it("defines every required semantic token for every built-in skin", () => {

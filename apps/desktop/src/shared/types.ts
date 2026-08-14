@@ -1892,7 +1892,7 @@ export interface WorkspaceMediaSaveResult {
 // ============================================================
 
 /** 涓婚妯″紡 */
-export type SkinId = "white" | "black" | "ocean";
+export type SkinId = "white" | "black" | "yaka";
 
 export interface SkinTokenValues {
   background: string;
@@ -1997,25 +1997,28 @@ const BLACK_TOKENS: SkinTokenValues = {
   link: "oklch(0.922 0 0)",
 };
 
-const OCEAN_TOKENS: SkinTokenValues = {
+const YAKA_TOKENS: SkinTokenValues = {
   ...WHITE_TOKENS,
-  background: "oklch(0.985 0.015 225)",
-  foreground: "oklch(0.18 0.03 230)",
-  surfaceForeground: "oklch(0.18 0.03 230)",
-  overlayForeground: "oklch(0.18 0.03 230)",
-  fieldForeground: "oklch(0.18 0.03 230)",
-  primary: "oklch(0.46 0.15 230)",
-  primaryForeground: "oklch(0.985 0.003 247)",
-  secondary: "oklch(0.95 0.025 225)",
-  secondaryForeground: "oklch(0.18 0.03 230)",
-  muted: "oklch(0.95 0.025 225)",
-  mutedForeground: "oklch(0.45 0.04 230)",
-  accent: "oklch(0.95 0.025 225)",
-  accentForeground: "oklch(0.18 0.03 230)",
-  border: "oklch(0.72 0.06 230 / 32%)",
-  separator: "oklch(0.9 0.025 230)",
-  focus: "oklch(0.46 0.15 230)",
-  link: "oklch(0.4 0.14 230)",
+  background: "oklch(0.96 0.02 232)",
+  foreground: "oklch(0.2 0.03 232)",
+  surface: "oklch(0.975 0.018 232)",
+  surfaceForeground: "oklch(0.2 0.03 232)",
+  overlay: "oklch(0.985 0.012 232)",
+  overlayForeground: "oklch(0.2 0.03 232)",
+  fieldBackground: "oklch(0.875 0.055 232)",
+  fieldForeground: "oklch(0.2 0.03 232)",
+  primary: "oklch(0.42 0.12 232)",
+  primaryForeground: "oklch(0.98 0.02 232)",
+  secondary: "oklch(0.86 0.06 232)",
+  secondaryForeground: "oklch(0.2 0.03 232)",
+  muted: "oklch(0.86 0.06 232)",
+  mutedForeground: "oklch(0.46 0.04 232)",
+  accent: "oklch(0.84 0.07 232)",
+  accentForeground: "oklch(0.2 0.03 232)",
+  border: "oklch(0.72 0.07 232 / 60%)",
+  separator: "oklch(0.78 0.05 232)",
+  focus: "oklch(0.52 0.12 232)",
+  link: "oklch(0.42 0.12 232)",
 };
 
 export const SKIN_DEFINITIONS: SkinDefinition[] = [
@@ -2052,17 +2055,17 @@ export const SKIN_DEFINITIONS: SkinDefinition[] = [
     monoFontStack: NOVA_MONO_FONT_STACK,
   },
   {
-    id: "ocean",
-    labelKey: "skin.ocean",
-    descKey: "skin.ocean.desc",
+    id: "yaka",
+    labelKey: "skin.yaka",
+    descKey: "skin.yaka.desc",
     colorScheme: "light",
     preview: {
-      background: "#e9f7fa",
-      surface: "#ffffff",
-      accent: "#176b82",
-      foreground: "#17313d",
+      background: "#EAF6FC",
+      surface: "#F2FAFE",
+      accent: "#4E8EAE",
+      foreground: "#203B49",
     },
-    tokens: OCEAN_TOKENS,
+    tokens: YAKA_TOKENS,
     radius: 10,
     fontStack: NOVA_FONT_STACK,
     monoFontStack: NOVA_MONO_FONT_STACK,

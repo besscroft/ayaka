@@ -72,7 +72,6 @@ function parseEnum<T extends string>(raw: string | null, allowed: readonly T[], 
 const LEGACY_SKIN_IDS: Record<string, SkinId> = {
   "nova-light": "white",
   "nova-dark": "black",
-  "ocean-light": "ocean",
 };
 
 function parseSkin(raw: string | null): SkinId {
