@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.1.20] - 2026-08-14
+
+### 中文
+
+#### 新增
+
+- 新增视觉模型配置与通用设置标签页，支持自动选择或指定图片输入模型。
+- 新增对话图片灯箱预览，支持自适应图片预览、键盘切换、缩放查看，以及保存图片和定位文件。
+
+#### 变更
+
+- 重构媒体资源加载与上下文桥接，统一处理图片及其他媒体附件，并增加加载占位和失败提示。
+- 当对话包含图片输入时自动使用已配置的视觉模型；当前模型不支持图片输入时显示明确的错误提示。
+
+#### 修复
+
+- 修复工作区文件通过 Electron contextBridge 传输时的二进制数据类型兼容性问题。
+
+### English
+
+#### Added
+
+- Added vision model configuration and a General settings tab, with support for automatic selection or a dedicated model for image input.
+- Added an image lightbox for conversations with adaptive previews, keyboard navigation, zooming, image saving, and file location.
+
+#### Changed
+
+- Refactored media-resource loading and context bridging to unify image and other media attachment handling, with loading placeholders and failure messages.
+- Conversations with image input now automatically use the configured vision model and show a clear error when the current model does not support images.
+
+#### Fixed
+
+- Fixed binary data type compatibility when workspace files are transferred through Electron's contextBridge.
+
 ## [0.1.19] - 2026-08-13
 
 ### 中文
