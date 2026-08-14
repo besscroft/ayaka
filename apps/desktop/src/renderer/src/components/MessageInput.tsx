@@ -327,7 +327,6 @@ export function MessageInput({
           </div>
         </div>
       </div>
-      <p className="mt-1.5 px-1 text-[10px] text-foreground/35">{t("input.shortcutHint")}</p>
     </div>
   );
 }

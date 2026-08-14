@@ -872,10 +872,6 @@ const entries = {
     en: "Describe with attachments…",
   },
   "input.send": { zh: "发送", en: "Send" },
-  "input.shortcutHint": {
-    zh: "Enter 发送 · Shift+Enter 换行",
-    en: "Enter to send · Shift+Enter for newline",
-  },
   "input.stop": { zh: "停止", en: "Stop" },
   "model.addModel": { zh: "添加模型", en: "Add model" },
   "model.addModel.desc": { zh: "添加新的语言模型配置", en: "Add a new language model" },
