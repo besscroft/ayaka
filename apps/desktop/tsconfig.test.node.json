@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.node.json",
+  "include": [
+    "../../tests/desktop/main.test.ts",
+    "../../tests/desktop/electron.test.ts",
+    "../../tests/desktop/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*"
+  ],
+  "compilerOptions": {
+    "composite": false,
+    "paths": {
+      "@desktop-main/*": ["./src/main/*"],
+      "@shared/*": ["./src/shared/*"],
+      "drizzle-orm": ["./node_modules/drizzle-orm"]
+    }
+  }
+}

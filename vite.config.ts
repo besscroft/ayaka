@@ -18,7 +18,7 @@ export default defineConfig({
     ignorePatterns: [...skillIgnorePatterns, ...generatedIgnorePatterns],
   },
   lint: {
-    ignorePatterns: [...skillIgnorePatterns, ...generatedIgnorePatterns],
+    ignorePatterns: [...skillIgnorePatterns, ...generatedIgnorePatterns, "tests/desktop/**"],
     options: { typeAware: true, typeCheck: true },
   },
   run: {

@@ -1,16 +1,19 @@
 {
   "name": "paimon",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Void AI 是一个本地优先的 AI 桌面工作台",
   "homepage": "https://ai.zzzvoid.com/",
   "author": "Bess Croft",
   "main": "./out/main/index.mjs",
   "scripts": {
-    "format": "prettier --write .",
-    "lint": "eslint --cache .",
+    "format": "prettier --write . ../../tests/desktop",
+    "lint": "eslint --cache --rule \"prettier/prettier: off\" . && pnpm --dir ../.. exec node apps/desktop/node_modules/eslint/bin/eslint.js --cache --config eslint.config.mjs tests/desktop",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "typecheck:test:web": "tsc --noEmit -p tsconfig.test.web.json --composite false",
+    "typecheck:test:node": "tsc --noEmit -p tsconfig.test.node.json --composite false",
+    "typecheck:test": "npm run typecheck:test:web && npm run typecheck:test:node",
     "start": "electron-vite preview",
     "rebuild:native": "node scripts/rebuild-better-sqlite3.cjs",
     "setup": "pnpm install && pnpm run rebuild:native",
@@ -24,9 +27,10 @@
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "pnpm run rebuild:native && electron-vite build && electron-builder --mac",
     "build:linux": "pnpm run rebuild:native && electron-vite build && electron-builder --linux",
-    "test": "tsx --tsconfig tsconfig.web.json --test src/renderer/src/lib/i18n.test.ts src/renderer/src/lib/settings.test.ts src/renderer/src/lib/theme.test.ts src/renderer/src/lib/errors.test.ts src/renderer/src/lib/chat-messages.test.ts src/renderer/src/lib/chat-persistence.test.ts src/renderer/src/lib/chat-reconciliation.test.ts src/renderer/src/lib/chat-retry.test.ts src/renderer/src/lib/chat-tools.test.ts src/renderer/src/lib/chat-media.test.ts src/renderer/src/lib/media-resource.test.ts src/renderer/src/lib/agent-config.test.ts src/renderer/src/lib/agent-drawer-model.test.ts src/renderer/src/lib/generated-tool-ui.test.ts src/renderer/src/components/MessageList.test.ts src/renderer/src/components/MessageInput.test.tsx src/renderer/src/components/ReasoningSelector.test.ts src/renderer/src/components/AgentStatusWidget.test.ts src/renderer/src/components/MainPanelView.test.tsx src/renderer/src/components/ToolsPanel.test.tsx src/renderer/src/components/ui/controls.test.tsx src/renderer/src/components/ai-elements/rich-content.test.ts src/renderer/src/components/ai-elements/use-conversation-scroll.test.ts src/renderer/src/components/ai-elements/image-lightbox-model.test.ts src/renderer/src/components/ai-elements/message-attachments.test.tsx && tsx --tsconfig tsconfig.node.json --experimental-test-module-mocks --test src/main/server/index.test.ts src/main/lib/changelog.test.ts src/main/lib/chat-errors.test.ts src/main/lib/providers.test.ts src/main/lib/chat-tools.test.ts src/main/lib/web-page-reader.test.ts src/main/lib/media-generation.test.ts src/main/lib/agent-memory-files.test.ts src/main/lib/memory-orchestrator.test.ts src/main/lib/sandbox-agents.test.ts src/main/lib/runtime-architecture.test.ts src/main/lib/agent-coordinator.test.ts src/main/lib/agent-context-manager.test.ts src/main/lib/cron-store.test.ts src/main/lib/catalog-adapters.test.ts src/main/lib/mcp-so-adapter.test.ts src/main/lib/drizzle-metadata.test.ts src/main/lib/update-manager.test.ts && npm run test:agent-lifecycle",
-    "test:changelog": "tsx --tsconfig tsconfig.web.json --test src/renderer/src/lib/changelog.test.ts && tsx --tsconfig tsconfig.node.json --test src/main/lib/changelog.test.ts",
-    "test:agent-lifecycle": "node -e \"const { spawnSync } = require('node:child_process'); const result = spawnSync(require('electron'), [require.resolve('tsx/cli'), '--tsconfig', 'tsconfig.node.json', '--experimental-test-module-mocks', '--test', 'src/main/lib/agent-completion.test.ts', 'src/main/lib/agent-tool-results.test.ts', 'src/main/lib/agent-lifecycle.test.ts', 'src/main/lib/agent-loop-session.test.ts', 'src/main/lib/run-tool-scheduler.test.ts', 'src/main/lib/agent-management-tools.test.ts', 'src/main/lib/conversation-workspace.test.ts'], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }); if (result.error) throw result.error; process.exit(result.status ?? 1);}\""
+    "test": "npm run test:renderer && npm run test:main && npm run test:electron",
+    "test:renderer": "node scripts/run-desktop-tests.mjs renderer",
+    "test:main": "node scripts/run-desktop-tests.mjs main",
+    "test:electron": "node scripts/run-desktop-tests.mjs electron"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",

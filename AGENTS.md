@@ -26,6 +26,7 @@ This is a pnpm workspace for a local-first AI desktop application.
 - `apps/desktop/drizzle`: checked-in SQLite migrations and Drizzle metadata. The runtime database is created under Electron's `userData/data/void-ai.db`, not in the repository.
 - `apps/desktop/resources`: packaged desktop assets, including pet resources.
 - `tests/vite-plus`: root-level Vite+ smoke tests.
+- `tests/desktop`: desktop main-process and renderer tests, kept separate from production `src` code.
 - `docs`: architecture notes, component notes, and implementation specifications. `docs/architecture.md` is the source of truth for the product/runtime model.
 - `.agents/skills`: local agent skills. Root formatting and linting intentionally ignore skill trees.
 
@@ -63,6 +64,10 @@ Validation and builds:
 vp check                         # repository formatting, lint, and type-aware checks
 vp test                          # root tests configured in vite.config.ts
 vp run desktop#test              # full desktop renderer + main-process test suite
+vp run desktop#test:renderer     # desktop renderer tests
+vp run desktop#test:main         # desktop main-process tests
+vp run desktop#test:electron     # Electron-backed desktop tests
+vp run desktop#typecheck:test    # test-only TypeScript checks
 vp run desktop#typecheck         # node and web TypeScript projects
 vp run desktop#typecheck:web
 vp run desktop#typecheck:node
@@ -73,7 +78,7 @@ vp run docs#build
 
 The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are stale after changing Node/Electron versions, run `vp run desktop#rebuild:native` before retrying. The package also exposes `desktop#db:generate`, `desktop#db:studio`, and `desktop#db:migrate` for Drizzle work.
 
-`vp run desktop#test` uses Node's built-in test runner through `tsx` and includes separate renderer/web and main/node groups, plus the Electron-backed lifecycle test. A focused test can be run from `apps/desktop` with the corresponding `pnpm test` command only when debugging; the root command is the expected final verification.
+`vp run desktop#test` uses Node's built-in test runner through `tsx` and includes separate renderer/web, main/node, and Electron-backed groups. Tests live under `tests/desktop` and are registered through the renderer, main, and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
 
 ## Change Guidelines
 
@@ -81,15 +86,15 @@ The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are s
 - Keep renderer UI in the existing React/shadcn Base UI composition. Reuse Lucide icons, existing i18n helpers, and the app's `MotionConfig`; animations must respect the reduced-motion setting.
 - Add user-facing strings to `apps/desktop/src/renderer/src/lib/i18n.messages.ts` rather than hard-coding copy in components. Preserve both Chinese and English entries when changing shared UI text.
 - Prefer narrow main-process modules under `apps/desktop/src/main/lib`. Keep IPC handlers thin and put validation/business logic in the owning module so it can be unit tested without a window.
-- For agent, workflow, tool, memory, approval, sandbox, or provider changes, add or update focused tests beside the implementation. Include runtime event/step assertions when the change affects execution or diagnostics.
-- For UI changes, update the nearest component/lib test when behavior is non-trivial; do not add a browser automation dependency for a pure helper or state transition.
+- For agent, workflow, tool, memory, approval, sandbox, or provider changes, add or update focused tests under `tests/desktop/main` while mirroring the production source area. Include runtime event/step assertions when the change affects execution or diagnostics.
+- For UI changes, add or update the corresponding test under `tests/desktop/renderer`; do not add a browser automation dependency for a pure helper or state transition.
 - Do not commit build output, native rebuild output, local databases, secrets, or generated temporary files. Keep unrelated worktree changes intact.
 
 ## Review Checklist
 
 Before handing off a change, confirm:
 
-- The smallest relevant test passes, then run `vp check` and the appropriate root/desktop test command.
+- The smallest relevant test group passes, then run `vp check`, `vp test`, and the appropriate desktop test command.
 - IPC additions are typed in preload and consumed through `lib/api.ts`.
 - Database changes include a migration, empty-database initialization coverage, and seed/runtime checks where applicable.
 - Privileged data stays in the main process and error paths produce actionable, localized UI messages when user-facing.
