@@ -5,7 +5,7 @@ import { useT } from "../../lib/i18n";
 import { notify } from "../../lib/toast";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
-import { clampImageIndex, wrapImageIndex } from "./image-lightbox-model";
+import { clampImageIndex, readImageData, wrapImageIndex } from "./image-lightbox-model";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 
 export interface ImageLightboxItem {
@@ -69,12 +69,11 @@ export function ImageLightbox({
     if (!image || saving) return;
     setSaving(true);
     try {
-      const response = await fetch(image.src);
-      if (!response.ok) throw new Error(`Image request failed with status ${response.status}.`);
+      const data = await readImageData(image, conversationId, api.workspace.read);
       const result = await api.workspace.saveMediaAs({
         filename: image.name,
         mediaType: image.mediaType,
-        data: await response.arrayBuffer(),
+        data,
       });
       if (result.saved) notify.success(t("image.toast.saved"));
     } catch (error) {
@@ -82,7 +81,7 @@ export function ImageLightbox({
     } finally {
       setSaving(false);
     }
-  }, [image, locale, saving, t]);
+  }, [conversationId, image, locale, saving, t]);
 
   const revealImage = useCallback(async (): Promise<void> => {
     if (!conversationId || !image?.workspacePath) return;
