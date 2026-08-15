@@ -7,7 +7,7 @@
   "r2_buckets": [
     {
       "binding": "RELEASES_BUCKET",
-      "bucket_name": "ayaka-releases",
+      "bucket_name": "void-ai-releases",
     },
   ],
   "vars": {
