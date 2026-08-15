@@ -102,6 +102,7 @@ import {
 } from "./agent-completion";
 import { reconcileToolResults, removeIncompleteToolParts } from "./agent-tool-results";
 import { getChatSamplingSettings } from "./chat-model-settings";
+import { persistChatStreamSnapshot } from "./chat-history";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -426,6 +427,13 @@ async function streamRootAgentLoop({
   let lastText = "";
   let lastUsage: unknown;
   let finalExecution: ChatMessageMetadata["execution"];
+  const releaseStream = context.session.registerStreamCompletion();
+  let streamReleased = false;
+  const releaseStreamOnce = (): void => {
+    if (streamReleased) return;
+    streamReleased = true;
+    releaseStream();
+  };
 
   const stream = createUIMessageStream<UIMessage<ChatMessageMetadata>>({
     originalMessages: initialMessages as UIMessage<ChatMessageMetadata>[],
@@ -614,6 +622,30 @@ async function streamRootAgentLoop({
         writer.write({ type: "finish", finishReason: "error" });
       }
     },
+    onEnd: async ({ messages, isAborted }) => {
+      try {
+        if (context.conversationId) {
+          const snapshotMessages = mergeStreamMessages(messages, context.session.messageTrace);
+          const result = await persistChatStreamSnapshot(context.conversationId, snapshotMessages);
+          console.info("[agent-runtime] persisted chat stream snapshot", {
+            runId: context.runId,
+            conversationId: context.conversationId,
+            messageCount: result.messageCount,
+            aborted: isAborted,
+            revision: result.revision,
+          });
+        }
+      } catch (error) {
+        console.error("[agent-runtime] failed to persist chat stream snapshot", {
+          runId: context.runId,
+          conversationId: context.conversationId,
+          aborted: isAborted,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        releaseStreamOnce();
+      }
+    },
     onError: (error) =>
       classifyChatError(error, {
         phase: "stream",
@@ -622,6 +654,18 @@ async function streamRootAgentLoop({
   });
 
   return createUIMessageStreamResponse({ stream });
+}
+
+function mergeStreamMessages(
+  messages: UIMessage<ChatMessageMetadata>[],
+  tracedMessages: UIMessage[],
+): UIMessage<ChatMessageMetadata>[] {
+  const merged = new Map<string, UIMessage<ChatMessageMetadata>>();
+  for (const message of messages) merged.set(message.id, message);
+  for (const message of tracedMessages) {
+    if (!merged.has(message.id)) merged.set(message.id, message as UIMessage<ChatMessageMetadata>);
+  }
+  return [...merged.values()];
 }
 
 async function appendQueuedMessages(

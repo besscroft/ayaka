@@ -45,12 +45,42 @@ function messageScore(message: UIMessage): number {
   }, 10);
 }
 
-function messagesScore(messages: UIMessage[]): number {
-  return messages.reduce((score, message) => score + messageScore(message), 0);
-}
-
 function hasAssistantMessage(messages: UIMessage[]): boolean {
   return messages.some((message) => message.role === "assistant" && message.parts.length > 0);
+}
+
+/**
+ * Merge an automatically received snapshot into the current client state.
+ *
+ * A stream can briefly expose an empty or older snapshot while the transport
+ * catches up. Such a snapshot must never erase the current output. Messages
+ * explicitly changed by the user bypass this helper and call setMessages
+ * directly, so deletion and edit semantics remain intact.
+ */
+export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): UIMessage[] | null {
+  if (incoming.length === 0) return current.length === 0 ? [] : null;
+  if (current.length === 0) return incoming;
+
+  const incomingById = new Map(incoming.map((message) => [message.id, message]));
+  for (const message of current) {
+    const incomingMessage = incomingById.get(message.id);
+    if (!incomingMessage || messageScore(incomingMessage) < messageScore(message)) return null;
+  }
+
+  const currentTailId = current.at(-1)?.id;
+  const tailIndex = currentTailId
+    ? incoming.findIndex((message) => message.id === currentTailId)
+    : -1;
+  if (tailIndex < 0) return null;
+
+  const merged = current.map((message) => {
+    const incomingMessage = incomingById.get(message.id);
+    // User messages are locally authoritative: persisted stream snapshots can
+    // still contain the pre-edit text while a regenerated run is finishing.
+    return message.role === "user" || !incomingMessage ? message : incomingMessage;
+  });
+  merged.push(...incoming.slice(tailIndex + 1));
+  return merged;
 }
 
 /**
@@ -63,27 +93,5 @@ export function reconcileChatMessages(
   persisted: UIMessage[],
 ): UIMessage[] | null {
   if (!hasAssistantMessage(persisted)) return null;
-
-  const currentScore = messagesScore(current);
-  const persistedScore = messagesScore(persisted);
-  if (persistedScore < currentScore) return null;
-
-  const persistedById = new Map(persisted.map((message) => [message.id, message]));
-  const merged = current.map((message) => {
-    const persistedMessage = persistedById.get(message.id);
-    if (!persistedMessage) return message;
-    return messageScore(persistedMessage) >= messageScore(message) ? persistedMessage : message;
-  });
-
-  const currentTailId = current.at(-1)?.id;
-  const tailIndex = currentTailId
-    ? persisted.findIndex((message) => message.id === currentTailId)
-    : -1;
-  if (tailIndex >= 0) {
-    merged.push(...persisted.slice(tailIndex + 1));
-  } else if (current.length === 0) {
-    merged.push(...persisted);
-  }
-
-  return merged;
+  return mergeChatMessages(current, persisted);
 }

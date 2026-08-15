@@ -45,7 +45,11 @@ import {
   persistMessagesPatch,
   type MessagePersistenceRequest,
 } from "../lib/chat-persistence";
-import { reconcileChatMessages, shouldReconcileCompletedRun } from "../lib/chat-reconciliation";
+import {
+  mergeChatMessages,
+  reconcileChatMessages,
+  shouldReconcileCompletedRun,
+} from "../lib/chat-reconciliation";
 import {
   isResumableBlockedRun,
   readChatRunIdHeader,
@@ -171,7 +175,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     timer: number | null;
   }>({ runId: null, attempts: 0, timer: null });
   const latestMessagesRef = useRef<UIMessage[]>([]);
-  const hydratedConversationRef = useRef<string | null>(null);
+  const lastNonEmptyMessagesRef = useRef<UIMessage[]>([]);
+  const explicitEmptyMessagesRef = useRef(false);
+  const manualMessageMutationRef = useRef(false);
+  const hydrationAppliedRef = useRef<string | null>(null);
   const hydrationStateRef = useRef<"loading" | "ready" | "error">("loading");
   const revisionRef = useRef(0);
   const persistenceDirtyRef = useRef(false);
@@ -442,7 +449,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     createdAtRef.current = new Map();
     revisionRef.current = 0;
     persistenceDirtyRef.current = false;
-    hydratedConversationRef.current = null;
+    latestMessagesRef.current = [];
+    lastNonEmptyMessagesRef.current = [];
+    explicitEmptyMessagesRef.current = false;
+    manualMessageMutationRef.current = false;
+    hydrationAppliedRef.current = null;
     // 涓嶉噸缃?titledRef锛氫繚鐣欒法浼氳瘽璁板綍锛岄伩鍏嶉噸澶嶇敓鎴愶紙鍒囨崲鍥炲埌鏃у璇濅篃涓嶉噸鐢熸垚锛?
 
     let cancelled = false;
@@ -452,6 +463,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       .then((conversation) => {
         if (!conversation) {
           if (cancelled) return;
+          latestMessagesRef.current = [];
+          lastNonEmptyMessagesRef.current = [];
+          explicitEmptyMessagesRef.current = true;
           setInitialMessages([]);
           setIsPersistedConversation(false);
           setHydrationState("ready");
@@ -471,6 +485,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         const messages = hydratedMessages.filter(isNonEmptyUIMessage);
         createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
         revisionRef.current = snapshot.revision;
+        latestMessagesRef.current = messages;
+        lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
+        explicitEmptyMessagesRef.current = messages.length === 0;
         setInitialMessages(messages);
         setHydrationState("ready");
         hydrationStateRef.current = "ready";
@@ -503,6 +520,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     experimental_throttle: 50,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: ({ messages, isError, isAbort }) => {
+      // onFinish is the authoritative client snapshot. Update the ref before
+      // any throttled persistence or follow-up work can observe an older one.
+      if (messages.length > 0) {
+        latestMessagesRef.current = messages;
+        lastNonEmptyMessagesRef.current = messages;
+        explicitEmptyMessagesRef.current = false;
+      }
       if (!isError) {
         chatFailureRef.current = false;
         errorReportedRef.current = false;
@@ -551,6 +575,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
             });
             if (updatedMessages === latestMessagesRef.current) return;
             latestMessagesRef.current = updatedMessages;
+            if (updatedMessages.length > 0) lastNonEmptyMessagesRef.current = updatedMessages;
+            explicitEmptyMessagesRef.current = updatedMessages.length === 0;
             chatRef.current?.setMessages(updatedMessages);
             persistInBackground(updatedMessages, "follow-up suggestions");
           });
@@ -610,14 +636,40 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   });
   chatRef.current = chat;
 
-  latestMessagesRef.current = chat.messages;
+  const mergedChatMessages = mergeChatMessages(latestMessagesRef.current, chat.messages);
+  const renderedMessages =
+    mergedChatMessages ??
+    (latestMessagesRef.current.length > 0
+      ? latestMessagesRef.current
+      : chat.messages.length > 0 || explicitEmptyMessagesRef.current
+        ? chat.messages
+        : lastNonEmptyMessagesRef.current);
+  if (chat.messages.length > 0 && mergedChatMessages) {
+    latestMessagesRef.current = mergedChatMessages;
+    lastNonEmptyMessagesRef.current = mergedChatMessages;
+    explicitEmptyMessagesRef.current = false;
+  }
   const followupSuggestions =
-    hydrationState === "ready" ? getLatestFollowupSuggestions(chat.messages) : [];
+    hydrationState === "ready" ? getLatestFollowupSuggestions(renderedMessages) : [];
 
   useEffect(() => {
-    if (hydrationState !== "ready" || hydratedConversationRef.current === conversationId) return;
-    chat.setMessages(initialMessages);
-    hydratedConversationRef.current = conversationId;
+    if (
+      hydrationState !== "ready" ||
+      hydrationAppliedRef.current === conversationId ||
+      initialMessages.length === 0
+    ) {
+      if (hydrationState === "ready" && initialMessages.length === 0) {
+        hydrationAppliedRef.current = conversationId;
+      }
+      return;
+    }
+    if (chat.messages.length === 0) {
+      latestMessagesRef.current = initialMessages;
+      lastNonEmptyMessagesRef.current = initialMessages;
+      explicitEmptyMessagesRef.current = false;
+      chat.setMessages(initialMessages);
+    }
+    hydrationAppliedRef.current = conversationId;
   }, [chat, conversationId, hydrationState, initialMessages]);
 
   const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
@@ -635,6 +687,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const { setMessages: setChatMessages, stop: stopChat } = chat;
   const reconcileCompletedRun = useCallback(
     (runId: string): void => {
+      if (manualMessageMutationRef.current) return;
       const state = reconciliationRef.current;
       if (state.runId !== runId) {
         if (state.timer !== null) window.clearTimeout(state.timer);
@@ -658,6 +711,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
             if (!reconciled || !isChatLoadingRef.current) return;
 
             latestMessagesRef.current = reconciled;
+            if (reconciled.length > 0) lastNonEmptyMessagesRef.current = reconciled;
+            explicitEmptyMessagesRef.current = reconciled.length === 0;
             setChatMessages(reconciled);
             void stopChat().catch((error) => {
               console.error("[chat] failed to finish reconciled stream:", error);
@@ -768,12 +823,12 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   /* ---------- 新建对话开场建议（随机生成） ---------- */
   const starterFetchedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (chat.messages.length === 0 && !isLoading) {
+    if (renderedMessages.length === 0 && !isLoading) {
       if (starterFetchedForRef.current === conversationId) return;
       starterFetchedForRef.current = conversationId;
       void fetchStarterSuggestions();
     }
-  }, [conversationId, chat.messages.length, isLoading, fetchStarterSuggestions]);
+  }, [conversationId, renderedMessages.length, isLoading, fetchStarterSuggestions]);
 
   /* ---------- 鐘舵€佹槧灏?---------- */
   const statusKind: ConversationStatusKind = chat.error
@@ -788,7 +843,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   /* ---------- Context usage ---------- */
   const contextMetrics = useMemo(() => {
-    const usedTokens = chat.messages.reduce((sum, m) => {
+    const usedTokens = renderedMessages.reduce((sum, m) => {
       const text = (m.parts ?? [])
         .filter((p) => p.type === "text")
         .map((p) => (p as { text: string }).text)
@@ -800,7 +855,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       selectedModel ? modelContextWindows.get(selectedModel) : undefined,
     );
     return { usedTokens, maxTokens, costUsd: undefined as number | undefined };
-  }, [chat.messages, modelContextWindows, selectedModel]);
+  }, [renderedMessages, modelContextWindows, selectedModel]);
 
   /* ---------- 鍙戦€?---------- */
   const handleSend = async ({
@@ -858,6 +913,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setChatError(null);
     setChatErrorRetryable(false);
     setIsStopped(false);
+    manualMessageMutationRef.current = false;
     chatFailureRef.current = false;
     errorReportedRef.current = false;
     chat.clearError();
@@ -953,7 +1009,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   const handleRetry = (): void => {
     if (!chatErrorRetryable) return;
-    const snapshot = prepareFailedChatSnapshot(chat.messages);
+    const snapshot = prepareFailedChatSnapshot(renderedMessages);
     const currentRunId = runIdRef.current;
     const currentRun = currentRunId
       ? runtimeSnapshot?.runtimeRuns.find(
@@ -969,8 +1025,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     runModeRef.current = retryRun.mode;
     reconciliationRef.current = { runId: retryRun.runId, attempts: 0, timer: null };
     retryFallbackRef.current = { active: true, attempted: false };
+    manualMessageMutationRef.current = true;
     chat.setMessages(snapshot.messages);
     latestMessagesRef.current = snapshot.messages;
+    if (snapshot.messages.length > 0) lastNonEmptyMessagesRef.current = snapshot.messages;
+    explicitEmptyMessagesRef.current = snapshot.messages.length === 0;
     persistInBackground(snapshot.messages, "cleared failed response", snapshot.deleteIds);
     setChatError(null);
     setChatErrorRetryable(false);
@@ -1015,10 +1074,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   /* ---------- 消息操作：编辑 ---------- */
   const handleEditMessage = async (messageId: string, newText: string): Promise<void> => {
-    const idx = chat.messages.findIndex((m) => m.id === messageId);
+    const idx = renderedMessages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
-    const target = chat.messages[idx];
+    const target = renderedMessages[idx];
     if (target.role !== "user") return;
+    manualMessageMutationRef.current = true;
 
     // 1. 鎵惧埌璇?user 娑堟伅锛屾浛鎹?text part锛屽垹闄ゅ悗缁墍鏈夋秷鎭?
     const updated: UIMessage = {
@@ -1028,16 +1088,18 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         ...(target.parts ?? []).filter((p) => p.type !== "text"),
       ],
     };
-    const nextMessages = [...chat.messages.slice(0, idx), updated];
+    const nextMessages = [...renderedMessages.slice(0, idx), updated];
     chat.setMessages(nextMessages);
     latestMessagesRef.current = nextMessages;
+    if (nextMessages.length > 0) lastNonEmptyMessagesRef.current = nextMessages;
+    explicitEmptyMessagesRef.current = nextMessages.length === 0;
     createdAtRef.current.delete(messageId);
 
     // 2. 鎸佷箙鍖栨柊蹇収锛堝垹闄ゅ悗缁秷鎭級
     persistInBackground(
       nextMessages,
       "edited message",
-      chat.messages.slice(idx + 1).map((message) => message.id),
+      renderedMessages.slice(idx + 1).map((message) => message.id),
     );
     setIsStopped(false);
     setChatError(null);
@@ -1053,15 +1115,18 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   /* ---------- 娑堟伅鍔ㄤ綔锛氶噸鏂板彂閫?---------- */
   const handleResendMessage = async (messageId: string): Promise<void> => {
-    const idx = chat.messages.findIndex((m) => m.id === messageId);
+    const idx = renderedMessages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
-    const target = chat.messages[idx];
+    const target = renderedMessages[idx];
     if (target.role !== "user") return;
+    manualMessageMutationRef.current = true;
 
     // 1. 鎴柇鍒拌 user 娑堟伅
-    const nextMessages = chat.messages.slice(0, idx + 1);
+    const nextMessages = renderedMessages.slice(0, idx + 1);
     chat.setMessages(nextMessages);
     latestMessagesRef.current = nextMessages;
+    if (nextMessages.length > 0) lastNonEmptyMessagesRef.current = nextMessages;
+    explicitEmptyMessagesRef.current = nextMessages.length === 0;
     setIsStopped(false);
     setChatError(null);
     chat.clearError();
@@ -1070,7 +1135,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     persistInBackground(
       nextMessages,
       "resent message",
-      chat.messages.slice(idx + 1).map((message) => message.id),
+      renderedMessages.slice(idx + 1).map((message) => message.id),
     );
 
     // 3. 瑙﹀彂閲嶆柊鐢熸垚
@@ -1083,14 +1148,15 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   /* ---------- 娑堟伅鍔ㄤ綔锛氬垹闄?---------- */
   const handleDeleteMessage = (messageId: string): void => {
-    const idx = chat.messages.findIndex((m) => m.id === messageId);
+    const idx = renderedMessages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
-    const target = chat.messages[idx];
+    const target = renderedMessages[idx];
     const confirmed = window.confirm(t("msg.delete.confirm"));
     if (!confirmed) return;
+    manualMessageMutationRef.current = true;
 
     // 1. 鍒犻櫎鐩爣 + 濡傛灉鐩爣鏄?user 娑堟伅锛岀揣璺熺殑 assistant 涔熶竴骞跺垹闄?
-    const next = [...chat.messages];
+    const next = [...renderedMessages];
     const deletedIds = [target.id];
     next.splice(idx, 1);
     if (target.role === "user" && next[idx]?.role === "assistant") {
@@ -1099,6 +1165,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
     chat.setMessages(next);
     latestMessagesRef.current = next;
+    if (next.length > 0) lastNonEmptyMessagesRef.current = next;
+    explicitEmptyMessagesRef.current = next.length === 0;
     createdAtRef.current.delete(messageId);
     if (next[idx - 1]?.role === "user") {
       // 鍚屾鍒犻櫎鍙兘瀛樺湪鐨?createdAt
@@ -1133,7 +1201,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     );
   }
 
-  const isEmpty = chat.messages.length === 0 && !isLoading;
+  const isEmpty = renderedMessages.length === 0 && !isLoading;
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
@@ -1152,7 +1220,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           ) : (
             <MessageList
               conversationId={conversationId}
-              messages={chat.messages}
+              messages={renderedMessages}
               isLoading={isLoading}
               status={statusKind}
               error={chat.error}

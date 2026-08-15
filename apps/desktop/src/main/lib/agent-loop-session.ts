@@ -84,6 +84,7 @@ export class AgentLoopSession {
   private budgetReason: AgentLoopBudgetReason | null = null;
   private absoluteLimitReason: AgentLoopAbsoluteLimitReason | null = null;
   private completionCandidate: AgentCompletionCandidate | undefined;
+  private readonly streamCompletions = new Set<Promise<void>>();
   runtimeHandles: { coordinator: unknown; recorder: unknown } | null = null;
 
   constructor(
@@ -115,6 +116,22 @@ export class AgentLoopSession {
 
   get signal(): AbortSignal {
     return this.controller.signal;
+  }
+
+  registerStreamCompletion(): () => void {
+    let resolveCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve;
+    });
+    this.streamCompletions.add(completion);
+    return () => {
+      this.streamCompletions.delete(completion);
+      resolveCompletion();
+    };
+  }
+
+  async waitForStreamCompletions(): Promise<void> {
+    await Promise.all(this.streamCompletions);
   }
 
   get isActive(): boolean {
@@ -539,7 +556,9 @@ export class AgentLoopSessionManager {
   }
 
   async interruptAll(): Promise<void> {
-    await Promise.all([...this.sessions.values()].map((session) => session.interrupt()));
+    const sessions = [...this.sessions.values()];
+    await Promise.all(sessions.map((session) => session.interrupt()));
+    await Promise.all(sessions.map((session) => session.waitForStreamCompletions()));
   }
 }
 

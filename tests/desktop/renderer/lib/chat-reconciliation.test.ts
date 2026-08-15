@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { UIMessage } from "ai";
 import {
   isTerminalRunStatus,
+  mergeChatMessages,
   reconcileChatMessages,
   shouldReconcileCompletedRun,
 } from "@renderer/lib/chat-reconciliation";
@@ -70,5 +71,49 @@ void describe("chat reconciliation", () => {
 
   void it("does not recover without an assistant response", () => {
     assert.equal(reconcileChatMessages([user("u1", "Question")], [user("u1", "Question")]), null);
+  });
+
+  void it("rejects an empty automatic snapshot without clearing the current stream", () => {
+    const current = [user("u1", "Question"), assistant("a1", "Partial answer")];
+    assert.equal(mergeChatMessages(current, []), null);
+  });
+
+  void it("rejects an older assistant snapshot even when it has the same message id", () => {
+    const current = [user("u1", "Question"), assistant("a1", "A complete answer")];
+    const older = [user("u1", "Question"), assistant("a1", "A")];
+    assert.equal(mergeChatMessages(current, older), null);
+  });
+
+  void it("keeps locally edited user text when an automatic snapshot is stale", () => {
+    const current = [user("u1", "Edited question"), assistant("a1", "Answer")];
+    const persisted = [user("u1", "Original question"), assistant("a1", "Answer, more")];
+    const part = mergeChatMessages(current, persisted)?.[0]?.parts[0];
+    assert.equal(part?.type === "text" ? part.text : undefined, "Edited question");
+  });
+
+  void it("hydrates a complete assistant message with tool, reasoning, and media parts", () => {
+    const persisted: UIMessage = {
+      id: "a1",
+      role: "assistant",
+      parts: [
+        { type: "reasoning", text: "Checking the workspace" },
+        { type: "text", text: "Done" },
+        {
+          type: "file",
+          mediaType: "image/png",
+          filename: "result.png",
+          url: "workspace://result.png",
+        },
+        {
+          type: "tool-call",
+          toolCallId: "call-1",
+          toolName: "generate_media",
+          input: { prompt: "result" },
+        } as never,
+      ],
+    };
+    const merged = mergeChatMessages([user("u1", "Question")], [user("u1", "Question"), persisted]);
+    assert.equal(merged?.at(-1)?.parts.length, 4);
+    assert.equal(merged?.at(-1)?.parts[2]?.type, "file");
   });
 });

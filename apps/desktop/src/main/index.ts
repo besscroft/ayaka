@@ -155,10 +155,12 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   isCleaningUpBeforeQuit = true;
   stopCronScheduler();
-  stopServer();
   void agentLoopSessions
     .interruptAll()
-    .then(() => closeDb())
+    .then(() => {
+      stopServer();
+      return closeDb();
+    })
     .finally(() => app.quit());
 });
 
