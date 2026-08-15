@@ -29,6 +29,11 @@ import {
   upsertMemoryInMem0,
 } from "./mem0-service";
 import { dreamMemoryFiles, incorporateNewMemories } from "./agent-memory-files";
+import {
+  canAccessMemoryRecord,
+  resolveMemoryQueryAgentId,
+  type MemoryAccessContext,
+} from "./memory-access";
 
 const OBSERVATION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 const RETRIEVAL_CANDIDATES = 24;
@@ -46,6 +51,7 @@ export interface ObserveTurnInput {
 
 export interface RetrieveMemoryInput {
   query: string;
+  access: MemoryAccessContext;
   agentId?: string | null;
   limit?: number;
   scope?: MemoryScope | null;
@@ -120,6 +126,7 @@ export class MemoryOrchestrator {
     const query = input.query.trim();
     if (!query) return [];
     const limit = Math.max(1, Math.min(input.limit ?? RETRIEVAL_LIMIT, 12));
+    const queryAgentId = resolveMemoryQueryAgentId(input.access, input.agentId);
     let semanticAvailable = false;
     const scored = new Map<string, { memory: MemoryRecord; semantic: number }>();
 
@@ -129,7 +136,12 @@ export class MemoryOrchestrator {
       for (const hit of hits ?? []) {
         const sqliteId = typeof hit.metadata.sqliteId === "string" ? hit.metadata.sqliteId : null;
         const memory = sqliteId ? getMemoryById(sqliteId) : getMemoryByMem0Id(hit.id);
-        if (!memory || !isVisibleMemory(memory, input.agentId, input.scope, input.kind)) continue;
+        if (
+          !memory ||
+          !isVisibleMemory(memory, input.access, queryAgentId, input.scope, input.kind)
+        ) {
+          continue;
+        }
         scored.set(memory.id, { memory, semantic: normalizeSemanticScore(hit.score) });
       }
     } catch (error) {
@@ -148,11 +160,11 @@ export class MemoryOrchestrator {
         scope: input.scope,
         kind: input.kind,
         status: "active",
-        agentId: input.agentId,
+        agentId: queryAgentId,
         limit: RETRIEVAL_CANDIDATES,
       });
       for (const memory of lexical) {
-        if (!isVisibleMemory(memory, input.agentId, input.scope, input.kind)) continue;
+        if (!isVisibleMemory(memory, input.access, queryAgentId, input.scope, input.kind)) continue;
         if (!scored.has(memory.id)) scored.set(memory.id, { memory, semantic: 0 });
       }
     }
@@ -169,7 +181,9 @@ export class MemoryOrchestrator {
       detail: {
         count: selected.length,
         semantic: semanticAvailable,
-        agentId: input.agentId ?? null,
+        actorAgentId: input.access.actorAgentId,
+        accessMode: input.access.mode,
+        agentId: queryAgentId ?? null,
       },
     });
     return selected;
@@ -489,7 +503,8 @@ function findCorrectionTarget(observation: MemoryObservation): MemoryRecord | nu
 
 function isVisibleMemory(
   memory: MemoryRecord,
-  agentId?: string | null,
+  access: MemoryAccessContext,
+  queryAgentId?: string,
   scope?: MemoryScope | null,
   kind?: MemoryKind | null,
 ): boolean {
@@ -497,7 +512,8 @@ function isVisibleMemory(
   if (memory.expires_at != null && memory.expires_at <= Date.now()) return false;
   if (scope && memory.scope !== scope) return false;
   if (kind && memory.kind !== kind) return false;
-  if (memory.scope === "agent" && memory.agent_id !== (agentId ?? DEFAULT_AGENT_ID)) return false;
+  if (!canAccessMemoryRecord(access, memory)) return false;
+  if (queryAgentId && memory.scope === "agent" && memory.agent_id !== queryAgentId) return false;
   return true;
 }
 

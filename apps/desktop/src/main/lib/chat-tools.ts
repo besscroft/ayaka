@@ -2,6 +2,7 @@ import { isStepCount, jsonSchema, tool } from "ai";
 import type { streamText, ToolApprovalConfiguration, ToolChoice, ToolSet } from "ai";
 import {
   CHAT_TOOL_IDS,
+  DEFAULT_AGENT_ID,
   SILENT_ROOT_MEMORY_TOOL_IDS,
   isChatToolId,
   isToolRecordReference,
@@ -17,6 +18,7 @@ import {
 } from "../../shared/types";
 import type { NativeChatTool } from "./providers";
 import {
+  getAgent,
   getMemoryById,
   getRuntimeSnapshot,
   insertRuntimeEvent,
@@ -24,6 +26,12 @@ import {
   upsertAgentRuntimeState,
 } from "./db";
 import { memoryOrchestrator } from "./memory-orchestrator";
+import {
+  assertCanAccessMemoryRecord,
+  createMemoryAccessContext,
+  resolveAgentMemoryTarget,
+  type MemoryAccessContext,
+} from "./memory-access";
 import { createMcpToolDescriptors, createMcpToolSet } from "./mcp-manager";
 import { createSkillToolDescriptors, createSkillToolSet } from "./skill-runtime";
 import {
@@ -119,6 +127,9 @@ interface ToolDefinition {
 interface MemorySearchInput {
   query: string;
   limit?: number;
+  scope?: MemoryScope;
+  kind?: MemoryKind;
+  agentId?: string;
 }
 
 interface RuntimeSnapshotInput {
@@ -146,6 +157,7 @@ interface MemorySaveInput {
   kind?: MemoryKind;
   salience?: number;
   pinned?: boolean;
+  agentId?: string;
 }
 
 interface MemoryUpdateInput {
@@ -156,6 +168,7 @@ interface MemoryUpdateInput {
   kind?: MemoryKind;
   salience?: number;
   pinned?: boolean;
+  agentId?: string;
 }
 
 interface CronToolInput {
@@ -597,7 +610,11 @@ export async function executeChatHostTool({
           const value = input as MemorySearchInput;
           const query = normalizeQuery(value.query);
           const limit = normalizeLimit(value.limit, 6, 12);
-          const results = await searchMemories(query, limit, agentId);
+          const results = await searchMemories(query, limit, requireMemoryAccess(agentId), {
+            scope: value.scope,
+            kind: value.kind,
+            agentId: value.agentId,
+          });
           return { query, count: results.length, results };
         }
         case "runtime_snapshot": {
@@ -625,11 +642,15 @@ export async function executeChatHostTool({
           return searchConversation(conversationId, query, limit);
         }
         case "memory_save":
-          return await saveChatMemory(input as MemorySaveInput, conversationId, agentId);
+          return await saveChatMemory(
+            input as MemorySaveInput,
+            conversationId,
+            requireMemoryAccess(agentId),
+          );
         case "memory_update":
-          return await updateChatMemory(input as MemoryUpdateInput);
+          return await updateChatMemory(input as MemoryUpdateInput, requireMemoryAccess(agentId));
         case "memory_delete":
-          return await deleteChatMemory(input as { id: string });
+          return await deleteChatMemory(input as { id: string }, requireMemoryAccess(agentId));
         case "cron":
           return await executeCronTool(input as CronToolInput);
         case "sandbox_list_files":
@@ -752,6 +773,12 @@ function createHostTools({
         properties: {
           query: { type: "string", description: "Search query." },
           limit: { type: "number", description: "Maximum results to return." },
+          scope: { type: "string", enum: ["global", "agent"] },
+          kind: {
+            type: "string",
+            enum: ["fact", "preference", "episode", "profile", "skill"],
+          },
+          agentId: { type: "string", description: "Optional agent-scoped memory owner." },
         },
         required: ["query"],
         additionalProperties: false,
@@ -760,7 +787,11 @@ function createHostTools({
         executeWithAudit("memory_search", "Memory search", model, conversationId, async () => {
           const query = normalizeQuery(input.query);
           const limit = normalizeLimit(input.limit, 6, 12);
-          const results = await searchMemories(query, limit, agentId);
+          const results = await searchMemories(query, limit, requireMemoryAccess(agentId), {
+            scope: input.scope,
+            kind: input.kind,
+            agentId: input.agentId,
+          });
           return { query, count: results.length, results };
         }),
     }),
@@ -844,6 +875,10 @@ function createHostTools({
           },
           salience: { type: "number", description: "Importance from 1 to 100." },
           pinned: { type: "boolean", description: "Whether to pin the memory." },
+          agentId: {
+            type: "string",
+            description: "Target owner when scope is agent. Root may target any agent.",
+          },
         },
         required: ["title", "content"],
         additionalProperties: false,
@@ -854,7 +889,7 @@ function createHostTools({
           "Save memory",
           model,
           conversationId,
-          async () => await saveChatMemory(input, conversationId, agentId),
+          async () => await saveChatMemory(input, conversationId, requireMemoryAccess(agentId)),
         ),
     }),
     memory_update: tool({
@@ -872,6 +907,10 @@ function createHostTools({
           },
           salience: { type: "number", description: "Importance from 1 to 100." },
           pinned: { type: "boolean", description: "Whether to pin the memory." },
+          agentId: {
+            type: "string",
+            description: "Target owner when the resulting scope is agent.",
+          },
         },
         required: ["id"],
         additionalProperties: false,
@@ -882,7 +921,7 @@ function createHostTools({
           "Update memory",
           model,
           conversationId,
-          async () => await updateChatMemory(input),
+          async () => await updateChatMemory(input, requireMemoryAccess(agentId)),
         ),
     }),
     memory_delete: tool({
@@ -901,7 +940,7 @@ function createHostTools({
           "Delete memory",
           model,
           conversationId,
-          async () => await deleteChatMemory(input),
+          async () => await deleteChatMemory(input, requireMemoryAccess(agentId)),
         ),
     }),
     cron: tool({
@@ -1022,6 +1061,9 @@ export function createMemoryHostTools({
   conversationId?: string;
   agentId?: string | null;
 }): Partial<Record<ChatToolId, ToolSet[string]>> {
+  if (agentId !== DEFAULT_AGENT_ID) {
+    throw new Error("Silent root memory tools are only available to the root agent.");
+  }
   const hostTools = createHostTools({
     model,
     descriptors: createChatToolDescriptors(model),
@@ -1245,7 +1287,8 @@ function recordAgentRuntimeState(patch: Parameters<typeof upsertAgentRuntimeStat
 async function searchMemories(
   query: string,
   limit: number,
-  agentId?: string | null,
+  access: MemoryAccessContext,
+  filters?: Pick<MemorySearchInput, "scope" | "kind" | "agentId">,
 ): Promise<
   Array<{
     id: string;
@@ -1258,7 +1301,14 @@ async function searchMemories(
   }>
 > {
   // Mem0 语义搜索（无 API Key 时内部降级到全量过滤）
-  const results = await memoryOrchestrator.retrieve({ query, agentId, limit });
+  const results = await memoryOrchestrator.retrieve({
+    query,
+    access,
+    agentId: filters?.agentId,
+    scope: filters?.scope,
+    kind: filters?.kind,
+    limit,
+  });
   return results.map((memory) => ({
     id: memory.id,
     scope: memory.scope,
@@ -1341,14 +1391,17 @@ function searchConversation(
 async function saveChatMemory(
   input: MemorySaveInput,
   conversationId: string | undefined,
-  agentId: string | null | undefined,
+  access: MemoryAccessContext,
 ): Promise<unknown> {
+  const scope = input.scope ?? "global";
+  const targetAgentId = scope === "agent" ? resolveAgentMemoryTarget(access, input.agentId) : null;
+  if (targetAgentId) requireMemoryAgent(targetAgentId);
   const memory = await memoryOrchestrator.saveExplicit({
     title: input.title,
     content: input.content,
-    scope: input.scope ?? "global",
+    scope,
     kind: input.kind ?? "fact",
-    agentId,
+    agentId: targetAgentId,
     sourceConversationId: conversationId ?? null,
     salience: input.salience,
     pinned: input.pinned,
@@ -1365,12 +1418,25 @@ async function saveChatMemory(
   };
 }
 
-async function updateChatMemory(input: MemoryUpdateInput): Promise<unknown> {
+async function updateChatMemory(
+  input: MemoryUpdateInput,
+  access: MemoryAccessContext,
+): Promise<unknown> {
+  const existing = getMemoryById(input.id);
+  if (!existing) throw new Error(`Memory not found: ${input.id}`);
+  assertCanAccessMemoryRecord(access, existing);
+  const nextScope = input.scope ?? existing.scope;
+  const targetAgentId =
+    nextScope === "agent"
+      ? resolveAgentMemoryTarget(access, input.agentId ?? existing.agent_id)
+      : null;
+  if (targetAgentId) requireMemoryAgent(targetAgentId);
   const memory = await memoryOrchestrator.update(input.id, {
     title: input.title?.trim().slice(0, 120),
     content: input.content?.trim().slice(0, 4_000),
     scope: input.scope,
     kind: input.kind,
+    agent_id: targetAgentId,
     salience: input.salience !== undefined ? clampNumber(input.salience, 1, 100) : undefined,
     pinned: input.pinned !== undefined ? (input.pinned ? 1 : 0) : undefined,
   });
@@ -1385,11 +1451,24 @@ async function updateChatMemory(input: MemoryUpdateInput): Promise<unknown> {
   };
 }
 
-async function deleteChatMemory(input: { id: string }): Promise<unknown> {
+async function deleteChatMemory(
+  input: { id: string },
+  access: MemoryAccessContext,
+): Promise<unknown> {
   const existing = getMemoryById(input.id);
   if (!existing) throw new Error(`Memory not found: ${input.id}`);
+  assertCanAccessMemoryRecord(access, existing);
   await memoryOrchestrator.remove(input.id);
   return { success: true, id: input.id };
+}
+
+function requireMemoryAccess(agentId: string | null | undefined): MemoryAccessContext {
+  if (!agentId) throw new Error("Memory tools require an acting agent.");
+  return createMemoryAccessContext(agentId);
+}
+
+function requireMemoryAgent(agentId: string): void {
+  if (!getAgent(agentId)) throw new Error(`Agent not found: ${agentId}`);
 }
 
 async function searchWebFallback(input: WebSearchInput): Promise<{

@@ -8,8 +8,12 @@ void describe("RunToolScheduler", () => {
     const signal = new AbortController().signal;
     const first = await scheduler.acquire("memory_search", signal);
     const second = await scheduler.acquire("runtime_snapshot", signal);
+    const third = await scheduler.acquire("soul_read", signal);
+    const fourth = await scheduler.acquire("memory_list", signal);
     first();
     second();
+    third();
+    fourth();
   });
 
   void it("serializes side effects in acquisition order", async () => {

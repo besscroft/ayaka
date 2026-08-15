@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, before, describe, it, mock } from "node:test";
-import type { MemoryObservation, MemoryRecord } from "@shared/types";
+import { DEFAULT_AGENT_ID, type MemoryObservation, type MemoryRecord } from "@shared/types";
+import { createMemoryAccessContext } from "@desktop-main/lib/memory-access";
 
 const memories: MemoryRecord[] = [];
 const observations: MemoryObservation[] = [];
@@ -198,12 +199,61 @@ void describe("MemoryOrchestrator", () => {
       { id: "mem0-active", memory: "Concise", score: 0.8, metadata: { sqliteId: "active" } },
     ]);
 
-    const result = await orchestrator.retrieve({ query: "answers", agentId: "agent-root" });
+    const result = await orchestrator.retrieve({
+      query: "answers",
+      access: createMemoryAccessContext("agent-root"),
+      agentId: "agent-root",
+    });
     assert.deepEqual(
       result.map((memory) => memory.id),
       ["active"],
     );
     assert.deepEqual(usedIds, ["active"]);
+  });
+
+  void it("gives root all agent memories while keeping child retrieval isolated", async () => {
+    memories.push(
+      memoryRecord({ id: "global", content: "shared answer" }),
+      memoryRecord({
+        id: "child-a",
+        content: "alpha answer",
+        scope: "agent",
+        agent_id: "agent-a",
+      }),
+      memoryRecord({
+        id: "child-b",
+        content: "beta answer",
+        scope: "agent",
+        agent_id: "agent-b",
+      }),
+    );
+
+    const root = await orchestrator.retrieve({
+      query: "answer",
+      access: createMemoryAccessContext(DEFAULT_AGENT_ID),
+      limit: 12,
+    });
+    assert.deepEqual(
+      new Set(root.map((memory) => memory.id)),
+      new Set(["global", "child-a", "child-b"]),
+    );
+
+    const child = await orchestrator.retrieve({
+      query: "answer",
+      access: createMemoryAccessContext("agent-a"),
+      limit: 12,
+    });
+    assert.deepEqual(new Set(child.map((memory) => memory.id)), new Set(["global", "child-a"]));
+
+    await assert.rejects(
+      () =>
+        orchestrator.retrieve({
+          query: "answer",
+          access: createMemoryAccessContext("agent-a"),
+          agentId: "agent-b",
+        }),
+      /cannot access memories/i,
+    );
   });
 
   void it("binds the stable Mem0 id after a sync job", async () => {

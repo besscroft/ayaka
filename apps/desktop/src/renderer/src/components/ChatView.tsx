@@ -175,6 +175,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const chatFailureRef = useRef(false);
   const errorReportedRef = useRef(false);
   const retryFallbackRef = useRef({ active: false, attempted: false });
+  const chatRef = useRef<{
+    regenerate: () => Promise<void>;
+    clearError: () => void;
+  } | null>(null);
   const persistenceQueue = useMemo(
     () =>
       createSnapshotPersistenceQueue<MessagePersistenceRequest>(
@@ -516,14 +520,55 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     onError: (err) => {
       const info = getChatErrorInfo(err, locale);
       const retryFallback = retryFallbackRef.current;
-      if (retryFallback.active && shouldFallbackToFreshRun(info.code, retryFallback.attempted)) {
+      if (
+        shouldFallbackToFreshRun(info.code, retryFallback.attempted) &&
+        (retryFallback.active || runModeRef.current === "resume")
+      ) {
+        retryFallback.active = true;
+        retryFallback.attempted = true;
+        const freshRun = selectChatRetryRun({
+          currentRunId: null,
+          currentRun: null,
+          newRunId: crypto.randomUUID(),
+        });
+        runIdRef.current = freshRun.runId;
+        runModeRef.current = freshRun.mode;
+        reconciliationRef.current = { runId: freshRun.runId, attempts: 0, timer: null };
+        setChatError(null);
+        setChatErrorRetryable(false);
+        chatFailureRef.current = false;
+        errorReportedRef.current = false;
+        queueMicrotask(() => {
+          const currentChat = chatRef.current;
+          if (!currentChat) {
+            retryFallback.active = false;
+            reportChatError("streaming", err, {
+              persistSnapshot: latestMessagesRef.current,
+            });
+            return;
+          }
+          currentChat.clearError();
+          void currentChat
+            .regenerate()
+            .catch((fallbackError) => {
+              reportChatError("retry", fallbackError, {
+                persistSnapshot: latestMessagesRef.current,
+              });
+            })
+            .finally(() => {
+              retryFallback.active = false;
+              persistInBackground(latestMessagesRef.current, "retried response");
+            });
+        });
         return;
       }
+      retryFallback.active = false;
       reportChatError("streaming", err, {
         persistSnapshot: latestMessagesRef.current,
       });
     },
   });
+  chatRef.current = chat;
 
   latestMessagesRef.current = chat.messages;
 
@@ -832,7 +877,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           if (code === "run_not_active" || code === "run_not_found") {
             latestMessagesRef.current = pendingMessages;
             void persistAndTouch(pendingMessages);
-            await chat.sendMessage(userMessage);
+            await chat.sendMessage({ ...userMessage, messageId: userMessage.id });
             return;
           }
           reportChatError("send", err, { persistSnapshot: pendingMessages });
@@ -904,42 +949,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     chatFailureRef.current = false;
     errorReportedRef.current = false;
     chat.clearError();
-    void (async () => {
-      try {
-        await chat.regenerate();
-      } catch (err) {
-        const info = getChatErrorInfo(err, locale);
-        const retryFallback = retryFallbackRef.current;
-        if (shouldFallbackToFreshRun(info.code, retryFallback.attempted)) {
-          retryFallback.attempted = true;
-          const freshRun = selectChatRetryRun({
-            currentRunId: null,
-            currentRun: null,
-            newRunId: crypto.randomUUID(),
-          });
-          runIdRef.current = freshRun.runId;
-          runModeRef.current = freshRun.mode;
-          reconciliationRef.current = { runId: freshRun.runId, attempts: 0, timer: null };
-          setChatError(null);
-          setChatErrorRetryable(false);
-          chatFailureRef.current = false;
-          errorReportedRef.current = false;
-          chat.clearError();
-          try {
-            await chat.regenerate();
-          } catch (fallbackError) {
-            reportChatError("retry", fallbackError, {
-              persistSnapshot: latestMessagesRef.current,
-            });
-          }
-          return;
-        }
-        reportChatError("retry", err, { persistSnapshot: latestMessagesRef.current });
-      } finally {
-        retryFallbackRef.current.active = false;
-        persistInBackground(latestMessagesRef.current, "retried response");
-      }
-    })();
+    void chat.regenerate().catch((err) => {
+      retryFallbackRef.current.active = false;
+      reportChatError("retry", err, { persistSnapshot: latestMessagesRef.current });
+    });
   };
 
   const handleDismissError = (): void => {

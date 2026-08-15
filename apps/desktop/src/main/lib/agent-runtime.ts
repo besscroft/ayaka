@@ -55,6 +55,7 @@ import {
   type ChatToolModelContext,
   type ChatToolRuntimeConfig,
 } from "./chat-tools";
+import { addRootMemoryTools, ROOT_MEMORY_TOOL_NAMES } from "./root-memory-tools";
 import { commandLooksDangerous, inputHasPathEscape } from "./approval-policy";
 import { isBuiltinToolName, rootToolRequiresApproval } from "./root-tool-approval";
 import { loadAgentGraph } from "./agent-graph";
@@ -636,6 +637,12 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   const tools = silentMemoryRuntime.tools;
   const activeTools = new Set<string>(silentMemoryRuntime.activeTools);
   const builtinToolNames = new Set<string>(silentMemoryRuntime.builtinToolNames ?? []);
+  addRootMemoryTools(tools, activeTools, {
+    actorAgentId: DEFAULT_AGENT_ID,
+    runId: context.runId,
+    conversationId: context.conversationId,
+  });
+  for (const toolName of ROOT_MEMORY_TOOL_NAMES) builtinToolNames.add(toolName);
   assignTool(tools, MEDIA_GENERATION_TOOL_NAME, createMediaGenerationTool(context));
   activeTools.add(MEDIA_GENERATION_TOOL_NAME);
   builtinToolNames.add(MEDIA_GENERATION_TOOL_NAME);
@@ -1391,6 +1398,7 @@ function createGuardrailApproval(
   return async ({ toolCall }) => {
     const toolName = String(toolCall.toolName);
     const input = (toolCall as { input?: unknown }).input;
+    const auditInput = redactMemoryContentForAudit(toolName, input);
     const decision = evaluateToolGuardrail(
       context,
       toolName,
@@ -1412,7 +1420,7 @@ function createGuardrailApproval(
         decision.decision === "require_review"
           ? "Approval requested: " + toolName
           : "Guardrail " + decision.decision + ": " + toolName,
-      detail: { toolName, input, decision },
+      detail: { toolName, input: auditInput, decision },
       finished_at: decision.decision === "require_review" ? null : Date.now(),
     });
     insertRuntimeEvent({
@@ -1427,7 +1435,7 @@ function createGuardrailApproval(
           : decision.decision === "require_review"
             ? "queued"
             : "succeeded",
-      detail: { runId: context.runId, toolName, input, decision },
+      detail: { runId: context.runId, toolName, input: auditInput, decision },
     });
     if (decision.decision === "require_review") {
       context.approvalRequested = true;
@@ -1445,6 +1453,22 @@ function createGuardrailApproval(
       return { type: "denied", reason: decision.reason } satisfies ToolApprovalStatus;
     }
     return "not-applicable";
+  };
+}
+
+function redactMemoryContentForAudit(toolName: string, input: unknown): unknown {
+  if (
+    !["soul_write", "memory_file_write", "memory_save", "memory_update"].includes(toolName) ||
+    !input ||
+    typeof input !== "object"
+  ) {
+    return input;
+  }
+  const value = input as Record<string, unknown>;
+  if (typeof value.content !== "string") return input;
+  return {
+    ...value,
+    content: { redacted: true, charCount: value.content.length },
   };
 }
 

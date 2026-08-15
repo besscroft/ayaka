@@ -182,6 +182,12 @@ void describe("agent memory files", () => {
       ),
       { soul: "# SOUL\nSoul", user: "# USER\nUser", memory: "# MEMORY\nMemory" },
     );
+    assert.deepEqual(
+      memoryFiles.parseConsolidationOutput(
+        "```markdown\n===SOUL===  \n# SOUL\nSoul\n===USER===\n# USER\nUser\n===MEMORY===\n# MEMORY\nMemory\n```",
+      ),
+      { soul: "# SOUL\nSoul", user: "# USER\nUser", memory: "# MEMORY\nMemory" },
+    );
   });
 
   void it("keeps SOUL files isolated per agent while sharing USER and MEMORY", () => {

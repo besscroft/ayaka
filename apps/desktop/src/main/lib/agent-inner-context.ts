@@ -12,6 +12,7 @@ import {
   readMemoryFile,
   type MemoryFileKind,
 } from "./agent-memory-files";
+import { createMemoryAccessContext } from "./memory-access";
 
 const INNER_CONTEXT_CHAR_BUDGET = 8_000;
 const RELEVANT_MEMORY_LIMIT = 6;
@@ -59,6 +60,7 @@ export async function retrieveRelevantMemories(input: {
 
   const results = await memoryOrchestrator.retrieve({
     query,
+    access: createMemoryAccessContext(input.agentId ?? DEFAULT_AGENT_ID),
     agentId: input.agentId ?? DEFAULT_AGENT_ID,
     limit: input.limit ?? RELEVANT_MEMORY_LIMIT,
   });

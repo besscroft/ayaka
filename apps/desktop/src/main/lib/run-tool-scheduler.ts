@@ -2,6 +2,11 @@ import type { ToolSet } from "ai";
 
 const READ_ONLY_TOOLS = new Set([
   "memory_search",
+  "memory_list",
+  "memory_get",
+  "memory_file_read",
+  "soul_list",
+  "soul_read",
   "runtime_snapshot",
   "conversation_search",
   "current_time",

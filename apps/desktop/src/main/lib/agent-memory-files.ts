@@ -398,8 +398,16 @@ export async function consolidateMemoryFiles(
       providerOptions: model.providerOptions,
     });
     const parsed = parseConsolidationOutput(result.text);
-    if (!parsed || !manualBaselinesArePreserved(parsed, current)) {
-      recordMemoryFileDiagnostic(null, "consolidation-rejected", "Invalid or lossy model output.");
+    if (!parsed) {
+      recordMemoryFileDiagnostic(null, "consolidation-rejected", "Invalid model output format.");
+      return;
+    }
+    if (!manualBaselinesArePreserved(parsed, current)) {
+      recordMemoryFileDiagnostic(
+        null,
+        "consolidation-rejected",
+        "Model output would lose a manual baseline.",
+      );
       return;
     }
 
@@ -472,9 +480,9 @@ function buildConsolidationPrompt(input: {
 }
 
 export function parseConsolidationOutput(text: string): Record<MemoryFileKind, string> | null {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
+  const normalized = stripConsolidationCodeFence(text.replace(/\r\n/g, "\n").trim());
   const match = normalized.match(
-    /^===SOUL===\n([\s\S]+?)\n===USER===\n([\s\S]+?)\n===MEMORY===\n([\s\S]+)$/,
+    /^===SOUL===\s*\n([\s\S]+?)\n===USER===\s*\n([\s\S]+?)\n===MEMORY===\s*\n([\s\S]+)$/,
   );
   if (!match) return null;
   const parsed: Record<MemoryFileKind, string> = {
@@ -486,6 +494,13 @@ export function parseConsolidationOutput(text: string): Record<MemoryFileKind, s
     if (!parsed[kind] || parsed[kind].length > MEMORY_FILE_LIMITS[kind]) return null;
   }
   return parsed;
+}
+
+function stripConsolidationCodeFence(text: string): string {
+  return text
+    .replace(/^```(?:markdown|md|text)?\s*\n/i, "")
+    .replace(/\n```\s*$/i, "")
+    .trim();
 }
 
 function manualBaselinesArePreserved(

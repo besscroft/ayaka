@@ -17,7 +17,9 @@ import {
   updateMessageReaction,
 } from "@renderer/lib/chat-messages";
 import { hasMeaningfulConversationTitle } from "@renderer/lib/conversation-title";
+import { getChatErrorInfo } from "@renderer/lib/errors";
 import { translate } from "@renderer/lib/i18n";
+import { shouldFallbackToFreshRun } from "@renderer/lib/chat-retry";
 
 void describe("chat message helpers", () => {
   void it("builds text-only user UI messages", () => {
@@ -284,6 +286,52 @@ void describe("chat message helpers", () => {
 
     assert.equal(sentBatches.length, 1);
     assert.deepEqual(stripMetadata(sentBatches[0]), [message]);
+    assert.deepEqual(stripMetadata(chat.messages), [message]);
+  });
+
+  void it("retries a stale transport run with the existing user message id", async () => {
+    const sentBatches: UIMessage[][] = [];
+    let sendCount = 0;
+    let resolveRecovery!: () => void;
+    const recovery = new Promise<void>((resolve) => {
+      resolveRecovery = resolve;
+    });
+    let chat!: Chat<UIMessage>;
+    chat = new Chat<UIMessage>({
+      transport: {
+        sendMessages: async ({ messages }) => {
+          sentBatches.push(messages);
+          sendCount += 1;
+          if (sendCount === 1) {
+            throw new Error(
+              JSON.stringify({
+                error: "Agent run cannot be resumed after its process ended.",
+                code: "run_not_active",
+                retryable: true,
+              }),
+            );
+          }
+          return createFinishedStream();
+        },
+        reconnectToStream: async () => null,
+      },
+      onError: (error) => {
+        const info = getChatErrorInfo(error, "en");
+        if (shouldFallbackToFreshRun(info.code, false)) {
+          queueMicrotask(() => {
+            void chat.regenerate().finally(resolveRecovery);
+          });
+        }
+      },
+    });
+
+    const message = buildUserMessage({ id: "u-stale", text: "Continue", files: [] });
+    await chat.sendMessage(message);
+    await recovery;
+
+    assert.equal(sentBatches.length, 2);
+    assert.deepEqual(stripMetadata(sentBatches[0]), [message]);
+    assert.deepEqual(stripMetadata(sentBatches[1]), [message]);
     assert.deepEqual(stripMetadata(chat.messages), [message]);
   });
 });

@@ -40,6 +40,26 @@ void describe("chat error classification", () => {
     );
   });
 
+  void it("preserves provider retryability through an AI SDK RetryError wrapper", () => {
+    const retryError = {
+      name: "AI_RetryError",
+      message: "Failed after 3 attempts.",
+      errors: [
+        {
+          name: "AI_APICallError",
+          message: "Service Unavailable",
+          statusCode: 503,
+          responseBody: '{"code":"SERVICE_BUSY","message":"Service busy"}',
+        },
+      ],
+    };
+
+    const classification = classifyChatError(retryError, { phase: "stream" });
+    assert.equal(classification.code, "provider");
+    assert.equal(classification.retryable, true);
+    assert.equal(classification.status, 503);
+  });
+
   void it("redacts secrets and truncates persisted diagnostics", () => {
     const diagnostic = redactChatDiagnostic(
       "Authorization: Bearer secret-token api_key=sk-abcdefghijklmnopqrstuvwxyz",

@@ -17,6 +17,8 @@ interface ErrorShape {
   statusCode?: unknown;
   responseBody?: unknown;
   body?: unknown;
+  errors?: unknown;
+  lastError?: unknown;
 }
 
 const RETRYABLE_CODES = new Set<ChatErrorCode>([
@@ -231,10 +233,38 @@ function readString(value: unknown): string | undefined {
 }
 
 function readStatus(error: unknown): number | undefined {
+  return findNestedErrorValue(error, (value) => {
+    const shape = value as ErrorShape;
+    const status = typeof shape.statusCode === "number" ? shape.statusCode : shape.status;
+    return typeof status === "number" ? status : undefined;
+  });
+}
+
+function findNestedErrorValue<T>(
+  error: unknown,
+  read: (value: Record<string, unknown>) => T | undefined,
+  seen = new Set<object>(),
+): T | undefined {
   if (!error || typeof error !== "object") return undefined;
-  const shape = error as ErrorShape;
-  const status = typeof shape.statusCode === "number" ? shape.statusCode : shape.status;
-  return typeof status === "number" ? status : undefined;
+  if (seen.has(error)) return undefined;
+  seen.add(error);
+
+  const value = error as Record<string, unknown>;
+  const direct = read(value);
+  if (direct !== undefined) return direct;
+
+  for (const nested of [value.cause, value.lastError, value.errors]) {
+    if (Array.isArray(nested)) {
+      for (const item of nested) {
+        const result = findNestedErrorValue(item, read, seen);
+        if (result !== undefined) return result;
+      }
+      continue;
+    }
+    const result = findNestedErrorValue(nested, read, seen);
+    if (result !== undefined) return result;
+  }
+  return undefined;
 }
 
 function readCode(error: unknown): ChatErrorCode | undefined {

@@ -99,8 +99,10 @@ import type {
   WorkspaceMediaSaveInput,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
+import { DEFAULT_AGENT_ID } from "../../shared/types";
 import { queueAgentLearning } from "../lib/agent-learning";
 import { memoryOrchestrator } from "../lib/memory-orchestrator";
+import { createMemoryAccessContext } from "../lib/memory-access";
 import {
   getMemoryFileSnapshot,
   reloadMemoryFile,
@@ -411,6 +413,7 @@ export function registerIpcHandlers(): void {
     filters.query?.trim()
       ? memoryOrchestrator.retrieve({
           query: filters.query,
+          access: createMemoryAccessContext(DEFAULT_AGENT_ID),
           agentId: filters.agentId,
           scope: filters.scope,
           kind: filters.kind,
