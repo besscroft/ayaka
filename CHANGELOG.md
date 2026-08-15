@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.1.22] - 2026-08-15
+
+### 中文
+
+#### 新增
+
+- 新增全局与代理记忆管理工具，支持查看、读取和写入 SOUL 与记忆文件，并通过访问控制与审计日志保护敏感内容。
+- 新增对话运行 ID 跟踪与追问建议，支持重试时自动恢复过期运行。
+- 新增兼容 OpenAI 接口模型的推理内容识别与展示，并支持展示消息来源。
+- 新增 Agent 头像组件，区分主代理与子代理的身份展示。
+
+#### 变更
+
+- 重构聊天消息合并与持久化流程，通过会话快照提升流式更新、重连和退出时的数据一致性。
+- 将产品品牌统一更新为 Ayaka，并同步应用、文档、协议及资源命名。
+- 更新设置页模型选择布局与 Ayaka 主题，优化不同窗口尺寸下的显示效果。
+- 优化关于页资源入口与品牌图标，移除过时的桌面助手网站内容。
+- 优化实时思考面板与消息流式展示，简化执行状态信息并减少滚动和渲染跳动。
+- 移除输入框中已不再使用的快捷键提示，减少无效界面信息。
+
+### English
+
+#### Added
+
+- Added global and agent memory-management tools for listing, reading, and writing SOUL and memory files, with access control and audit logging for sensitive content.
+- Added conversation run ID tracking and follow-up suggestions, with automatic recovery for stale runs during retries.
+- Added reasoning-content detection and rendering for OpenAI-compatible models, along with source display in conversations.
+- Added Agent avatar components to distinguish the primary agent from sub-agents.
+
+#### Changed
+
+- Refactored chat-message merging and persistence around conversation snapshots to improve consistency during streaming updates, reconnects, and shutdown.
+- Unified the product branding under Ayaka across the application, documentation, protocols, and resources.
+- Updated the model-selector layout and Ayaka theme in Settings for better behavior across window sizes.
+- Improved About-page resource links and brand icons, and removed the outdated desktop-companion website section.
+- Simplified the live-thinking panel and streaming message rendering to reduce unnecessary status detail, scrolling, and layout jumps.
+- Removed the unused input shortcut hint to reduce interface noise.
+
 ## [0.1.21] - 2026-08-14
 
 ### 中文
