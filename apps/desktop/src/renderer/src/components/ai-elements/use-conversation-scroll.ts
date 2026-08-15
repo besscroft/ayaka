@@ -51,12 +51,26 @@ export function shouldHandleConversationScroll(isProgrammaticScroll: boolean): b
   return !isProgrammaticScroll;
 }
 
+export function getDisclosureScrollAdjustment(
+  wasAboveViewport: boolean,
+  previousHeight: number,
+  currentHeight: number,
+): number {
+  return wasAboveViewport ? currentHeight - previousHeight : 0;
+}
+
+interface DisclosureScrollSnapshot {
+  element: HTMLElement;
+  wasAboveViewport: boolean;
+  previousHeight: number;
+}
+
 export interface ConversationScrollController {
   containerRef: RefObject<HTMLDivElement | null>;
   contentRef: (node: HTMLDivElement | null) => void;
   isAwayFromLatest: boolean;
   scrollToLatest: () => void;
-  preserveScrollOnDisclosure: () => void;
+  preserveScrollOnDisclosure: (element?: HTMLElement | null) => void;
 }
 
 const ConversationScrollContext = createContext<ConversationScrollController | null>(null);
@@ -72,6 +86,7 @@ export function useConversationScrollController(): ConversationScrollController 
   const settleTimerRef = useRef<number | null>(null);
   const disclosureScrollLockUntilRef = useRef(0);
   const disclosureScrollLockTimerRef = useRef<number | null>(null);
+  const disclosureScrollSnapshotRef = useRef<DisclosureScrollSnapshot | null>(null);
   const reducedMotion = Boolean(useReducedMotion());
 
   const updateScrollState = useCallback((): void => {
@@ -140,18 +155,36 @@ export function useConversationScrollController(): ConversationScrollController 
     updateScrollState();
   }, [updateScrollState]);
 
-  const preserveScrollOnDisclosure = useCallback((): void => {
-    cancelProgrammaticScroll();
-    updateScrollState();
-    disclosureScrollLockUntilRef.current = Date.now() + CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS;
-    if (disclosureScrollLockTimerRef.current !== null) {
-      window.clearTimeout(disclosureScrollLockTimerRef.current);
-    }
-    disclosureScrollLockTimerRef.current = window.setTimeout(() => {
-      disclosureScrollLockTimerRef.current = null;
-      disclosureScrollLockUntilRef.current = 0;
-    }, CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS);
-  }, [cancelProgrammaticScroll, updateScrollState]);
+  const preserveScrollOnDisclosure = useCallback(
+    (element?: HTMLElement | null): void => {
+      cancelProgrammaticScroll();
+      updateScrollState();
+
+      const container = containerRef.current;
+      if (container && element) {
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        disclosureScrollSnapshotRef.current = {
+          element,
+          wasAboveViewport: elementRect.bottom <= containerRect.top,
+          previousHeight: elementRect.height,
+        };
+      } else {
+        disclosureScrollSnapshotRef.current = null;
+      }
+
+      disclosureScrollLockUntilRef.current = Date.now() + CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS;
+      if (disclosureScrollLockTimerRef.current !== null) {
+        window.clearTimeout(disclosureScrollLockTimerRef.current);
+      }
+      disclosureScrollLockTimerRef.current = window.setTimeout(() => {
+        disclosureScrollLockTimerRef.current = null;
+        disclosureScrollLockUntilRef.current = 0;
+        disclosureScrollSnapshotRef.current = null;
+      }, CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS);
+    },
+    [cancelProgrammaticScroll, updateScrollState],
+  );
 
   const scrollToLatest = useCallback((): void => {
     const node = containerRef.current;
@@ -211,7 +244,21 @@ export function useConversationScrollController(): ConversationScrollController 
       return;
     }
 
-    const observer = new ResizeObserver(() => scheduleFollow());
+    const observer = new ResizeObserver(() => {
+      const node = containerRef.current;
+      const snapshot = disclosureScrollSnapshotRef.current;
+      if (node && snapshot && snapshot.element.isConnected) {
+        const currentHeight = snapshot.element.getBoundingClientRect().height;
+        const adjustment = getDisclosureScrollAdjustment(
+          snapshot.wasAboveViewport,
+          snapshot.previousHeight,
+          currentHeight,
+        );
+        if (adjustment !== 0) node.scrollTop += adjustment;
+        snapshot.previousHeight = currentHeight;
+      }
+      scheduleFollow();
+    });
     observer.observe(contentNode);
     scheduleFollow();
     return () => observer.disconnect();
@@ -229,6 +276,7 @@ export function useConversationScrollController(): ConversationScrollController 
       if (disclosureScrollLockTimerRef.current !== null) {
         window.clearTimeout(disclosureScrollLockTimerRef.current);
       }
+      disclosureScrollSnapshotRef.current = null;
     };
   }, []);
 

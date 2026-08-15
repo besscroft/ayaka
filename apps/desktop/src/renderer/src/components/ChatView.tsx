@@ -636,10 +636,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
     )
     .sort((a, b) => b.started_at - a.started_at)[0];
-  const liveRuntimeRunId = activeRuntimeRun?.id ?? runIdRef.current;
-  const liveRuntimeSteps = liveRuntimeRunId
-    ? (runtimeSnapshot?.runtimeSteps.filter((step) => step.run_id === liveRuntimeRunId) ?? [])
-    : [];
   const isAgentRunActive = isChatLoading || hasActivePersistedRun;
   const shouldPollRuntime = isLoading || hasActivePersistedRun;
 
@@ -1166,7 +1162,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
               messages={chat.messages}
               isLoading={isLoading}
               status={statusKind}
-              runtimeSteps={liveRuntimeSteps}
               runtimeStartedAt={activeRuntimeRun?.started_at}
               error={chat.error}
               errorDetail={chatError}

@@ -31,6 +31,7 @@ export {
 } from "./prompt-input";
 
 export { Reasoning, ReasoningTrigger, ReasoningContent, useReasoning } from "./reasoning";
+export { Source, Sources, SourcesContent, SourcesTrigger } from "./sources";
 
 export { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput, type ToolState } from "./tool";
 

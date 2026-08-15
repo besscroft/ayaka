@@ -17,17 +17,8 @@
 import { Fragment, memo, useCallback, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
+import { MEDIA_GENERATION_TOOL_NAME, type MediaGenerationResponse } from "@shared/types";
 import {
-  MEDIA_GENERATION_TOOL_NAME,
-  type MediaGenerationResponse,
-  type RuntimeStep,
-} from "@shared/types";
-import {
-  ChainOfThought,
-  ChainOfThoughtImage,
-  ChainOfThoughtSearchResult,
-  ChainOfThoughtSearchResults,
-  ChainOfThoughtStep,
   Conversation,
   ConversationContent,
   ConversationEmptyState,
@@ -42,13 +33,15 @@ import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
   Tool,
   ToolContent,
   ToolHeader,
   ToolInput,
   ToolOutput,
-  type ChainStepIcon,
-  type ChainStepStatus,
   type ConversationStatusKind,
   type FilePartLike,
 } from "./ai-elements";
@@ -63,14 +56,13 @@ import {
   normalizeToolState,
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
-import { IconCopy } from "./icons";
+import { IconBrain, IconCopy } from "./icons";
 
 interface MessageListProps {
   conversationId?: string;
   messages: UIMessage[];
   isLoading: boolean;
   status: ConversationStatusKind;
-  runtimeSteps?: RuntimeStep[];
   runtimeStartedAt?: number | null;
   error?: Error;
   errorDetail?: string | null;
@@ -104,7 +96,6 @@ export function MessageList({
   messages,
   isLoading,
   status,
-  runtimeSteps = [],
   runtimeStartedAt,
   error,
   errorDetail,
@@ -243,11 +234,7 @@ export function MessageList({
             exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           >
-            <LiveThinkingPanel
-              status={activityStatus}
-              steps={runtimeSteps}
-              startedAt={runtimeStartedAt}
-            />
+            <LiveThinkingPanel status={activityStatus} startedAt={runtimeStartedAt} />
           </motion.div>
         ) : null}
 
@@ -295,73 +282,9 @@ export type MessageActivityStatus =
   | "responding";
 
 export interface ReasoningDisplay {
+  partIndex: number;
   text: string;
   isStreaming: boolean;
-}
-
-export type LiveThinkingKind = RuntimeStep["kind"] | "thinking";
-
-export interface LiveThinkingStep {
-  id: string;
-  kind: LiveThinkingKind;
-  status: ChainStepStatus;
-  title: string | null;
-}
-
-export function getLiveThinkingSteps(
-  steps: RuntimeStep[],
-  activityStatus: MessageActivityStatus,
-): LiveThinkingStep[] {
-  const visibleSteps: LiveThinkingStep[] = [...steps]
-    .sort((a, b) => a.started_at - b.started_at)
-    .slice(-5)
-    .map((step) => ({
-      id: step.id,
-      kind: step.kind,
-      status: getChainStepStatus(step.status),
-      title: step.title?.trim() || null,
-    }));
-  const hasLiveStep = visibleSteps.some(
-    (step) => step.status === "active" || step.status === "pending",
-  );
-
-  if (visibleSteps.length === 0 || !hasLiveStep) {
-    visibleSteps.push({
-      id: "live-thinking",
-      kind: "thinking",
-      status: "active",
-      title: null,
-    });
-  }
-
-  if (activityStatus === "waiting-approval") {
-    visibleSteps.push({
-      id: "live-approval",
-      kind: "approval",
-      status: "active",
-      title: null,
-    });
-  }
-
-  return visibleSteps;
-}
-
-function getChainStepStatus(status: string): ChainStepStatus {
-  if (status === "succeeded") return "complete";
-  if (status === "failed" || status === "cancelled" || status === "interrupted") return "error";
-  if (status === "running" || status === "waiting_approval" || status === "waiting_handoff") {
-    return "active";
-  }
-  return "pending";
-}
-
-function getLiveThinkingIcon(kind: LiveThinkingKind): ChainStepIcon {
-  if (kind === "tool" || kind === "sandbox") return "tool";
-  if (kind === "memory" || kind === "skill" || kind === "handoff") return "sparkles";
-  if (kind === "model" || kind === "agent" || kind === "thinking" || kind === "approval") {
-    return "think";
-  }
-  return "default";
 }
 
 function getLiveThinkingTitle(
@@ -372,106 +295,45 @@ function getLiveThinkingTitle(
   if (status === "responding") return t("msg.thinking.responding");
   if (status === "tool-calling") return t("msg.activity.toolCalling");
   if (status === "waiting-approval") return t("msg.activity.waitingApproval");
-  return t("msg.cot.reasoningActive");
+  return t("msg.thinking.waiting");
 }
 
 export function LiveThinkingPanel({
   status,
-  steps,
   startedAt,
 }: {
   status: MessageActivityStatus;
-  steps: RuntimeStep[];
   startedAt?: number | null;
 }): React.JSX.Element {
   const { t, f } = useT();
-  const liveSteps = getLiveThinkingSteps(steps, status);
   const elapsed = startedAt ? formatExecutionTime(Date.now() - startedAt, f) : null;
-  const hasError = liveSteps.some((step) => step.status === "error");
+  const liveTitle = getLiveThinkingTitle(status, t);
   return (
     <Message from="assistant">
       <MessageContent data-from="assistant">
-        <ChainOfThought
-          active
-          defaultOpen
-          keepOpen={status === "waiting-approval" || hasError}
-          title={getLiveThinkingTitle(status, t)}
+        <div
+          data-slot="live-thinking-status"
+          className="flex items-center gap-2 py-2 text-sm text-muted-foreground"
+          role="status"
           aria-live="polite"
         >
-          {liveSteps.map((step) => (
-            <ChainOfThoughtStep
-              key={step.id}
-              icon={getLiveThinkingIcon(step.kind)}
-              status={step.status}
-              label={
-                step.title ??
-                (step.kind === "thinking" || step.kind === "approval"
-                  ? getLiveThinkingTitle(status, t)
-                  : t(`runtime.kind.${step.kind}`))
-              }
-              description={
-                step.id === "live-thinking" && elapsed
-                  ? t("msg.thinking.elapsed", { duration: elapsed })
-                  : undefined
-              }
-            />
-          ))}
-        </ChainOfThought>
+          <IconBrain className="size-4 text-muted-foreground/70" />
+          <span>{liveTitle}</span>
+          {elapsed ? (
+            <span className="text-xs text-muted-foreground/70">
+              {t("msg.thinking.elapsed", { duration: elapsed })}
+            </span>
+          ) : null}
+        </div>
       </MessageContent>
     </Message>
   );
 }
 
-export interface ExecutionSummary {
-  toolCount: number;
-  activeToolCount: number;
-  pendingToolCount: number;
-  errorToolCount: number;
-  sourceCount: number;
-  compactionCount: number;
-  imageCount: number;
-  hasActivity: boolean;
-  hasAttention: boolean;
-}
-
-export function getExecutionSummary(parts: UIMessage["parts"]): ExecutionSummary {
-  const visibleParts = parts.filter((part) => !isSilentToolPart(part));
-  const toolParts = visibleParts.filter(isToolPart);
-  const activeToolCount = toolParts.filter(
-    (part) => part.state !== undefined && isActiveToolState(normalizeToolState(part.state)),
-  ).length;
-  const errorToolCount = toolParts.filter(
-    (part) => part.state !== undefined && isToolErrorState(normalizeToolState(part.state)),
-  ).length;
-  const pendingToolCount = toolParts.filter((part) => part.state === undefined).length;
-  const sourceCount = visibleParts.filter(isSourcePart).length;
-  const compactionCount = visibleParts.filter(
-    (part) => part.type === "custom" && (part as { kind?: unknown }).kind === "openai.compaction",
-  ).length;
-  const imageCount = visibleParts.filter(isAttachmentPart).filter((part) => {
-    return (part.mediaType ?? "").startsWith("image/");
-  }).length;
-  const hasActivity =
-    toolParts.length > 0 || sourceCount > 0 || compactionCount > 0 || imageCount > 0;
-
-  return {
-    toolCount: toolParts.length,
-    activeToolCount,
-    pendingToolCount,
-    errorToolCount,
-    sourceCount,
-    compactionCount,
-    imageCount,
-    hasActivity,
-    hasAttention: activeToolCount > 0 || errorToolCount > 0,
-  };
-}
-
-export function shouldRenderExecutionSummary(
-  role: UIMessage["role"],
-  hasActivity: boolean,
-): boolean {
-  return role === "assistant" && hasActivity;
+export function hasRenderableActivity(parts: UIMessage["parts"]): boolean {
+  return parts
+    .filter((part) => !isSilentToolPart(part))
+    .some((part) => isToolPart(part) || isSourcePart(part) || isAttachmentPart(part));
 }
 
 export function getMessageActivityStatus(
@@ -511,29 +373,26 @@ export function shouldShowLiveThinking(
   const lastMessage = messages.at(-1);
   if (!lastMessage || lastMessage.role !== "assistant") return true;
   const parts = (lastMessage.parts ?? []).filter((part) => !isSilentToolPart(part));
-  return getReasoningDisplay(parts, isLoading) === null && !getExecutionSummary(parts).hasActivity;
+  return getReasoningDisplays(parts, isLoading).length === 0 && !hasRenderableActivity(parts);
 }
 
-export function getReasoningDisplay(
+export function getReasoningDisplays(
   parts: UIMessage["parts"],
   messageStreaming: boolean,
-): ReasoningDisplay | null {
-  const reasoningParts = parts.filter(isReasoningPart);
-  if (reasoningParts.length === 0) return null;
+): ReasoningDisplay[] {
+  const lastVisiblePartIndex = parts.reduce(
+    (lastIndex, part, partIndex) => (isSilentToolPart(part) ? lastIndex : partIndex),
+    -1,
+  );
+  return parts.flatMap((part, partIndex) => {
+    if (!isReasoningPart(part)) return [];
 
-  const lastReasoningPart = reasoningParts.at(-1);
-  const lastPart = parts.at(-1);
-  return {
-    text: reasoningParts
-      .map((part) => part.text)
-      .filter((text) => text.length > 0)
-      .join("\n\n"),
-    isStreaming:
-      messageStreaming &&
-      lastPart !== undefined &&
-      isReasoningPart(lastPart) &&
-      lastReasoningPart?.state !== "done",
-  };
+    const isStreaming =
+      messageStreaming && partIndex === lastVisiblePartIndex && part.state !== "done";
+    if (!part.text && !isStreaming) return [];
+
+    return [{ partIndex, text: part.text, isStreaming }];
+  });
 }
 
 export interface MessageItemProps {
@@ -571,29 +430,19 @@ function MessageItem({
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const parts = (message.parts ?? []).filter((part) => !isSilentToolPart(part));
+  const allParts = message.parts ?? [];
+  const parts = allParts.filter((part) => !isSilentToolPart(part));
   const messageStreaming = isLastMessage && isStreaming;
-  const executionSummary = getExecutionSummary(parts);
-  const reasoningDisplay = getReasoningDisplay(parts, messageStreaming);
-  const reasoningText = reasoningDisplay?.text ?? "";
-  const isReasoningStreaming = reasoningDisplay?.isStreaming ?? false;
+  const reasoningDisplays = getReasoningDisplays(allParts, messageStreaming);
+  const reasoningDisplaysByPartIndex = new Map(
+    reasoningDisplays.map((display) => [display.partIndex, display]),
+  );
   const fileParts = parts.filter(isAttachmentPart) as unknown as FilePartLike[];
   const sourceParts = parts.filter(isSourcePart);
-  const imageParts = fileParts.filter((p) => (p.mediaType ?? "").startsWith("image/"));
   const textParts = parts.filter(isTextPart).map((part) => part.text);
   const fullText = textParts.join("\n\n");
   const metadata = readChatMessageMetadata(message);
   const executionTime = formatExecutionTime(metadata.execution?.durationMs, f);
-  const reasoningMetrics = [
-    executionTime ? t("msg.cot.duration", { duration: executionTime }) : null,
-    metadata.execution?.reasoningTokens !== undefined
-      ? t("msg.cot.reasoningTokens", {
-          count: f.number(metadata.execution.reasoningTokens),
-        })
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" / ");
   const isUser = message.role === "user";
   const isMediaError = message.role === "assistant" && isMediaGenerationError(message);
   // 是否允许 hover 动作（仅在非流式中）
@@ -688,50 +537,66 @@ function MessageItem({
 
   return (
     <Message from={message.role}>
-      {shouldRenderExecutionSummary(message.role, executionSummary.hasActivity) ? (
-        <ExecutionSummaryPanel
-          conversationId={conversationId}
-          executionSummary={executionSummary}
-          messageStreaming={messageStreaming}
-          sourceParts={sourceParts}
-          imageParts={imageParts}
-        />
+      {message.role === "assistant" && sourceParts.length > 0 ? (
+        <Sources className="mb-1">
+          <SourcesTrigger count={sourceParts.length}>
+            <span className="font-medium">
+              {t("msg.cot.sources", { count: f.number(sourceParts.length) })}
+            </span>
+            <span aria-hidden="true">⌄</span>
+          </SourcesTrigger>
+          <SourcesContent>
+            {sourceParts.map((source) => {
+              const title =
+                source.type === "source-url"
+                  ? source.title || source.url
+                  : source.title || source.filename || t("msg.cot.document");
+              return (
+                <Source
+                  key={`${source.type}-${source.sourceId}`}
+                  href={source.type === "source-url" ? source.url : undefined}
+                  title={title}
+                />
+              );
+            })}
+          </SourcesContent>
+        </Sources>
       ) : null}
       {/* 气泡本体：思维链、附件、各类 part */}
       <MessageContent data-from={message.role}>
-        {reasoningDisplay ? (
-          <Reasoning
-            isStreaming={isReasoningStreaming}
-            defaultOpen={isReasoningStreaming}
-            className="w-full"
-          >
-            <ReasoningTrigger
-              getThinkingMessage={(streaming) => {
-                const label = streaming ? t("msg.cot.reasoningActive") : t("msg.cot.reasoned");
-                return !streaming && reasoningMetrics ? `${label} · ${reasoningMetrics}` : label;
-              }}
-            />
-            <ReasoningContent>
-              {reasoningText ? (
-                <MessageResponse
-                  data-slot="reasoning-text"
-                  className="rounded-md border border-border bg-muted px-2.5 py-2 font-mono text-[11px] leading-5 text-foreground/70"
-                >
-                  {reasoningText}
-                </MessageResponse>
-              ) : null}
-            </ReasoningContent>
-          </Reasoning>
-        ) : null}
-
         {fileParts.length > 0 && (
           <MessageAttachments conversationId={conversationId} parts={fileParts} />
         )}
 
-        {parts.map((part, index) => {
+        {allParts.map((part, index) => {
           const key = message.id + "-" + index;
+          if (isSilentToolPart(part)) {
+            return <Fragment key={key} />;
+          }
+
+          if (part.type === "reasoning") {
+            const display = reasoningDisplaysByPartIndex.get(index);
+            if (!display) return <Fragment key={key} />;
+
+            return (
+              <Reasoning
+                key={`${message.id}-reasoning-${index}`}
+                isStreaming={display.isStreaming}
+                className="w-full"
+              >
+                <ReasoningTrigger
+                  getThinkingMessage={(streaming, duration) => {
+                    if (streaming || duration === 0) return t("msg.cot.reasoningActive");
+                    if (duration === undefined) return t("msg.cot.reasoned");
+                    return t("msg.cot.reasonedFor", { duration: f.number(duration) });
+                  }}
+                />
+                <ReasoningContent>{display.text}</ReasoningContent>
+              </Reasoning>
+            );
+          }
+
           if (
-            part.type === "reasoning" ||
             part.type === "reasoning-file" ||
             part.type === "source-url" ||
             part.type === "source-document" ||
@@ -854,116 +719,6 @@ function MessageItem({
 }
 
 /* ---------- 类型守卫 ---------- */
-
-interface ExecutionSummaryPanelProps {
-  conversationId?: string;
-  executionSummary: ExecutionSummary;
-  messageStreaming: boolean;
-  sourceParts: SourcePart[];
-  imageParts: FilePartLike[];
-}
-
-function ExecutionSummaryPanel({
-  conversationId,
-  executionSummary,
-  messageStreaming,
-  sourceParts,
-  imageParts,
-}: ExecutionSummaryPanelProps): React.JSX.Element {
-  const { t, f } = useT();
-
-  return (
-    <ChainOfThought
-      active={messageStreaming}
-      keepOpen={executionSummary.hasAttention}
-      defaultOpen={messageStreaming || executionSummary.hasAttention}
-      title={messageStreaming ? t("msg.cot.activityActive") : t("msg.cot.activity")}
-    >
-      {executionSummary.toolCount > 0 ? (
-        <ChainOfThoughtStep
-          icon="tool"
-          status={
-            executionSummary.errorToolCount > 0
-              ? "error"
-              : executionSummary.activeToolCount > 0
-                ? "active"
-                : executionSummary.pendingToolCount > 0
-                  ? "pending"
-                  : "complete"
-          }
-          label={
-            executionSummary.errorToolCount > 0
-              ? t("msg.cot.toolsFailed", {
-                  count: f.number(executionSummary.errorToolCount),
-                })
-              : executionSummary.activeToolCount > 0
-                ? t("msg.cot.toolsActive", {
-                    count: f.number(executionSummary.toolCount),
-                  })
-                : executionSummary.pendingToolCount > 0
-                  ? t("msg.cot.toolsPending", {
-                      count: f.number(executionSummary.pendingToolCount),
-                    })
-                  : t("msg.cot.tools", { count: f.number(executionSummary.toolCount) })
-          }
-        />
-      ) : null}
-
-      {executionSummary.compactionCount > 0 ? (
-        <ChainOfThoughtStep
-          icon="think"
-          status="complete"
-          label={t("msg.cot.contextCompacted", {
-            count: f.number(executionSummary.compactionCount),
-          })}
-        />
-      ) : null}
-
-      {executionSummary.sourceCount > 0 ? (
-        <ChainOfThoughtStep
-          icon="search"
-          status="complete"
-          label={t("msg.cot.search", { count: f.number(executionSummary.sourceCount) })}
-        >
-          <ChainOfThoughtSearchResults>
-            {sourceParts.map((source) => {
-              const label =
-                source.type === "source-url" ? source.title || source.url : source.title;
-              const key = source.type + "-" + source.sourceId;
-              return (
-                <ChainOfThoughtSearchResult
-                  key={key}
-                  href={source.type === "source-url" ? source.url : undefined}
-                  title={label}
-                  description={source.type === "source-url" ? source.url : t("msg.cot.document")}
-                />
-              );
-            })}
-          </ChainOfThoughtSearchResults>
-        </ChainOfThoughtStep>
-      ) : null}
-
-      {executionSummary.imageCount > 0 ? (
-        <ChainOfThoughtStep
-          icon="image"
-          status="complete"
-          label={t("msg.cot.image", { count: f.number(executionSummary.imageCount) })}
-        >
-          <div className="grid grid-cols-2 gap-1.5">
-            {imageParts.map((part, index) => (
-              <ChainOfThoughtImage
-                key={index}
-                src={part.url || part.data || ""}
-                alt={part.filename || t("msg.cot.imageAlt")}
-                conversationId={conversationId}
-              />
-            ))}
-          </div>
-        </ChainOfThoughtStep>
-      ) : null}
-    </ChainOfThought>
-  );
-}
 
 export function areMessageItemPropsEqual(
   previous: MessageItemProps,
@@ -1124,10 +879,6 @@ function isActiveToolState(state: ReturnType<typeof normalizeToolState>): boolea
   return (
     state === "input-streaming" || state === "input-available" || state === "approval-requested"
   );
-}
-
-function isToolErrorState(state: ReturnType<typeof normalizeToolState>): boolean {
-  return state === "output-error" || state === "output-denied";
 }
 
 export function getToolDefaultOpen(state: ReturnType<typeof normalizeToolState>): boolean {

@@ -5,26 +5,26 @@ import { Fragment, createElement } from "react";
 import type { UIMessage } from "ai";
 import {
   areMessageItemPropsEqual,
-  getExecutionSummary,
-  getLiveThinkingSteps,
+  hasRenderableActivity,
   getMessageActivityStatus,
-  getReasoningDisplay,
+  getReasoningDisplays,
   getToolDefaultOpen,
   isMessageStreaming,
   LiveThinkingPanel,
+  MessageList,
   readMediaToolResult,
-  shouldRenderExecutionSummary,
   shouldShowLiveThinking,
 } from "@renderer/components/MessageList";
 import {
-  ChainOfThought,
-  ChainOfThoughtImage,
-  ChainOfThoughtSearchResult,
-  ChainOfThoughtStep,
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
 } from "@renderer/components/ai-elements";
+import { getDisclosureScrollAdjustment } from "@renderer/components/ai-elements/use-conversation-scroll";
 import { normalizeToolState } from "@renderer/lib/generated-tool-ui";
 
 function assistant(parts: UIMessage["parts"]): UIMessage[] {
@@ -45,7 +45,11 @@ void describe("chat message activity", () => {
   });
 
   void it("distinguishes tool execution, approval, and text output", () => {
-    const toolBase = { type: "dynamic-tool", toolName: "search", toolCallId: "tool-1" };
+    const toolBase = {
+      type: "dynamic-tool",
+      toolName: "search",
+      toolCallId: "tool-1",
+    };
     assert.equal(
       getMessageActivityStatus(
         assistant([{ ...toolBase, state: "input-available", input: {} } as never]),
@@ -117,81 +121,11 @@ void describe("chat message activity", () => {
       false,
     );
   });
-
-  void it("maps runtime steps into visible statuses and adds current waiting state", () => {
-    const steps = getLiveThinkingSteps(
-      [
-        {
-          id: "model-1",
-          kind: "model",
-          status: "succeeded",
-          title: "Model step",
-          started_at: 1,
-        } as never,
-        {
-          id: "tool-1",
-          kind: "tool",
-          status: "running",
-          title: "Tool step",
-          started_at: 2,
-        } as never,
-      ],
-      "tool-calling",
-    );
-
-    assert.deepEqual(
-      steps.map(({ id, kind, status, title }) => ({ id, kind, status, title })),
-      [
-        { id: "model-1", kind: "model", status: "complete", title: "Model step" },
-        { id: "tool-1", kind: "tool", status: "active", title: "Tool step" },
-      ],
-    );
-
-    const approvalSteps = getLiveThinkingSteps([], "waiting-approval");
-    assert.deepEqual(
-      approvalSteps.map(({ id, kind, status }) => ({ id, kind, status })),
-      [
-        { id: "live-thinking", kind: "thinking", status: "active" },
-        { id: "live-approval", kind: "approval", status: "active" },
-      ],
-    );
-  });
-
-  void it("treats cancelled and interrupted runtime steps as errors", () => {
-    const steps = getLiveThinkingSteps(
-      [
-        {
-          id: "cancelled",
-          kind: "tool",
-          status: "cancelled",
-          title: "Stopped",
-          started_at: 1,
-        } as never,
-        {
-          id: "interrupted",
-          kind: "model",
-          status: "interrupted",
-          title: "Interrupted",
-          started_at: 2,
-        } as never,
-      ],
-      "thinking",
-    );
-
-    assert.deepEqual(
-      steps.map(({ id, status }) => ({ id, status })),
-      [
-        { id: "cancelled", status: "error" },
-        { id: "interrupted", status: "error" },
-        { id: "live-thinking", status: "active" },
-      ],
-    );
-  });
 });
 
 void describe("reasoning display", () => {
-  void it("keeps the original reasoning text and streaming state", () => {
-    const display = getReasoningDisplay(
+  void it("keeps reasoning segments separate and in order", () => {
+    const displays = getReasoningDisplays(
       [
         { type: "reasoning", text: "first thought", state: "done" },
         { type: "reasoning", text: "second thought", state: "streaming" },
@@ -199,14 +133,14 @@ void describe("reasoning display", () => {
       true,
     );
 
-    assert.deepEqual(display, {
-      text: "first thought\n\nsecond thought",
-      isStreaming: true,
-    });
+    assert.deepEqual(displays, [
+      { partIndex: 0, text: "first thought", isStreaming: false },
+      { partIndex: 1, text: "second thought", isStreaming: true },
+    ]);
   });
 
-  void it("uses only the final reasoning part status", () => {
-    const display = getReasoningDisplay(
+  void it("does not replay completed segments as streaming", () => {
+    const displays = getReasoningDisplays(
       [
         { type: "reasoning", text: "old stream", state: "streaming" },
         { type: "reasoning", text: "finished", state: "done" },
@@ -214,33 +148,55 @@ void describe("reasoning display", () => {
       true,
     );
 
-    assert.equal(display?.isStreaming, false);
+    assert.deepEqual(displays, [
+      { partIndex: 0, text: "old stream", isStreaming: false },
+      { partIndex: 1, text: "finished", isStreaming: false },
+    ]);
   });
 
-  void it("keeps empty reasoning content renderable without adding separators", () => {
-    const display = getReasoningDisplay(
+  void it("keeps original part indexes across silent internal parts", () => {
+    const displays = getReasoningDisplays(
+      [
+        { type: "reasoning", text: "first thought", state: "done" },
+        {
+          type: "dynamic-tool",
+          toolName: "complete_task",
+          toolCallId: "silent-1",
+        } as never,
+        { type: "reasoning", text: "second thought", state: "streaming" },
+      ],
+      true,
+    );
+
+    assert.deepEqual(displays, [
+      { partIndex: 0, text: "first thought", isStreaming: false },
+      { partIndex: 2, text: "second thought", isStreaming: true },
+    ]);
+  });
+
+  void it("does not render an empty completed reasoning part", () => {
+    const displays = getReasoningDisplays(
       [
         { type: "reasoning", text: "", state: "done" },
-        { type: "reasoning", text: "", state: "done" },
+        { type: "reasoning", text: "visible", state: "done" },
       ],
       false,
     );
 
-    assert.equal(display?.text, "");
+    assert.deepEqual(displays, [{ partIndex: 1, text: "visible", isStreaming: false }]);
   });
 
   void it("marks completed reasoning as no longer streaming", () => {
-    const display = getReasoningDisplay(
+    const displays = getReasoningDisplays(
       [{ type: "reasoning", text: "final thought", state: "done" }],
       false,
     );
 
-    assert.equal(display?.text, "final thought");
-    assert.equal(display?.isStreaming, false);
+    assert.deepEqual(displays, [{ partIndex: 0, text: "final thought", isStreaming: false }]);
   });
 
   void it("stops reasoning when the answer is the latest streaming part", () => {
-    const display = getReasoningDisplay(
+    const displays = getReasoningDisplays(
       [
         { type: "reasoning", text: "final thought", state: "done" },
         { type: "text", text: "The answer" },
@@ -248,117 +204,149 @@ void describe("reasoning display", () => {
       true,
     );
 
-    assert.equal(display?.isStreaming, false);
+    assert.deepEqual(displays, [{ partIndex: 0, text: "final thought", isStreaming: false }]);
   });
 
   void it("does not animate persisted streaming parts after a stopped run", () => {
-    const display = getReasoningDisplay(
+    const displays = getReasoningDisplays(
       [{ type: "reasoning", text: "partial thought", state: "streaming" }],
       false,
     );
 
-    assert.equal(display?.isStreaming, false);
+    assert.deepEqual(displays, [{ partIndex: 0, text: "partial thought", isStreaming: false }]);
   });
 });
 
-void describe("execution summary", () => {
-  void it("only renders for assistant messages", () => {
-    assert.equal(shouldRenderExecutionSummary("user", true), false);
-    assert.equal(shouldRenderExecutionSummary("assistant", true), true);
-    assert.equal(shouldRenderExecutionSummary("assistant", false), false);
+void describe("execution details", () => {
+  void it("renders reasoning at its original message part positions", () => {
+    const html = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: assistant([
+          { type: "reasoning", text: "first thought", state: "done" },
+          { type: "text", text: "first answer" },
+          {
+            type: "dynamic-tool",
+            toolName: "search",
+            toolCallId: "tool-1",
+            state: "output-available",
+            input: {},
+            output: "tool result",
+          } as never,
+          { type: "reasoning", text: "second thought", state: "done" },
+          { type: "text", text: "final answer" },
+        ]),
+        isLoading: false,
+        status: "ready",
+      }),
+    );
+    const firstReasoning = html.indexOf('data-slot="reasoning"');
+    const firstAnswer = html.indexOf("first answer");
+    const tool = html.indexOf('data-slot="tool"');
+    const secondReasoning = html.indexOf('data-slot="reasoning"', firstReasoning + 1);
+    const finalAnswer = html.indexOf("final answer");
+
+    assert.ok(firstReasoning < firstAnswer);
+    assert.ok(firstAnswer < tool);
+    assert.ok(tool < secondReasoning);
+    assert.ok(secondReasoning < finalAnswer);
+    assert.equal((html.match(/data-slot="reasoning"/g) ?? []).length, 2);
   });
 
-  void it("aggregates activity counts and blocking states", () => {
-    const summary = getExecutionSummary([
-      {
-        type: "dynamic-tool",
-        toolName: "search",
-        toolCallId: "tool-1",
-        state: "approval-requested",
-        input: {},
-      } as never,
-      {
-        type: "tool-web_search",
-        toolCallId: "tool-2",
-        state: "output-error",
-        input: {},
-      } as never,
-      { type: "source-url", sourceId: "source-1", url: "https://example.com" },
-      { type: "custom", kind: "openai.compaction" } as never,
-      { type: "file", mediaType: "image/png", url: "https://example.com/image.png" },
-    ]);
-
-    assert.deepEqual(summary, {
-      toolCount: 2,
-      activeToolCount: 1,
-      pendingToolCount: 0,
-      errorToolCount: 1,
-      sourceCount: 1,
-      compactionCount: 1,
-      imageCount: 1,
-      hasActivity: true,
-      hasAttention: true,
-    });
-
-    const legacySummary = getExecutionSummary([
-      { type: "tool-legacy", toolCallId: "legacy-1", input: {} } as never,
-    ]);
-    assert.equal(legacySummary.pendingToolCount, 1);
-    assert.equal(legacySummary.hasAttention, false);
+  void it("detects independently renderable tools, sources, and attachments", () => {
+    assert.equal(
+      hasRenderableActivity([
+        {
+          type: "dynamic-tool",
+          toolName: "search",
+          toolCallId: "tool-1",
+        } as never,
+      ]),
+      true,
+    );
+    assert.equal(
+      hasRenderableActivity([
+        {
+          type: "source-url",
+          sourceId: "source-1",
+          url: "https://example.com",
+        },
+      ]),
+      true,
+    );
+    assert.equal(
+      hasRenderableActivity([{ type: "custom", kind: "openai.compaction" } as never]),
+      false,
+    );
   });
 
-  void it("renders localized disclosures and filters unsafe source links", () => {
+  void it("renders Reasoning and Sources without an execution summary", () => {
     const html = renderToStaticMarkup(
       createElement(
         Fragment,
         null,
         createElement(
           Reasoning,
-          { isStreaming: true, defaultOpen: true },
+          { isStreaming: false, defaultOpen: true },
           createElement(ReasoningTrigger),
           createElement(ReasoningContent, null, "first thought"),
         ),
         createElement(
-          ChainOfThought,
-          { defaultOpen: true },
-          createElement(ChainOfThoughtStep, {
-            icon: "tool",
-            status: "error",
-            label: "Tool failed",
-          }),
-          createElement(ChainOfThoughtSearchResult, {
-            href: "javascript:alert(1)",
-            title: "Unsafe source",
-          }),
-          createElement(ChainOfThoughtImage, {
-            src: "javascript:alert(1)",
-            alt: "Unsafe image",
-          }),
+          Reasoning,
+          { isStreaming: false, defaultOpen: false },
+          createElement(ReasoningTrigger),
+          createElement(ReasoningContent, null, "second thought"),
+        ),
+        createElement(
+          Sources,
+          { open: true },
+          createElement(SourcesTrigger, { count: 2 }),
+          createElement(
+            SourcesContent,
+            null,
+            createElement(Source, {
+              href: "javascript:alert(1)",
+              title: "Unsafe source",
+            }),
+            createElement(Source, {
+              href: "https://example.com",
+              title: "Safe source",
+            }),
+          ),
         ),
       ),
     );
 
-    assert.match(html, /data-slot="reasoning"/);
+    assert.equal((html.match(/data-slot="reasoning"/g) ?? []).length, 2);
     assert.match(html, /aria-expanded="true"/);
-    assert.match(html, /data-status="error"/);
     assert.match(html, /Unsafe source/);
     assert.doesNotMatch(html, /href="javascript:/);
-    assert.match(html, /Unsafe image/);
-    assert.doesNotMatch(html, /src="javascript:/);
+    assert.match(html, /Safe source/);
+    assert.doesNotMatch(html, /Activity summary/);
   });
 
-  void it("renders the live fallback as a ChainOfThought disclosure", () => {
+  void it("renders the live fallback as a non-interactive status row", () => {
     const html = renderToStaticMarkup(
       createElement(LiveThinkingPanel, {
         status: "thinking",
-        steps: [],
       }),
     );
 
-    assert.match(html, /data-slot="chain-of-thought"/);
-    assert.match(html, /data-slot="chain-of-thought-step"/);
-    assert.match(html, /data-status="active"/);
+    assert.match(html, /data-slot="live-thinking-status"/);
+    assert.match(html, /role="status"/);
+    assert.doesNotMatch(html, /data-slot="reasoning"/);
+    assert.doesNotMatch(html, /<button/);
     assert.doesNotMatch(html, /data-slot="message-activity"/);
+  });
+});
+
+void describe("disclosure scroll preservation", () => {
+  void it("compensates for height changes above the viewport", () => {
+    assert.equal(getDisclosureScrollAdjustment(true, 240, 80), -160);
+    assert.equal(getDisclosureScrollAdjustment(true, 80, 240), 160);
+  });
+
+  void it("does not move the viewport for visible or lower disclosures", () => {
+    assert.equal(getDisclosureScrollAdjustment(false, 240, 80), 0);
   });
 });
 
