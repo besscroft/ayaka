@@ -103,9 +103,7 @@ function SiteHeader() {
   return (
     <header className="site-header">
       <a className="brand-lockup" href="#top" aria-label="Ayaka 首页">
-        <span className="brand-seal" aria-hidden="true">
-          A
-        </span>
+        <img className="brand-seal" src="/favicon.png" alt="" aria-hidden="true" />
         <span>
           <strong>Ayaka</strong>
           <small>LOCAL WORKSPACE</small>
@@ -166,7 +164,12 @@ function ProductPreview() {
               <p>整理这周的项目线索，并记住我的工作偏好。</p>
             </div>
             <div className="preview-message preview-message-agent">
-              <span className="preview-avatar avatar-agent">A</span>
+              <img
+                className="preview-avatar avatar-agent"
+                src="/favicon.png"
+                alt=""
+                aria-hidden="true"
+              />
               <div>
                 <p>收到。我会先检索本地记录，再把结果整理成一份可继续执行的摘要。</p>
                 <div className="preview-tool-row">
@@ -383,9 +386,7 @@ function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="footer-brand">
-        <span className="brand-seal" aria-hidden="true">
-          A
-        </span>
+        <img className="brand-seal" src="/favicon.png" alt="" aria-hidden="true" />
         <div>
           <strong>Ayaka</strong>
           <span>本地优先的 AI 桌面工作台</span>

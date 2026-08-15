@@ -59,6 +59,7 @@ import { useT, type TranslationKey } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { AgentAvatar } from "./AgentAvatar";
 import {
   IconCheck,
   IconClose,
@@ -553,9 +554,10 @@ function AgentCard({
             className="flex min-w-0 flex-1 items-start gap-3 text-left"
             onClick={onSelect}
           >
-            <span className="flex size-10 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-primary">
-              {agent.avatar || agent.name.slice(0, 1)}
-            </span>
+            <AgentAvatar
+              profile={agent}
+              className="size-10 rounded-md bg-accent/10 text-sm font-semibold text-primary"
+            />
             <span className="min-w-0">
               <Card.Title className="truncate">{agent.name}</Card.Title>
               <Card.Description className="truncate">{agent.role}</Card.Description>
@@ -679,9 +681,10 @@ function AgentDetailModal({
       <DialogContent className="max-h-[88vh] max-w-2xl p-0">
         <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-9 shrink-0 select-none items-center justify-center rounded-md bg-accent/10 text-sm font-semibold text-primary">
-              {agent.avatar || agent.name.slice(0, 1)}
-            </span>
+            <AgentAvatar
+              profile={agent}
+              className="size-9 rounded-md bg-accent/10 text-sm font-semibold text-primary"
+            />
             <div className="min-w-0">
               <DialogTitle className="truncate text-base font-semibold">{agent.name}</DialogTitle>
               <DialogDescription className="truncate text-sm text-foreground/50">

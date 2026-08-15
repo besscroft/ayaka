@@ -110,16 +110,12 @@ a:focus-visible {
 }
 
 .brand-seal {
-  display: grid;
+  display: block;
+  flex: 0 0 auto;
   width: 34px;
   height: 34px;
-  place-items: center;
-  border: 1px solid var(--sage-deep);
-  border-radius: 50% 44% 50% 46%;
-  color: var(--sage-deep);
-  font-family: var(--font-sans);
-  font-size: 17px;
-  transform: rotate(-8deg);
+  border-radius: 10px;
+  object-fit: cover;
 }
 
 .site-nav {
@@ -568,7 +564,8 @@ h1 em,
 .avatar-agent {
   background: var(--sage);
   color: #fffdf6;
-  transform: rotate(-8deg);
+  border-radius: 7px;
+  object-fit: cover;
 }
 
 .preview-tool-row {

@@ -1,3 +1,4 @@
+import "./renderer/components/AgentAvatar.test.tsx";
 import "./renderer/components/AgentStatusWidget.test.ts";
 import "./renderer/components/ai-elements/image-lightbox-model.test.ts";
 import "./renderer/components/ai-elements/message-attachments.test.tsx";

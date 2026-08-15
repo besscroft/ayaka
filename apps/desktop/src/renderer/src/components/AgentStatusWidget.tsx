@@ -40,6 +40,7 @@ import {
   IconPanelRightClose,
   IconPanelRightOpen,
 } from "./icons";
+import { AgentAvatar } from "./AgentAvatar";
 
 type RuntimeSnapshotSubset = Pick<
   RuntimeSnapshot,
@@ -295,7 +296,11 @@ export function AgentStatusWidget({
       {open ? (
         <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
-            <AgentAvatar profile={activeProfile} fallback={t("agentStatus.rootAgent")} />
+            <AgentAvatar
+              profile={activeProfile}
+              fallback={t("agentStatus.rootAgent")}
+              className="size-8 rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground"
+            />
             <div className="min-w-0 flex-1 select-none">
               <p className="truncate text-sm font-medium text-foreground/90">
                 {activeProfile?.name || t("agentStatus.rootAgent")}
@@ -698,21 +703,6 @@ function SectionLabel({ id, label }: { id?: string; label: string }): React.JSX.
     >
       {label}
     </p>
-  );
-}
-
-function AgentAvatar({
-  profile,
-  fallback,
-}: {
-  profile: AgentProfile | null;
-  fallback: string;
-}): React.JSX.Element {
-  const label = profile?.avatar || profile?.name?.slice(0, 1) || fallback.slice(0, 1);
-  return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground select-none">
-      {label}
-    </div>
   );
 }
 
