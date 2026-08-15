@@ -50,6 +50,22 @@ function hasAssistantMessage(messages: UIMessage[]): boolean {
 }
 
 /**
+ * Keep a renderer-owned message snapshot. Some stream implementations update
+ * a message object in place, which would otherwise make memoized message rows
+ * miss a reasoning/text delta because the object reference stayed the same.
+ */
+export function snapshotUIMessage(message: UIMessage): UIMessage {
+  return {
+    ...message,
+    parts: message.parts.map((part) => ({ ...part })),
+  };
+}
+
+export function snapshotUIMessages(messages: UIMessage[]): UIMessage[] {
+  return messages.map(snapshotUIMessage);
+}
+
+/**
  * Merge an automatically received snapshot into the current client state.
  *
  * A stream can briefly expose an empty or older snapshot while the transport
@@ -59,7 +75,7 @@ function hasAssistantMessage(messages: UIMessage[]): boolean {
  */
 export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): UIMessage[] | null {
   if (incoming.length === 0) return current.length === 0 ? [] : null;
-  if (current.length === 0) return incoming;
+  if (current.length === 0) return snapshotUIMessages(incoming);
 
   const incomingById = new Map(incoming.map((message) => [message.id, message]));
   for (const message of current) {
@@ -77,9 +93,11 @@ export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): 
     const incomingMessage = incomingById.get(message.id);
     // User messages are locally authoritative: persisted stream snapshots can
     // still contain the pre-edit text while a regenerated run is finishing.
-    return message.role === "user" || !incomingMessage ? message : incomingMessage;
+    return message.role === "user" || !incomingMessage
+      ? message
+      : snapshotUIMessage(incomingMessage);
   });
-  merged.push(...incoming.slice(tailIndex + 1));
+  merged.push(...incoming.slice(tailIndex + 1).map(snapshotUIMessage));
   return merged;
 }
 

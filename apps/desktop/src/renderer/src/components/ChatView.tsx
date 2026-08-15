@@ -24,7 +24,14 @@ import { IconFolderOpen } from "./icons";
 import { getModelReasoningDefault } from "./ReasoningSelector";
 import { Button, LoadingIndicator } from "./ui";
 import { api, type RuntimeSnapshot } from "../lib/api";
-import { hasMeaningfulConversationTitle } from "../lib/conversation-title";
+import {
+  deriveFallbackConversationTitle,
+  generateConversationTitleWithFallback,
+  getConversationTitleExcerpt,
+  getFirstUserMessageText,
+  hasMeaningfulConversationTitle,
+  persistConversationTitleWithRetry,
+} from "../lib/conversation-title";
 import { getChatErrorInfo, getChatErrorMessage } from "../lib/errors";
 import { AgentStatusWidget } from "./AgentStatusWidget";
 import {
@@ -86,6 +93,8 @@ interface ChatViewProps {
   conversationId: string;
   serverInfo: LocalServerInfo;
 }
+
+type AutoTitleStatus = "running" | "completed";
 
 /**
  * 妯″瀷涓婁笅鏂囩獥鍙ｆ煡鎵撅紙绮楃暐锛夈€?
@@ -161,7 +170,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     DEFAULT_CHAT_TOOL_SELECTION,
   );
   /** 鏄惁宸蹭负鏈璇濈敓鎴愯繃鏍囬锛堥槻姝㈤噸澶嶇敓鎴愶級 */
-  const titledRef = useRef<Set<string>>(new Set());
+  const titleStateRef = useRef<Map<string, AutoTitleStatus>>(new Map());
   const createdAtRef = useRef<Map<string, number>>(new Map());
   const selectedModelRef = useRef<string | null>(null);
   const reasoningLevelRef = useRef<ChatReasoningLevel>(DEFAULT_SETTINGS.chatReasoningLevel);
@@ -493,7 +502,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         hydrationStateRef.current = "ready";
         // 濡傛灉鍘嗗彶涓凡缁忔湁鏍囬锛圖B 宸叉湁锛夛紝鏍囪涓哄凡鐢熸垚锛岄伩鍏嶅啀娆¤Е鍙?
         if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
-          titledRef.current.add(conversationId);
+          titleStateRef.current.set(conversationId, "completed");
         }
       })
       .catch((error) => {
@@ -557,7 +566,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           console.error("[chat] failed to persist messages or queue learning:", err);
         });
       // 鑷姩鐢熸垚鏍囬锛氭湰杞彂閫佷簡娑堟伅 + assistant 瀹屾暣浜х敓 + 杩樻病鐢熸垚杩?
-      if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titledRef);
+      if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titleStateRef);
       // 异步生成追问建议
       if (!isError && !isAbort) {
         const assistantMessage = [...messages]
@@ -1329,56 +1338,81 @@ function ChatHeader({ status, workspace }: ChatHeaderProps): React.JSX.Element {
 function tryAutoTitle(
   conversationId: string,
   messages: UIMessage[],
-  titledRef: React.MutableRefObject<Set<string>>,
+  titleStateRef: React.MutableRefObject<Map<string, AutoTitleStatus>>,
 ): void {
-  if (titledRef.current.has(conversationId)) return;
-  if (messages.length < 1) return;
+  const currentStatus = titleStateRef.current.get(conversationId);
+  if (currentStatus === "running" || currentStatus === "completed") return;
+  const excerpt = getConversationTitleExcerpt(messages);
+  if (excerpt.length === 0 || !getFirstUserMessageText(excerpt)) return;
 
-  // 找到第一条 user 消息，以及紧随其后的第一条 assistant 消息。
-  // 不严格要求位于 messages[0]/messages[1]，兼容历史/系统消息前置、顺序变化等场景，
-  // 否则会因角色/位置不匹配而永远跳过标题生成。
-  let userMsg: UIMessage | undefined;
-  let assistantMsg: UIMessage | undefined;
-  for (const m of messages) {
-    if (m.role === "user" && !userMsg) {
-      userMsg = m;
-      continue;
-    }
-    if (userMsg && m.role === "assistant" && !assistantMsg) {
-      assistantMsg = m;
-      break;
-    }
-  }
-  if (!userMsg) return;
+  titleStateRef.current.set(conversationId, "running");
+  void (async () => {
+    try {
+      const existing = await api.conversations.get(conversationId);
+      if (hasMeaningfulConversationTitle(existing?.title)) {
+        titleStateRef.current.set(conversationId, "completed");
+        return;
+      }
 
-  // 取第一个 user（+ 紧随其后的 assistant）的纯文本作为 prompt
-  const excerpt: UIMessage[] = assistantMsg ? [userMsg, assistantMsg] : [userMsg];
-  void api.server
-    .info()
-    .then((info) => {
-      // 鑻?DB 涓凡鏈夋爣棰樺垯璺宠繃 LLM 璋冪敤
-      return api.conversations.get(conversationId).then((conv) => {
-        if (hasMeaningfulConversationTitle(conv?.title)) {
-          titledRef.current.add(conversationId);
-          return null;
-        }
-        return fetchTitle(info, excerpt);
+      let serverInfo: LocalServerInfo | null = null;
+      const title = await generateConversationTitleWithFallback({
+        messages,
+        generate: async (titleExcerpt) => {
+          serverInfo ??= await api.server.info();
+          return fetchTitle(serverInfo, titleExcerpt);
+        },
       });
-    })
-    .then((title) => {
-      if (!title) return;
-      titledRef.current.add(conversationId);
-      return api.conversations.touch(conversationId, title).then(() => title);
-    })
-    .then((title) => {
-      // 閫氱煡渚ф爮鍒锋柊锛堟惡甯︽渶鏂?title锛岄伩鍏嶉噸鏂版媺鍙栨暣寮犲垪琛級
+      if (!title) {
+        titleStateRef.current.delete(conversationId);
+        return;
+      }
+
+      let persistResult = await persistConversationTitle(conversationId, title);
+      if (persistResult.status === "existing") {
+        titleStateRef.current.set(conversationId, "completed");
+        return;
+      }
+      if (persistResult.status === "failed") {
+        const fallback = deriveFallbackConversationTitle(messages);
+        if (!fallback || fallback === title) {
+          titleStateRef.current.delete(conversationId);
+          return;
+        }
+        persistResult = await persistConversationTitle(conversationId, fallback);
+        if (persistResult.status === "existing") {
+          titleStateRef.current.set(conversationId, "completed");
+          return;
+        }
+        if (persistResult.status === "failed") {
+          titleStateRef.current.delete(conversationId);
+          return;
+        }
+      }
+
+      titleStateRef.current.set(conversationId, "completed");
       window.dispatchEvent(
         new CustomEvent("ayaka:conversation-renamed", {
-          detail: { id: conversationId, title },
+          detail: { id: conversationId, title: persistResult.title },
         }),
       );
-    })
-    .catch((err) => console.error("[chat] auto title failed:", err));
+    } catch (error) {
+      console.error("[chat] auto title failed:", error);
+      titleStateRef.current.delete(conversationId);
+    }
+  })();
+}
+
+async function persistConversationTitle(
+  conversationId: string,
+  title: string,
+): ReturnType<typeof persistConversationTitleWithRetry> {
+  return persistConversationTitleWithRetry({
+    title,
+    readCurrentTitle: async () => (await api.conversations.get(conversationId))?.title,
+    writeTitle: async (nextTitle) => {
+      await api.conversations.touch(conversationId, nextTitle);
+    },
+  });
 }
 
 async function fetchTitle(

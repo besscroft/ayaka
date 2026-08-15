@@ -19,7 +19,14 @@ import {
   updateFollowupSuggestions,
   updateMessageReaction,
 } from "@renderer/lib/chat-messages";
-import { hasMeaningfulConversationTitle } from "@renderer/lib/conversation-title";
+import {
+  deriveFallbackConversationTitle,
+  generateConversationTitleWithFallback,
+  getFirstUserMessageText,
+  hasMeaningfulConversationTitle,
+  persistConversationTitleWithRetry,
+  sanitizeConversationTitle,
+} from "@renderer/lib/conversation-title";
 import { getChatErrorInfo } from "@renderer/lib/errors";
 import { translate } from "@renderer/lib/i18n";
 import { shouldFallbackToFreshRun } from "@renderer/lib/chat-retry";
@@ -404,6 +411,110 @@ void describe("conversation title helpers", () => {
   void it("accepts real generated titles", () => {
     assert.equal(hasMeaningfulConversationTitle("量子计算入门"), true);
     assert.equal(hasMeaningfulConversationTitle("Debugging Electron IPC"), true);
+  });
+
+  void it("cleans generated titles and derives a local fallback from the first user message", () => {
+    const messages: UIMessage[] = [
+      {
+        id: "u1",
+        role: "user",
+        parts: [
+          { type: "text", text: "  请帮我分析\n这个 Electron 问题  " },
+          {
+            type: "file",
+            mediaType: "text/plain",
+            filename: "log.txt",
+            url: "workspace://log.txt",
+          },
+        ],
+      },
+    ];
+
+    assert.equal(sanitizeConversationTitle("  “测试标题”\n"), "测试标题");
+    assert.equal(getFirstUserMessageText(messages), "请帮我分析 这个 Electron 问题");
+    assert.equal(deriveFallbackConversationTitle(messages), "请帮我分析 这个 Electron 问题");
+  });
+
+  void it("does not create a fallback title for attachment-only messages", () => {
+    assert.equal(
+      deriveFallbackConversationTitle([
+        {
+          id: "u1",
+          role: "user",
+          parts: [{ type: "file", mediaType: "image/png", filename: "image.png", url: "data:" }],
+        },
+      ]),
+      null,
+    );
+  });
+
+  void it("retries title generation and returns the generated title when a later attempt succeeds", async () => {
+    let attempts = 0;
+    const delays: number[] = [];
+    const title = await generateConversationTitleWithFallback({
+      messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: "Question" }] }],
+      generate: async () => {
+        attempts += 1;
+        return attempts === 3 ? "Generated title" : null;
+      },
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    assert.equal(title, "Generated title");
+    assert.equal(attempts, 3);
+    assert.deepEqual(delays, [250, 750]);
+  });
+
+  void it("falls back to the first user message after all title attempts fail", async () => {
+    let attempts = 0;
+    const title = await generateConversationTitleWithFallback({
+      messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: "Use local fallback" }] }],
+      generate: async () => {
+        attempts += 1;
+        throw new Error("title unavailable");
+      },
+      sleep: async () => undefined,
+    });
+
+    assert.equal(title, "Use local fallback");
+    assert.equal(attempts, 3);
+  });
+
+  void it("retries title persistence and does not complete before the write succeeds", async () => {
+    let writes = 0;
+    const delays: number[] = [];
+    const result = await persistConversationTitleWithRetry({
+      title: "Retry title",
+      readCurrentTitle: async () => null,
+      writeTitle: async () => {
+        writes += 1;
+        if (writes < 3) throw new Error("database busy");
+      },
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    assert.deepEqual(result, { status: "saved", title: "Retry title" });
+    assert.equal(writes, 3);
+    assert.deepEqual(delays, [250, 750]);
+  });
+
+  void it("does not overwrite a title that appeared while generation was in flight", async () => {
+    let writes = 0;
+    const result = await persistConversationTitleWithRetry({
+      title: "Generated title",
+      readCurrentTitle: async () => "Manual title",
+      writeTitle: async () => {
+        writes += 1;
+      },
+      sleep: async () => undefined,
+    });
+
+    assert.deepEqual(result, { status: "existing" });
+    assert.equal(writes, 0);
   });
 });
 

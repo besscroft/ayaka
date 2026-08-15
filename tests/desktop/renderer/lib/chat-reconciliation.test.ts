@@ -5,6 +5,7 @@ import {
   isTerminalRunStatus,
   mergeChatMessages,
   reconcileChatMessages,
+  snapshotUIMessage,
   shouldReconcileCompletedRun,
 } from "@renderer/lib/chat-reconciliation";
 
@@ -115,5 +116,34 @@ void describe("chat reconciliation", () => {
     const merged = mergeChatMessages([user("u1", "Question")], [user("u1", "Question"), persisted]);
     assert.equal(merged?.at(-1)?.parts.length, 4);
     assert.equal(merged?.at(-1)?.parts[2]?.type, "file");
+  });
+
+  void it("creates a new assistant snapshot when the stream mutates a message in place", () => {
+    const streamed: UIMessage = {
+      id: "a1",
+      role: "assistant",
+      parts: [{ type: "reasoning", text: "first" }],
+    };
+    const first = mergeChatMessages([user("u1", "Question")], [user("u1", "Question"), streamed]);
+    assert.ok(first);
+    assert.notEqual(first[1], streamed);
+
+    (streamed.parts[0] as { text: string }).text = "first second";
+    const second = mergeChatMessages(first, [user("u1", "Question"), streamed]);
+    assert.ok(second);
+    assert.notEqual(second[1], first[1]);
+    assert.equal(
+      second[1]?.parts[0]?.type === "reasoning" ? second[1].parts[0].text : undefined,
+      "first second",
+    );
+  });
+
+  void it("copies each part while preserving the message content", () => {
+    const message = assistant("a1", "Answer");
+    const snapshot = snapshotUIMessage(message);
+    assert.deepEqual(snapshot, message);
+    assert.notEqual(snapshot, message);
+    assert.notEqual(snapshot.parts, message.parts);
+    assert.notEqual(snapshot.parts[0], message.parts[0]);
   });
 });
