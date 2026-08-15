@@ -66,8 +66,6 @@ const entries = {
     zh: "\u5220\u9664\u5de5\u4f5c\u533a\u5931\u8d25",
     en: "Failed to delete workspace",
   },
-  "about.action.documentation": { zh: "\u6587\u6863", en: "Documentation" },
-  "about.action.issues": { zh: "\u95ee\u9898\u53cd\u9988", en: "Issue tracker" },
   "agents.value.untilComplete": { zh: "直到任务完成或手动停止", en: "Until complete or stopped" },
   "Runtime.kind.agent": { zh: "智能体", en: "Agent" },
   "Runtime.kind.approval": { zh: "审批", en: "Approval" },
@@ -156,7 +154,7 @@ const entries = {
   "agentStatus.toolCategory.automation": { zh: "自动化", en: "Automation" },
   "agentStatus.toolCategory.mcp": { zh: "MCP", en: "MCP" },
   "agentStatus.toolCategory.skill": { zh: "技能", en: "Skill" },
-  "about.action.repository": { zh: "项目主页", en: "Project repository" },
+  "about.action.repository": { zh: "官网", en: "Official website" },
   "about.description": {
     zh: "在一个桌面空间中组织对话、智能体、工具与自动化，数据默认保留在本机。",
     en: "Organize conversations, agents, tools, and automations in one desktop workspace, with data kept on your device by default.",

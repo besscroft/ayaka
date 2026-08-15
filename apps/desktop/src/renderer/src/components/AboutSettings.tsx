@@ -15,20 +15,10 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { RichContent } from "./ai-elements/rich-content";
-import {
-  IconArrowDown,
-  IconBookOpen,
-  IconBug,
-  IconGitFork,
-  IconHistory,
-  IconRefresh,
-  IconRotateCcw,
-} from "./icons";
+import { IconArrowDown, IconGitFork, IconHistory, IconRefresh, IconRotateCcw } from "./icons";
 
 const RESOURCE_ICONS: Record<AboutResourceId, typeof IconGitFork> = {
   repository: IconGitFork,
-  documentation: IconBookOpen,
-  issues: IconBug,
 };
 
 export function AboutSettings(): React.JSX.Element {
@@ -119,9 +109,7 @@ export function AboutSettings(): React.JSX.Element {
           className="size-20 shrink-0 rounded-xl shadow-sm ring-1 ring-border"
         />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-primary">{t("about.product")}</p>
           <h3 className="mt-1 text-2xl font-semibold leading-tight">Ayaka</h3>
-          <Description className="mt-1">{t("shell.tagline")}</Description>
         </div>
       </header>
 

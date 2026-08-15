@@ -1,4 +1,4 @@
-export type AboutResourceId = "repository" | "documentation" | "issues";
+export type AboutResourceId = "repository";
 
 export interface AboutResource {
   id: AboutResourceId;
@@ -6,9 +6,7 @@ export interface AboutResource {
 }
 
 export const ABOUT_RESOURCES: readonly AboutResource[] = [
-  { id: "repository", href: "https://github.com/besscroft/void-ai" },
-  { id: "documentation", href: "https://github.com/besscroft/void-ai/tree/main/docs" },
-  { id: "issues", href: "https://github.com/besscroft/void-ai/issues" },
+  { id: "repository", href: "https://ai.zzzvoid.com/" },
 ];
 
 export function normalizeAppVersion(value: unknown): string | null {

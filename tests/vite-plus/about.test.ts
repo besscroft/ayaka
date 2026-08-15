@@ -12,11 +12,7 @@ describe("about settings", () => {
     expect(normalizeAppVersion(null)).toBeNull();
   });
 
-  it("links to the repository, documentation, and issue tracker", () => {
-    expect(ABOUT_RESOURCES).toEqual([
-      { id: "repository", href: "https://github.com/besscroft/void-ai" },
-      { id: "documentation", href: "https://github.com/besscroft/void-ai/tree/main/docs" },
-      { id: "issues", href: "https://github.com/besscroft/void-ai/issues" },
-    ]);
+  it("links to the official website", () => {
+    expect(ABOUT_RESOURCES).toEqual([{ id: "repository", href: "https://ai.zzzvoid.com/" }]);
   });
 });
