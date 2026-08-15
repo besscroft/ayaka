@@ -200,9 +200,6 @@ function ProductPreview() {
         <br />
         <strong>Local first</strong>
       </div>
-      <div className="preview-pet" aria-hidden="true">
-        <span className="pet-sprite" />
-      </div>
     </div>
   );
 }
@@ -365,28 +362,6 @@ function PrivacySection() {
   );
 }
 
-function PetSection() {
-  return (
-    <section className="pet-section">
-      <div className="pet-section-art" aria-hidden="true">
-        <div className="pet-orbit orbit-one" />
-        <div className="pet-orbit orbit-two" />
-        <span className="pet-sprite pet-sprite-large" />
-      </div>
-      <div className="pet-section-copy">
-        <span className="section-code">05 / DESKTOP COMPANION</span>
-        <h2>
-          工作很复杂，
-          <br />
-          桌面可以有一点魔法。
-        </h2>
-        <p>Ayaka 是桌面端的小向导。她不替你做决定，只在你需要的时候，让工作空间多一点回应。</p>
-        <span className="pet-caption">A SMALL GUIDE FOR BIG TASKS</span>
-      </div>
-    </section>
-  );
-}
-
 function DownloadSection({ downloadUrl }: { downloadUrl: string | null }) {
   return (
     <section className="download-section" id="download">
@@ -453,7 +428,6 @@ export function SiteHome() {
       <CapabilitiesSection />
       <OperationSection />
       <PrivacySection />
-      <PetSection />
       <DownloadSection downloadUrl={downloadUrl} />
       <SiteFooter />
     </main>

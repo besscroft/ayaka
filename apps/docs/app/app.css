@@ -71,7 +71,6 @@ a:focus-visible {
 .site-header,
 .hero-section,
 .content-section,
-.pet-section,
 .download-section,
 .site-footer {
   width: min(1180px, calc(100% - 48px));
@@ -656,26 +655,6 @@ h1 em,
   transform: rotate(-7deg);
 }
 
-.preview-pet {
-  position: absolute;
-  right: 1%;
-  bottom: 0;
-  width: 100px;
-  height: 116px;
-  overflow: hidden;
-  animation: pet-drift 5s ease-in-out infinite;
-}
-
-.pet-sprite {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background-image: url("/ayaka-spritesheet.webp");
-  background-position: 0 0;
-  background-repeat: no-repeat;
-  background-size: 800% 800%;
-}
-
 .content-section {
   padding: 104px 0;
 }
@@ -696,7 +675,6 @@ h1 em,
 
 .section-heading h2,
 .privacy-copy h2,
-.pet-section-copy h2,
 .download-panel h2 {
   margin-bottom: 0;
   font-size: 46px;
@@ -961,68 +939,6 @@ h1 em,
   letter-spacing: 0.06em;
 }
 
-.pet-section {
-  display: grid;
-  grid-template-columns: 0.86fr 1.14fr;
-  align-items: center;
-  gap: 72px;
-  padding: 110px 0 92px;
-}
-
-.pet-section-art {
-  position: relative;
-  display: grid;
-  min-height: 320px;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 50% 47% 52% 45%;
-  background: var(--sky);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-.pet-sprite-large {
-  position: relative;
-  z-index: 2;
-  width: 190px;
-  height: 220px;
-  animation: pet-drift 5s ease-in-out infinite;
-}
-
-.pet-orbit {
-  position: absolute;
-  border: 1px solid rgba(81, 125, 116, 0.28);
-  border-radius: 50%;
-  transform: rotate(-13deg);
-}
-
-.orbit-one {
-  width: 390px;
-  height: 170px;
-}
-
-.orbit-two {
-  width: 250px;
-  height: 300px;
-  transform: rotate(27deg);
-}
-
-.pet-section-copy h2 {
-  margin: 18px 0 20px;
-}
-
-.pet-section-copy p {
-  max-width: 500px;
-  margin-bottom: 24px;
-  color: var(--ink-soft);
-  font-size: 16px;
-  line-height: 1.85;
-}
-
-.pet-caption {
-  color: var(--peach);
-}
-
 .download-section {
   padding: 0 0 76px;
 }
@@ -1080,19 +996,8 @@ h1 em,
   font-size: 8px;
 }
 
-@keyframes pet-drift {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(1deg);
-  }
-}
-
 @media (max-width: 980px) {
-  .hero-section,
-  .pet-section {
+  .hero-section {
     grid-template-columns: 1fr;
   }
 
@@ -1132,10 +1037,6 @@ h1 em,
     max-width: 620px;
   }
 
-  .pet-section-art {
-    min-height: 280px;
-  }
-
   .download-panel {
     grid-template-columns: 1fr;
   }
@@ -1149,7 +1050,6 @@ h1 em,
   .site-header,
   .hero-section,
   .content-section,
-  .pet-section,
   .download-section,
   .site-footer {
     width: min(100% - 32px, 560px);
@@ -1247,12 +1147,6 @@ h1 em,
     left: -7px;
   }
 
-  .preview-pet {
-    right: -8px;
-    width: 72px;
-    height: 88px;
-  }
-
   .content-section {
     padding: 76px 0;
   }
@@ -1344,8 +1238,7 @@ h1 em,
     padding: 76px 0;
   }
 
-  .privacy-copy h2,
-  .pet-section-copy h2 {
+  .privacy-copy h2 {
     font-size: 31px;
   }
 
@@ -1362,20 +1255,6 @@ h1 em,
 
   .privacy-row strong {
     font-size: 15px;
-  }
-
-  .pet-section {
-    gap: 35px;
-    padding: 76px 0;
-  }
-
-  .pet-section-art {
-    min-height: 240px;
-  }
-
-  .pet-section-art img {
-    width: 145px;
-    height: 175px;
   }
 
   .download-section {
