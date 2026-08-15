@@ -1,4 +1,4 @@
-import type { ChatErrorCode, RuntimeRun } from "@shared/types";
+import { CHAT_RUN_ID_HEADER, type ChatErrorCode, type RuntimeRun } from "@shared/types";
 
 export type ChatRunMode = "start" | "resume";
 
@@ -42,4 +42,15 @@ export function selectChatRetryRun({
 
 export function shouldFallbackToFreshRun(code: ChatErrorCode, alreadyAttempted: boolean): boolean {
   return !alreadyAttempted && STALE_RUN_ERROR_CODES.has(code);
+}
+
+/** Read the authoritative run id from a successful local chat response. */
+export function readChatRunIdHeader(response: Pick<Response, "headers" | "ok">): string | null {
+  if (!response.ok) return null;
+  const runId = response.headers.get(CHAT_RUN_ID_HEADER);
+  return runId && isUuid(runId) ? runId : null;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

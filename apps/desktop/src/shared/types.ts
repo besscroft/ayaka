@@ -921,6 +921,7 @@ export interface ToolsSnapshot {
 }
 
 export const CHAT_SESSION_HEADER = "x-ayaka-session";
+export const CHAT_RUN_ID_HEADER = "x-ayaka-run-id";
 
 export interface LocalServerInfo {
   port: number;
@@ -990,6 +991,7 @@ export interface ChatMessageMetadata {
   execution?: ChatExecutionMetadata;
   reaction?: ChatReactionMetadata;
   mediaGeneration?: JsonObject;
+  followupSuggestions?: string[];
 }
 
 export type ChatErrorCode =

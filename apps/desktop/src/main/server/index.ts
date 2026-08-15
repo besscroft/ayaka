@@ -1,9 +1,10 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { generateText, type UIMessage } from "ai";
 import {
+  CHAT_RUN_ID_HEADER,
   CHAT_SESSION_HEADER,
   type ChatErrorResponse,
   isChatReasoningLevel,
@@ -74,6 +75,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       origin: (origin) => allowRendererOrigin(origin),
       allowMethods: ["GET", "POST", "OPTIONS"],
       allowHeaders: ["Content-Type", CHAT_SESSION_HEADER],
+      exposeHeaders: [CHAT_RUN_ID_HEADER],
       maxAge: 600,
     }),
   );
@@ -197,7 +199,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       const reasoning = parsedReasoning;
       const runAgentChat =
         options.runAgentChat ?? (await import("../lib/agent-runtime")).runAgentChat;
-      return await runAgentChat({
+      const runOptions = {
         messages: materializedMessages,
         modelRef: requestedModel,
         overrideAgentModel: hasVisionInput(materializedMessages),
@@ -207,14 +209,46 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         reasoning: reasoning.value,
         toolSelection: body.toolSelection,
         disableCronTools: body.cronRun === true,
-        runId: body.runId,
-        mode: body.mode ?? "start",
         origin: body.cronRun === true ? "automation" : "chat",
         buildAgentSystemPrompt: async (agentId, conversationId) =>
           body.system ?? (await buildAgentSystemPrompt(agentId, conversationId)),
         resolveModel,
         abortSignal: c.req.raw.signal,
-      });
+      } satisfies Omit<Parameters<typeof runAgentChat>[0], "mode" | "recovery" | "runId">;
+
+      let effectiveRunId = body.runId ?? randomUUID();
+      let effectiveMode: "start" | "resume" = body.mode ?? "start";
+      if (effectiveMode === "resume" && body.runId === undefined) effectiveMode = "start";
+
+      try {
+        const response = await runAgentChat({
+          ...runOptions,
+          runId: effectiveRunId,
+          mode: effectiveMode,
+        });
+        return withChatRunId(response, effectiveRunId);
+      } catch (err) {
+        const classification = classifyChatError(err, {
+          phase: "request",
+          abortSignal: c.req.raw.signal,
+        });
+        if (
+          effectiveMode !== "resume" ||
+          (classification.code !== "run_not_active" && classification.code !== "run_not_found")
+        ) {
+          throw err;
+        }
+
+        const previousRunId = effectiveRunId;
+        effectiveRunId = randomUUID();
+        const response = await runAgentChat({
+          ...runOptions,
+          runId: effectiveRunId,
+          mode: "start",
+          recovery: { previousRunId, reason: classification.code },
+        });
+        return withChatRunId(response, effectiveRunId);
+      }
     } catch (err) {
       const classification = classifyChatError(err, {
         phase: "request",
@@ -557,4 +591,14 @@ function sanitizeTitle(raw: string): string {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function withChatRunId(response: Response, runId: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set(CHAT_RUN_ID_HEADER, runId);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

@@ -1,6 +1,9 @@
 import type { FileUIPart, UIMessage } from "ai";
 import type { ChatMessageMetadata, ChatReactionMetadata, MessageRow } from "@shared/types";
 
+const FOLLOWUP_SUGGESTION_LIMIT = 4;
+const FOLLOWUP_SUGGESTION_MAX_LENGTH = 60;
+
 export interface FilePartInput {
   type?: string;
   mediaType?: string;
@@ -55,6 +58,57 @@ export function readChatMessageMetadata(message: UIMessage | undefined): ChatMes
   return metadata && typeof metadata === "object" && !Array.isArray(metadata)
     ? (metadata as ChatMessageMetadata)
     : {};
+}
+
+export function normalizeFollowupSuggestions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (suggestion): suggestion is string =>
+        typeof suggestion === "string" && suggestion.trim().length > 0,
+    )
+    .map((suggestion) => suggestion.trim())
+    .filter((suggestion) => suggestion.length <= FOLLOWUP_SUGGESTION_MAX_LENGTH)
+    .slice(0, FOLLOWUP_SUGGESTION_LIMIT);
+}
+
+export function readFollowupSuggestions(message: UIMessage | undefined): string[] {
+  if (message?.role !== "assistant") return [];
+  return normalizeFollowupSuggestions(readChatMessageMetadata(message).followupSuggestions);
+}
+
+export function getLatestFollowupSuggestions(messages: UIMessage[]): string[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const suggestions = readFollowupSuggestions(messages[index]);
+    if (suggestions.length > 0) return suggestions;
+  }
+  return [];
+}
+
+export function updateFollowupSuggestions({
+  messages,
+  messageId,
+  suggestions,
+}: {
+  messages: UIMessage[];
+  messageId: string;
+  suggestions: string[];
+}): UIMessage[] {
+  const normalized = normalizeFollowupSuggestions(suggestions);
+  let updated = false;
+  const next = messages.map((message) => {
+    if (message.id !== messageId || message.role !== "assistant") return message;
+    updated = true;
+    const metadata = readChatMessageMetadata(message);
+    return {
+      ...message,
+      metadata: {
+        ...metadata,
+        followupSuggestions: normalized,
+      } satisfies ChatMessageMetadata,
+    };
+  });
+  return updated ? next : messages;
 }
 
 export function updateMessageReaction({

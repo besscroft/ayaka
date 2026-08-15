@@ -123,6 +123,10 @@ export interface RunAgentChatOptions {
   runId?: string;
   mode?: AgentLoopMode;
   origin?: AgentRunOrigin;
+  recovery?: {
+    previousRunId: string;
+    reason: "run_not_active" | "run_not_found";
+  };
   /** Use the request-selected model even when the root agent has a model override. */
   overrideAgentModel?: boolean;
 }
@@ -289,6 +293,20 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
         enabledChildAgents: enabledChildren.map((agent) => agent.id),
       },
     });
+    if (options.recovery) {
+      insertRuntimeEvent({
+        runId,
+        conversationId: options.conversationId,
+        kind: "diagnostic",
+        title: "Stale chat run recovered",
+        status: "succeeded",
+        detail: {
+          previousRunId: options.recovery.previousRunId,
+          runId,
+          reason: options.recovery.reason,
+        },
+      });
+    }
   }
 
   auditChatToolApprovalResponses({

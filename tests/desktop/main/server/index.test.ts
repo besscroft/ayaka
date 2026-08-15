@@ -10,6 +10,7 @@ import {
 } from "ai/test";
 import { createApp } from "@desktop-main/server/index";
 import {
+  CHAT_RUN_ID_HEADER,
   CHAT_REASONING_LEVELS,
   CHAT_SESSION_HEADER,
   type MediaGenerationErrorResponse,
@@ -43,6 +44,10 @@ void describe("local chat server", () => {
     assert.match(
       response.headers.get("access-control-allow-headers") ?? "",
       new RegExp(CHAT_SESSION_HEADER, "i"),
+    );
+    assert.match(
+      response.headers.get("access-control-expose-headers") ?? "",
+      new RegExp(CHAT_RUN_ID_HEADER, "i"),
     );
   });
 
@@ -247,6 +252,7 @@ void describe("local chat server", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
         [CHAT_SESSION_HEADER]: token,
       },
       body: JSON.stringify({
@@ -262,6 +268,11 @@ void describe("local chat server", () => {
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type") ?? "", /text\/event-stream/);
     assert.equal(response.headers.get("x-vercel-ai-ui-message-stream"), "v1");
+    assert.equal(response.headers.get(CHAT_RUN_ID_HEADER), "018f8896-bef7-7051-8c30-1f862a28d31a");
+    assert.match(
+      response.headers.get("access-control-expose-headers") ?? "",
+      new RegExp(CHAT_RUN_ID_HEADER, "i"),
+    );
     assert.equal(await response.text(), "runtime-stream");
     assert.equal(captured.value?.modelRef, "mock/chat");
     assert.equal(captured.value?.conversationId, "c-stream");
@@ -360,21 +371,102 @@ void describe("local chat server", () => {
     assert.equal((await response.json()).code, "vision_model_unavailable");
   });
 
-  void it("returns stable run conflict codes", async () => {
+  void it("restarts stale resume requests with a fresh authoritative run id", async () => {
+    for (const code of ["run_not_active", "run_not_found"] as const) {
+      const calls: RunAgentChatOptions[] = [];
+      const model = new MockLanguageModelV4({});
+      const app = createApp({
+        sessionToken: token,
+        resolveModel: () => ({
+          model,
+          temperature: 0.7,
+          topP: 1,
+          maxOutputTokens: 256,
+        }),
+        buildAgentSystemPrompt: async () => "test",
+        runAgentChat: async (options) => {
+          calls.push(options);
+          if (calls.length === 1) {
+            throw Object.assign(new Error("Run is stale."), {
+              name: "AgentLoopSessionError",
+              code,
+            });
+          }
+          return agentRuntimeResponse("recovered-stream");
+        },
+      });
+      const previousRunId = "018f8896-bef7-7051-8c30-1f862a28d31a";
+      const response = await app.request("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [CHAT_SESSION_HEADER]: token,
+        },
+        body: JSON.stringify({
+          messages: validMessages,
+          model: "mock/chat",
+          conversationId: "conversation-stale",
+          reasoning: "high",
+          runId: previousRunId,
+          mode: "resume",
+        }),
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), "recovered-stream");
+      assert.equal(calls.length, 2);
+      assert.equal(calls[0]?.runId, previousRunId);
+      assert.equal(calls[0]?.mode, "resume");
+      assert.equal(calls[1]?.mode, "start");
+      assert.notEqual(calls[1]?.runId, previousRunId);
+      assert.equal(calls[1]?.conversationId, "conversation-stale");
+      assert.equal(calls[1]?.reasoning, "high");
+      assert.deepEqual(calls[1]?.messages, validMessages);
+      assert.deepEqual(calls[1]?.recovery, { previousRunId, reason: code });
+      assert.equal(response.headers.get(CHAT_RUN_ID_HEADER), calls[1]?.runId);
+    }
+  });
+
+  void it("normalizes resume without a run id to one fresh start", async () => {
+    const calls: RunAgentChatOptions[] = [];
     const model = new MockLanguageModelV4({});
     const app = createApp({
       sessionToken: token,
-      resolveModel: () => ({
-        model,
-        temperature: 0.7,
-        topP: 1,
-        maxOutputTokens: 256,
-      }),
+      resolveModel: () => ({ model, temperature: 0.7, topP: 1, maxOutputTokens: 256 }),
+      buildAgentSystemPrompt: async () => "test",
+      runAgentChat: async (options) => {
+        calls.push(options);
+        return agentRuntimeResponse("fresh-stream");
+      },
+    });
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({ messages: validMessages, model: "mock/chat", mode: "resume" }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.mode, "start");
+    assert.match(calls[0]?.runId ?? "", /^[0-9a-f-]{36}$/i);
+    assert.equal(response.headers.get(CHAT_RUN_ID_HEADER), calls[0]?.runId);
+  });
+
+  void it("does not retry a failed fresh replacement", async () => {
+    let calls = 0;
+    const model = new MockLanguageModelV4({});
+    const app = createApp({
+      sessionToken: token,
+      resolveModel: () => ({ model, temperature: 0.7, topP: 1, maxOutputTokens: 256 }),
       buildAgentSystemPrompt: async () => "test",
       runAgentChat: async () => {
-        throw Object.assign(new Error("Run is no longer active."), {
+        calls += 1;
+        throw Object.assign(new Error(calls === 1 ? "Run is no longer active." : "Busy."), {
           name: "AgentLoopSessionError",
-          code: "run_not_active",
+          code: calls === 1 ? "run_not_active" : "conversation_busy",
         });
       },
     });
@@ -391,8 +483,10 @@ void describe("local chat server", () => {
         mode: "resume",
       }),
     });
+
+    assert.equal(calls, 2);
     assert.equal(response.status, 409);
-    assert.equal((await response.json()).code, "run_not_active");
+    assert.equal((await response.json()).code, "conversation_busy");
   });
 
   void it("returns safe chat failures without exposing provider diagnostics", async () => {

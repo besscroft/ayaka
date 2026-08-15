@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { RuntimeRun } from "@shared/types";
+import { CHAT_RUN_ID_HEADER, type RuntimeRun } from "@shared/types";
 import {
   isResumableBlockedRun,
+  readChatRunIdHeader,
   selectChatRetryRun,
   shouldFallbackToFreshRun,
 } from "@renderer/lib/chat-retry";
@@ -72,5 +73,26 @@ void describe("chat retry", () => {
     assert.equal(shouldFallbackToFreshRun("run_not_found", false), true);
     assert.equal(shouldFallbackToFreshRun("run_not_active", true), false);
     assert.equal(shouldFallbackToFreshRun("provider", false), false);
+  });
+
+  void it("reads only valid run ids from successful chat responses", () => {
+    const runId = "018f8896-bef7-7051-8c30-1f862a28d31a";
+    assert.equal(
+      readChatRunIdHeader(new Response(null, { headers: { [CHAT_RUN_ID_HEADER]: runId } })),
+      runId,
+    );
+    assert.equal(
+      readChatRunIdHeader(
+        new Response(null, { status: 409, headers: { [CHAT_RUN_ID_HEADER]: runId } }),
+      ),
+      null,
+    );
+    assert.equal(
+      readChatRunIdHeader(
+        new Response(null, { headers: { [CHAT_RUN_ID_HEADER]: "not-a-run-id" } }),
+      ),
+      null,
+    );
+    assert.equal(readChatRunIdHeader(new Response(null)), null);
   });
 });

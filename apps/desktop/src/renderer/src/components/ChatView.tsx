@@ -30,11 +30,14 @@ import { AgentStatusWidget } from "./AgentStatusWidget";
 import {
   appendOrReplaceMessage,
   buildUserMessage,
+  getLatestFollowupSuggestions,
   getAgentLearningQueueKey,
   hydrateStoredMessage,
   isNonEmptyUIMessage,
+  normalizeFollowupSuggestions,
   prepareFailedChatSnapshot,
   toFileUIParts,
+  updateFollowupSuggestions,
 } from "../lib/chat-messages";
 import {
   createSnapshotPersistenceQueue,
@@ -45,6 +48,7 @@ import {
 import { reconcileChatMessages, shouldReconcileCompletedRun } from "../lib/chat-reconciliation";
 import {
   isResumableBlockedRun,
+  readChatRunIdHeader,
   selectChatRetryRun,
   shouldFallbackToFreshRun,
 } from "../lib/chat-retry";
@@ -175,9 +179,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const chatFailureRef = useRef(false);
   const errorReportedRef = useRef(false);
   const retryFallbackRef = useRef({ active: false, attempted: false });
+  const followupRequestRef = useRef<string | null>(null);
   const chatRef = useRef<{
     regenerate: () => Promise<void>;
     clearError: () => void;
+    setMessages: (messages: UIMessage[]) => void;
   } | null>(null);
   const persistenceQueue = useMemo(
     () =>
@@ -194,7 +200,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
   const [starterSuggestions, setStarterSuggestions] = useState<string[]>([]);
   const [starterLoading, setStarterLoading] = useState<boolean>(true);
-  const [followupSuggestions, setFollowupSuggestions] = useState<string[]>([]);
 
   /** 异步生成「新建对话」的开场建议（随机） */
   const fetchStarterSuggestions = useCallback(async (): Promise<void> => {
@@ -283,13 +288,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
 
   /** 异步生成追问建议 */
-  const fetchFollowupSuggestions = useCallback(async (messages: UIMessage[]): Promise<void> => {
+  const fetchFollowupSuggestions = useCallback(async (messages: UIMessage[]): Promise<string[]> => {
     try {
       const settings = await api.settings.getAll([SettingKey.SelectedModel]);
       const model = settings[SettingKey.SelectedModel];
-      if (!model) return;
+      if (!model) return [];
       const info = await api.server.info();
-      if (messages.length < 2) return;
+      if (messages.length < 2) return [];
       const res = await fetch(`http://127.0.0.1:${info.port}/api/followups`, {
         method: "POST",
         headers: {
@@ -298,13 +303,12 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         },
         body: JSON.stringify({ model, messages }),
       });
-      if (!res.ok) return;
-      const data = (await res.json()) as { suggestions?: string[] };
-      if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
-        setFollowupSuggestions(data.suggestions);
-      }
+      if (!res.ok) return [];
+      const data = (await res.json()) as { suggestions?: unknown };
+      return normalizeFollowupSuggestions(data.suggestions);
     } catch (err) {
       console.error("[chat] fetch followup suggestions error:", err);
+      return [];
     }
   }, []);
 
@@ -394,6 +398,20 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       new DefaultChatTransport({
         api: `http://127.0.0.1:${serverInfo.port}/api/chat`,
         headers: () => ({ [CHAT_SESSION_HEADER]: serverInfo.token }),
+        fetch: async (input, init) => {
+          const response = await globalThis.fetch(input, init);
+          const effectiveRunId = readChatRunIdHeader(response);
+          if (effectiveRunId) {
+            const reconciliation = reconciliationRef.current;
+            if (reconciliation.runId !== effectiveRunId && reconciliation.timer !== null) {
+              window.clearTimeout(reconciliation.timer);
+            }
+            runIdRef.current = effectiveRunId;
+            runModeRef.current = "resume";
+            reconciliationRef.current = { runId: effectiveRunId, attempts: 0, timer: null };
+          }
+          return response;
+        },
         body: () => ({
           model: selectedModelRef.current ?? undefined,
           agentId: DEFAULT_AGENT_ID,
@@ -416,6 +434,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     chatFailureRef.current = false;
     errorReportedRef.current = false;
     retryFallbackRef.current = { active: false, attempted: false };
+    followupRequestRef.current = null;
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
     runIdRef.current = null;
     runModeRef.current = "start";
@@ -473,6 +492,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     });
     return () => {
       cancelled = true;
+      followupRequestRef.current = null;
     };
   }, [conversationId, hydrationRetry, locale, persistenceQueue]);
 
@@ -515,7 +535,27 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       // 鑷姩鐢熸垚鏍囬锛氭湰杞彂閫佷簡娑堟伅 + assistant 瀹屾暣浜х敓 + 杩樻病鐢熸垚杩?
       if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titledRef);
       // 异步生成追问建议
-      if (!isError && !isAbort) void fetchFollowupSuggestions(messages);
+      if (!isError && !isAbort) {
+        const assistantMessage = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant");
+        if (assistantMessage) {
+          const requestKey = `${conversationId}:${assistantMessage.id}`;
+          followupRequestRef.current = requestKey;
+          void fetchFollowupSuggestions(messages).then((suggestions) => {
+            if (followupRequestRef.current !== requestKey || suggestions.length === 0) return;
+            const updatedMessages = updateFollowupSuggestions({
+              messages: latestMessagesRef.current,
+              messageId: assistantMessage.id,
+              suggestions,
+            });
+            if (updatedMessages === latestMessagesRef.current) return;
+            latestMessagesRef.current = updatedMessages;
+            chatRef.current?.setMessages(updatedMessages);
+            persistInBackground(updatedMessages, "follow-up suggestions");
+          });
+        }
+      }
     },
     onError: (err) => {
       const info = getChatErrorInfo(err, locale);
@@ -571,6 +611,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   chatRef.current = chat;
 
   latestMessagesRef.current = chat.messages;
+  const followupSuggestions =
+    hydrationState === "ready" ? getLatestFollowupSuggestions(chat.messages) : [];
 
   useEffect(() => {
     if (hydrationState !== "ready" || hydratedConversationRef.current === conversationId) return;
@@ -779,8 +821,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     text: string;
     files: FilePartLike[];
   }): Promise<void> => {
-    // 发送新消息时清空旧的追问建议
-    setFollowupSuggestions([]);
     let finalFiles = toFileUIParts(files);
 
     if (!selectedModel) return;

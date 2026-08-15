@@ -8,12 +8,15 @@ import {
   buildMessageSnapshotRows,
   buildUserMessage,
   getAgentLearningQueueKey,
+  getLatestFollowupSuggestions,
   hasPendingToolApproval,
   hydrateStoredMessage,
   isNonEmptyUIMessage,
+  normalizeFollowupSuggestions,
   prepareFailedChatSnapshot,
   readChatMessageMetadata,
   toFileUIParts,
+  updateFollowupSuggestions,
   updateMessageReaction,
 } from "@renderer/lib/chat-messages";
 import { hasMeaningfulConversationTitle } from "@renderer/lib/conversation-title";
@@ -238,6 +241,54 @@ void describe("chat message helpers", () => {
 
     assert.deepEqual(next, messages);
   });
+
+  void it("persists the latest follow-up suggestions on assistant messages", () => {
+    const messages: UIMessage[] = [
+      { id: "u1", role: "user", parts: [{ type: "text", text: "Question" }] },
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [{ type: "text", text: "First answer" }],
+        metadata: { followupSuggestions: ["Previous suggestion"] },
+      },
+      { id: "u2", role: "user", parts: [{ type: "text", text: "Next" }] },
+      {
+        id: "a2",
+        role: "assistant",
+        parts: [{ type: "text", text: "Latest answer" }],
+        metadata: { execution: { startedAt: 1, durationMs: 2 } },
+      },
+    ];
+
+    assert.deepEqual(getLatestFollowupSuggestions(messages), ["Previous suggestion"]);
+    assert.deepEqual(
+      normalizeFollowupSuggestions(["  First  ", "", 42, "Second", "Third", "Fourth", "Fifth"]),
+      ["First", "Second", "Third", "Fourth"],
+    );
+
+    const updated = updateFollowupSuggestions({
+      messages,
+      messageId: "a2",
+      suggestions: ["New suggestion", "Another one"],
+    });
+    assert.deepEqual(getLatestFollowupSuggestions(updated), ["New suggestion", "Another one"]);
+    assert.equal(readChatMessageMetadata(updated[3]).execution?.durationMs, 2);
+
+    const [row] = buildMessageSnapshotRows({
+      conversationId: "c1",
+      messages: [updated[3]],
+      createdAtById: new Map([["a2", 10]]),
+    });
+    assert.deepEqual(getLatestFollowupSuggestions([hydrateStoredMessage(row)]), [
+      "New suggestion",
+      "Another one",
+    ]);
+    assert.equal(
+      updateFollowupSuggestions({ messages, messageId: "missing", suggestions: ["Ignored"] }),
+      messages,
+    );
+  });
+
   void it("replaces pending messages by id before snapshot persistence", () => {
     const original: MessageRow[] = [];
     assert.deepEqual(original, []);
