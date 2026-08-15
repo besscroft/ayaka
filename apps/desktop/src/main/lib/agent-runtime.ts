@@ -425,11 +425,20 @@ async function streamRootAgentLoop({
   let lastFinishReason: FinishReason = "stop";
   let lastText = "";
   let lastUsage: unknown;
+  let finalExecution: ChatMessageMetadata["execution"];
 
   const stream = createUIMessageStream<UIMessage<ChatMessageMetadata>>({
     originalMessages: initialMessages as UIMessage<ChatMessageMetadata>[],
     execute: async ({ writer }) => {
       try {
+        const completeRun = async (outputSummary?: string): Promise<void> => {
+          finalExecution ??= tracker.finalize(lastFinishReason, lastUsage);
+          await finishRun(context, "succeeded", {
+            execution: finalExecution,
+            outputSummary,
+          });
+        };
+
         while (context.session.isActive) {
           if (context.session.absoluteLimitExceededReason) {
             await blockRun(context, "The absolute agent safety limit was reached.");
@@ -508,19 +517,13 @@ async function streamRootAgentLoop({
           }
           const completionValidation = context.completionController?.getValidation();
           if (completionValidation?.accepted) {
-            await finishRun(context, "succeeded", {
-              execution: tracker.finalize(lastFinishReason, lastUsage),
-              outputSummary: completionValidation.candidate.result,
-            });
+            await completeRun(completionValidation.candidate.result);
             break;
           }
           if (!context.modelContext.capabilities.toolCalling && lastText) {
             const fallback = context.completionController?.parseAndSubmit(lastText);
             if (fallback?.accepted) {
-              await finishRun(context, "succeeded", {
-                execution: tracker.finalize(lastFinishReason, lastUsage),
-                outputSummary: fallback.candidate.result,
-              });
+              await completeRun(fallback.candidate.result);
               break;
             }
           }
@@ -574,6 +577,12 @@ async function streamRootAgentLoop({
             reason: String(context.session.signal.reason ?? "cancelled"),
           });
         } else {
+          if (finalExecution) {
+            writer.write({
+              type: "message-metadata",
+              messageMetadata: { execution: finalExecution },
+            });
+          }
           writer.write({ type: "finish", finishReason: lastFinishReason });
         }
       } catch (error) {
@@ -1662,7 +1671,7 @@ function createExecutionTracker({
   recordModelStep: () => void;
   finalize: (finishReason: FinishReason, usage: unknown) => ChatMessageMetadata["execution"];
 } {
-  const startedAt = Date.now();
+  const startedAt = context.session.startedAt;
   let stepCount = 0;
   let toolCallCount = 0;
   const buildExecution = (
@@ -1708,9 +1717,7 @@ function createExecutionTracker({
     if (part.type === "start") {
       return { execution: { startedAt, model: modelRef, agentId } };
     }
-    if (part.type !== "finish") return undefined;
-    const execution = buildExecution(part.finishReason, part.totalUsage);
-    return { execution };
+    return undefined;
   };
   return {
     messageMetadata,

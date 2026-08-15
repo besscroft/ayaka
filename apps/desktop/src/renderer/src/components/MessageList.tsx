@@ -63,7 +63,6 @@ interface MessageListProps {
   messages: UIMessage[];
   isLoading: boolean;
   status: ConversationStatusKind;
-  runtimeStartedAt?: number | null;
   error?: Error;
   errorDetail?: string | null;
   /** 后备建议（empty 状态） */
@@ -96,7 +95,6 @@ export function MessageList({
   messages,
   isLoading,
   status,
-  runtimeStartedAt,
   error,
   errorDetail,
   emptySuggestions,
@@ -234,7 +232,7 @@ export function MessageList({
             exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           >
-            <LiveThinkingPanel status={activityStatus} startedAt={runtimeStartedAt} />
+            <LiveThinkingPanel status={activityStatus} />
           </motion.div>
         ) : null}
 
@@ -300,13 +298,10 @@ function getLiveThinkingTitle(
 
 export function LiveThinkingPanel({
   status,
-  startedAt,
 }: {
   status: MessageActivityStatus;
-  startedAt?: number | null;
 }): React.JSX.Element {
-  const { t, f } = useT();
-  const elapsed = startedAt ? formatExecutionTime(Date.now() - startedAt, f) : null;
+  const { t } = useT();
   const liveTitle = getLiveThinkingTitle(status, t);
   return (
     <Message from="assistant">
@@ -319,11 +314,6 @@ export function LiveThinkingPanel({
         >
           <IconBrain className="size-4 text-muted-foreground/70" />
           <span>{liveTitle}</span>
-          {elapsed ? (
-            <span className="text-xs text-muted-foreground/70">
-              {t("msg.thinking.elapsed", { duration: elapsed })}
-            </span>
-          ) : null}
         </div>
       </MessageContent>
     </Message>
@@ -585,11 +575,9 @@ function MessageItem({
                 className="w-full"
               >
                 <ReasoningTrigger
-                  getThinkingMessage={(streaming, duration) => {
-                    if (streaming || duration === 0) return t("msg.cot.reasoningActive");
-                    if (duration === undefined) return t("msg.cot.reasoned");
-                    return t("msg.cot.reasonedFor", { duration: f.number(duration) });
-                  }}
+                  getThinkingMessage={(streaming) =>
+                    streaming ? t("msg.cot.reasoningActive") : t("msg.cot.reasoned")
+                  }
                 />
                 <ReasoningContent>{display.text}</ReasoningContent>
               </Reasoning>

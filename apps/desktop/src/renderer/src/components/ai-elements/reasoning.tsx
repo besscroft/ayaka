@@ -29,7 +29,6 @@ interface ReasoningContextValue {
   isStreaming: boolean;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  duration: number | undefined;
 }
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
@@ -49,11 +48,9 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
-  duration?: number;
 };
 
 const AUTO_CLOSE_DELAY = 1000;
-const MS_IN_S = 1000;
 
 export const Reasoning = memo(function Reasoning({
   className,
@@ -61,7 +58,6 @@ export const Reasoning = memo(function Reasoning({
   open,
   defaultOpen,
   onOpenChange,
-  duration: durationProp,
   children,
   ...props
 }: ReasoningProps): React.JSX.Element {
@@ -72,26 +68,17 @@ export const Reasoning = memo(function Reasoning({
     onChange: onOpenChange,
     prop: open,
   });
-  const [duration, setDuration] = useControllableState<number | undefined>({
-    defaultProp: undefined,
-    prop: durationProp,
-  });
   const conversationScroll = useConversationScrollOptional();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const hasEverStreamedRef = useRef(isStreaming);
   const hasAutoClosedRef = useRef(false);
-  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isStreaming) {
       hasEverStreamedRef.current = true;
       hasAutoClosedRef.current = false;
-      if (startTimeRef.current === null) startTimeRef.current = Date.now();
-    } else if (startTimeRef.current !== null) {
-      setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
-      startTimeRef.current = null;
     }
-  }, [isStreaming, setDuration]);
+  }, [isStreaming]);
 
   useEffect(() => {
     if (isStreaming && !isOpen && !isExplicitlyClosed) setIsOpen(true);
@@ -123,8 +110,8 @@ export const Reasoning = memo(function Reasoning({
     [setReasoningOpen],
   );
   const contextValue = useMemo(
-    () => ({ duration, isOpen, isStreaming, setIsOpen }),
-    [duration, isOpen, isStreaming, setIsOpen],
+    () => ({ isOpen, isStreaming, setIsOpen }),
+    [isOpen, isStreaming, setIsOpen],
   );
 
   return (
@@ -150,13 +137,12 @@ export const Reasoning = memo(function Reasoning({
 });
 
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
-  getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
+  getThinkingMessage?: (isStreaming: boolean) => ReactNode;
 };
 
-const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number): ReactNode => {
-  if (isStreaming || duration === 0) return <Shimmer duration={1}>Thinking...</Shimmer>;
-  if (duration === undefined) return <span>Thought for a few seconds</span>;
-  return <span>Thought for {duration} seconds</span>;
+const defaultGetThinkingMessage = (isStreaming: boolean): ReactNode => {
+  if (isStreaming) return <Shimmer duration={1}>Thinking...</Shimmer>;
+  return <span>Thought completed</span>;
 };
 
 export const ReasoningTrigger = memo(function ReasoningTrigger({
@@ -165,7 +151,7 @@ export const ReasoningTrigger = memo(function ReasoningTrigger({
   getThinkingMessage = defaultGetThinkingMessage,
   ...props
 }: ReasoningTriggerProps): React.JSX.Element {
-  const { isStreaming, isOpen, duration } = useReasoning();
+  const { isStreaming, isOpen } = useReasoning();
 
   return (
     <CollapsibleTrigger
@@ -182,7 +168,7 @@ export const ReasoningTrigger = memo(function ReasoningTrigger({
       {children ?? (
         <>
           <BrainIcon className="size-4" />
-          {getThinkingMessage(isStreaming, duration)}
+          {getThinkingMessage(isStreaming)}
           <ChevronDownIcon
             className={cn(
               "ml-auto size-3.5 text-muted-foreground/65 transition-transform",

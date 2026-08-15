@@ -322,6 +322,26 @@ void describe("execution details", () => {
     assert.doesNotMatch(html, /href="javascript:/);
     assert.match(html, /Safe source/);
     assert.doesNotMatch(html, /Activity summary/);
+    assert.doesNotMatch(html, /Thought for/);
+  });
+
+  void it("renders one final execution duration from assistant metadata", () => {
+    const html = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: [
+          {
+            id: "assistant-with-execution",
+            role: "assistant",
+            parts: [{ type: "text", text: "Done" }],
+            metadata: { execution: { durationMs: 1250 } },
+          },
+        ],
+        isLoading: false,
+        status: "ready",
+      }),
+    );
+
+    assert.equal((html.match(/1\.3/g) ?? []).length, 1);
   });
 
   void it("renders the live fallback as a non-interactive status row", () => {
@@ -336,6 +356,7 @@ void describe("execution details", () => {
     assert.doesNotMatch(html, /data-slot="reasoning"/);
     assert.doesNotMatch(html, /<button/);
     assert.doesNotMatch(html, /data-slot="message-activity"/);
+    assert.doesNotMatch(html, /Waiting \d+s|已等待/);
   });
 });
 

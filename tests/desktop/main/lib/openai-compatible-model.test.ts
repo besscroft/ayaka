@@ -276,7 +276,11 @@ void describe("OpenAI-compatible reasoning middleware", () => {
             { type: "stream-start", warnings: [] },
             {
               type: "raw",
-              rawValue: { choices: [{ delta: { reasoning_content: "first thought" } }] },
+              rawValue: { choices: [{ delta: { reasoning_content: "first " } }] },
+            },
+            {
+              type: "raw",
+              rawValue: { choices: [{ delta: { reasoning_content: "thought" } }] },
             },
             { type: "text-start", id: "0" },
             { type: "text-delta", id: "0", delta: "intermediate" },
@@ -316,6 +320,13 @@ void describe("OpenAI-compatible reasoning middleware", () => {
       states.push(message);
     }
     const finalMessage = states.at(-1);
+    const reasoningTexts = states.flatMap((message) =>
+      message.parts
+        .filter((part) => part.type === "reasoning")
+        .map((part) => (part.type === "reasoning" ? part.text : "")),
+    );
+    assert.ok(reasoningTexts.includes("first "));
+    assert.ok(reasoningTexts.includes("first thought"));
     const reasoningParts = finalMessage?.parts.filter((part) => part.type === "reasoning") ?? [];
     const textParts = finalMessage?.parts.filter((part) => part.type === "text") ?? [];
     assert.deepEqual(
