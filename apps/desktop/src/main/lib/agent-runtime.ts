@@ -496,7 +496,7 @@ async function streamRootAgentLoop({
                 abortSignal: context.session.signal,
               }).error,
           });
-          for await (const chunk of uiStream) writer.write(chunk);
+          writer.merge(uiStream);
 
           const responseMessages = (await result.responseMessages) as ModelMessage[];
           modelMessages.push(

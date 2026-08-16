@@ -186,6 +186,21 @@ void describe("reasoning display", () => {
     assert.deepEqual(displays, [{ partIndex: 1, text: "visible", isStreaming: false }]);
   });
 
+  void it("renders an empty reasoning part as soon as streaming starts", () => {
+    assert.deepEqual(
+      getReasoningDisplays([{ type: "reasoning", text: "", state: "streaming" }], true),
+      [{ partIndex: 0, text: "", isStreaming: true }],
+    );
+    assert.equal(
+      shouldShowLiveThinking(
+        assistant([{ type: "reasoning", text: "", state: "streaming" }]),
+        true,
+        "streaming",
+      ),
+      false,
+    );
+  });
+
   void it("marks completed reasoning as no longer streaming", () => {
     const displays = getReasoningDisplays(
       [{ type: "reasoning", text: "final thought", state: "done" }],
@@ -397,13 +412,13 @@ void describe("media tool output", () => {
 });
 
 void describe("generated tool disclosure", () => {
-  void it("collapses completed tool output but keeps active and failure states open", () => {
+  void it("collapses tool cards in every state by default", () => {
     assert.equal(getToolDefaultOpen(normalizeToolState("output-available")), false);
     assert.equal(getToolDefaultOpen(normalizeToolState("approval-responded")), false);
-    assert.equal(getToolDefaultOpen(normalizeToolState("input-available")), true);
-    assert.equal(getToolDefaultOpen(normalizeToolState("approval-requested")), true);
-    assert.equal(getToolDefaultOpen(normalizeToolState("output-error")), true);
-    assert.equal(getToolDefaultOpen(normalizeToolState("output-denied")), true);
+    assert.equal(getToolDefaultOpen(normalizeToolState("input-available")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("approval-requested")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("output-error")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("output-denied")), false);
   });
 });
 

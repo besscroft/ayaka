@@ -55,6 +55,7 @@ import {
 import {
   mergeChatMessages,
   reconcileChatMessages,
+  selectLiveChatMessages,
   shouldReconcileCompletedRun,
 } from "../lib/chat-reconciliation";
 import {
@@ -526,7 +527,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     id: conversationId,
     messages: initialMessages,
     transport,
-    experimental_throttle: 50,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: ({ messages, isError, isAbort }) => {
       // onFinish is the authoritative client snapshot. Update the ref before
@@ -645,15 +645,23 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   });
   chatRef.current = chat;
 
-  const mergedChatMessages = mergeChatMessages(latestMessagesRef.current, chat.messages);
-  const renderedMessages =
-    mergedChatMessages ??
-    (latestMessagesRef.current.length > 0
-      ? latestMessagesRef.current
-      : chat.messages.length > 0 || explicitEmptyMessagesRef.current
-        ? chat.messages
-        : lastNonEmptyMessagesRef.current);
-  if (chat.messages.length > 0 && mergedChatMessages) {
+  const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
+  const mergedChatMessages = isChatLoading
+    ? null
+    : mergeChatMessages(latestMessagesRef.current, chat.messages);
+  const renderedMessages = isChatLoading
+    ? selectLiveChatMessages(chat.messages, latestMessagesRef.current)
+    : (mergedChatMessages ??
+      (latestMessagesRef.current.length > 0
+        ? latestMessagesRef.current
+        : chat.messages.length > 0 || explicitEmptyMessagesRef.current
+          ? chat.messages
+          : lastNonEmptyMessagesRef.current));
+  if (isChatLoading && renderedMessages.length > 0) {
+    latestMessagesRef.current = renderedMessages;
+    lastNonEmptyMessagesRef.current = renderedMessages;
+    explicitEmptyMessagesRef.current = false;
+  } else if (chat.messages.length > 0 && mergedChatMessages) {
     latestMessagesRef.current = mergedChatMessages;
     lastNonEmptyMessagesRef.current = mergedChatMessages;
     explicitEmptyMessagesRef.current = false;
@@ -681,7 +689,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     hydrationAppliedRef.current = conversationId;
   }, [chat, conversationId, hydrationState, initialMessages]);
 
-  const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
   const isChatLoadingRef = useRef(isChatLoading);
   isChatLoadingRef.current = isChatLoading;
   const isLoading = isChatLoading;

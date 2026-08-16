@@ -66,6 +66,18 @@ export function snapshotUIMessages(messages: UIMessage[]): UIMessage[] {
 }
 
 /**
+ * Prefer the live useChat state while a response is streaming. A transient
+ * empty state can occur while the transport is catching up, so keep the last
+ * non-empty renderer snapshot in that case.
+ */
+export function selectLiveChatMessages(
+  liveMessages: UIMessage[],
+  fallbackMessages: UIMessage[],
+): UIMessage[] {
+  return liveMessages.length > 0 ? snapshotUIMessages(liveMessages) : fallbackMessages;
+}
+
+/**
  * Merge an automatically received snapshot into the current client state.
  *
  * A stream can briefly expose an empty or older snapshot while the transport

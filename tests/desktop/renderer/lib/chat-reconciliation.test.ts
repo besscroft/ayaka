@@ -5,6 +5,7 @@ import {
   isTerminalRunStatus,
   mergeChatMessages,
   reconcileChatMessages,
+  selectLiveChatMessages,
   snapshotUIMessage,
   shouldReconcileCompletedRun,
 } from "@renderer/lib/chat-reconciliation";
@@ -38,7 +39,10 @@ void describe("chat reconciliation", () => {
     assert.equal(shouldReconcileCompletedRun(base), true);
     assert.equal(shouldReconcileCompletedRun({ ...base, runId: "run-2" }), false);
     assert.equal(
-      shouldReconcileCompletedRun({ ...base, runConversationId: "conversation-2" }),
+      shouldReconcileCompletedRun({
+        ...base,
+        runConversationId: "conversation-2",
+      }),
       false,
     );
     assert.equal(shouldReconcileCompletedRun({ ...base, isChatLoading: false }), false);
@@ -83,6 +87,28 @@ void describe("chat reconciliation", () => {
     const current = [user("u1", "Question"), assistant("a1", "A complete answer")];
     const older = [user("u1", "Question"), assistant("a1", "A")];
     assert.equal(mergeChatMessages(current, older), null);
+  });
+
+  void it("prefers live stream messages over the previous renderer snapshot", () => {
+    const previous = [user("u1", "Question"), assistant("a1", "old")];
+    const live: UIMessage[] = [
+      user("u1", "Question"),
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [{ type: "reasoning", text: "first", state: "streaming" }],
+      },
+    ];
+
+    const selected = selectLiveChatMessages(live, previous);
+    assert.equal(selected.at(-1)?.parts[0]?.type, "reasoning");
+    assert.notEqual(selected, live);
+    assert.notEqual(selected.at(-1), live.at(-1));
+  });
+
+  void it("keeps the last non-empty snapshot during a transient empty stream state", () => {
+    const previous = [user("u1", "Question"), assistant("a1", "partial reasoning")];
+    assert.equal(selectLiveChatMessages([], previous), previous);
   });
 
   void it("keeps locally edited user text when an automatic snapshot is stale", () => {

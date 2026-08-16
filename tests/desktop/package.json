@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "@ai-sdk/openai-compatible": "catalog:",
     "@ai-sdk/react": "catalog:",
     "ai": "catalog:",
     "drizzle-orm": "catalog:",

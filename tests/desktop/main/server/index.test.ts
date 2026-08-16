@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { UIMessage } from "ai";
+import { Chat } from "@ai-sdk/react";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  DefaultChatTransport,
+  type UIMessage,
+} from "ai";
 import {
   MockImageModelV4,
   MockLanguageModelV4,
@@ -546,6 +552,89 @@ void describe("local chat server", () => {
     assert.equal(await response.text(), "sanitized-stream");
   });
 
+  void it("forwards reasoning chunks to Chat before the response finishes", async () => {
+    const model = new MockLanguageModelV4({});
+    const app = createApp({
+      sessionToken: token,
+      resolveModel: () => ({
+        model,
+        temperature: 0.7,
+        topP: 1,
+        maxOutputTokens: 256,
+      }),
+      buildAgentSystemPrompt: async () => "Ayaka root prompt",
+      runAgentChat: async () => delayedReasoningResponse(),
+    });
+
+    const snapshots: UIMessage[][] = [];
+    let finished = false;
+    const chat = new Chat<UIMessage>({
+      id: "chat-stream",
+      messages: validMessages as UIMessage[],
+      transport: new DefaultChatTransport<UIMessage>({
+        api: "http://ayaka.test/api/chat",
+        headers: { [CHAT_SESSION_HEADER]: token },
+        body: { model: "mock/chat" },
+        fetch: async (input, init) => app.request(new Request(String(input), init)),
+      }),
+      onFinish: () => {
+        finished = true;
+      },
+    });
+    const unregister = chat["~registerMessagesCallback"](() => {
+      snapshots.push(structuredClone(chat.messages) as UIMessage[]);
+    });
+
+    let resolveFirstDelta!: () => void;
+    let rejectFirstDelta!: (error: Error) => void;
+    const firstDelta = new Promise<void>((resolve, reject) => {
+      resolveFirstDelta = resolve;
+      rejectFirstDelta = reject;
+    });
+    const firstDeltaTimeout = setTimeout(
+      () => rejectFirstDelta(new Error("Timed out waiting for the first reasoning delta.")),
+      2_000,
+    );
+    const sendPromise = chat.sendMessage();
+    const waitForFirstDelta = (async () => {
+      while (
+        !snapshots.some((messages) =>
+          messages.some((message) =>
+            message.parts.some((part) => part.type === "reasoning" && part.text === "first"),
+          ),
+        )
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      resolveFirstDelta();
+    })();
+
+    await Promise.race([firstDelta, waitForFirstDelta]);
+    clearTimeout(firstDeltaTimeout);
+
+    const firstSnapshot = snapshots.find((messages) =>
+      messages.some((message) =>
+        message.parts.some((part) => part.type === "reasoning" && part.text === "first"),
+      ),
+    );
+    assert.ok(firstSnapshot);
+    assert.equal(finished, false);
+    assert.equal(chat.status, "streaming");
+
+    await sendPromise;
+    unregister();
+
+    assert.equal(finished, true);
+    assert.equal(chat.status, "ready");
+    assert.ok(
+      snapshots.some((messages) =>
+        messages.some((message) =>
+          message.parts.some((part) => part.type === "reasoning" && part.text === "first second"),
+        ),
+      ),
+    );
+  });
+
   void it("routes OpenAI and non-OpenAI providers through the same agent runtime", async () => {
     const model = new MockLanguageModelV4({});
     const toolSelection = { mode: "manual" as const, selectedToolIds: ["memory_search" as const] };
@@ -896,6 +985,31 @@ function agentRuntimeResponse(body: string): Response {
       "x-vercel-ai-ui-message-stream": "v1",
     },
   });
+}
+
+function delayedReasoningResponse(): Response {
+  const stream = createUIMessageStream<UIMessage>({
+    execute: async ({ writer }) => {
+      writer.write({ type: "start", messageId: "assistant-stream" });
+      writer.write({ type: "reasoning-start", id: "reasoning-stream" });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      writer.write({
+        type: "reasoning-delta",
+        id: "reasoning-stream",
+        delta: "first",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      writer.write({
+        type: "reasoning-delta",
+        id: "reasoning-stream",
+        delta: " second",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      writer.write({ type: "reasoning-end", id: "reasoning-stream" });
+      writer.write({ type: "finish", finishReason: "stop" });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
 }
 
 function postMedia(app: ReturnType<typeof createApp>, body: unknown): Promise<Response> {

@@ -1,6 +1,6 @@
 {
   "name": "ayaka-desktop",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Ayaka 是一个本地优先的 AI 桌面工作台",
   "homepage": "https://ai.zzzvoid.com/",
   "author": "Bess Croft",
@@ -37,6 +37,7 @@
     "@ai-sdk/google": "catalog:",
     "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
+    "@ai-sdk/openai-compatible": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@base-ui/react": "catalog:",
     "@electron-toolkit/preload": "^3.0.2",

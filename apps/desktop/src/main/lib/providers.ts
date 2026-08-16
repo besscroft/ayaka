@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
-import { wrapOpenAICompatibleChatModel } from "./openai-compatible-model";
 import type {
   experimental_generateVideo,
   ImageModel,
@@ -1596,7 +1596,10 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     topP: model.topP,
     maxOutputTokens: model.maxOutputTokens,
     contextWindow: model.contextWindow,
-    providerOptions: model.providerOptions as ProviderOptions,
+    providerOptions:
+      config.kind === "openai-compatible"
+        ? normalizeOpenAICompatibleProviderOptions(config.id, model.providerOptions)
+        : (model.providerOptions as ProviderOptions),
     nativeTools: createNativeChatTools(config, apiKey, modelId, model.providerOptions),
     countInputTokens:
       config.kind === "openai"
@@ -1644,14 +1647,43 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
       return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id })(modelId);
     case "openai-compatible":
       if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
-      return wrapOpenAICompatibleChatModel(
-        createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id }).chat(modelId),
-      );
+      return createOpenAICompatible({
+        apiKey,
+        baseURL: config.baseUrl,
+        name: config.id,
+        includeUsage: true,
+      })(modelId);
     case "anthropic":
       return createAnthropic({ apiKey })(modelId);
     case "google":
       return createGoogle({ apiKey })(modelId);
   }
+}
+
+/**
+ * The compatible provider used to be backed by the OpenAI adapter, so saved
+ * model options used the `openai` namespace. Keep those settings working when
+ * the model is served by the official OpenAI-compatible adapter.
+ */
+export function normalizeOpenAICompatibleProviderOptions(
+  providerId: string,
+  providerOptions: JsonObject,
+): ProviderOptions {
+  const legacy = providerOptions.openai;
+  if (!isPlainJsonObject(legacy)) return providerOptions as ProviderOptions;
+
+  const compatible = isPlainJsonObject(providerOptions.openaiCompatible)
+    ? providerOptions.openaiCompatible
+    : {};
+  const providerSpecific = isPlainJsonObject(providerOptions[providerId])
+    ? providerOptions[providerId]
+    : {};
+
+  return {
+    ...providerOptions,
+    openaiCompatible: { ...legacy, ...compatible },
+    [providerId]: { ...legacy, ...providerSpecific },
+  } as ProviderOptions;
 }
 
 function createNativeChatTools(
