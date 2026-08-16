@@ -13,6 +13,7 @@ void describe("MCP workspace", () => {
         servers={[server()]}
         toolsByServer={new Map()}
         busy={false}
+        discoveringServerIds={new Set()}
         onRefresh={() => undefined}
         onEdit={() => undefined}
         onDelete={() => undefined}

@@ -40,6 +40,7 @@ export interface McpWorkspaceProps {
   servers: ToolServer[];
   toolsByServer: Map<string, ToolRecord[]>;
   busy: boolean;
+  discoveringServerIds: ReadonlySet<string>;
   onRefresh: () => void;
   activeConversationId?: string | null;
   onEdit: (server: ToolServer) => void;
@@ -51,6 +52,7 @@ export function McpWorkspace({
   servers,
   toolsByServer,
   busy,
+  discoveringServerIds,
   onRefresh,
   activeConversationId,
   onEdit,
@@ -67,6 +69,7 @@ export function McpWorkspace({
 
   const selected = servers.find((server) => server.id === selectedId) ?? servers[0] ?? null;
   const selectedTools = selected ? (toolsByServer.get(selected.id) ?? []) : [];
+  const selectedIsDiscovering = selected ? discoveringServerIds.has(selected.id) : false;
 
   useEffect(() => {
     if (!selected || selected.id !== selectedId) {
@@ -150,6 +153,7 @@ export function McpWorkspace({
               {servers.map((server) => {
                 const active = server.id === selected?.id;
                 const tools = toolsByServer.get(server.id) ?? [];
+                const discovering = discoveringServerIds.has(server.id);
                 return (
                   <button
                     key={server.id}
@@ -167,7 +171,9 @@ export function McpWorkspace({
                       <span className="block truncate text-sm font-medium">{server.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {server.enabled
-                          ? `${tools.length} ${t("tools.field.tools")}`
+                          ? discovering
+                            ? t("tools.mcp.workspace.connecting")
+                            : `${tools.length} ${t("tools.field.tools")}`
                           : t("catalog.disabled")}
                       </span>
                     </span>
@@ -193,10 +199,16 @@ export function McpWorkspace({
                     </Card.Description>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {selectedIsDiscovering ? (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <IconRotateCcw className="size-3 animate-spin" />
+                        {t("tools.mcp.workspace.connecting")}
+                      </span>
+                    ) : null}
                     <Switch
                       size="sm"
                       isSelected={selected.enabled !== 0}
-                      isDisabled={busy}
+                      isDisabled={busy || selectedIsDiscovering}
                       onChange={(value) => onToggle(selected, value)}
                     >
                       {t("tools.enabled")}
@@ -205,7 +217,7 @@ export function McpWorkspace({
                       size="sm"
                       variant="secondary"
                       onPress={() => onEdit(selected)}
-                      isDisabled={busy}
+                      isDisabled={busy || selectedIsDiscovering}
                     >
                       <IconEdit className="size-4" />
                       {t("tools.mcp.edit")}
@@ -214,7 +226,9 @@ export function McpWorkspace({
                       size="sm"
                       variant="secondary"
                       onPress={() => void loadCapabilities()}
-                      isDisabled={loadingCapabilities || selected.enabled === 0}
+                      isDisabled={
+                        loadingCapabilities || selectedIsDiscovering || selected.enabled === 0
+                      }
                     >
                       <IconRotateCcw
                         className={cn("size-4", loadingCapabilities && "animate-spin")}
@@ -225,7 +239,7 @@ export function McpWorkspace({
                       size="sm"
                       variant="danger"
                       onPress={() => onDelete(selected)}
-                      isDisabled={busy}
+                      isDisabled={busy || selectedIsDiscovering}
                     >
                       {t("common.delete")}
                     </Button>

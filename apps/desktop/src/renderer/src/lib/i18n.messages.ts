@@ -1467,6 +1467,7 @@ const entries = {
   "tools.mcp.workspace.resources": { zh: "资源", en: "Resources" },
   "tools.mcp.workspace.prompts": { zh: "提示词", en: "Prompts" },
   "tools.mcp.workspace.protocol": { zh: "协议", en: "Protocol" },
+  "tools.mcp.workspace.connecting": { zh: "连接中", en: "Connecting" },
   "tools.mcp.workspace.identity": { zh: "服务端", en: "Server identity" },
   "tools.mcp.workspace.instructions": { zh: "服务端说明", en: "Instructions" },
   "tools.mcp.workspace.authorize": { zh: "授权", en: "Authorize" },

@@ -61,6 +61,7 @@ export function McpPanel({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(() => new Set());
   const [mcpOpen, setMcpOpen] = useState(false);
   const [tab, setTab] = useState<"installed" | "marketplace">("installed");
   const [query, setQuery] = useState("");
@@ -131,6 +132,31 @@ export function McpPanel({
     }
   };
 
+  const setServerDiscovering = (serverId: string, discovering: boolean): void => {
+    setDiscoveringServerIds((current) => {
+      const next = new Set(current);
+      if (discovering) next.add(serverId);
+      else next.delete(serverId);
+      return next;
+    });
+  };
+
+  const discoverInBackground = (serverId: string): void => {
+    setServerDiscovering(serverId, true);
+    void api.mcp
+      .discover(serverId)
+      .then((discovery) => {
+        if (discovery.server.status === "error") {
+          notify.error(t("tools.toast.failed"), discovery.message, locale);
+        }
+      })
+      .catch((error) => notify.error(t("tools.toast.failed"), error, locale))
+      .finally(() => {
+        setServerDiscovering(serverId, false);
+        refresh();
+      });
+  };
+
   const confirmDelete = (): void => {
     if (!deleteTarget) return;
     const target = deleteTarget;
@@ -152,7 +178,16 @@ export function McpPanel({
             {t("main.title.mcp")}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => setTab(value === "marketplace" ? "marketplace" : "installed")}
+          >
+            <TabsList aria-label={t("catalog.mcp.tabsLabel")}>
+              <TabsTrigger value="installed">{t("catalog.mcp.installedTab")}</TabsTrigger>
+              <TabsTrigger value="marketplace">{t("catalog.mcp.marketplaceTab")}</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <MetricCard
             label={t("tools.metric.mcp")}
             value={mcpServers.length}
@@ -176,18 +211,6 @@ export function McpPanel({
             </Button>
           </div>
         </div>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <Tabs
-          value={tab}
-          onValueChange={(value) => setTab(value === "marketplace" ? "marketplace" : "installed")}
-        >
-          <TabsList aria-label={t("catalog.mcp.tabsLabel")}>
-            <TabsTrigger value="installed">{t("catalog.mcp.installedTab")}</TabsTrigger>
-            <TabsTrigger value="marketplace">{t("catalog.mcp.marketplaceTab")}</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto select-none">
@@ -245,6 +268,7 @@ export function McpPanel({
               servers={filteredServers}
               toolsByServer={mcpToolsByServer}
               busy={busy}
+              discoveringServerIds={discoveringServerIds}
               activeConversationId={activeConversationId}
               onEdit={(server) => {
                 setEditTarget(server);
@@ -269,18 +293,14 @@ export function McpPanel({
           setEditTarget(null);
         }}
         onSave={(input) =>
-          runAction(
-            async () => {
-              const server = editTarget
-                ? await api.mcp.update(editTarget.id, input)
-                : await api.mcp.create(input);
-              const discovery = await api.mcp.discover(server.id);
-              setMcpOpen(false);
-              setEditTarget(null);
-              if (discovery.server.status === "error") throw new Error(discovery.message);
-            },
-            editTarget ? t("tools.toast.saved") : t("tools.toast.discovered"),
-          )
+          runAction(async () => {
+            const server = editTarget
+              ? await api.mcp.update(editTarget.id, input)
+              : await api.mcp.create(input);
+            setMcpOpen(false);
+            setEditTarget(null);
+            discoverInBackground(server.id);
+          }, t("tools.toast.saved"))
         }
       />
 
