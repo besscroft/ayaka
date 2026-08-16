@@ -1,6 +1,34 @@
 # Changelog
 
-## [0.1.23] - 2026-08-16
+## [0.1.24]
+
+### 中文
+
+#### 新增
+
+- 新增完整的 MCP 客户端集成能力，支持工作区服务器配置、连接管理、工具调用及 OAuth 认证。
+- 新增 MCP 服务器连接状态显示与后台发现能力。
+- 新增 MCP 工作区服务器编辑功能。
+
+#### 变更
+
+- 优化 MCP 传输认证校验与交互流程。
+- 移除视频生成功能及相关配置、资源和界面。
+
+### English
+
+#### Added
+
+- Added full MCP client integration with workspace server configuration, connection management, tool invocation, and OAuth authentication.
+- Added MCP server connection-status display and background discovery.
+- Added editing support for MCP workspace servers.
+
+#### Changed
+
+- Improved MCP transport authentication validation and interaction flows.
+- Removed video-generation features and their related configuration, assets, and UI.
+
+## [0.1.23]
 
 ### 中文
 
@@ -26,7 +54,7 @@
 - Improved streaming chat message synchronization and rendering to reduce flicker and inconsistent states while conversations load.
 - Collapsed tool-call cards by default to reduce visual noise in long conversations.
 
-## [0.1.22] - 2026-08-15
+## [0.1.22]
 
 ### 中文
 
@@ -64,7 +92,7 @@
 - Simplified the live-thinking panel and streaming message rendering to reduce unnecessary status detail, scrolling, and layout jumps.
 - Removed the unused input shortcut hint to reduce interface noise.
 
-## [0.1.21] - 2026-08-14
+## [0.1.21]
 
 ### 中文
 
@@ -100,7 +128,7 @@
 - Fixed validation and handling for workspace images, data URLs, and remote image URLs, with a clear error when an attached image cannot be read.
 - Fixed request failures caused by sending unsupported sampling parameters to reasoning models.
 
-## [0.1.20] - 2026-08-14
+## [0.1.20]
 
 ### 中文
 
@@ -134,7 +162,7 @@
 
 - Fixed binary data type compatibility when workspace files are transferred through Electron's contextBridge.
 
-## [0.1.19] - 2026-08-13
+## [0.1.19]
 
 ### 中文
 
@@ -160,7 +188,7 @@
 - Removed the desktop pet feature and its related database configuration, assets, UI, documentation, and tests.
 - Added startup cleanup for legacy desktop pet data to prevent stale configuration from remaining after the feature removal.
 
-## [0.1.18] - 2026-08-13
+## [0.1.18]
 
 ### 中文
 
@@ -178,7 +206,7 @@
 - Updated the instructions section in the agent status panel to be collapsed by default, reducing the initial information density.
 - Removed the unused run button and related logic from skill cards.
 
-## [0.1.17] - 2026-08-13
+## [0.1.17]
 
 ### 中文
 
@@ -210,7 +238,7 @@
 
 - Fixed interpolation placeholders in the recycle-bin cleanup time message.
 
-## [0.1.16] - 2026-08-12
+## [0.1.16]
 
 ### 中文
 
@@ -234,7 +262,7 @@
 
 - Improved agent status and runtime diagnostics in the desktop workspace.
 
-## [0.1.15] - 2026-08-04
+## [0.1.15]
 
 ### 中文
 
