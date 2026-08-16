@@ -172,6 +172,31 @@ const api = {
     setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke("mcp:setEnabled", id, enabled),
     test: (id: string) => ipcRenderer.invoke("mcp:test", id),
     discover: (id: string) => ipcRenderer.invoke("mcp:discover", id),
+    capabilities: (id: string) => ipcRenderer.invoke("mcp:capabilities", id),
+    readResource: (input: unknown) => ipcRenderer.invoke("mcp:readResource", input),
+    getPrompt: (input: unknown) => ipcRenderer.invoke("mcp:getPrompt", input),
+    complete: (input: unknown) => ipcRenderer.invoke("mcp:complete", input),
+    subscribe: (id: string) => ipcRenderer.invoke("mcp:subscribe", id),
+    authorize: (id: string) => ipcRenderer.invoke("mcp:authorize", id),
+    authStatus: (id: string) => ipcRenderer.invoke("mcp:authStatus", id),
+    logout: (id: string) => ipcRenderer.invoke("mcp:logout", id),
+    respondInput: (id: string, value: unknown) => ipcRenderer.invoke("mcp:respondInput", id, value),
+    cancelInput: (id: string) => ipcRenderer.invoke("mcp:cancelInput", id),
+    onCapabilitiesChanged: (handler: (event: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("mcp:capabilities-changed", listener);
+      return () => ipcRenderer.removeListener("mcp:capabilities-changed", listener);
+    },
+    onInputRequested: (handler: (request: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("mcp:input-requested", listener);
+      return () => ipcRenderer.removeListener("mcp:input-requested", listener);
+    },
+    onAuthChanged: (handler: (event: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("mcp:auth-changed", listener);
+      return () => ipcRenderer.removeListener("mcp:auth-changed", listener);
+    },
     updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("mcp:updateTool", id, patch),
     setSecret: (input: unknown) => ipcRenderer.invoke("mcp:setSecret", input),
     deleteSecret: (id: string) => ipcRenderer.invoke("mcp:deleteSecret", id),

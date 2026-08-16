@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -32,6 +33,7 @@ export interface PendingAttachment extends AttachmentItem {
 }
 
 interface MessageInputProps {
+  conversationId?: string;
   isLoading: boolean;
   isRunActive?: boolean;
   onSend: (payload: { text: string; files: FilePartLike[] }) => void;
@@ -53,6 +55,7 @@ const DEFAULT_ACCEPT =
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024;
 
 export function MessageInput({
+  conversationId,
   isLoading,
   isRunActive = isLoading,
   onSend,
@@ -74,6 +77,24 @@ export function MessageInput({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const handleInsertPrompt = (event: Event): void => {
+      const detail = (event as CustomEvent<{ conversationId?: string; text?: string }>).detail;
+      if (
+        !conversationId ||
+        detail?.conversationId !== conversationId ||
+        typeof detail.text !== "string" ||
+        detail.text.trim().length === 0
+      ) {
+        return;
+      }
+      setInput((current) => (current.trim() ? `${current}\n\n${detail.text}` : detail.text!));
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+    window.addEventListener("ayaka:mcp-insert-prompt", handleInsertPrompt);
+    return () => window.removeEventListener("ayaka:mcp-insert-prompt", handleInsertPrompt);
+  }, [conversationId]);
   const selectedReasoningModel = useMemo(() => {
     if (!selectedModel) return undefined;
     const separator = selectedModel.indexOf("/");

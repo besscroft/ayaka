@@ -20,6 +20,7 @@ import {
 } from "ai";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { McpInputDialog } from "./McpWorkspace";
 import { IconFolderOpen } from "./icons";
 import { getModelReasoningDefault } from "./ReasoningSelector";
 import { Button, LoadingIndicator } from "./ui";
@@ -86,6 +87,7 @@ import {
   type ChatToolSelectionRequest,
   type AgentProfile,
   type LocalServerInfo,
+  type McpInputRequest,
   type ProviderInfo,
   type ToolsSnapshot,
 } from "@shared/types";
@@ -170,6 +172,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [toolSelection, setToolSelection] = useState<ChatToolSelectionRequest>(
     DEFAULT_CHAT_TOOL_SELECTION,
   );
+  const [mcpInputRequest, setMcpInputRequest] = useState<McpInputRequest | null>(null);
   /** 鏄惁宸蹭负鏈璇濈敓鎴愯繃鏍囬锛堥槻姝㈤噸澶嶇敓鎴愶級 */
   const titleStateRef = useRef<Map<string, AutoTitleStatus>>(new Map());
   const createdAtRef = useRef<Map<string, number>>(new Map());
@@ -409,6 +412,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   useEffect(() => {
     toolSelectionRef.current = toolSelection;
   }, [toolSelection]);
+
+  useEffect(() => {
+    const offInput = api.mcp.onInputRequested((request) => {
+      if (request.conversationId === conversationId) setMcpInputRequest(request);
+    });
+    return offInput;
+  }, [conversationId]);
 
   const transport = useMemo(
     () =>
@@ -1254,6 +1264,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           )}
 
           <MessageInput
+            conversationId={conversationId}
             isLoading={isLoading}
             isRunActive={isAgentRunActive}
             onSend={handleSend}
@@ -1285,6 +1296,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           onStop={handleStop}
         />
       </div>
+      <McpInputDialog request={mcpInputRequest} onClose={() => setMcpInputRequest(null)} />
     </div>
   );
 }

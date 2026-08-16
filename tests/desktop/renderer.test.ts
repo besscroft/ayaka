@@ -5,6 +5,7 @@ import "./renderer/components/ai-elements/message-attachments.test.tsx";
 import "./renderer/components/ai-elements/rich-content.test.ts";
 import "./renderer/components/ai-elements/use-conversation-scroll.test.ts";
 import "./renderer/components/MainPanelView.test.tsx";
+import "./renderer/components/McpWorkspace.test.tsx";
 import "./renderer/components/MessageInput.test.tsx";
 import "./renderer/components/MessageList.test.ts";
 import "./renderer/components/ReasoningSelector.test.ts";

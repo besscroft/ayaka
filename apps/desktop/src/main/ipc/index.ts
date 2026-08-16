@@ -97,6 +97,7 @@ import type {
   AgentRunInputKind,
   AgentRunInputSource,
   WorkspaceMediaSaveInput,
+  McpInputRequest,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID } from "../../shared/types";
@@ -109,7 +110,28 @@ import {
   writeMemoryFile,
   type MemoryFileKind,
 } from "../lib/agent-memory-files";
-import { closeMcpClient, discoverMcpServer, testMcpServer } from "../lib/mcp-manager";
+import {
+  closeMcpClient,
+  discoverMcpServer,
+  testMcpServer,
+  getMcpCapabilities,
+  readMcpResource,
+  getMcpPrompt,
+  completeMcp,
+  listenMcpCapabilities,
+  onMcpCapabilitiesChanged,
+} from "../lib/mcp-manager";
+import {
+  authorizeMcpServer,
+  getMcpAuthStatus,
+  logoutMcpServer,
+  onMcpAuthChanged,
+} from "../lib/mcp-auth";
+import {
+  cancelMcpInput,
+  onMcpInputRequested,
+  respondMcpInput,
+} from "../lib/mcp-interaction-broker";
 import { runToolSkill } from "../lib/skill-runtime";
 import { generateSkillDraft } from "../lib/skill-drafts";
 import {
@@ -162,6 +184,17 @@ import { readChangelog } from "../lib/changelog";
  */
 
 export function registerIpcHandlers(): void {
+  const broadcast = (channel: string, payload: unknown): void => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(channel, payload);
+    }
+  };
+  onMcpCapabilitiesChanged((serverId, capabilities) =>
+    broadcast("mcp:capabilities-changed", { serverId, capabilities }),
+  );
+  onMcpAuthChanged((serverId, status) => broadcast("mcp:auth-changed", { serverId, status }));
+  onMcpInputRequested((request: McpInputRequest) => broadcast("mcp:input-requested", request));
+
   // ---------- Main window controls ----------
   ipcMain.handle("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
@@ -518,6 +551,34 @@ export function registerIpcHandlers(): void {
   });
   ipcMain.handle("mcp:test", (_e, id: string) => testMcpServer(id));
   ipcMain.handle("mcp:discover", (_e, id: string) => discoverMcpServer(id));
+  ipcMain.handle("mcp:capabilities", (_e, id: string) => getMcpCapabilities(id));
+  ipcMain.handle("mcp:readResource", (_e, input: { serverId: string; uri: string }) =>
+    readMcpResource(input.serverId, input.uri),
+  );
+  ipcMain.handle(
+    "mcp:getPrompt",
+    (_e, input: { serverId: string; name: string; arguments?: Record<string, string> }) =>
+      getMcpPrompt(input.serverId, input.name, input.arguments),
+  );
+  ipcMain.handle(
+    "mcp:complete",
+    (
+      _e,
+      input: {
+        serverId: string;
+        ref: Record<string, unknown>;
+        argument: { name: string; value: string };
+      },
+    ) => completeMcp(input.serverId, input.ref, input.argument),
+  );
+  ipcMain.handle("mcp:subscribe", (_e, id: string) => listenMcpCapabilities(id));
+  ipcMain.handle("mcp:authorize", (_e, id: string) => authorizeMcpServer(id));
+  ipcMain.handle("mcp:authStatus", (_e, id: string) => getMcpAuthStatus(id));
+  ipcMain.handle("mcp:logout", (_e, id: string) => logoutMcpServer(id));
+  ipcMain.handle("mcp:respondInput", (_e, id: string, value: unknown) =>
+    respondMcpInput(id, value),
+  );
+  ipcMain.handle("mcp:cancelInput", (_e, id: string) => cancelMcpInput(id));
   ipcMain.handle(
     "mcp:updateTool",
     (

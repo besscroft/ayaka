@@ -37,6 +37,13 @@ import type {
   ToolServer,
   ToolServerInput,
   ToolRecord,
+  McpCapabilitySnapshot,
+  McpReadResourceResult,
+  McpPromptResult,
+  McpCompletionResult,
+  McpAuthorizationResult,
+  McpAuthStatus,
+  McpInputRequest,
   ProviderModelSyncResult,
   ProviderInfo,
   ProviderTestResult,
@@ -301,6 +308,34 @@ export const api = {
       assertApi().mcp.setEnabled(id, enabled),
     test: (id: string): Promise<ToolDiscoveryResult> => assertApi().mcp.test(id),
     discover: (id: string): Promise<ToolDiscoveryResult> => assertApi().mcp.discover(id),
+    capabilities: (id: string): Promise<McpCapabilitySnapshot> => assertApi().mcp.capabilities(id),
+    readResource: (input: { serverId: string; uri: string }): Promise<McpReadResourceResult> =>
+      assertApi().mcp.readResource(input),
+    getPrompt: (input: {
+      serverId: string;
+      name: string;
+      arguments?: Record<string, string>;
+    }): Promise<McpPromptResult> => assertApi().mcp.getPrompt(input),
+    complete: (input: {
+      serverId: string;
+      ref: Record<string, unknown>;
+      argument: { name: string; value: string };
+    }): Promise<McpCompletionResult> => assertApi().mcp.complete(input),
+    subscribe: (id: string): Promise<boolean> => assertApi().mcp.subscribe(id),
+    authorize: (id: string): Promise<McpAuthorizationResult> => assertApi().mcp.authorize(id),
+    authStatus: (id: string): Promise<McpAuthStatus> => assertApi().mcp.authStatus(id),
+    logout: (id: string): Promise<boolean> => assertApi().mcp.logout(id),
+    respondInput: (id: string, value: unknown): Promise<boolean> =>
+      assertApi().mcp.respondInput(id, value),
+    cancelInput: (id: string): Promise<boolean> => assertApi().mcp.cancelInput(id),
+    onCapabilitiesChanged: (
+      handler: (event: { serverId: string; capabilities: McpCapabilitySnapshot }) => void,
+    ): (() => void) => assertApi().mcp.onCapabilitiesChanged(handler),
+    onInputRequested: (handler: (request: McpInputRequest) => void): (() => void) =>
+      assertApi().mcp.onInputRequested(handler),
+    onAuthChanged: (
+      handler: (event: { serverId: string; status: McpAuthStatus }) => void,
+    ): (() => void) => assertApi().mcp.onAuthChanged(handler),
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
@@ -375,6 +410,13 @@ export type {
   MemoryScope,
   MessageRow,
   ToolDiscoveryResult,
+  McpCapabilitySnapshot,
+  McpReadResourceResult,
+  McpPromptResult,
+  McpCompletionResult,
+  McpAuthorizationResult,
+  McpAuthStatus,
+  McpInputRequest,
   ToolServer,
   ToolServerInput,
   ToolRecord,

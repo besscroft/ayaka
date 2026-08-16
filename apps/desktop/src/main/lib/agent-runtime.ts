@@ -2076,6 +2076,8 @@ function toChatToolModelContext(
     modelId,
     capabilities: resolved.capabilities ?? DEFAULT_MODEL_CAPABILITIES,
     nativeTools: resolved.nativeTools ?? [],
+    languageModel: resolved.model,
+    providerOptions: resolved.providerOptions,
   };
 }
 

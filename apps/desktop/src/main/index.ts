@@ -14,6 +14,9 @@ import { ensureBuiltinCatalogSources } from "./lib/catalog-service";
 import { agentLoopSessions } from "./lib/agent-loop-session";
 import { sendUpdateState, updateManager } from "./lib/update-manager";
 import { removeLegacyCompanionData } from "./lib/runtime-paths";
+import { closeAllMcpClients } from "./lib/mcp-manager";
+import { cancelAllMcpInputs } from "./lib/mcp-interaction-broker";
+import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
 
 const WINDOWS_APP_ID = "com.zzzvoid.ai";
 
@@ -157,6 +160,11 @@ app.on("before-quit", (event) => {
   stopCronScheduler();
   void agentLoopSessions
     .interruptAll()
+    .then(() => {
+      cancelAllMcpInputs();
+      return closeAllMcpClients();
+    })
+    .then(() => closeMcpOAuthLoopback())
     .then(() => {
       stopServer();
       return closeDb();

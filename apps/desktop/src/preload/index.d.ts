@@ -38,6 +38,13 @@ import type {
   ToolServer,
   ToolServerInput,
   ToolRecord,
+  McpCapabilitySnapshot,
+  McpReadResourceResult,
+  McpPromptResult,
+  McpCompletionResult,
+  McpAuthorizationResult,
+  McpAuthStatus,
+  McpInputRequest,
   ProviderModelSyncResult,
   ProviderInfo,
   ProviderTestResult,
@@ -256,6 +263,31 @@ export interface AyakaApi {
     setEnabled: (id: string, enabled: boolean) => Promise<ToolServer>;
     test: (id: string) => Promise<ToolDiscoveryResult>;
     discover: (id: string) => Promise<ToolDiscoveryResult>;
+    capabilities: (id: string) => Promise<McpCapabilitySnapshot>;
+    readResource: (input: { serverId: string; uri: string }) => Promise<McpReadResourceResult>;
+    getPrompt: (input: {
+      serverId: string;
+      name: string;
+      arguments?: Record<string, string>;
+    }) => Promise<McpPromptResult>;
+    complete: (input: {
+      serverId: string;
+      ref: Record<string, unknown>;
+      argument: { name: string; value: string };
+    }) => Promise<McpCompletionResult>;
+    subscribe: (id: string) => Promise<boolean>;
+    authorize: (id: string) => Promise<McpAuthorizationResult>;
+    authStatus: (id: string) => Promise<McpAuthStatus>;
+    logout: (id: string) => Promise<boolean>;
+    respondInput: (id: string, value: unknown) => Promise<boolean>;
+    cancelInput: (id: string) => Promise<boolean>;
+    onCapabilitiesChanged: (
+      handler: (event: { serverId: string; capabilities: McpCapabilitySnapshot }) => void,
+    ) => () => void;
+    onInputRequested: (handler: (request: McpInputRequest) => void) => () => void;
+    onAuthChanged: (
+      handler: (event: { serverId: string; status: McpAuthStatus }) => void,
+    ) => () => void;
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,

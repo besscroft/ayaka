@@ -54,6 +54,7 @@ export type MainSection = "agents" | "tools" | "mcp" | "skills" | "memory" | "au
 
 interface MainPanelViewProps {
   section: MainSection;
+  activeConversationId?: string | null;
 }
 
 interface PanelData {
@@ -64,7 +65,10 @@ interface PanelData {
 const MEMORY_SCOPES: MemoryScope[] = ["global", "agent"];
 const MEMORY_KINDS: MemoryKind[] = ["fact", "preference", "episode", "profile", "skill"];
 
-export function MainPanelView({ section }: MainPanelViewProps): React.JSX.Element {
+export function MainPanelView({
+  section,
+  activeConversationId,
+}: MainPanelViewProps): React.JSX.Element {
   useT();
   const [data, setData] = useState<PanelData>({
     agents: [],
@@ -111,7 +115,7 @@ export function MainPanelView({ section }: MainPanelViewProps): React.JSX.Elemen
   if (section === "mcp") {
     return (
       <main className="flex min-h-0 flex-1 overflow-hidden p-6">
-        <McpPanel />
+        <McpPanel activeConversationId={activeConversationId} />
       </main>
     );
   }

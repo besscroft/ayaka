@@ -170,7 +170,9 @@ function AppContent(): React.JSX.Element {
             </div>
           )}
         </div>
-        {activeView !== "chat" ? <MainPanelView section={activeView} /> : null}
+        {activeView !== "chat" ? (
+          <MainPanelView section={activeView} activeConversationId={activeId} />
+        ) : null}
       </AppShell>
 
       <SettingsDialog

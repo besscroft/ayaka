@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
-  Card,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -10,7 +9,6 @@ import {
   Input,
   LoadingIndicator,
   SelectField,
-  Switch,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -26,31 +24,13 @@ import type {
   CatalogItem,
   CatalogSnapshot,
   McpTransportKind,
-  ToolRecord,
   ToolServer,
 } from "@shared/types";
 import { McpMarketplacePanel } from "./McpMarketplacePanel";
+import { McpWorkspace } from "./McpWorkspace";
 import { ConfirmDialog } from "./ConfirmDialog";
-import {
-  IconCheck,
-  IconClose,
-  IconEye,
-  IconGlobe,
-  IconPlus,
-  IconRotateCcw,
-  IconSearch,
-  IconTrash,
-} from "./icons";
-import {
-  EmptyTools,
-  Field,
-  MetricCard,
-  ReadStat,
-  ToolDetailModal,
-  type DetailTarget,
-  formatEndpoint,
-  groupByServer,
-} from "./ToolsPanel";
+import { IconCheck, IconClose, IconPlus, IconRotateCcw, IconSearch } from "./icons";
+import { Field, MetricCard, ReadStat, groupByServer } from "./ToolsPanel";
 
 // MCP 新建表单的默认状态
 const EMPTY_MCP_FORM: McpFormState = {
@@ -70,7 +50,11 @@ const EMPTY_MCP_FORM: McpFormState = {
   timeoutSeconds: "60",
 };
 
-export function McpPanel(): React.JSX.Element {
+export function McpPanel({
+  activeConversationId,
+}: {
+  activeConversationId?: string | null;
+}): React.JSX.Element {
   const { t, locale } = useT();
   const [snapshot, setSnapshot] = useState<ToolsSnapshot | null>(null);
   const [catalogSnapshot, setCatalogSnapshot] = useState<CatalogSnapshot | null>(null);
@@ -83,9 +67,6 @@ export function McpPanel(): React.JSX.Element {
   const [status, setStatus] = useState<"all" | "enabled" | "disabled" | "error">("all");
   const [transport, setTransport] = useState<"all" | McpTransportKind>("all");
   const [deleteTarget, setDeleteTarget] = useState<ToolServer | null>(null);
-  const [detailTarget, setDetailTarget] = useState<Extract<DetailTarget, { type: "mcp" }> | null>(
-    null,
-  );
   const [reviewTarget, setReviewTarget] = useState<{
     installation: ArtifactInstallation;
     item: CatalogItem;
@@ -252,15 +233,16 @@ export function McpPanel(): React.JSX.Element {
                 ariaLabel={t("catalog.mcp.allTransports")}
               />
             </div>
-            <McpSection
+            <McpWorkspace
               servers={filteredServers}
               toolsByServer={mcpToolsByServer}
               busy={busy}
+              activeConversationId={activeConversationId}
+              onRefresh={refresh}
               onDelete={setDeleteTarget}
               onToggle={(server, enabled) =>
                 runAction(() => api.mcp.setEnabled(server.id, enabled), t("tools.toast.saved"))
               }
-              onDetail={(server, tools) => setDetailTarget({ type: "mcp", item: server, tools })}
             />
           </div>
         ) : null}
@@ -279,8 +261,6 @@ export function McpPanel(): React.JSX.Element {
           }, t("tools.toast.discovered"))
         }
       />
-
-      <ToolDetailModal detail={detailTarget} onClose={() => setDetailTarget(null)} />
 
       <McpReviewModal
         target={reviewTarget}
@@ -503,121 +483,6 @@ function McpReviewModal({
 function installationSecretKeys(installation: ArtifactInstallation): string[] {
   const value = installation.safety.secretKeys;
   return Array.isArray(value) ? value.filter((key): key is string => typeof key === "string") : [];
-}
-
-function McpSection({
-  servers,
-  toolsByServer,
-  busy,
-  onDelete,
-  onToggle,
-  onDetail,
-}: {
-  servers: ToolServer[];
-  toolsByServer: Map<string, ToolRecord[]>;
-  busy: boolean;
-  onDelete: (server: ToolServer) => void;
-  onToggle: (server: ToolServer, enabled: boolean) => void;
-  onDetail: (server: ToolServer, tools: ToolRecord[]) => void;
-}): React.JSX.Element {
-  const { t } = useT();
-  if (servers.length === 0) {
-    return <EmptyTools message={t("tools.mcp.empty")} />;
-  }
-  return (
-    <section className="grid gap-3 xl:grid-cols-2">
-      {servers.map((server) => (
-        <McpCard
-          key={server.id}
-          server={server}
-          tools={toolsByServer.get(server.id) ?? []}
-          busy={busy}
-          onDelete={() => onDelete(server)}
-          onToggle={(enabled) => onToggle(server, enabled)}
-          onDetail={() => onDetail(server, toolsByServer.get(server.id) ?? [])}
-        />
-      ))}
-    </section>
-  );
-}
-
-function McpCard({
-  server,
-  tools,
-  busy,
-  onDelete,
-  onToggle,
-  onDetail,
-}: {
-  server: ToolServer;
-  tools: ToolRecord[];
-  busy: boolean;
-  onDelete: () => void;
-  onToggle: (enabled: boolean) => void;
-  onDetail: () => void;
-}): React.JSX.Element {
-  const { t, f } = useT();
-  const enabledTools = tools.filter((tool) => tool.enabled !== 0).length;
-  return (
-    <Card>
-      <Card.Header>
-        <div className="flex w-full items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Card.Title className="truncate">{server.name}</Card.Title>
-            <Card.Description className="line-clamp-2">
-              {server.description || formatEndpoint(server)}
-            </Card.Description>
-          </div>
-          <IconGlobe className="size-5 shrink-0 text-foreground/40" />
-        </div>
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-3 p-4">
-        <div className="grid gap-2 text-xs sm:grid-cols-2">
-          <ReadStat label={t("tools.field.transport")} value={server.transport} />
-          <ReadStat label={t("tools.field.tools")} value={`${enabledTools} / ${tools.length}`} />
-          <ReadStat
-            label={t("tools.field.status")}
-            value={server.enabled ? server.status : "disabled"}
-          />
-          <ReadStat label="Timeout" value={`${server.timeout_seconds}s`} />
-          <ReadStat
-            className="sm:col-span-2"
-            label={t("tools.field.endpoint")}
-            value={formatEndpoint(server)}
-          />
-          <ReadStat
-            className="sm:col-span-2"
-            label={t("tools.field.connected")}
-            value={
-              server.last_connected_at ? f.dateTime(server.last_connected_at) : t("tools.never")
-            }
-          />
-        </div>
-        {server.last_error ? (
-          <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
-            {server.last_error}
-          </p>
-        ) : null}
-      </Card.Content>
-      <Card.Footer>
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <Switch size="sm" isSelected={server.enabled !== 0} isDisabled={busy} onChange={onToggle}>
-            {t("tools.enabled")}
-          </Switch>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onPress={onDetail} isDisabled={busy}>
-              <IconEye className="size-4" />
-              {t("tools.detail")}
-            </Button>
-            <Button size="sm" variant="danger" onPress={onDelete} isDisabled={busy}>
-              <IconTrash className="size-4" />
-              {t("common.delete")}
-            </Button>
-          </div>
-        </div>
-      </Card.Footer>
-    </Card>
-  );
 }
 
 function AddMcpModal({

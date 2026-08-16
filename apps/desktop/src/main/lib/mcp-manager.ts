@@ -1,9 +1,15 @@
-import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { createHash } from "node:crypto";
-import { jsonSchema, tool, type ToolSet } from "ai";
+import { generateText, jsonSchema, tool, type ToolSet } from "ai";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 import type {
   ChatToolDescriptor,
+  McpCapabilitySnapshot,
+  McpCompletionResult,
+  McpPrompt,
+  McpPromptResult,
+  McpReadResourceResult,
+  McpResource,
+  McpResourceTemplate,
   ToolDiscoveryResult,
   ToolRecord,
   ToolServer,
@@ -14,13 +20,23 @@ import {
   insertRuntimeEvent,
   listMcpServers,
   listMcpTools,
-  resolveToolSecretReferences,
   updateMcpServerStatusAsync,
   upsertMcpToolDefinitionsAsync,
 } from "./db";
 import type { ChatToolModelContext } from "./chat-tools";
+import {
+  closeAllMcpConnections,
+  closeMcpConnection as closeMcpClient,
+  getMcpConnection,
+  onMcpConnectionEvent,
+  redactMcpError,
+  withMcpTimeout,
+} from "./mcp-client-manager";
+import { runWithMcpExecutionContext } from "./mcp-context";
+import { getMcpAuthStatus } from "./mcp-auth";
 
-const clientCache = new Map<string, { updatedAt: number; client: MCPClient }>();
+export { closeAllMcpConnections as closeAllMcpClients };
+export { closeMcpClient };
 
 export function mcpToolReference(serverId: string, toolName: string): string {
   return `mcp:${serverId}:${toolName}`;
@@ -66,7 +82,6 @@ export function createMcpToolDescriptors(): ChatToolDescriptor[] {
       ];
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     return [
       {
         id: "mcp:registry:error",
@@ -78,7 +93,7 @@ export function createMcpToolDescriptors(): ChatToolDescriptor[] {
         defaultAuto: false,
         requiresApproval: false,
         available: false,
-        unavailableReason: message,
+        unavailableReason: error instanceof Error ? error.message : String(error),
         sourceName: "MCP",
       } satisfies ChatToolDescriptor,
     ];
@@ -122,14 +137,13 @@ export async function testMcpServer(serverId: string): Promise<ToolDiscoveryResu
 export async function discoverMcpServer(serverId: string): Promise<ToolDiscoveryResult> {
   const server = getMcpServer(serverId);
   if (!server) throw new Error("MCP server not found: " + serverId);
-  let client: MCPClient | null = null;
   try {
-    await closeMcpClient(serverId);
-    client = await withServerTimeout(createClient(server), server, "MCP connection timed out.");
-    const toolsResult = await withServerTimeout(
-      client.listTools(),
+    const connection = await getMcpConnection(server, { forceNew: true });
+    const toolsResult = await withMcpTimeout(
+      connection.client.listTools(),
       server,
       "MCP tool discovery timed out.",
+      () => closeMcpClient(server.id),
     );
     const definitions = toolsResult.tools.map((definition) => ({
       name: definition.name,
@@ -139,17 +153,12 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
       outputSchema: getOptionalValue(definition, "outputSchema"),
     }));
     const tools = await upsertMcpToolDefinitionsAsync(server.id, definitions);
-    const [resources, resourceTemplates, prompts] = await Promise.all([
-      countSafely(() => client?.listResources()),
-      countSafely(() => client?.listResourceTemplates()),
-      countSafely(() => client?.experimental_listPrompts()),
-    ]);
-    const connectedAt = Date.now();
+    const capabilities = await loadMcpCapabilities(connection, server);
     const nextServer =
       (await updateMcpServerStatusAsync(server.id, {
         status: server.enabled ? "ready" : "disabled",
         last_error: null,
-        last_connected_at: connectedAt,
+        last_connected_at: connection.snapshot.connectedAt,
       })) ?? server;
     insertRuntimeEvent({
       kind: "tool",
@@ -157,18 +166,31 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
       status: "succeeded",
       owner_type: "server",
       owner_id: server.id,
-      detail: { serverId: server.id, tools: tools.length, resources, resourceTemplates, prompts },
+      detail: {
+        serverId: server.id,
+        tools: tools.length,
+        resources: capabilities.resources.length,
+        resourceTemplates: capabilities.resourceTemplates.length,
+        prompts: capabilities.prompts.length,
+        protocolEra: connection.snapshot.protocolEra,
+      },
     });
     return {
       server: nextServer,
       tools,
-      resources,
-      resourceTemplates,
-      prompts,
+      resources: capabilities.resources.length,
+      resourceTemplates: capabilities.resourceTemplates.length,
+      prompts: capabilities.prompts.length,
       message: `Discovered ${tools.length} tools.`,
+      protocolEra: connection.snapshot.protocolEra,
+      protocolVersion: connection.snapshot.protocolVersion,
+      serverIdentity: connection.snapshot.serverInfo,
+      instructions: connection.snapshot.instructions,
+      capabilities: connection.snapshot.capabilities,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    await closeMcpClient(server.id);
+    const message = redactMcpError(error, server);
     const nextServer =
       (await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message })) ??
       server;
@@ -188,22 +210,161 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
       prompts: 0,
       message,
     };
-  } finally {
-    await client?.close().catch(() => undefined);
   }
 }
 
-export async function closeMcpClient(serverId: string): Promise<void> {
-  const cached = clientCache.get(serverId);
-  if (!cached) return;
-  clientCache.delete(serverId);
-  await cached.client.close().catch(() => undefined);
+export async function getMcpCapabilities(serverId: string): Promise<McpCapabilitySnapshot> {
+  const server = getMcpServer(serverId);
+  if (!server) throw new Error("MCP server not found: " + serverId);
+  try {
+    const connection = await getMcpConnection(server);
+    const loaded = await loadMcpCapabilities(connection, server);
+    return {
+      serverId,
+      protocolEra: connection.snapshot.protocolEra,
+      protocolVersion: connection.snapshot.protocolVersion,
+      identity: connection.snapshot.serverInfo,
+      instructions: connection.snapshot.instructions,
+      capabilities: connection.snapshot.capabilities,
+      resources: loaded.resources,
+      resourceTemplates: loaded.resourceTemplates,
+      prompts: loaded.prompts,
+      auth: getMcpAuthStatus(serverId),
+      connectedAt: connection.snapshot.connectedAt,
+    };
+  } catch (error) {
+    throw new Error(redactMcpError(error, server), { cause: error });
+  }
 }
 
-export async function closeAllMcpClients(): Promise<void> {
-  const clients = [...clientCache.values()];
-  clientCache.clear();
-  await Promise.all(clients.map((entry) => entry.client.close().catch(() => undefined)));
+export async function readMcpResource(
+  serverId: string,
+  uri: string,
+): Promise<McpReadResourceResult> {
+  const server = requireMcpServer(serverId);
+  const connection = await getMcpConnection(server);
+  const result = await withMcpRequest(
+    connection.client.readResource({ uri }),
+    server,
+    "MCP resource read timed out.",
+    () => closeMcpClient(server.id),
+  );
+  return {
+    contents: result.contents.map((content) => ({
+      uri: content.uri,
+      mimeType: content.mimeType,
+      text: getOptionalString(content, "text"),
+      blob: getOptionalString(content, "blob"),
+    })),
+  };
+}
+
+export async function getMcpPrompt(
+  serverId: string,
+  name: string,
+  args?: Record<string, string>,
+): Promise<McpPromptResult> {
+  const server = requireMcpServer(serverId);
+  const connection = await getMcpConnection(server);
+  const result = await withMcpRequest(
+    connection.client.getPrompt({ name, arguments: args }),
+    server,
+    "MCP prompt retrieval timed out.",
+    () => closeMcpClient(server.id),
+  );
+  return {
+    description: result.description,
+    messages: result.messages.map((message) => ({
+      role: message.role,
+      content: toJsonObject(message.content),
+    })),
+  };
+}
+
+export async function completeMcp(
+  serverId: string,
+  ref: Record<string, unknown>,
+  argument: { name: string; value: string },
+): Promise<McpCompletionResult> {
+  const server = requireMcpServer(serverId);
+  const connection = await getMcpConnection(server);
+  const result = await withMcpRequest(
+    connection.client.complete({ ref, argument } as never),
+    server,
+    "MCP completion timed out.",
+    () => closeMcpClient(server.id),
+  );
+  return {
+    values: result.completion.values,
+    total: result.completion.total,
+    hasMore: result.completion.hasMore,
+  };
+}
+
+export async function listenMcpCapabilities(serverId: string): Promise<boolean> {
+  const server = requireMcpServer(serverId);
+  const connection = await getMcpConnection(server);
+  if (connection.snapshot.protocolEra !== "modern") return false;
+  await connection.subscription?.close().catch(() => undefined);
+  connection.subscription = await withMcpRequest(
+    connection.client.listen({
+      tools: true,
+      resources: true,
+      prompts: true,
+    } as never),
+    server,
+    "MCP capability subscription timed out.",
+    () => closeMcpClient(server.id),
+  );
+  return true;
+}
+
+export function onMcpCapabilitiesChanged(
+  listener: (serverId: string, capabilities: McpCapabilitySnapshot) => void,
+): () => void {
+  return onMcpConnectionEvent((event) => {
+    if (event.type !== "capabilities-changed") return;
+    const server = getMcpServer(event.serverId);
+    if (!server) return;
+    void getMcpConnection(server)
+      .then(async (connection) => {
+        if (event.snapshot.capabilities.tools) {
+          const result = await withMcpTimeout(
+            connection.client.listTools(),
+            server,
+            "MCP tool refresh timed out.",
+            () => closeMcpClient(server.id),
+          );
+          await upsertMcpToolDefinitionsAsync(
+            server.id,
+            result.tools.map((definition) => ({
+              name: definition.name,
+              title: getOptionalString(definition, "title"),
+              description: definition.description,
+              inputSchema: definition.inputSchema,
+              outputSchema: getOptionalValue(definition, "outputSchema"),
+            })),
+          );
+        }
+        return loadMcpCapabilities(connection, server);
+      })
+      .then((loaded) =>
+        listener(event.serverId, {
+          serverId: event.serverId,
+          protocolEra: event.snapshot.protocolEra,
+          protocolVersion: event.snapshot.protocolVersion,
+          identity: event.snapshot.serverInfo,
+          instructions: event.snapshot.instructions,
+          capabilities: event.snapshot.capabilities,
+          resources: loaded.resources,
+          resourceTemplates: loaded.resourceTemplates,
+          prompts: loaded.prompts,
+          auth: getMcpAuthStatus(event.serverId),
+          connectedAt: event.snapshot.connectedAt,
+        }),
+      )
+      .catch(() => undefined);
+  });
 }
 
 async function executeMcpTool({
@@ -218,7 +379,7 @@ async function executeMcpTool({
   model: ChatToolModelContext;
   conversationId?: string;
   agentId?: string | null;
-}): Promise<unknown> {
+}): Promise<CallToolResult> {
   const parsed = parseMcpToolReference(reference);
   if (!parsed) throw new Error("Invalid MCP tool reference: " + reference);
   const server = getMcpServer(parsed.serverId);
@@ -228,21 +389,30 @@ async function executeMcpTool({
   }
   const started = Date.now();
   try {
-    const output = await withServerTimeout(
-      getOrCreateClient(server).then((client) =>
-        client.callTool({
-          name: mcpTool.name,
-          arguments: normalizeToolInput(input),
-        }),
-      ),
-      server,
-      "MCP tool call timed out.",
-      () => closeMcpClient(server.id),
+    const output = await runWithMcpExecutionContext(
+      {
+        serverId: server.id,
+        conversationId: conversationId ?? null,
+        agentId: agentId ?? null,
+        sampling: createMcpSamplingHandler(model),
+      },
+      () =>
+        withMcpTimeout(
+          getMcpConnection(server).then((connection) =>
+            connection.client.callTool({
+              name: mcpTool.name,
+              arguments: normalizeToolInput(input),
+            }),
+          ),
+          server,
+          "MCP tool call timed out.",
+          () => closeMcpClient(server.id),
+        ),
     );
     insertRuntimeEvent({
       kind: "tool",
       title: "MCP tool: " + mcpTool.name,
-      status: "succeeded",
+      status: output.isError ? "failed" : "succeeded",
       conversation_id: conversationId ?? null,
       agent_id: agentId ?? null,
       tool_id: mcpTool.id,
@@ -255,11 +425,16 @@ async function executeMcpTool({
         toolName: mcpTool.name,
         providerId: model.providerId,
         modelId: model.modelId,
+        isError: output.isError === true,
+        hasStructuredContent: output.structuredContent !== undefined,
       },
     });
+    // MCP tool-level failures are data, not transport failures. Passing the
+    // result through preserves structuredContent and lets the model decide how
+    // to explain the server's error.
     return output;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactMcpError(error, server);
     await closeMcpClient(server.id);
     await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message });
     insertRuntimeEvent({
@@ -274,73 +449,8 @@ async function executeMcpTool({
       duration_ms: Date.now() - started,
       detail: { serverId: server.id, toolName: mcpTool.name, error: message },
     });
-    throw error;
+    throw new Error(message, { cause: error });
   }
-}
-
-async function getOrCreateClient(server: ToolServer): Promise<MCPClient> {
-  const cached = clientCache.get(server.id);
-  if (cached && cached.updatedAt === server.updated_at) return cached.client;
-  await closeMcpClient(server.id);
-  const client = await createClient(server);
-  clientCache.set(server.id, { updatedAt: server.updated_at, client });
-  return client;
-}
-
-async function createClient(server: ToolServer): Promise<MCPClient> {
-  const transport =
-    server.transport === "stdio"
-      ? new Experimental_StdioMCPTransport({
-          command: requireCommand(server),
-          args: safeJsonArray(server.args_json).map(String),
-          env: {
-            ...stringEnv(process.env),
-            ...resolveToolSecretReferences("server", server.id, safeJsonRecord(server.env_json)),
-          },
-          cwd: server.cwd ?? undefined,
-        })
-      : server.transport === "http" || server.transport === "sse"
-        ? {
-            type: server.transport,
-            url: requireUrl(server),
-            headers: resolveToolSecretReferences(
-              "server",
-              server.id,
-              safeJsonRecord(server.headers_json),
-            ),
-            redirect: "error" as const,
-          }
-        : (() => {
-            throw new Error("Built-in tool servers do not use MCP transport");
-          })();
-  return createMCPClient({
-    clientName: "ayaka",
-    version: "1.0.0",
-    transport,
-    maxRetries: 0,
-    onUncaughtError: (error) => {
-      console.warn("[mcp] uncaught error:", error);
-    },
-  });
-}
-
-function withServerTimeout<T>(
-  promise: Promise<T>,
-  server: ToolServer,
-  message: string,
-  onTimeout?: () => void | Promise<void>,
-): Promise<T> {
-  const timeoutMs = Math.max(1, server.timeout_seconds || 60) * 1_000;
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      void Promise.resolve(onTimeout?.()).catch(() => undefined);
-      reject(new Error(message));
-    }, timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
 }
 
 function createMcpTool({
@@ -365,37 +475,185 @@ function createMcpTool({
   });
 }
 
-function requireCommand(server: ToolServer): string {
-  const command = server.command?.trim();
-  if (!command) throw new Error("MCP stdio server is missing a command.");
-  return command;
+function createMcpSamplingHandler(
+  model: ChatToolModelContext,
+): ((request: unknown) => Promise<unknown>) | undefined {
+  const languageModel = model.languageModel;
+  if (!languageModel) return undefined;
+  return async (request: unknown): Promise<unknown> => {
+    const params = asRecord(asRecord(request).params);
+    const rawMessages = Array.isArray(params.messages) ? params.messages : [];
+    const messages = rawMessages.map((item) => {
+      const message = asRecord(item);
+      return {
+        role: message.role === "assistant" ? "assistant" : "user",
+        content: samplingContent(message.content),
+      };
+    });
+    if (messages.length === 0) throw new Error("MCP sampling request did not include messages.");
+    const maxOutputTokens =
+      typeof params.maxTokens === "number" && Number.isFinite(params.maxTokens)
+        ? Math.max(1, Math.min(16_384, Math.floor(params.maxTokens)))
+        : undefined;
+    const temperature =
+      typeof params.temperature === "number" && Number.isFinite(params.temperature)
+        ? Math.max(0, Math.min(2, params.temperature))
+        : undefined;
+    const result = await generateText({
+      model: languageModel,
+      system: typeof params.systemPrompt === "string" ? params.systemPrompt : undefined,
+      messages: messages as never,
+      maxOutputTokens,
+      temperature,
+      providerOptions: model.providerOptions,
+    });
+    return {
+      model: model.modelId,
+      role: "assistant",
+      content: { type: "text", text: result.text },
+      stopReason: mapSamplingStopReason(result.finishReason),
+    };
+  };
 }
 
-function requireUrl(server: ToolServer): string {
-  const url = server.url?.trim();
-  if (!url) throw new Error("MCP remote server is missing a URL.");
-  return url;
+function samplingContent(value: unknown): string {
+  if (typeof value === "string") return value;
+  const content = asRecord(value);
+  if (content.type === "text" && typeof content.text === "string") return content.text;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => samplingContent(item))
+      .filter(Boolean)
+      .join("\n");
+  }
+  return JSON.stringify(value ?? "");
+}
+
+function mapSamplingStopReason(
+  reason: string,
+): "endTurn" | "stopSequence" | "maxTokens" | "toolUse" {
+  if (reason === "length") return "maxTokens";
+  if (reason === "content-filter") return "stopSequence";
+  if (reason === "tool-calls") return "toolUse";
+  return "endTurn";
+}
+
+async function loadMcpCapabilities(
+  connection: {
+    client: {
+      listResources: () => Promise<unknown>;
+      listResourceTemplates: () => Promise<unknown>;
+      listPrompts: () => Promise<unknown>;
+    };
+  },
+  server: ToolServer,
+): Promise<{
+  resources: McpResource[];
+  resourceTemplates: McpResourceTemplate[];
+  prompts: McpPrompt[];
+}> {
+  const [resourcesResult, templatesResult, promptsResult] = await Promise.all([
+    withMcpTimeout(
+      connection.client.listResources(),
+      server,
+      "MCP resource discovery timed out.",
+      () => closeMcpClient(server.id),
+    ).catch(() => ({ resources: [] })),
+    withMcpTimeout(
+      connection.client.listResourceTemplates(),
+      server,
+      "MCP resource template discovery timed out.",
+      () => closeMcpClient(server.id),
+    ).catch(() => ({ resourceTemplates: [] })),
+    withMcpTimeout(connection.client.listPrompts(), server, "MCP prompt discovery timed out.", () =>
+      closeMcpClient(server.id),
+    ).catch(() => ({ prompts: [] })),
+  ]);
+  const resources = Array.isArray((resourcesResult as { resources?: unknown[] }).resources)
+    ? (resourcesResult as { resources: unknown[] }).resources.map(toMcpResource)
+    : [];
+  const resourceTemplates = Array.isArray(
+    (templatesResult as { resourceTemplates?: unknown[] }).resourceTemplates,
+  )
+    ? (templatesResult as { resourceTemplates: unknown[] }).resourceTemplates.map(
+        toMcpResourceTemplate,
+      )
+    : [];
+  const prompts = Array.isArray((promptsResult as { prompts?: unknown[] }).prompts)
+    ? (promptsResult as { prompts: unknown[] }).prompts.map(toMcpPrompt)
+    : [];
+  return { resources, resourceTemplates, prompts };
+}
+
+function requireMcpServer(serverId: string): ToolServer {
+  const server = getMcpServer(serverId);
+  if (!server) throw new Error("MCP server not found: " + serverId);
+  if (server.enabled === 0) throw new Error("MCP server is disabled.");
+  return server;
+}
+
+function toMcpResource(value: unknown): McpResource {
+  const record = asRecord(value);
+  return {
+    uri: String(record.uri ?? ""),
+    name: String(record.name ?? record.uri ?? "Resource"),
+    title: getOptionalString(record, "title"),
+    description: getOptionalString(record, "description"),
+    mimeType: getOptionalString(record, "mimeType"),
+    size: typeof record.size === "number" ? record.size : undefined,
+  };
+}
+
+function toMcpResourceTemplate(value: unknown): McpResourceTemplate {
+  const record = asRecord(value);
+  return {
+    uriTemplate: String(record.uriTemplate ?? ""),
+    name: String(record.name ?? record.uriTemplate ?? "Resource template"),
+    title: getOptionalString(record, "title"),
+    description: getOptionalString(record, "description"),
+    mimeType: getOptionalString(record, "mimeType"),
+  };
+}
+
+function toMcpPrompt(value: unknown): McpPrompt {
+  const record = asRecord(value);
+  const args = Array.isArray(record.arguments)
+    ? record.arguments.map((argument) => {
+        const item = asRecord(argument);
+        return {
+          name: String(item.name ?? ""),
+          title: getOptionalString(item, "title"),
+          description: getOptionalString(item, "description"),
+          required: item.required === true,
+        };
+      })
+    : undefined;
+  return {
+    name: String(record.name ?? ""),
+    title: getOptionalString(record, "title"),
+    description: getOptionalString(record, "description"),
+    arguments: args,
+  };
+}
+
+function toJsonObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : { value };
 }
 
 function safeJsonSchema(raw: string): Record<string, unknown> {
   const parsed = safeJson(raw, {});
-  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-    return parsed as Record<string, unknown>;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : { type: "object", additionalProperties: true };
+}
+
+function normalizeToolInput(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("MCP tool input must be a JSON object.");
   }
-  return { type: "object", additionalProperties: true };
-}
-
-function safeJsonRecord(raw: string): Record<string, string> {
-  const parsed = safeJson(raw, {});
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-  return Object.fromEntries(
-    Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [key, String(value)]),
-  );
-}
-
-function safeJsonArray(raw: string): unknown[] {
-  const parsed = safeJson(raw, []);
-  return Array.isArray(parsed) ? parsed : [];
+  return input as Record<string, unknown>;
 }
 
 function safeJson(raw: string, fallback: unknown): unknown {
@@ -406,32 +664,10 @@ function safeJson(raw: string, fallback: unknown): unknown {
   }
 }
 
-function normalizeToolInput(input: unknown): Record<string, unknown> {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new Error("MCP tool input must be a JSON object.");
-  }
-  return input as Record<string, unknown>;
-}
-
-function stringEnv(env: NodeJS.ProcessEnv): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
-  );
-}
-
-async function countSafely(run: () => Promise<unknown> | undefined): Promise<number> {
-  try {
-    const value = await run();
-    if (!value || typeof value !== "object") return 0;
-    const record = value as Record<string, unknown>;
-    for (const key of ["tools", "resources", "resourceTemplates", "prompts"]) {
-      const list = record[key];
-      if (Array.isArray(list)) return list.length;
-    }
-    return 0;
-  } catch {
-    return 0;
-  }
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function getOptionalString(record: unknown, key: string): string | undefined {
@@ -440,8 +676,7 @@ function getOptionalString(record: unknown, key: string): string | undefined {
 }
 
 function getOptionalValue(record: unknown, key: string): unknown {
-  if (!record || typeof record !== "object") return undefined;
-  return (record as Record<string, unknown>)[key];
+  return asRecord(record)[key];
 }
 
 function toolNamePart(value: string): string {
@@ -451,4 +686,17 @@ function toolNamePart(value: string): string {
     .replace(/^_+|_+$/g, "")
     .slice(0, 48);
   return part || "tool";
+}
+
+async function withMcpRequest<T>(
+  promise: Promise<T>,
+  server: ToolServer,
+  message: string,
+  onTimeout?: () => void | Promise<void>,
+): Promise<T> {
+  try {
+    return await withMcpTimeout(promise, server, message, onTimeout);
+  } catch (error) {
+    throw new Error(redactMcpError(error, server), { cause: error });
+  }
 }

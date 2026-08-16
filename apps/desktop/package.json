@@ -35,7 +35,6 @@
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
     "@ai-sdk/google": "catalog:",
-    "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@ai-sdk/openai-compatible": "catalog:",
     "@ai-sdk/react": "catalog:",
@@ -43,6 +42,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@hono/node-server": "^1.13.7",
+    "@modelcontextprotocol/client": "catalog:",
     "@openai/agents": "catalog:",
     "@openai/agents-extensions": "catalog:",
     "@radix-ui/react-use-controllable-state": "catalog:",

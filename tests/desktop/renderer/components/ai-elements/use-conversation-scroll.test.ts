@@ -6,6 +6,7 @@ import {
   AnimatedDisclosure,
   AnimatedDisclosureTrigger,
 } from "@renderer/components/ai-elements/animated-disclosure";
+import { Conversation, ConversationContent } from "@renderer/components/ai-elements/conversation";
 import {
   CONVERSATION_AUTO_STICK_THRESHOLD,
   CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS,
@@ -77,6 +78,26 @@ void describe("conversation scroll state", () => {
 
     assert.match(html, /data-slot="animated-disclosure-trigger"/);
     assert.match(html, /aria-expanded="false"/);
+  });
+
+  void it("keeps the conversation viewport separate from its positioning shell", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        Conversation,
+        null,
+        createElement(ConversationContent, null, "Messages"),
+        createElement("button", { type: "button", "data-test-id": "scroll-button" }, "Jump"),
+      ),
+    );
+    const shellIndex = html.indexOf('data-slot="conversation"');
+    const viewportIndex = html.indexOf('data-slot="conversation-viewport"');
+    const buttonIndex = html.indexOf('data-test-id="scroll-button"');
+
+    assert.ok(shellIndex >= 0);
+    assert.ok(viewportIndex > shellIndex);
+    assert.ok(buttonIndex > viewportIndex);
+    assert.match(html, /data-slot="conversation"[^>]*class="[^"]*relative[^"]*"/);
+    assert.match(html, /data-slot="conversation-viewport"[^>]*class="[^"]*overflow-y-auto[^"]*"/);
   });
 
   void it("ignores intermediate programmatic scroll events", () => {

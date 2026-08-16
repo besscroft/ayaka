@@ -764,9 +764,125 @@ export interface SandboxArtifact {
 
 export type ToolStatus = "ready" | "disabled" | "error" | "unknown";
 export type McpTransportKind = "stdio" | "http" | "sse" | "builtin";
+export type McpProtocolEra = "modern" | "legacy";
 export type ToolServerKind = "mcp" | "local" | "sandbox";
 export type ToolRecordKind = "builtin" | "mcp" | "skill" | "sandbox";
 export type ToolSecretOwnerType = "server" | "tool";
+
+export interface McpCapabilitySummary {
+  tools: boolean;
+  resources: boolean;
+  resourceTemplates: boolean;
+  prompts: boolean;
+  resourceSubscriptions: boolean;
+  listChanged: { tools: boolean; resources: boolean; prompts: boolean };
+  sampling: boolean;
+  elicitation: boolean;
+}
+
+export interface McpServerIdentity {
+  name: string;
+  version: string;
+  websiteUrl?: string;
+}
+
+export interface McpResource {
+  uri: string;
+  name: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  size?: number;
+}
+
+export interface McpResourceTemplate {
+  uriTemplate: string;
+  name: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface McpPromptArgument {
+  name: string;
+  title?: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface McpPrompt {
+  name: string;
+  title?: string;
+  description?: string;
+  arguments?: McpPromptArgument[];
+}
+
+export interface McpCapabilitySnapshot {
+  serverId: string;
+  protocolEra: McpProtocolEra;
+  protocolVersion: string | null;
+  identity: McpServerIdentity | null;
+  instructions: string | null;
+  capabilities: McpCapabilitySummary;
+  resources: McpResource[];
+  resourceTemplates: McpResourceTemplate[];
+  prompts: McpPrompt[];
+  auth: McpAuthStatus;
+  connectedAt: number | null;
+}
+
+export interface McpResourceContent {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+}
+
+export interface McpReadResourceResult {
+  contents: McpResourceContent[];
+}
+
+export interface McpPromptMessage {
+  role: "user" | "assistant";
+  content: JsonObject;
+}
+
+export interface McpPromptResult {
+  description?: string;
+  messages: McpPromptMessage[];
+}
+
+export interface McpCompletionResult {
+  values: string[];
+  total?: number;
+  hasMore?: boolean;
+}
+
+export interface McpAuthStatus {
+  status: "unknown" | "not_required" | "authorized" | "pending" | "error";
+  expiresAt: number | null;
+  error?: string;
+}
+
+export interface McpAuthorizationResult {
+  status: McpAuthStatus["status"];
+  authorizationUrl?: string;
+  message?: string;
+}
+
+export type McpInputRequestKind = "form" | "url" | "sampling";
+
+export interface McpInputRequest {
+  id: string;
+  serverId: string;
+  conversationId: string | null;
+  agentId: string | null;
+  kind: McpInputRequestKind;
+  message: string;
+  url: string | null;
+  requestedSchema: JsonObject | null;
+  createdAt: number;
+}
 
 export interface ToolServer {
   id: string;
@@ -841,6 +957,11 @@ export interface ToolDiscoveryResult {
   resourceTemplates: number;
   prompts: number;
   message: string;
+  protocolEra?: McpProtocolEra;
+  protocolVersion?: string | null;
+  serverIdentity?: McpServerIdentity | null;
+  instructions?: string | null;
+  capabilities?: McpCapabilitySummary;
 }
 
 export interface ToolSkill {

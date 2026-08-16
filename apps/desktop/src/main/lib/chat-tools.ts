@@ -1,5 +1,5 @@
 import { isStepCount, jsonSchema, tool } from "ai";
-import type { streamText, ToolApprovalConfiguration, ToolChoice, ToolSet } from "ai";
+import type { LanguageModel, streamText, ToolApprovalConfiguration, ToolChoice, ToolSet } from "ai";
 import {
   CHAT_TOOL_IDS,
   DEFAULT_AGENT_ID,
@@ -54,6 +54,8 @@ export interface ChatToolModelContext {
   modelId: string;
   capabilities: ModelCapabilities;
   nativeTools: NativeChatTool[];
+  languageModel?: LanguageModel;
+  providerOptions?: NonNullable<Parameters<typeof streamText>[0]["providerOptions"]>;
 }
 
 export interface BuildChatToolRuntimeOptions {

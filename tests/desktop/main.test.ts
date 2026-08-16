@@ -5,6 +5,7 @@ import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";
 import "./main/lib/drizzle-metadata.test.ts";
 import "./main/lib/mcp-so-adapter.test.ts";
+import "./main/lib/mcp-client-manager.test.ts";
 import "./main/lib/media-generation.test.ts";
 import "./main/lib/memory-orchestrator.test.ts";
 import "./main/lib/openai-compatible-model.test.ts";

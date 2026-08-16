@@ -18,12 +18,17 @@ export function Conversation({
   return (
     <ConversationScrollProvider value={scrollController}>
       <div
-        ref={scrollController.containerRef}
         data-slot="conversation"
-        className={cn("relative flex-1 overflow-y-auto", className)}
+        className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}
         {...rest}
       >
-        {children}
+        <div
+          ref={scrollController.containerRef}
+          data-slot="conversation-viewport"
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          {children}
+        </div>
       </div>
     </ConversationScrollProvider>
   );
