@@ -14,7 +14,6 @@ const textCapabilities: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
-  videoOutput: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -26,7 +25,6 @@ const mediaCapabilities: ModelCapabilities = {
   imageOutput: true,
   speechOutput: true,
   transcription: true,
-  videoOutput: true,
   toolCalling: false,
 };
 
@@ -37,6 +35,7 @@ void describe("chat media settings", () => {
         defaults: {
           image: { modelRef: " mock/media ", options: { count: 2.8, size: "1024x1024" } },
           speech: { options: { voice: " alloy " } },
+          video: { modelRef: "legacy/video", options: { duration: 5 } },
         },
       }),
     );
@@ -44,6 +43,7 @@ void describe("chat media settings", () => {
     assert.equal(settings.defaults.image.modelRef, "mock/media");
     assert.deepEqual(settings.defaults.image.options, { count: 2, size: "1024x1024" });
     assert.deepEqual(settings.defaults.speech.options, { voice: "alloy" });
+    assert.equal("video" in settings.defaults, false);
     assert.deepEqual(settings.vision, { mode: "inherit", modelRef: null });
     assert.deepEqual(
       parseMediaGenerationSettings(serializeMediaGenerationSettings(settings)),
@@ -55,7 +55,7 @@ void describe("chat media settings", () => {
     const settings = parseMediaGenerationSettings("{bad json");
     assert.equal(settings.version, 1);
     assert.equal(settings.defaults.image.modelRef, null);
-    assert.deepEqual(settings.defaults.video.options, {});
+    assert.equal("video" in settings.defaults, false);
   });
 
   void it("filters enabled models by media capability", () => {
@@ -64,7 +64,6 @@ void describe("chat media settings", () => {
       getMediaCapableProviders(providers, "image")[0]?.models.map((model) => model.id),
       ["media"],
     );
-    assert.deepEqual(getMediaCapableProviders(providers, "video"), []);
   });
 
   void it("normalizes and filters vision model settings", () => {
@@ -111,7 +110,7 @@ function provider(): ProviderInfo {
         topP: 1,
         maxOutputTokens: 4096,
         contextWindow: 32_000,
-        capabilities: { ...mediaCapabilities, videoOutput: false },
+        capabilities: mediaCapabilities,
         providerOptions: {},
       },
     ],

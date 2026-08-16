@@ -20,7 +20,6 @@ const baseCapabilities: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
-  videoOutput: false,
   toolCalling: false,
   reasoning: false,
   embedding: false,
@@ -96,20 +95,6 @@ void describe("media generation tool requests", () => {
       prompt: "draw a city",
       options: { size: "1024x1024", count: 3 },
     });
-  });
-
-  void it("falls back to the first enabled capable model with an API key", async () => {
-    const request = await buildMediaGenerationToolRequest(
-      { kind: "video", content: "quiet ocean" },
-      [],
-      dependencies(JSON.stringify({ defaults: { video: { modelRef: "disabled/video" } } }), [
-        managedModel("disabled/video", "video", { enabled: false }),
-        managedModel("missing-key/video", "video", { hasApiKey: false }),
-        managedModel("ready/video", "video"),
-      ]),
-    );
-
-    assert.equal(request.model, "ready/video");
   });
 
   void it("uses the latest audio attachment and supports filename disambiguation", async () => {
@@ -198,7 +183,6 @@ function managedModel(
       imageOutput: kind === "image",
       speechOutput: kind === "speech",
       transcription: kind === "transcription",
-      videoOutput: kind === "video",
       vision: patch.vision ?? baseCapabilities.vision,
       textGeneration: patch.textGeneration ?? baseCapabilities.textGeneration,
     },

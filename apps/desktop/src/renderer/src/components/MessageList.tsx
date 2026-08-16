@@ -834,10 +834,7 @@ export function readMediaToolResult(part: RenderableToolPart): MediaGenerationRe
   if (!output || typeof output !== "object" || Array.isArray(output)) return null;
   const value = output as Partial<MediaGenerationResponse>;
   if (
-    (value.kind !== "image" &&
-      value.kind !== "speech" &&
-      value.kind !== "transcription" &&
-      value.kind !== "video") ||
+    (value.kind !== "image" && value.kind !== "speech" && value.kind !== "transcription") ||
     typeof value.text !== "string" ||
     !Array.isArray(value.files)
   ) {

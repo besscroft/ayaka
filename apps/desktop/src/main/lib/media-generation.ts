@@ -1,10 +1,4 @@
-import {
-  experimental_generateVideo as generateVideo,
-  generateImage,
-  generateSpeech,
-  transcribe,
-  type UIMessage,
-} from "ai";
+import { generateImage, generateSpeech, transcribe, type UIMessage } from "ai";
 import {
   DEFAULT_MEDIA_GENERATION_SETTINGS,
   SettingKey,
@@ -148,40 +142,6 @@ export async function executeMediaGeneration(
         },
       };
     }
-    case "video": {
-      const resolved = resolve(request.model, "video");
-      const result = await generateVideo({
-        model: resolved.model,
-        prompt: request.prompt,
-        n: normalizeCount(request.options?.count, 1, 4),
-        aspectRatio: normalizeAspectRatio(request.options?.aspectRatio),
-        resolution: normalizeSize(request.options?.resolution),
-        duration: normalizeNumberOption(request.options?.duration, 1, 60),
-        fps: normalizeNumberOption(request.options?.fps, 1, 120),
-        seed: normalizeInteger(request.options?.seed),
-        generateAudio:
-          typeof request.options?.generateAudio === "boolean"
-            ? request.options.generateAudio
-            : undefined,
-        providerOptions: resolved.providerOptions,
-      });
-      const files = await Promise.all(
-        result.videos.map((video, index) =>
-          writeGeneratedAsset(write, dependencies.conversationId, {
-            data: video.uint8Array,
-            mediaType: video.mediaType,
-            kind: "video",
-            filename: `video-${index + 1}`,
-          }),
-        ),
-      );
-      return {
-        kind: "video",
-        text: files.length === 1 ? "Video generated." : `${files.length} videos generated.`,
-        files,
-        metadata: buildMediaMetadata(result.warnings, result.providerMetadata),
-      };
-    }
   }
 }
 
@@ -232,9 +192,6 @@ export async function buildMediaGenerationToolRequest(
     case "speech":
       if (!content) throw new Error("Speech text is required.");
       return { kind: "speech", model, text: content, options };
-    case "video":
-      if (!content) throw new Error("Video prompt is required.");
-      return { kind: "video", model, prompt: content, options };
     case "transcription": {
       const audio = findAudioAttachment(messages, input.sourceFilename);
       if (!audio) throw new Error("An audio attachment is required for transcription.");
@@ -253,20 +210,14 @@ export function validateMediaGenerationRequest(
 ): string | null {
   if (!body || typeof body !== "object") return "request body is required";
   if (!body.kind) return "kind is required";
-  if (
-    body.kind !== "image" &&
-    body.kind !== "speech" &&
-    body.kind !== "transcription" &&
-    body.kind !== "video"
-  ) {
-    return "kind must be one of: image, speech, transcription, video";
+  if (body.kind !== "image" && body.kind !== "speech" && body.kind !== "transcription") {
+    return "kind must be one of: image, speech, transcription";
   }
   if (!body.model || typeof body.model !== "string") {
     return "model is required in provider/model format";
   }
   switch (body.kind) {
     case "image":
-    case "video":
       return typeof body.prompt === "string" && body.prompt.trim() ? null : "prompt is required";
     case "speech":
       return typeof body.text === "string" && body.text.trim() ? null : "text is required";
@@ -323,7 +274,7 @@ function parseMediaGenerationSettings(raw: string | null): MediaGenerationSettin
       source.defaults && typeof source.defaults === "object"
         ? (source.defaults as Record<string, unknown>)
         : {};
-    for (const kind of ["image", "speech", "transcription", "video"] as const) {
+    for (const kind of ["image", "speech", "transcription"] as const) {
       const rawKind =
         rawDefaults[kind] && typeof rawDefaults[kind] === "object"
           ? (rawDefaults[kind] as Record<string, unknown>)
@@ -392,8 +343,6 @@ function modelSupportsMediaKind(model: ManagedModelInfo, kind: MediaGenerationKi
       return model.capabilities.speechOutput;
     case "transcription":
       return model.capabilities.transcription;
-    case "video":
-      return model.capabilities.videoOutput;
   }
 }
 
@@ -407,7 +356,6 @@ function normalizeMediaOptions(value: unknown): MediaGenerationOptions {
     "outputFormat",
     "language",
     "instructions",
-    "resolution",
   ] as const) {
     const normalized = normalizeOptionalText(source[key]);
     if (normalized) options[key] = normalized;
@@ -416,8 +364,6 @@ function normalizeMediaOptions(value: unknown): MediaGenerationOptions {
     ["count", true],
     ["seed", true],
     ["speed", false],
-    ["duration", false],
-    ["fps", false],
   ] as const) {
     const value = source[key];
     if (value === undefined || value === null || value === "") continue;
@@ -425,7 +371,6 @@ function normalizeMediaOptions(value: unknown): MediaGenerationOptions {
     if (Number.isFinite(numberValue))
       options[key] = integer ? Math.floor(numberValue) : numberValue;
   }
-  if (typeof source.generateAudio === "boolean") options.generateAudio = source.generateAudio;
   return options;
 }
 
@@ -438,7 +383,6 @@ function compactMediaOptions(
     image: ["size", "aspectRatio", "count", "seed"],
     speech: ["voice", "outputFormat", "speed", "language", "instructions"],
     transcription: ["language"],
-    video: ["aspectRatio", "resolution", "duration", "fps", "generateAudio", "count", "seed"],
   }[kind] as readonly (keyof MediaGenerationOptions)[];
   return Object.fromEntries(
     keys

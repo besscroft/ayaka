@@ -12,7 +12,6 @@ import {
   MockLanguageModelV4,
   MockSpeechModelV4,
   MockTranscriptionModelV4,
-  MockVideoModelV4,
 } from "ai/test";
 import { createApp } from "@desktop-main/server/index";
 import {
@@ -798,7 +797,6 @@ const mediaCapabilities: ModelCapabilities = {
   imageOutput: true,
   speechOutput: true,
   transcription: true,
-  videoOutput: true,
   toolCalling: false,
   reasoning: false,
   embedding: false,
@@ -835,6 +833,21 @@ void describe("local chat server /api/media/generate", () => {
     const body = (await response.json()) as MediaGenerationErrorResponse;
     assert.equal(body.code, "invalid_request");
     assert.match(body.error, /prompt is required/);
+  });
+
+  void it("rejects video generation requests", async () => {
+    const app = createApp({ sessionToken: token });
+
+    const response = await postMedia(app, {
+      kind: "video",
+      model: "mock/video",
+      prompt: "make video",
+    });
+
+    assert.equal(response.status, 400);
+    const body = (await response.json()) as MediaGenerationErrorResponse;
+    assert.equal(body.code, "invalid_request");
+    assert.match(body.error, /image, speech, transcription/);
   });
 
   void it("returns structured permission errors for disabled image generation groups", async () => {
@@ -875,7 +888,7 @@ void describe("local chat server /api/media/generate", () => {
     assert.match(body.error, /not enabled for this group/);
   });
 
-  void it("generates image, speech, transcription, and video responses", async () => {
+  void it("generates image, speech, and transcription responses", async () => {
     const imageModel = new MockImageModelV4({
       doGenerate: async () => ({
         images: [new Uint8Array([1, 2, 3])],
@@ -903,28 +916,12 @@ void describe("local chat server /api/media/generate", () => {
         providerMetadata: {},
       }),
     });
-    const videoModel = new MockVideoModelV4({
-      doGenerate: async () => ({
-        videos: [
-          { type: "binary" as const, data: new Uint8Array([1, 2, 3]), mediaType: "video/mp4" },
-        ],
-        warnings: [],
-        response: mockResponse("video"),
-        providerMetadata: {},
-      }),
-    });
     const app = createApp({
       sessionToken: token,
       resolveMediaModel: ((modelRef: string, kind: MediaGenerationKind) => {
         assert.match(modelRef, /^mock\//);
         const model =
-          kind === "image"
-            ? imageModel
-            : kind === "speech"
-              ? speechModel
-              : kind === "transcription"
-                ? transcriptionModel
-                : videoModel;
+          kind === "image" ? imageModel : kind === "speech" ? speechModel : transcriptionModel;
         return {
           kind,
           model,
@@ -965,15 +962,6 @@ void describe("local chat server /api/media/generate", () => {
     };
     assert.equal(transcriptionBody.text, "hello transcript");
     assert.equal(transcriptionBody.metadata.language, "en");
-
-    const video = await postMedia(app, {
-      kind: "video",
-      model: "mock/video",
-      prompt: "make video",
-    });
-    assert.equal(video.status, 200);
-    const videoBody = (await video.json()) as { files: Array<{ mediaType: string }> };
-    assert.equal(videoBody.files[0]?.mediaType, "video/mp4");
   });
 });
 

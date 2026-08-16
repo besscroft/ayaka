@@ -87,9 +87,6 @@ function toolForMediaType(mediaType: string, kind: MediaGenerationKind): string 
     "audio/wave": "wav",
     "audio/x-wav": "wav",
     "audio/ogg": "ogg",
-    "video/mp4": "mp4",
-    "video/webm": "webm",
-    "video/quicktime": "mov",
   };
   if (known[normalized]) return known[normalized];
   switch (kind) {
@@ -99,8 +96,6 @@ function toolForMediaType(mediaType: string, kind: MediaGenerationKind): string 
       return "mp3";
     case "transcription":
       return "bin";
-    case "video":
-      return "mp4";
   }
 }
 
@@ -121,7 +116,5 @@ function defaultFilename(kind: MediaGenerationKind, tool: string): string {
       return `speech.${tool}`;
     case "transcription":
       return `audio.${tool}`;
-    case "video":
-      return `video.${tool}`;
   }
 }

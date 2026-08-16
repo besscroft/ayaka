@@ -15,7 +15,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Slider,
   Switch,
   TextArea,
   ToggleButton,
@@ -884,13 +883,28 @@ function MemoryEditModal({
                 <Label>
                   {t("main.memory.field.salience")}: {salience}
                 </Label>
-                <Slider
-                  value={[salience]}
-                  onValueChange={(values) => setSalience(values[0] ?? 70)}
-                  min={1}
-                  max={100}
-                  step={1}
-                />
+                <div className="relative h-3 w-full">
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-md bg-muted" />
+                  <div
+                    className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-md bg-primary"
+                    style={{ width: `${salience}%` }}
+                  />
+                  <input
+                    type="range"
+                    value={salience}
+                    onChange={(event) => setSalience(event.currentTarget.valueAsNumber)}
+                    min={1}
+                    max={100}
+                    step={1}
+                    aria-label={t("main.memory.field.salience")}
+                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/30 bg-background shadow-xs"
+                    style={{ left: `${salience}%` }}
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Switch isSelected={pinned} onChange={setPinned}>

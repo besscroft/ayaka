@@ -12,7 +12,6 @@ export const MEDIA_GENERATION_KINDS: readonly MediaGenerationKind[] = [
   "image",
   "speech",
   "transcription",
-  "video",
 ];
 
 export function parseMediaGenerationSettings(
@@ -96,7 +95,6 @@ function cloneDefaultMediaSettings(): MediaGenerationSettings {
         modelRef: DEFAULT_MEDIA_GENERATION_SETTINGS.defaults.transcription.modelRef,
         options: {},
       },
-      video: { modelRef: DEFAULT_MEDIA_GENERATION_SETTINGS.defaults.video.modelRef, options: {} },
     },
     vision: { ...DEFAULT_MEDIA_GENERATION_SETTINGS.vision },
   };
@@ -113,8 +111,6 @@ function modelSupportsMediaKind(
       return model.capabilities.speechOutput;
     case "transcription":
       return model.capabilities.transcription;
-    case "video":
-      return model.capabilities.videoOutput;
   }
 }
 
@@ -130,10 +126,6 @@ function normalizeMediaOptions(value: unknown): MediaGenerationOptions {
   setNumberOption(options, "speed", source.speed, false);
   setStringOption(options, "language", source.language);
   setStringOption(options, "instructions", source.instructions);
-  setStringOption(options, "resolution", source.resolution);
-  setNumberOption(options, "duration", source.duration, false);
-  setNumberOption(options, "fps", source.fps, false);
-  if (typeof source.generateAudio === "boolean") options.generateAudio = source.generateAudio;
   return options;
 }
 

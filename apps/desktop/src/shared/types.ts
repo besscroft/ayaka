@@ -1613,7 +1613,6 @@ export const MODEL_CAPABILITY_KEYS = [
   "imageOutput",
   "speechOutput",
   "transcription",
-  "videoOutput",
   "toolCalling",
   "reasoning",
   "embedding",
@@ -1629,7 +1628,6 @@ export interface ModelCapabilities {
   imageOutput: boolean;
   speechOutput: boolean;
   transcription: boolean;
-  videoOutput: boolean;
   toolCalling: boolean;
   reasoning: boolean;
   embedding: boolean;
@@ -1774,7 +1772,7 @@ export interface ProviderModelSyncResult {
   updatedCapabilities: number;
 }
 
-export type MediaGenerationKind = "image" | "speech" | "transcription" | "video";
+export type MediaGenerationKind = "image" | "speech" | "transcription";
 
 export const MEDIA_GENERATION_TOOL_NAME = "generate_media" as const;
 
@@ -1796,10 +1794,6 @@ export interface MediaGenerationOptions {
   speed?: number;
   language?: string;
   instructions?: string;
-  resolution?: string;
-  duration?: number;
-  fps?: number;
-  generateAudio?: boolean;
 }
 
 export interface MediaGenerationToolInput {
@@ -1836,16 +1830,6 @@ export type MediaGenerationRequest =
         filename?: string;
       };
       options?: Pick<MediaGenerationOptions, "language">;
-      conversationId?: string;
-    }
-  | {
-      kind: "video";
-      model: string;
-      prompt: string;
-      options?: Pick<
-        MediaGenerationOptions,
-        "aspectRatio" | "resolution" | "duration" | "fps" | "generateAudio" | "count" | "seed"
-      >;
       conversationId?: string;
     };
 
@@ -1901,10 +1885,6 @@ export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
       options: {},
     },
     transcription: {
-      modelRef: null,
-      options: {},
-    },
-    video: {
       modelRef: null,
       options: {},
     },

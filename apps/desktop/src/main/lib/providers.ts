@@ -2,14 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
-import type {
-  experimental_generateVideo,
-  ImageModel,
-  LanguageModel,
-  SpeechModel,
-  streamText,
-  TranscriptionModel,
-} from "ai";
+import type { ImageModel, LanguageModel, SpeechModel, streamText, TranscriptionModel } from "ai";
 import type { ExactTokenCountInput } from "./context-engine";
 import {
   deleteApiKey,
@@ -48,7 +41,6 @@ import {
 
 type ProviderConfig = Omit<ProviderInfo, "hasApiKey" | "hasProviderApiKey">;
 type ProviderOptions = NonNullable<Parameters<typeof streamText>[0]["providerOptions"]>;
-type VideoModel = Parameters<typeof experimental_generateVideo>[0]["model"];
 
 const DEFAULT_MODEL_TEMPERATURE = 0.7;
 const DEFAULT_MODEL_TOP_P = 1;
@@ -61,7 +53,6 @@ const DEFAULT_CAPABILITIES: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
-  videoOutput: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -120,16 +111,8 @@ export type ResolvedMediaModelConfig =
       modelId: string;
       capabilities: ModelCapabilities;
       providerOptions?: ProviderOptions;
-    }
-  | {
-      kind: "video";
-      model: VideoModel;
-      providerId: string;
-      providerKind: ProviderInfo["kind"];
-      modelId: string;
-      capabilities: ModelCapabilities;
-      providerOptions?: ProviderOptions;
     };
+
 function emptyCatalog(): ModelCatalogSettings {
   return { providers: [], models: [], modelStates: [] };
 }
@@ -427,7 +410,6 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
   const imageOutput = value.imageOutput === true;
   const speechOutput = value.speechOutput === true;
   const transcription = value.transcription === true;
-  const videoOutput = value.videoOutput === true;
   const toolCapabilities = isPlainJsonObject(value.toolCapabilities)
     ? Object.fromEntries(
         Object.entries(value.toolCapabilities).filter(
@@ -438,14 +420,13 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
   const textGeneration =
     typeof value.textGeneration === "boolean"
       ? value.textGeneration
-      : !embedding && !imageOutput && !speechOutput && !transcription && !videoOutput;
+      : !embedding && !imageOutput && !speechOutput && !transcription;
   return {
     textGeneration,
     vision: value.vision === true,
     imageOutput,
     speechOutput,
     transcription,
-    videoOutput,
     toolCalling: textGeneration && value.toolCalling !== false,
     reasoning: value.reasoning === true,
     embedding,
@@ -815,13 +796,12 @@ export function inferModelCapabilities(modelId: string): ModelCapabilities {
   const embedding = /embed|embedding/.test(lower);
   const speechOutput = /(^|[-_/])tts([-_/]|$)|gpt-4o-mini-tts|gemini[-_.\w]*tts/.test(lower);
   const transcription = /whisper|transcribe|transcription/.test(lower);
-  const videoOutput = /(^|[-_/])veo([-_/]|$)|video/.test(lower);
+  const videoOnly = /(^|[-_/])veo([-_/]|$)|video/.test(lower);
   const imageOutput = /gpt-image|dall-e|imagen|gemini[-_.\w]*image|(^|[-_/])image([-_/]|$)/.test(
     lower,
   );
   const pureImage = /gpt-image|dall-e|imagen/.test(lower);
-  const textGeneration =
-    !embedding && !speechOutput && !transcription && !videoOutput && !pureImage;
+  const textGeneration = !embedding && !speechOutput && !transcription && !videoOnly && !pureImage;
   return {
     textGeneration,
     vision:
@@ -830,7 +810,6 @@ export function inferModelCapabilities(modelId: string): ModelCapabilities {
     imageOutput,
     speechOutput,
     transcription,
-    videoOutput,
     toolCalling: textGeneration && !imageOutput,
     reasoning:
       textGeneration &&
@@ -904,10 +883,6 @@ function providerCapabilityMetadata(raw: Record<string, unknown>): {
       "speechOutput",
       outputModalities.some((item) => item.includes("audio")),
     );
-    setCapability(
-      "videoOutput",
-      outputModalities.some((item) => item.includes("video")),
-    );
   }
   if (supportedMethods.length > 0) {
     if (supportedMethods.some((item) => /generatecontent|chat|completion/.test(item))) {
@@ -919,11 +894,8 @@ function providerCapabilityMetadata(raw: Record<string, unknown>): {
     if (supportedMethods.some((item) => /transcrib|speech_to_text/.test(item))) {
       setCapability("transcription", true);
     }
-    if (supportedMethods.some((item) => /image|predict/.test(item))) {
+    if (supportedMethods.some((item) => item === "predict" || /image/.test(item))) {
       setCapability("imageOutput", true);
-    }
-    if (supportedMethods.some((item) => /video/.test(item))) {
-      setCapability("videoOutput", true);
     }
   }
   if (supportedParameters.some((item) => /tool|function/.test(item))) {
@@ -1107,8 +1079,7 @@ export function parseGoogleModelListResponse(json: unknown): RemoteModelInfo[] {
         return (
           lowerMethods.includes("generatecontent") ||
           capabilities.imageOutput ||
-          capabilities.speechOutput ||
-          capabilities.videoOutput
+          capabilities.speechOutput
         );
       })
       .map(({ supportedGenerationMethods: _methods, ...item }) => item),
@@ -1449,10 +1420,6 @@ export function resolveMediaModel(
   modelRef: string,
   kind: "transcription",
 ): Extract<ResolvedMediaModelConfig, { kind: "transcription" }>;
-export function resolveMediaModel(
-  modelRef: string,
-  kind: "video",
-): Extract<ResolvedMediaModelConfig, { kind: "video" }>;
 
 export function resolveMediaModel(
   modelRef: string,
@@ -1515,8 +1482,6 @@ function modelSupportsMediaKind(
       return capabilities.speechOutput;
     case "transcription":
       return capabilities.transcription;
-    case "video":
-      return capabilities.videoOutput;
   }
 }
 
@@ -1525,7 +1490,7 @@ function createMediaModel(
   apiKey: string,
   modelId: string,
   kind: MediaGenerationKind,
-): ImageModel | SpeechModel | TranscriptionModel | VideoModel {
+): ImageModel | SpeechModel | TranscriptionModel {
   switch (config.kind) {
     case "openai":
     case "openai-compatible": {
@@ -1538,8 +1503,6 @@ function createMediaModel(
           return provider.speech(modelId);
         case "transcription":
           return provider.transcription(modelId);
-        case "video":
-          throw new Error(config.label + " does not support video generation.");
       }
       break;
     }
@@ -1550,8 +1513,6 @@ function createMediaModel(
           return provider.image(modelId);
         case "speech":
           return provider.speech(modelId);
-        case "video":
-          return provider.video(modelId);
         case "transcription":
           throw new Error("Google transcription is not available in this build.");
       }

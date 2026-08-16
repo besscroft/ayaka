@@ -57,7 +57,6 @@ const capabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
-  videoOutput: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -359,7 +358,6 @@ void describe("provider helpers", () => {
       imageOutput: true,
       speechOutput: false,
       transcription: false,
-      videoOutput: false,
     });
     assert.deepEqual(
       pickMediaCapabilities(providerHelpers.inferModelCapabilities("gpt-4o-mini-tts")),
@@ -368,7 +366,6 @@ void describe("provider helpers", () => {
         imageOutput: false,
         speechOutput: true,
         transcription: false,
-        videoOutput: false,
       },
     );
     assert.deepEqual(pickMediaCapabilities(providerHelpers.inferModelCapabilities("whisper-1")), {
@@ -376,7 +373,6 @@ void describe("provider helpers", () => {
       imageOutput: false,
       speechOutput: false,
       transcription: true,
-      videoOutput: false,
     });
     assert.deepEqual(
       pickMediaCapabilities(providerHelpers.inferModelCapabilities("veo-3.0-generate-preview")),
@@ -385,12 +381,11 @@ void describe("provider helpers", () => {
         imageOutput: false,
         speechOutput: false,
         transcription: false,
-        videoOutput: true,
       },
     );
   });
 
-  void it("keeps Google media models that do not expose generateContent", () => {
+  void it("keeps supported Google media models and excludes video-only models", () => {
     const googleModels = providerHelpers.parseGoogleModelListResponse({
       models: [
         { name: "models/imagen-4.0", supportedGenerationMethods: ["predict"] },
@@ -404,7 +399,7 @@ void describe("provider helpers", () => {
 
     assert.deepEqual(
       googleModels.map((model) => model.id),
-      ["imagen-4.0", "veo-3.0-generate-preview"],
+      ["imagen-4.0"],
     );
   });
 
@@ -613,13 +608,11 @@ function pickMediaCapabilities(capabilities: import("@shared/types").ModelCapabi
   imageOutput: boolean;
   speechOutput: boolean;
   transcription: boolean;
-  videoOutput: boolean;
 } {
   return {
     textGeneration: capabilities.textGeneration,
     imageOutput: capabilities.imageOutput,
     speechOutput: capabilities.speechOutput,
     transcription: capabilities.transcription,
-    videoOutput: capabilities.videoOutput,
   };
 }

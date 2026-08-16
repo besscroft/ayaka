@@ -34,3 +34,23 @@ void describe("message image attachments", () => {
     assert.doesNotMatch(html, /object-cover/);
   });
 });
+
+void describe("message video attachments", () => {
+  void it("keeps rendering uploaded video files after video generation removal", () => {
+    const html = renderToStaticMarkup(
+      <MessageAttachments
+        parts={[
+          {
+            type: "file",
+            mediaType: "video/mp4",
+            filename: "clip.mp4",
+            url: "data:video/mp4;base64,AA==",
+          },
+        ]}
+      />,
+    );
+
+    assert.match(html, /<video/);
+    assert.match(html, /clip\.mp4/);
+  });
+});

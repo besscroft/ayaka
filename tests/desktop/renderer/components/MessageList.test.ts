@@ -408,6 +408,14 @@ void describe("media tool output", () => {
     assert.equal(result?.kind, "image");
     assert.equal(result?.files[0]?.url, "ayaka-media://asset/image-1.png");
     assert.equal(readMediaToolResult({ type: "tool-web_search", output: result }), null);
+    assert.equal(
+      readMediaToolResult({
+        type: "tool-generate_media",
+        state: "output-available",
+        output: { kind: "video", text: "Video generated.", files: [] },
+      }),
+      null,
+    );
   });
 });
 

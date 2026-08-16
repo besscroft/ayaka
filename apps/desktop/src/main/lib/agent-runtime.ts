@@ -167,7 +167,6 @@ const DEFAULT_MODEL_CAPABILITIES: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
-  videoOutput: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -795,19 +794,19 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
 function createMediaGenerationTool(context: RuntimeContext): ToolSet[string] {
   return tool({
     description:
-      "Generate an image, speech audio, transcription, or video only when the user explicitly requests that media output. Choose the media kind from the conversation. Do not call this tool merely because media is mentioned. For transcription, use the most recent user audio attachment and provide sourceFilename only to disambiguate multiple audio files.",
+      "Generate an image, speech audio, or transcription only when the user explicitly requests that media output. Choose the media kind from the conversation. Do not call this tool merely because media is mentioned. For transcription, use the most recent user audio attachment and provide sourceFilename only to disambiguate multiple audio files.",
     inputSchema: jsonSchema<MediaGenerationToolInput>({
       type: "object",
       properties: {
         kind: {
           type: "string",
-          enum: ["image", "speech", "transcription", "video"],
+          enum: ["image", "speech", "transcription"],
           description: "The output type required by the user's request.",
         },
         content: {
           type: "string",
           description:
-            "Image/video prompt or exact text to synthesize as speech. Omit for transcription.",
+            "Image prompt or exact text to synthesize as speech. Omit for transcription.",
         },
         sourceFilename: {
           type: "string",
@@ -825,10 +824,6 @@ function createMediaGenerationTool(context: RuntimeContext): ToolSet[string] {
             speed: { type: "number", description: "Speech speed from 0.25 to 4." },
             language: { type: "string", description: "Speech or transcription language." },
             instructions: { type: "string", description: "Speech delivery instructions." },
-            resolution: { type: "string", description: "Video resolution such as 1920x1080." },
-            duration: { type: "number", description: "Video duration in seconds." },
-            fps: { type: "number", description: "Video frames per second." },
-            generateAudio: { type: "boolean", description: "Whether video should include audio." },
           },
           additionalProperties: false,
         },
@@ -1843,8 +1838,8 @@ async function createRootInstructions(
     "A plain text response never completes the task. Before finishing, call complete_task with a non-empty result, completedItems, verificationEvidence, and an empty remainingItems list. If tools are unavailable, return exactly that same object as JSON.",
     "After a successful handoff, return the handoff result's output verbatim as the final answer. Do not summarize it, add a preface, or continue using tools.",
     context.modelContext.capabilities.toolCalling
-      ? "When the user explicitly requests an image, speech audio, transcription, or video, decide the appropriate output and call generate_media. After it succeeds, briefly confirm the result without repeating the raw tool output."
-      : "This chat model cannot call tools or generate media through the app. If the user asks for an image, speech audio, transcription, or video, explain that limitation and ask them to switch to a tool-calling chat model.",
+      ? "When the user explicitly requests an image, speech audio, or transcription, decide the appropriate output and call generate_media. After it succeeds, briefly confirm the result without repeating the raw tool output."
+      : "This chat model cannot call tools or generate media through the app. If the user asks for an image, speech audio, or transcription, explain that limitation and ask them to switch to a tool-calling chat model.",
     context.preferredAgentId
       ? "The conversation is currently owned by " +
         context.preferredAgentId +
