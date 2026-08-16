@@ -66,6 +66,7 @@ export function McpPanel({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "enabled" | "disabled" | "error">("all");
   const [transport, setTransport] = useState<"all" | McpTransportKind>("all");
+  const [editTarget, setEditTarget] = useState<ToolServer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ToolServer | null>(null);
   const [reviewTarget, setReviewTarget] = useState<{
     installation: ArtifactInstallation;
@@ -158,7 +159,14 @@ export function McpPanel({
             orientation="horizontal"
           />
           <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onPress={() => setMcpOpen(true)}>
+            <Button
+              variant="primary"
+              size="sm"
+              onPress={() => {
+                setEditTarget(null);
+                setMcpOpen(true);
+              }}
+            >
               <IconPlus className="size-4" />
               {t("tools.mcp.add")}
             </Button>
@@ -238,6 +246,10 @@ export function McpPanel({
               toolsByServer={mcpToolsByServer}
               busy={busy}
               activeConversationId={activeConversationId}
+              onEdit={(server) => {
+                setEditTarget(server);
+                setMcpOpen(true);
+              }}
               onRefresh={refresh}
               onDelete={setDeleteTarget}
               onToggle={(server, enabled) =>
@@ -251,14 +263,24 @@ export function McpPanel({
       <AddMcpModal
         open={mcpOpen}
         busy={busy}
-        onClose={() => setMcpOpen(false)}
-        onCreate={(input) =>
-          runAction(async () => {
-            const server = await api.mcp.create(input);
-            const discovery = await api.mcp.discover(server.id);
-            setMcpOpen(false);
-            if (discovery.server.status === "error") throw new Error(discovery.message);
-          }, t("tools.toast.discovered"))
+        server={editTarget}
+        onClose={() => {
+          setMcpOpen(false);
+          setEditTarget(null);
+        }}
+        onSave={(input) =>
+          runAction(
+            async () => {
+              const server = editTarget
+                ? await api.mcp.update(editTarget.id, input)
+                : await api.mcp.create(input);
+              const discovery = await api.mcp.discover(server.id);
+              setMcpOpen(false);
+              setEditTarget(null);
+              if (discovery.server.status === "error") throw new Error(discovery.message);
+            },
+            editTarget ? t("tools.toast.saved") : t("tools.toast.discovered"),
+          )
         }
       />
 
@@ -485,20 +507,68 @@ function installationSecretKeys(installation: ArtifactInstallation): string[] {
   return Array.isArray(value) ? value.filter((key): key is string => typeof key === "string") : [];
 }
 
+function mcpFormFromServer(server: ToolServer): McpFormState {
+  return {
+    ...EMPTY_MCP_FORM,
+    name: server.name,
+    description: server.description,
+    transport: server.transport,
+    enabled: server.enabled !== 0,
+    auto_use: server.auto_use !== 0,
+    requires_approval: server.requires_approval !== 0,
+    command: server.command ?? "",
+    args: formatJsonArray(server.args_json),
+    url: server.url ?? "",
+    headers: formatJsonObject(server.headers_json),
+    env: formatJsonObject(server.env_json),
+    cwd: server.cwd ?? "",
+    timeoutSeconds: String(server.timeout_seconds),
+  };
+}
+
+function formatJsonArray(raw: string): string {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return Array.isArray(value) ? JSON.stringify(value, null, 2) : "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function formatJsonObject(raw: string): string {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? JSON.stringify(value, null, 2)
+      : "{}";
+  } catch {
+    return "{}";
+  }
+}
+
 function AddMcpModal({
   open,
   busy,
   onClose,
-  onCreate,
+  onSave,
+  server,
 }: {
   open: boolean;
   busy: boolean;
   onClose: () => void;
-  onCreate: (input: ReturnType<typeof buildMcpInput>) => Promise<void>;
+  onSave: (input: ReturnType<typeof buildMcpInput>) => Promise<void>;
+  server: ToolServer | null;
 }): React.JSX.Element {
   const { t } = useT();
   const [form, setForm] = useState<McpFormState>(EMPTY_MCP_FORM);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    // Reset the draft whenever the modal switches between new and edit mode.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm(server ? mcpFormFromServer(server) : EMPTY_MCP_FORM);
+    setError(null);
+  }, [open, server?.id]);
   const patch = (value: Partial<McpFormState>): void =>
     setForm((current) => ({ ...current, ...value }));
   const close = (): void => {
@@ -509,7 +579,7 @@ function AddMcpModal({
   const save = (): void => {
     try {
       setError(null);
-      void onCreate(buildMcpInput(form)).catch((err) =>
+      void onSave(buildMcpInput(form)).catch((err) =>
         setError(err instanceof Error ? err.message : String(err)),
       );
     } catch (err) {
@@ -524,7 +594,7 @@ function AddMcpModal({
           <div className="flex w-full items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="truncate text-base font-semibold">
-                {t("tools.mcp.add")}
+                {server ? t("tools.mcp.edit") : t("tools.mcp.add")}
               </DialogTitle>
               <p className="line-clamp-2 text-sm text-foreground/50">
                 Manual MCP server connection.
@@ -577,15 +647,25 @@ function AddMcpModal({
               />
             </Field>
             {form.transport === "stdio" ? (
-              <Field label="命令">
-                <TextArea
-                  rows={3}
-                  value={form.commandLine}
-                  placeholder="npx -y @modelcontextprotocol/server-filesystem"
-                  className="font-mono text-sm"
-                  onChange={(event) => patch({ commandLine: event.target.value })}
-                />
-              </Field>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label={t("tools.field.command")}>
+                  <Input
+                    value={form.command}
+                    placeholder="npx"
+                    className="font-mono text-sm"
+                    onChange={(event) => patch({ command: event.target.value })}
+                  />
+                </Field>
+                <Field label={t("tools.field.args")}>
+                  <TextArea
+                    rows={3}
+                    value={form.args}
+                    placeholder='["-y", "@modelcontextprotocol/server-filesystem", "C:\\data"]'
+                    className="font-mono text-sm"
+                    onChange={(event) => patch({ args: event.target.value })}
+                  />
+                </Field>
+              </div>
             ) : (
               <Field label={t("tools.field.url")}>
                 <Input
@@ -640,7 +720,7 @@ function AddMcpModal({
             </Button>
             <Button variant="primary" isPending={busy} onPress={save}>
               <IconCheck className="size-4" />
-              {t("tools.mcp.add")}
+              {server ? t("common.save") : t("tools.mcp.add")}
             </Button>
           </div>
         </DialogFooter>

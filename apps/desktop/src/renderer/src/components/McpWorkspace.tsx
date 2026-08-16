@@ -30,7 +30,7 @@ import {
   TabsTrigger,
   TextArea,
 } from "./ui";
-import { IconCheck, IconCopy, IconGlobe, IconRotateCcw } from "./icons";
+import { IconCheck, IconCopy, IconEdit, IconGlobe, IconRotateCcw } from "./icons";
 import { cn } from "../lib/utils";
 import { Field, ReadStat } from "./ToolsPanel";
 
@@ -42,6 +42,7 @@ export interface McpWorkspaceProps {
   busy: boolean;
   onRefresh: () => void;
   activeConversationId?: string | null;
+  onEdit: (server: ToolServer) => void;
   onDelete: (server: ToolServer) => void;
   onToggle: (server: ToolServer, enabled: boolean) => void;
 }
@@ -52,6 +53,7 @@ export function McpWorkspace({
   busy,
   onRefresh,
   activeConversationId,
+  onEdit,
   onDelete,
   onToggle,
 }: McpWorkspaceProps): React.JSX.Element {
@@ -199,6 +201,15 @@ export function McpWorkspace({
                     >
                       {t("tools.enabled")}
                     </Switch>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => onEdit(selected)}
+                      isDisabled={busy}
+                    >
+                      <IconEdit className="size-4" />
+                      {t("tools.mcp.edit")}
+                    </Button>
                     <Button
                       size="sm"
                       variant="secondary"

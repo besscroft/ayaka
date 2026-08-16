@@ -14,6 +14,7 @@ void describe("MCP workspace", () => {
         toolsByServer={new Map()}
         busy={false}
         onRefresh={() => undefined}
+        onEdit={() => undefined}
         onDelete={() => undefined}
         onToggle={() => undefined}
       />,
