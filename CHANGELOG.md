@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.23] - 2026-08-16
+
+### 中文
+
+#### 新增
+
+- 新增基于官方 OpenAI-Compatible SDK 的兼容提供商支持，并保留旧模型配置选项的兼容迁移。
+
+#### 变更
+
+- 重构兼容提供商的模型创建与提供商参数处理，支持返回用量信息。
+- 优化流式聊天消息同步与渲染，减少加载期间的消息闪烁和状态错乱。
+- 默认折叠工具调用卡片，降低长对话中的信息密度。
+
+### English
+
+#### Added
+
+- Added official OpenAI-compatible SDK support for compatible providers while preserving legacy model-option settings.
+
+#### Changed
+
+- Refactored compatible-provider model creation and provider-option handling, including usage reporting.
+- Improved streaming chat message synchronization and rendering to reduce flicker and inconsistent states while conversations load.
+- Collapsed tool-call cards by default to reduce visual noise in long conversations.
+
 ## [0.1.22] - 2026-08-15
 
 ### 中文
