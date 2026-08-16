@@ -9,6 +9,7 @@ import type {
   ToolRecord,
   ToolServer,
 } from "@shared/types";
+import { isMcpOAuthTransport } from "@shared/types";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
@@ -79,7 +80,9 @@ export function McpWorkspace({
     try {
       const [next, nextAuth] = await Promise.all([
         api.mcp.capabilities(selected.id),
-        api.mcp.authStatus(selected.id),
+        isMcpOAuthTransport(selected.transport)
+          ? api.mcp.authStatus(selected.id)
+          : Promise.resolve({ status: "not_required" as const, expiresAt: null }),
       ]);
       setCapabilities(next);
       setAuth(nextAuth);
@@ -236,6 +239,7 @@ export function McpWorkspace({
                   <OverviewWorkspace
                     capabilities={capabilities}
                     auth={auth}
+                    oauthSupported={isMcpOAuthTransport(selected.transport)}
                     onAuthorize={async () => {
                       try {
                         const result = await api.mcp.authorize(selected.id);
@@ -284,11 +288,13 @@ export function McpWorkspace({
 function OverviewWorkspace({
   capabilities,
   auth,
+  oauthSupported,
   onAuthorize,
   onLogout,
 }: {
   capabilities: McpCapabilitySnapshot | null;
   auth: McpAuthStatus | null;
+  oauthSupported: boolean;
   onAuthorize: () => Promise<void>;
   onLogout: () => Promise<void>;
 }): React.JSX.Element {
@@ -324,7 +330,9 @@ function OverviewWorkspace({
               : t("tools.mcp.workspace.no")
           }
         />
-        <ReadStat label={t("tools.mcp.workspace.authorize")} value={authLabel} />
+        {oauthSupported ? (
+          <ReadStat label={t("tools.mcp.workspace.authorize")} value={authLabel} />
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
         {Object.entries(capabilities.capabilities).flatMap(([key, value]) =>
@@ -345,21 +353,23 @@ function OverviewWorkspace({
           </p>
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onPress={() => void onAuthorize()}
-          isDisabled={auth?.status === "authorized" || auth?.status === "pending"}
-        >
-          {authLabel}
-        </Button>
-        {auth?.status === "authorized" ? (
-          <Button size="sm" variant="tertiary" onPress={() => void onLogout()}>
-            {t("tools.mcp.workspace.logout")}
+      {oauthSupported ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => void onAuthorize()}
+            isDisabled={auth?.status === "authorized" || auth?.status === "pending"}
+          >
+            {authLabel}
           </Button>
-        ) : null}
-      </div>
+          {auth?.status === "authorized" ? (
+            <Button size="sm" variant="tertiary" onPress={() => void onLogout()}>
+              {t("tools.mcp.workspace.logout")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

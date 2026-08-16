@@ -47,6 +47,14 @@ export async function getMcpOAuthProvider(
 }
 
 export async function authorizeMcpServer(serverId: string): Promise<McpAuthorizationResult> {
+  const existing = getMcpServer(serverId);
+  if (!existing) throw new Error("MCP server not found: " + serverId);
+  if (existing.transport !== "http" && existing.transport !== "sse") {
+    return {
+      status: "not_required",
+      message: "OAuth is only available for remote MCP servers.",
+    };
+  }
   const server = requireRemoteServer(serverId);
   const provider = await providerFor(server);
   emit(serverId, { status: "pending", expiresAt: null });

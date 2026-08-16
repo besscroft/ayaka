@@ -765,6 +765,10 @@ export interface SandboxArtifact {
 export type ToolStatus = "ready" | "disabled" | "error" | "unknown";
 export type McpTransportKind = "stdio" | "http" | "sse" | "builtin";
 export type McpProtocolEra = "modern" | "legacy";
+
+export function isMcpOAuthTransport(transport: McpTransportKind): boolean {
+  return transport === "http" || transport === "sse";
+}
 export type ToolServerKind = "mcp" | "local" | "sandbox";
 export type ToolRecordKind = "builtin" | "mcp" | "skill" | "sandbox";
 export type ToolSecretOwnerType = "server" | "tool";

@@ -3,7 +3,7 @@ void React;
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ToolServer } from "@shared/types";
+import { isMcpOAuthTransport, type ToolServer } from "@shared/types";
 import { McpWorkspace } from "@renderer/components/McpWorkspace";
 
 void describe("MCP workspace", () => {
@@ -25,6 +25,12 @@ void describe("MCP workspace", () => {
     assert.match(html, />工具发现</);
     assert.match(html, />资源</);
     assert.match(html, />提示词</);
+  });
+
+  void it("only enables OAuth for remote transports", () => {
+    assert.equal(isMcpOAuthTransport("stdio"), false);
+    assert.equal(isMcpOAuthTransport("http"), true);
+    assert.equal(isMcpOAuthTransport("sse"), true);
   });
 });
 
