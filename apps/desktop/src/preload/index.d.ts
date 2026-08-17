@@ -53,6 +53,8 @@ import type {
   AgentRunInput,
   AgentRunInputKind,
   AgentRunInputSource,
+  TrayAction,
+  TrayMenuLabels,
   UpdateState,
   WorkspaceFileRef,
   WorkspaceFileContent,
@@ -80,6 +82,10 @@ export interface AyakaApi {
     onMaximizedChange: (handler: (maximized: boolean) => void) => () => void;
   };
   // 浼氳瘽鍘嗗彶
+  tray: {
+    onAction: (handler: (action: TrayAction) => void) => () => void;
+    setLabels: (labels: TrayMenuLabels) => Promise<boolean>;
+  };
   conversations: {
     list: () => Promise<Conversation[]>;
     listDeleted: () => Promise<Conversation[]>;

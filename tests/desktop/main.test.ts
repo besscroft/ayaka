@@ -1,5 +1,6 @@
 import "./main/lib/catalog-adapters.test.ts";
 import "./main/lib/changelog.test.ts";
+import "./main/lib/default-workspace-assets.test.ts";
 import "./main/lib/chat-errors.test.ts";
 import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";
@@ -12,6 +13,7 @@ import "./main/lib/openai-compatible-model.test.ts";
 import "./main/lib/providers.test.ts";
 import "./main/lib/runtime-architecture.test.ts";
 import "./main/lib/runtime-paths.test.ts";
+import "./main/lib/tray-menu.test.ts";
 import "./main/lib/sandbox-agents.test.ts";
 import "./main/lib/update-manager.test.ts";
 import "./main/lib/web-page-reader.test.ts";

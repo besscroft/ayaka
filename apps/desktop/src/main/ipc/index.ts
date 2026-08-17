@@ -98,6 +98,7 @@ import type {
   AgentRunInputSource,
   WorkspaceMediaSaveInput,
   McpInputRequest,
+  TrayMenuLabels,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID } from "../../shared/types";
@@ -183,7 +184,11 @@ import { readChangelog } from "../lib/changelog";
  *  - providers:list      鑾峰彇 provider 鍒楄〃锛堝惈妯″瀷銆乭elpUrl锛?
  */
 
-export function registerIpcHandlers(): void {
+export interface IpcHandlerOptions {
+  onTrayLabelsChanged?: (labels: TrayMenuLabels) => void;
+}
+
+export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   const broadcast = (channel: string, payload: unknown): void => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(channel, payload);
@@ -211,6 +216,12 @@ export function registerIpcHandlers(): void {
   });
   ipcMain.handle("window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.handle("tray:setLabels", (_event, labels: TrayMenuLabels) => {
+    if (!isTrayMenuLabels(labels)) throw new Error("Invalid tray menu labels.");
+    options.onTrayLabelsChanged?.(labels);
+    return true;
   });
 
   // ---------- Application updates ----------
@@ -706,6 +717,17 @@ export function registerIpcHandlers(): void {
       appPath: process.env.AYAKA_APP_PATH ?? app.getAppPath(),
       resourcesPath: process.resourcesPath,
     }),
+  );
+}
+
+function isTrayMenuLabels(value: unknown): value is TrayMenuLabels {
+  if (!value || typeof value !== "object") return false;
+  const labels = value as Record<string, unknown>;
+  return (
+    typeof labels.settings === "string" &&
+    typeof labels.openHome === "string" &&
+    typeof labels.chat === "string" &&
+    typeof labels.quit === "string"
   );
 }
 

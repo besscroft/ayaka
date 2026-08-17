@@ -59,6 +59,8 @@ import type {
   WorkspaceMediaSaveResult,
   WorkspaceInfo,
   WorkspaceOrphan,
+  TrayAction,
+  TrayMenuLabels,
 } from "@shared/types";
 import type { UIMessage } from "ai";
 
@@ -94,6 +96,11 @@ export const api = {
     close: (): Promise<void> => assertApi().windowControls.close(),
     onMaximizedChange: (handler: (maximized: boolean) => void): (() => void) =>
       assertApi().windowControls.onMaximizedChange(handler),
+  },
+  tray: {
+    onAction: (handler: (action: TrayAction) => void): (() => void) =>
+      assertApi().tray.onAction(handler),
+    setLabels: (labels: TrayMenuLabels): Promise<boolean> => assertApi().tray.setLabels(labels),
   },
   conversations: {
     list: (): Promise<Conversation[]> => assertApi().conversations.list(),

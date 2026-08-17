@@ -17,6 +17,10 @@ import { removeLegacyCompanionData } from "./lib/runtime-paths";
 import { closeAllMcpClients } from "./lib/mcp-manager";
 import { cancelAllMcpInputs } from "./lib/mcp-interaction-broker";
 import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
+import { createTray, type TrayController } from "./lib/tray";
+import { getDefaultTrayMenuLabels } from "./lib/tray-menu";
+import { ensureDefaultWorkspaceAsset } from "./lib/default-workspace-assets";
+import type { TrayAction, TrayMenuLabels } from "../shared/types";
 
 const WINDOWS_APP_ID = "com.zzzvoid.ai";
 
@@ -34,17 +38,49 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindowRef: BrowserWindow | null = null;
 let isCleaningUpBeforeQuit = false;
+let isQuitting = false;
+let trayController: TrayController | null = null;
+const pendingTrayActions: TrayAction[] = [];
 
 function getPreloadPath(): string {
   return join(__dirname, "../preload/index.js");
 }
-
 function getRendererFilePath(): string {
   return join(__dirname, "../renderer/index.html");
 }
 
+function flushPendingTrayActions(): void {
+  const mainWindow = mainWindowRef;
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoadingMainFrame())
+    return;
+  while (pendingTrayActions.length > 0) {
+    const action = pendingTrayActions.shift();
+    if (action) mainWindow.webContents.send("tray:action", action);
+  }
+}
+
+function showMainWindow(): BrowserWindow | null {
+  if (!app.isReady()) return null;
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) createWindow();
+  const mainWindow = mainWindowRef;
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  return mainWindow;
+}
+
+function dispatchTrayAction(action: TrayAction): void {
+  const mainWindow = showMainWindow();
+  if (!mainWindow) return;
+  if (mainWindow.webContents.isLoadingMainFrame()) {
+    pendingTrayActions.push(action);
+    return;
+  }
+  mainWindow.webContents.send("tray:action", action);
+}
+
 function createWindow(): BrowserWindow {
-  // 创建浏览器窗口
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -62,12 +98,17 @@ function createWindow(): BrowserWindow {
   });
   mainWindowRef = mainWindow;
 
-  mainWindow.on("ready-to-show", () => {
-    mainWindow.show();
+  mainWindow.on("close", (event) => {
+    if (process.platform !== "win32" || isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
   });
+  mainWindow.on("ready-to-show", () => mainWindow.show());
+  mainWindow.webContents.on("did-finish-load", flushPendingTrayActions);
   mainWindow.on("closed", () => {
     if (mainWindowRef === mainWindow) mainWindowRef = null;
   });
+
   const sendMaximizedState = (): void => {
     if (!mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send("window:maximized-changed", mainWindow.isMaximized());
@@ -81,7 +122,6 @@ function createWindow(): BrowserWindow {
     return { action: "deny" };
   });
 
-  // HMR for renderer based on electron-vite cli.
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     void mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
@@ -91,85 +131,98 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-// 应用就绪后初始化所有子系统
-void app.whenReady().then(async () => {
-  process.env.AYAKA_USER_DATA_DIR ??= app.getPath("userData");
-  process.env.AYAKA_APP_PATH ??= app.getAppPath();
-  process.env.AYAKA_DEV = is.dev ? "1" : "0";
-  electronApp.setAppUserModelId(WINDOWS_APP_ID);
-  app.setName("Ayaka");
-  removeLegacyCompanionData();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
-  // 默认在开发环境用 F12 打开 DevTools，生产环境忽略 Cmd/Ctrl+R
-  app.on("browser-window-created", (_, window) => {
-    optimizer.watchWindowShortcuts(window);
+if (!hasSingleInstanceLock) {
+  app.exit(0);
+} else {
+  app.on("second-instance", () => {
+    if (app.isReady()) void showMainWindow();
+    else void app.whenReady().then(() => showMainWindow());
   });
 
-  // 1. 初始化数据库（better-sqlite3 + drizzle-orm）
-  //    迁移文件位于 apps/desktop/drizzle，生产环境从 process.resourcesPath/drizzle 读取
-  try {
-    await initDbWriter();
-    await migrateProviderApiKeysToModelKeys();
-    await ensureBuiltinCatalogSources();
-    scheduleMemoryFileConsolidation();
-    startMemoryWorker();
-    console.log("[main] 数据库已初始化");
-  } catch (err) {
-    // 注意：electron-vite dev 下 stderr 偶发不刷新，改用 console.log 确保可见
-    console.log("[main] 数据库初始化失败:", err);
-  }
+  void app.whenReady().then(async () => {
+    process.env.AYAKA_USER_DATA_DIR ??= app.getPath("userData");
+    process.env.AYAKA_APP_PATH ??= app.getAppPath();
+    process.env.AYAKA_DEV = is.dev ? "1" : "0";
+    electronApp.setAppUserModelId(WINDOWS_APP_ID);
+    app.setName("Ayaka");
+    removeLegacyCompanionData();
 
-  registerAyakaMediaProtocol();
+    app.on("browser-window-created", (_, window) => {
+      optimizer.watchWindowShortcuts(window);
+    });
 
-  // 2. 启动本地 HTTP 服务（用于 AI SDK 流式通信）
-  try {
-    const port = await startServer();
-    startCronScheduler();
-    console.log(`[main] AI 服务端口: ${port}`);
-  } catch (err) {
-    console.error("[main] AI 服务启动失败:", err);
-  }
+    try {
+      await ensureDefaultWorkspaceAsset();
+      await initDbWriter();
+      await migrateProviderApiKeysToModelKeys();
+      await ensureBuiltinCatalogSources();
+      scheduleMemoryFileConsolidation();
+      startMemoryWorker();
+      console.log("[main] database initialized");
+    } catch (err) {
+      console.log("[main] database initialization failed:", err);
+    }
 
-  // 3. 注册 IPC handlers
-  createWindow();
-  updateManager.setEmitter((state) => sendUpdateState(mainWindowRef, state));
-  updateManager.setInstallGuard(() => !agentLoopSessions.hasActiveSessions());
-  registerIpcHandlers();
-  updateManager.start();
+    registerAyakaMediaProtocol();
 
-  // IPC test（保留模板自带的 ping）
-  ipcMain.on("ping", () => console.log("pong"));
+    try {
+      const port = await startServer();
+      startCronScheduler();
+      console.log(`[main] AI server port: ${port}`);
+    } catch (err) {
+      console.error("[main] AI server startup failed:", err);
+    }
 
-  app.on("activate", function () {
-    // macOS 上点击 dock 图标时若无窗口则重建
-    if (!mainWindowRef || mainWindowRef.isDestroyed()) createWindow();
-    else mainWindowRef.show();
+    createWindow();
+    if (process.platform === "win32") {
+      trayController = createTray(
+        dispatchTrayAction,
+        () => app.quit(),
+        getDefaultTrayMenuLabels(app.getLocale()),
+      );
+    }
+    updateManager.setEmitter((state) => sendUpdateState(mainWindowRef, state));
+    updateManager.setInstallGuard(() => !agentLoopSessions.hasActiveSessions());
+    registerIpcHandlers({
+      onTrayLabelsChanged: (labels: TrayMenuLabels) => trayController?.setLabels(labels),
+    });
+    updateManager.start();
+
+    ipcMain.on("ping", () => console.log("pong"));
+
+    app.on("activate", () => {
+      showMainWindow();
+    });
   });
-});
 
-// 所有窗口关闭时退出（macOS 除外）
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin" && process.platform !== "win32") app.quit();
+  });
 
-// 应用退出前清理资源
-app.on("before-quit", (event) => {
-  if (isCleaningUpBeforeQuit) return;
-  event.preventDefault();
-  isCleaningUpBeforeQuit = true;
-  stopCronScheduler();
-  void agentLoopSessions
-    .interruptAll()
-    .then(() => {
-      cancelAllMcpInputs();
-      return closeAllMcpClients();
-    })
-    .then(() => closeMcpOAuthLoopback())
-    .then(() => {
-      stopServer();
-      return closeDb();
-    })
-    .finally(() => app.quit());
-});
+  app.on("will-quit", () => {
+    trayController?.destroy();
+    trayController = null;
+  });
 
-// 其余 main 进程代码可以拆分到独立文件并在此 require
+  app.on("before-quit", (event) => {
+    if (isCleaningUpBeforeQuit) return;
+    isQuitting = true;
+    event.preventDefault();
+    isCleaningUpBeforeQuit = true;
+    stopCronScheduler();
+    void agentLoopSessions
+      .interruptAll()
+      .then(() => {
+        cancelAllMcpInputs();
+        return closeAllMcpClients();
+      })
+      .then(() => closeMcpOAuthLoopback())
+      .then(() => {
+        stopServer();
+        return closeDb();
+      })
+      .finally(() => app.quit());
+  });
+}

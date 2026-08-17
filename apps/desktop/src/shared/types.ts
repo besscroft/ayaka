@@ -8,6 +8,15 @@ export interface Conversation {
   purge_after_at: number | null;
 }
 
+export type TrayAction = "open-settings" | "open-home" | "new-chat";
+
+export interface TrayMenuLabels {
+  settings: string;
+  openHome: string;
+  chat: string;
+  quit: string;
+}
+
 /** 娑堟伅璁板綍锛堝搴?DB 涓殑 messages 琛級 */
 export interface MessageRow {
   id: string;

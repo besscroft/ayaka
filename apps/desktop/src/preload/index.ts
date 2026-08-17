@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { electronAPI } from "@electron-toolkit/preload";
+import type { TrayAction, TrayMenuLabels } from "../shared/types";
 
 /**
  * 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
@@ -21,6 +22,14 @@ const api = {
       ipcRenderer.on("window:maximized-changed", listener);
       return () => ipcRenderer.removeListener("window:maximized-changed", listener);
     },
+  },
+  tray: {
+    onAction: (handler: (action: TrayAction) => void) => {
+      const listener = (_event: IpcRendererEvent, action: TrayAction): void => handler(action);
+      ipcRenderer.on("tray:action", listener);
+      return () => ipcRenderer.removeListener("tray:action", listener);
+    },
+    setLabels: (labels: TrayMenuLabels) => ipcRenderer.invoke("tray:setLabels", labels),
   },
   conversations: {
     list: () => ipcRenderer.invoke("conversations:list"),

@@ -4,6 +4,7 @@ import { ChatView } from "./components/ChatView";
 import { SettingsDialog, type SettingsTabId } from "./components/SettingsDialog";
 import { MainPanelView } from "./components/MainPanelView";
 import { api } from "./lib/api";
+import { handleTrayAction } from "./lib/tray-actions";
 import { SettingsProvider, useSettings } from "./lib/settings";
 import { AppI18nProvider, useT } from "./lib/i18n";
 import { SettingKey, type LocalServerInfo, type UpdateState } from "@shared/types";
@@ -39,6 +40,7 @@ function AppRoot({ children }: { children: ReactNode }): React.JSX.Element {
 
 function AppContent(): React.JSX.Element {
   const { t } = useT();
+  const { resolvedLanguage } = useSettings();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AppView>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -54,6 +56,32 @@ function AppContent(): React.JSX.Element {
     setActiveView("chat");
     await api.settings.set(SettingKey.ActiveConversationId, id);
   }, [t]);
+
+  useEffect(() => {
+    void api.tray.setLabels({
+      settings: t("tray.settings"),
+      openHome: t("tray.open"),
+      chat: t("tray.chat"),
+      quit: t("tray.quit"),
+    });
+  }, [resolvedLanguage, t]);
+
+  useEffect(() => {
+    const offTrayAction = api.tray.onAction((action) => {
+      handleTrayAction(action, {
+        openSettings: () => {
+          setSettingsInitialTab("appearance");
+          setSettingsOpen(true);
+        },
+        openHome: () => {
+          setSettingsOpen(false);
+          setActiveView("chat");
+        },
+        newChat: () => void createNewConversation(),
+      });
+    });
+    return offTrayAction;
+  }, [createNewConversation]);
 
   useEffect(() => {
     // 鎻愭棭鎷夊彇鏈湴鏈嶅姟绔彛锛岄伩鍏?ChatView 鍐呴儴 useEffect 鎶㈣窇
