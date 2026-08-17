@@ -7,7 +7,6 @@ import {
   type AgentRunOrigin,
   type AgentRuntimeConfig,
   type AgentLoopControlMetadata,
-  type AgentCompletionCandidate,
   type RuntimeRun,
 } from "../../shared/types";
 import {
@@ -83,7 +82,6 @@ export class AgentLoopSession {
   private closed = false;
   private budgetReason: AgentLoopBudgetReason | null = null;
   private absoluteLimitReason: AgentLoopAbsoluteLimitReason | null = null;
-  private completionCandidate: AgentCompletionCandidate | undefined;
   private readonly streamCompletions = new Set<Promise<void>>();
   runtimeHandles: { coordinator: unknown; recorder: unknown } | null = null;
 
@@ -110,7 +108,6 @@ export class AgentLoopSession {
     this.turnCount = metadata.totalTurns;
     this.toolCallCount = metadata.totalToolCalls;
     this.noProgressRounds = metadata.noProgressRounds;
-    this.completionCandidate = metadata.completionCandidate;
     this.appendMessages(initialMessages);
   }
 
@@ -160,7 +157,6 @@ export class AgentLoopSession {
       noProgressRounds: this.noProgressRounds,
       absoluteDeadline: this.startedAt + this.absoluteMaxDurationMs,
       windowStartedAt: this.windowStartedAt,
-      completionCandidate: this.completionCandidate,
       resumable: this.isResumable,
     };
   }
@@ -189,7 +185,6 @@ export class AgentLoopSession {
     message: UIMessage,
   ): Promise<AgentRunInput> {
     this.assertActive();
-    this.clearCompletionCandidate();
     this.appendMessages([message]);
     const queued = await enqueueAgentRunInput({ runId: this.runId, kind, source, message });
     insertRuntimeEvent({
@@ -248,15 +243,6 @@ export class AgentLoopSession {
 
   get noProgressExceeded(): boolean {
     return this.noProgressRounds >= this.maxNoProgressRounds;
-  }
-
-  setCompletionCandidate(candidate: AgentCompletionCandidate | undefined): void {
-    this.completionCandidate = candidate;
-    void this.persistControlMetadata();
-  }
-
-  clearCompletionCandidate(): void {
-    this.setCompletionCandidate(undefined);
   }
 
   beginNextWindow(): void {
@@ -407,7 +393,6 @@ function parseControlMetadata(raw: string | undefined): AgentLoopControlMetadata
       totalToolCalls: typeof value.totalToolCalls === "number" ? value.totalToolCalls : 0,
       noProgressRounds: typeof value.noProgressRounds === "number" ? value.noProgressRounds : 0,
       absoluteDeadline: typeof value.absoluteDeadline === "number" ? value.absoluteDeadline : 0,
-      completionCandidate: value.completionCandidate,
       blockedReason: value.blockedReason,
       resumable: value.resumable !== false,
       windowStartedAt: value.windowStartedAt,
@@ -444,7 +429,6 @@ export class AgentLoopSessionManager {
         );
       }
       await active.markRunning();
-      active.clearCompletionCandidate();
       active.appendMessages(options.messages ?? []);
       return active;
     }

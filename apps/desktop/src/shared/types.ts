@@ -694,22 +694,12 @@ export interface AgentRunInput {
   discarded_reason: string | null;
 }
 
-export interface AgentCompletionCandidate {
-  result: string;
-  completedItems: string[];
-  verificationEvidence: string[];
-  remainingItems: string[];
-  blockingReason?: string;
-  submittedAt: number;
-}
-
 export interface AgentLoopControlMetadata {
   windowCount: number;
   totalTurns: number;
   totalToolCalls: number;
   noProgressRounds: number;
   absoluteDeadline: number;
-  completionCandidate?: AgentCompletionCandidate;
   blockedReason?: string;
   resumable: boolean;
   windowStartedAt?: number;

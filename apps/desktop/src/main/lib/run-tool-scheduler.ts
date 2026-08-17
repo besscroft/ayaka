@@ -1,5 +1,26 @@
 import type { ToolSet } from "ai";
 
+export interface ToolTurnControl {
+  concludeTurn(): void;
+  reset(): void;
+  readonly concluded: boolean;
+}
+
+export function createToolTurnControl(): ToolTurnControl {
+  let concluded = false;
+  return {
+    concludeTurn: () => {
+      concluded = true;
+    },
+    reset: () => {
+      concluded = false;
+    },
+    get concluded() {
+      return concluded;
+    },
+  };
+}
+
 const READ_ONLY_TOOLS = new Set([
   "memory_search",
   "memory_list",
@@ -44,6 +65,7 @@ export function scheduleToolSet(
   scheduler: RunToolScheduler,
   signal: AbortSignal,
   beginToolCall?: () => boolean,
+  turnControl?: ToolTurnControl,
 ): ToolSet {
   return Object.fromEntries(
     Object.entries(tools).map(([name, definition]) => {
@@ -62,7 +84,17 @@ export function scheduleToolSet(
               if (beginToolCall && !beginToolCall()) {
                 throw new Error("Agent run tool-call budget exhausted.");
               }
-              const result = execute(...args);
+              const executionArgs =
+                turnControl && args.length > 1 && isRecord(args[1])
+                  ? [
+                      args[0],
+                      {
+                        ...args[1],
+                        concludeTurn: () => turnControl.concludeTurn(),
+                      },
+                    ]
+                  : args;
+              const result = execute(...executionArgs);
               if (isAsyncIterable(result)) {
                 for await (const chunk of result) yield chunk;
               } else {
@@ -80,6 +112,10 @@ export function scheduleToolSet(
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return !!value && typeof value === "object" && Symbol.asyncIterator in value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function throwIfAborted(signal: AbortSignal): void {

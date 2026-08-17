@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { RunToolScheduler } from "@desktop-main/lib/run-tool-scheduler";
+import { jsonSchema, type ToolSet } from "ai";
+import {
+  createToolTurnControl,
+  RunToolScheduler,
+  scheduleToolSet,
+} from "@desktop-main/lib/run-tool-scheduler";
 
 void describe("RunToolScheduler", () => {
   void it("allows read-only tools to acquire concurrently", async () => {
@@ -41,5 +46,50 @@ void describe("RunToolScheduler", () => {
     controller.abort("cancelled");
     first();
     await assert.rejects(queued, { name: "AbortError" });
+  });
+});
+
+void describe("run tool turn control", () => {
+  void it("exposes concludeTurn to tool execution options", async () => {
+    const control = createToolTurnControl();
+    const tools = {
+      terminal: {
+        description: "A test terminal tool.",
+        inputSchema: jsonSchema<Record<string, never>>({
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        }),
+        execute: async (_input: unknown, options: { concludeTurn?: () => void }) => {
+          options.concludeTurn?.();
+          return { ok: true };
+        },
+      },
+    } as ToolSet;
+    const scheduled = scheduleToolSet(
+      tools,
+      new RunToolScheduler(),
+      new AbortController().signal,
+      undefined,
+      control,
+    );
+    const execute = scheduled.terminal?.execute as unknown as (
+      input: unknown,
+      options: Record<string, unknown>,
+    ) => AsyncIterable<unknown>;
+
+    const outputs: unknown[] = [];
+    for await (const output of execute({}, {})) outputs.push(output);
+
+    assert.deepEqual(outputs, [{ ok: true }]);
+    assert.equal(control.concluded, true);
+  });
+
+  void it("can reset the conclusion for the next model step", () => {
+    const control = createToolTurnControl();
+    control.concludeTurn();
+    assert.equal(control.concluded, true);
+    control.reset();
+    assert.equal(control.concluded, false);
   });
 });

@@ -19,5 +19,7 @@ import "./main/lib/update-manager.test.ts";
 import "./main/lib/web-page-reader.test.ts";
 import "./main/lib/agent-context-manager.test.ts";
 import "./main/lib/agent-coordinator.test.ts";
+import "./main/lib/agent-run-policy.test.ts";
 import "./main/lib/cron-store.test.ts";
+import "./main/lib/run-tool-scheduler.test.ts";
 import "./main/server/index.test.ts";
