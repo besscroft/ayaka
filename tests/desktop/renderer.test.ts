@@ -25,5 +25,6 @@ import "./renderer/lib/generated-tool-ui.test.ts";
 import "./renderer/lib/i18n.test.ts";
 import "./renderer/lib/media-resource.test.ts";
 import "./renderer/lib/settings.test.ts";
+import "./renderer/lib/skins.test.ts";
 import "./renderer/lib/theme.test.ts";
 import "./renderer/lib/tray-actions.test.ts";

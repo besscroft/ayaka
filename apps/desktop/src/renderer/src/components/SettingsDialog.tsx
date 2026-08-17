@@ -66,7 +66,6 @@ import {
   type ChatReasoningLevel,
   FONT_PRESETS,
   MONO_FONT_PRESETS,
-  SKIN_DEFINITIONS,
   type Conversation,
   type CustomProviderInput,
   type FontPreset,
@@ -89,6 +88,7 @@ import {
   type MediaGenerationKind,
   type MediaGenerationSettings,
 } from "@shared/types";
+import { SKIN_DEFINITIONS } from "../skins/registry";
 
 interface SettingsDialogProps {
   /** 鎺у埗鏄鹃殣 */

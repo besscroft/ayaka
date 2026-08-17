@@ -13,7 +13,6 @@ import {
   SettingKey,
   DEFAULT_SETTINGS,
   CHAT_REASONING_LEVELS,
-  SKIN_DEFINITIONS,
   type AppSettings,
   type SkinId,
   type FontSizeLevel,
@@ -25,6 +24,7 @@ import {
   type ChatReasoningLevel,
 } from "@shared/types";
 import { applyTheme } from "./theme";
+import { SKIN_DEFINITIONS } from "../skins/registry";
 
 const APP_SETTING_KEYS: string[] = [
   SettingKey.Skin,

@@ -1,73 +1,27 @@
 import {
   FONT_SIZE_PX,
-  SKIN_DEFINITIONS,
   type AppSettings,
   type DiffMark,
   type FontSizeLevel,
   type LayoutDensity,
   type ReduceMotion,
   type SkinId,
-  type SkinTokenValues,
 } from "@shared/types";
+import type { SkinDefinition } from "../skins/types";
+import { getSkinDefinition } from "../skins/registry";
 
-const SKIN_TOKEN_CSS_VARS: Record<keyof SkinTokenValues, string> = {
-  background: "--skin-background",
-  foreground: "--skin-foreground",
-  surface: "--skin-surface",
-  surfaceForeground: "--skin-surface-foreground",
-  overlay: "--skin-overlay",
-  overlayForeground: "--skin-overlay-foreground",
-  fieldBackground: "--skin-field-background",
-  fieldForeground: "--skin-field-foreground",
-  primary: "--skin-primary",
-  primaryForeground: "--skin-primary-foreground",
-  secondary: "--skin-secondary",
-  secondaryForeground: "--skin-secondary-foreground",
-  muted: "--skin-muted",
-  mutedForeground: "--skin-muted-foreground",
-  accent: "--skin-accent",
-  accentForeground: "--skin-accent-foreground",
-  border: "--skin-border",
-  separator: "--skin-separator",
-  focus: "--skin-focus",
-  link: "--skin-link",
-  success: "--skin-success",
-  successForeground: "--skin-success-foreground",
-  warning: "--skin-warning",
-  warningForeground: "--skin-warning-foreground",
-  danger: "--skin-danger",
-  dangerForeground: "--skin-danger-foreground",
-};
-
-export function getSkin(skin: SkinId) {
-  return SKIN_DEFINITIONS.find((definition) => definition.id === skin) ?? SKIN_DEFINITIONS[0];
+export function getSkin(skin: SkinId): SkinDefinition {
+  return getSkinDefinition(skin);
 }
 
 export function applySkin(skin: SkinId): SkinId {
   const root = document.documentElement;
   const definition = getSkin(skin);
 
-  for (const extensionName of new Set(
-    SKIN_DEFINITIONS.flatMap((candidate) => Object.keys(candidate.extensions ?? {})),
-  )) {
-    root.style.removeProperty(extensionName);
-  }
-
   root.setAttribute("data-skin", definition.id);
-  root.style.setProperty("color-scheme", definition.colorScheme);
   root.classList.toggle("light", definition.colorScheme === "light");
   root.classList.toggle("dark", definition.colorScheme === "dark");
   root.removeAttribute("data-theme");
-
-  for (const key of Object.keys(SKIN_TOKEN_CSS_VARS) as Array<keyof SkinTokenValues>) {
-    root.style.setProperty(SKIN_TOKEN_CSS_VARS[key], definition.tokens[key]);
-  }
-  root.style.setProperty("--skin-radius", `${definition.radius}px`);
-  root.style.setProperty("--skin-font-stack", definition.fontStack);
-  root.style.setProperty("--skin-mono-font-stack", definition.monoFontStack);
-  for (const [name, value] of Object.entries(definition.extensions ?? {})) {
-    root.style.setProperty(name, value);
-  }
 
   return definition.id;
 }

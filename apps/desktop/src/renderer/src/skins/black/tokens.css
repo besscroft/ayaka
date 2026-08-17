@@ -1,0 +1,32 @@
+:root[data-skin="black"] {
+  color-scheme: dark;
+  --skin-radius: 10px;
+  --skin-font-stack: "Inter", "PingFang SC", system-ui, sans-serif;
+  --skin-mono-font-stack: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --skin-background: oklch(0.145 0 0);
+  --skin-foreground: oklch(0.985 0 0);
+  --skin-surface: oklch(0.205 0 0);
+  --skin-surface-foreground: oklch(0.985 0 0);
+  --skin-overlay: oklch(0.205 0 0);
+  --skin-overlay-foreground: oklch(0.985 0 0);
+  --skin-field-background: oklch(0.205 0 0);
+  --skin-field-foreground: oklch(0.985 0 0);
+  --skin-primary: oklch(0.922 0 0);
+  --skin-primary-foreground: oklch(0.205 0 0);
+  --skin-secondary: oklch(0.269 0 0);
+  --skin-secondary-foreground: oklch(0.985 0 0);
+  --skin-muted: oklch(0.269 0 0);
+  --skin-muted-foreground: oklch(0.708 0 0);
+  --skin-border: oklch(1 0 0 / 10%);
+  --skin-separator: oklch(1 0 0 / 10%);
+  --skin-accent: oklch(0.269 0 0);
+  --skin-accent-foreground: oklch(0.985 0 0);
+  --skin-focus: oklch(0.556 0 0);
+  --skin-link: oklch(0.922 0 0);
+  --skin-success: oklch(0.62 0.17 155);
+  --skin-success-foreground: oklch(0.98 0.01 155);
+  --skin-warning: oklch(0.72 0.18 70);
+  --skin-warning-foreground: oklch(0.2 0.02 70);
+  --skin-danger: oklch(0.58 0.2 25);
+  --skin-danger-foreground: oklch(0.98 0.01 25);
+}

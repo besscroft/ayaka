@@ -1,0 +1,63 @@
+/* ============================================================
+   外观设置（运行时数据属性驱动）
+   ============================================================ */
+
+/* 半透明侧边栏（data-translucent-sidebar="true"） */
+[data-translucent-sidebar="true"] aside.app-sidebar {
+  background-color: color-mix(in oklch, var(--color-background) 65%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* 减少动态效果（data-reduce-motion="on"） */
+[data-reduce-motion="on"] *,
+[data-reduce-motion="on"] *::before,
+[data-reduce-motion="on"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* 指针光标（data-pointer-cursor="true"） */
+[data-pointer-cursor="true"] button:not(:disabled),
+[data-pointer-cursor="true"] [role="button"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] [role="tab"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] [role="option"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] [role="switch"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] [role="checkbox"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] [role="radio"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] a[href],
+[data-pointer-cursor="true"] label[for],
+[data-pointer-cursor="true"] select:not(:disabled),
+[data-pointer-cursor="true"] input[type="button"]:not(:disabled),
+[data-pointer-cursor="true"] input[type="submit"]:not(:disabled),
+[data-pointer-cursor="true"] input[type="reset"]:not(:disabled),
+[data-pointer-cursor="true"] input[type="range"]:not(:disabled),
+[data-pointer-cursor="true"] [data-clickable="true"]:not([aria-disabled="true"]),
+[data-pointer-cursor="true"] summary {
+  cursor: pointer;
+}
+
+[data-pointer-cursor="true"] button:disabled,
+[data-pointer-cursor="true"] input:disabled,
+[data-pointer-cursor="true"] select:disabled,
+[data-pointer-cursor="true"] [aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* 差异标记：symbol 模式（data-diff-mark="symbol"） */
+[data-diff-mark="symbol"] .diff-add::before {
+  content: "+ ";
+  color: var(--color-success);
+  font-weight: 700;
+}
+[data-diff-mark="symbol"] .diff-remove::before {
+  content: "- ";
+  color: var(--color-danger);
+  font-weight: 700;
+}
+[data-diff-mark="color"] .diff-add::before,
+[data-diff-mark="color"] .diff-remove::before {
+  content: "";
+}

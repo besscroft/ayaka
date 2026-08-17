@@ -1,0 +1,276 @@
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --font-display-family: var(--display-family);
+  --font-display-weight: 500;
+  --font-display-tracking: 0em;
+  --font-body-family: var(--body-family);
+  --font-body-weight: 400;
+  --font-body-tracking: 0em;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-footer: var(--footer);
+  --color-footer-foreground: var(--footer-foreground);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-highlight: var(--code-highlight);
+  --color-code-number: var(--code-number);
+  --color-code-selection: var(--code-selection);
+  --color-code-border: var(--code-border);
+}
+
+@utility font-display {
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+}
+
+@utility font-body {
+  font-family: var(--font-body-family);
+  font-weight: var(--font-body-weight);
+  letter-spacing: var(--font-body-tracking);
+}
+
+/* ============================================================
+   应用全局样式
+   ============================================================ */
+
+:root {
+  --spacing: 0.25rem;
+  /* Skin metrics feed Tailwind's named radius utilities. */
+  --skin-radius: 0.625rem;
+  --radius: var(--skin-radius);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --skin-font-stack: "Inter", "PingFang SC", system-ui, sans-serif;
+  --skin-mono-font-stack: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --white: oklch(1 0 0);
+  --snow: oklch(0.985 0.003 247);
+  --eclipse: oklch(0.145 0.01 260);
+
+  /* User font overrides are inline; empty overrides fall back to the active skin. */
+  --app-font-sans: var(--skin-font-stack);
+  --app-font-mono: var(--skin-mono-font-stack);
+  --display-family: var(--skin-command-font, var(--app-font-sans));
+  --body-family: var(--app-font-sans);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+
+  --background: var(--skin-background);
+  --foreground: var(--skin-foreground);
+  --surface: var(--skin-surface);
+  --surface-foreground: var(--skin-surface-foreground);
+  --overlay: var(--skin-overlay);
+  --overlay-foreground: var(--skin-overlay-foreground);
+  --field-background: var(--skin-field-background);
+  --field-foreground: var(--skin-field-foreground);
+  --primary: var(--skin-primary);
+  --primary-foreground: var(--skin-primary-foreground);
+  --secondary: var(--skin-secondary);
+  --secondary-foreground: var(--skin-secondary-foreground);
+  --muted: var(--skin-muted);
+  --muted-foreground: var(--skin-muted-foreground);
+  --border: var(--skin-border);
+  --separator: var(--skin-separator);
+  --accent: var(--skin-accent);
+  --accent-foreground: var(--skin-accent-foreground);
+  --focus: var(--skin-focus);
+  --link: var(--skin-link);
+  --success: var(--skin-success);
+  --success-foreground: var(--skin-success-foreground);
+  --warning: var(--skin-warning);
+  --warning-foreground: var(--skin-warning-foreground);
+  --danger: var(--skin-danger);
+  --danger-foreground: var(--skin-danger-foreground);
+
+  --card: var(--surface);
+  --card-foreground: var(--surface-foreground);
+  --popover: var(--overlay);
+  --popover-foreground: var(--overlay-foreground);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+  --input: var(--skin-input, var(--border));
+  --ring: var(--skin-ring, var(--focus));
+
+  --sidebar: var(--skin-sidebar, var(--background));
+  --sidebar-foreground: var(--skin-sidebar-foreground, var(--foreground));
+  --sidebar-primary: var(--skin-sidebar-primary, var(--primary));
+  --sidebar-primary-foreground: var(--skin-sidebar-primary-foreground, var(--primary-foreground));
+  --sidebar-accent: var(--skin-sidebar-accent, var(--accent));
+  --sidebar-accent-foreground: var(--skin-sidebar-accent-foreground, var(--accent-foreground));
+  --sidebar-border: var(--skin-sidebar-border, var(--border));
+  --sidebar-ring: var(--skin-sidebar-ring, var(--ring));
+
+  --chart-1: var(--skin-chart-1, var(--primary));
+  --chart-2: var(--skin-chart-2, var(--primary));
+  --chart-3: var(--skin-chart-3, var(--primary));
+  --chart-4: var(--skin-chart-4, var(--primary));
+  --chart-5: var(--skin-chart-5, var(--primary));
+
+  --header: var(--skin-header, var(--surface));
+  --header-foreground: var(--skin-header-foreground, var(--surface-foreground));
+  --footer: var(--skin-footer, var(--surface));
+  --footer-foreground: var(--skin-footer-foreground, var(--surface-foreground));
+  --code: var(--skin-code, var(--surface));
+  --code-foreground: var(--skin-code-foreground, var(--muted-foreground));
+  --code-highlight: var(--skin-code-highlight, var(--foreground));
+  --code-number: var(--skin-code-number, var(--muted-foreground));
+  --code-selection: var(--skin-code-selection, var(--border));
+  --code-border: var(--skin-code-border, var(--border));
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+}
+
+/* Semantic aliases below keep shadcn and application components skin-agnostic. */
+html {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body-family);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  /* 允许文本选择（聊天内容需要复制） */
+  user-select: text;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+.window-drag-region {
+  -webkit-app-region: drag;
+}
+
+.window-no-drag,
+.window-control-button {
+  -webkit-app-region: no-drag;
+}
+
+.window-control-button {
+  display: flex;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in oklch, var(--color-foreground) 58%, transparent);
+  outline: none;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.window-control-button:hover {
+  color: var(--color-foreground);
+  background: color-mix(in oklch, var(--color-foreground) 7%, transparent);
+}
+
+.window-control-button:focus-visible {
+  color: var(--color-accent);
+  background: color-mix(in oklch, var(--color-accent) 12%, transparent);
+}
+
+.window-close-button:hover,
+.window-close-button:focus-visible {
+  color: var(--danger-foreground);
+  background: var(--danger);
+}
+
+/* 自定义滚动条：更现代的视觉 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--color-foreground) 20%, transparent);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--color-foreground) 35%, transparent);
+}
+
+/* 代码块样式 */
+code,
+pre {
+  font-family: var(--font-mono);
+}
+code {
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background-color: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+  font-size: var(--code-font-size, 0.875em);
+}
+
+.rich-content :where(code):not(pre code) {
+  background-color: color-mix(in oklch, currentColor 10%, transparent);
+}
+
+.rich-content :where(pre code) {
+  background-color: transparent;
+  padding: 0;
+}
