@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.27]
+
+### 中文
+
+#### 新增
+
+- 新增“明日方舟”主题皮肤，提供完整的颜色、字体、组件几何与交互样式定义。
+- 为基础 UI 组件补充 `data-slot` 属性，便于皮肤和自定义样式进行精准定位。
+
+#### 变更
+
+- 重构皮肤系统，将皮肤定义与样式拆分至渲染器侧的独立模块，简化皮肤注册与扩展。
+- 优化设置页面皮肤选择网格布局，在不同窗口尺寸下自适应 2 列或 4 列展示。
+- 优化窗口标题栏及基础 UI 组件的样式标记，提升主题样式覆盖能力。
+
+### English
+
+#### Added
+
+- Added an Arknights skin with complete color tokens, typography, component geometry, and interaction styles.
+- Added `data-slot` attributes to base UI components for precise skin and custom-style targeting.
+
+#### Changed
+
+- Refactored the skin system into renderer-side modules for simpler skin registration and extension.
+- Improved the Settings skin selector with a responsive two- or four-column grid across window sizes.
+- Improved styling hooks for the window title bar and base UI components to support theme overrides.
+
 ## [0.1.26]
 
 ### 中文
