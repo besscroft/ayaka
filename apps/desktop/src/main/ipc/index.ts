@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { getServerInfo, getServerPort } from "../server";
 import {
   listConversations,
@@ -99,6 +99,7 @@ import type {
   WorkspaceMediaSaveInput,
   McpInputRequest,
   TrayMenuLabels,
+  ErrorLogInput,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID } from "../../shared/types";
@@ -171,6 +172,12 @@ import {
 } from "../lib/conversation-workspace";
 import { updateManager } from "../lib/update-manager";
 import { readChangelog } from "../lib/changelog";
+import {
+  exportCurrentErrorLog,
+  recordErrorLog,
+  type ErrorLogSaveDialog,
+  type ErrorLogSaveDialogOptions,
+} from "../lib/error-logger";
 
 /**
  * IPC handlers 娉ㄥ唽
@@ -216,6 +223,17 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   });
   ipcMain.handle("window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.on("logs:record", (_event, input: ErrorLogInput) => {
+    if (!input || typeof input !== "object") return;
+    recordErrorLog({ ...input, source: "renderer" });
+  });
+  ipcMain.handle("logs:export", (event) => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const showSaveDialog: ErrorLogSaveDialog = (options: ErrorLogSaveDialogOptions) =>
+      parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
+    return exportCurrentErrorLog(showSaveDialog);
   });
 
   ipcMain.handle("tray:setLabels", (_event, labels: TrayMenuLabels) => {

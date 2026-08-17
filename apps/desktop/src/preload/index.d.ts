@@ -3,6 +3,7 @@ import type {
   AgentInput,
   AgentMemoryFileSnapshot,
   AgentProfile,
+  ErrorLogExportResult,
   Conversation,
   ArtifactInstallation,
   CatalogInstallInput,
@@ -148,6 +149,9 @@ export interface AyakaApi {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<boolean>;
     getAll: (keys: string[]) => Promise<Record<string, string | null>>;
+  };
+  logs: {
+    export: () => Promise<ErrorLogExportResult>;
   };
   // API Key 绠＄悊锛堟槑鏂囦笉澶栨硠锛?
   apikeys: {

@@ -20,6 +20,12 @@ import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
 import { createTray, type TrayController } from "./lib/tray";
 import { getDefaultTrayMenuLabels } from "./lib/tray-menu";
 import { ensureDefaultWorkspaceAsset } from "./lib/default-workspace-assets";
+import {
+  flushErrorLogs,
+  initializeErrorLogger,
+  installProcessErrorCapture,
+  recordErrorLog,
+} from "./lib/error-logger";
 import type { TrayAction, TrayMenuLabels } from "../shared/types";
 
 const WINDOWS_APP_ID = "com.zzzvoid.ai";
@@ -41,6 +47,8 @@ let isCleaningUpBeforeQuit = false;
 let isQuitting = false;
 let trayController: TrayController | null = null;
 const pendingTrayActions: TrayAction[] = [];
+
+installProcessErrorCapture();
 
 function getPreloadPath(): string {
   return join(__dirname, "../preload/index.js");
@@ -98,6 +106,18 @@ function createWindow(): BrowserWindow {
   });
   mainWindowRef = mainWindow;
 
+  mainWindow.webContents.on("console-message", (_event, level, message, lineNumber, sourceId) => {
+    const numericLevel = Number(level);
+    if (numericLevel < 2) return;
+    recordErrorLog({
+      source: "renderer",
+      level: numericLevel >= 3 ? "error" : "warning",
+      origin: "console",
+      message,
+      details: { lineNumber, sourceId },
+    });
+  });
+
   mainWindow.on("close", (event) => {
     if (process.platform !== "win32" || isQuitting) return;
     event.preventDefault();
@@ -145,6 +165,7 @@ if (!hasSingleInstanceLock) {
     process.env.AYAKA_USER_DATA_DIR ??= app.getPath("userData");
     process.env.AYAKA_APP_PATH ??= app.getAppPath();
     process.env.AYAKA_DEV = is.dev ? "1" : "0";
+    await initializeErrorLogger().catch(() => undefined);
     electronApp.setAppUserModelId(WINDOWS_APP_ID);
     app.setName("Ayaka");
     removeLegacyCompanionData();
@@ -175,6 +196,10 @@ if (!hasSingleInstanceLock) {
       console.error("[main] AI server startup failed:", err);
     }
 
+    registerIpcHandlers({
+      onTrayLabelsChanged: (labels: TrayMenuLabels) => trayController?.setLabels(labels),
+    });
+
     createWindow();
     if (process.platform === "win32") {
       trayController = createTray(
@@ -185,9 +210,6 @@ if (!hasSingleInstanceLock) {
     }
     updateManager.setEmitter((state) => sendUpdateState(mainWindowRef, state));
     updateManager.setInstallGuard(() => !agentLoopSessions.hasActiveSessions());
-    registerIpcHandlers({
-      onTrayLabelsChanged: (labels: TrayMenuLabels) => trayController?.setLabels(labels),
-    });
     updateManager.start();
 
     ipcMain.on("ping", () => console.log("pong"));
@@ -219,9 +241,10 @@ if (!hasSingleInstanceLock) {
         return closeAllMcpClients();
       })
       .then(() => closeMcpOAuthLoopback())
-      .then(() => {
+      .then(async () => {
         stopServer();
-        return closeDb();
+        await closeDb();
+        await flushErrorLogs();
       })
       .finally(() => app.quit());
   });

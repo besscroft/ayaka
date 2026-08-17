@@ -18,6 +18,7 @@ import {
   Cpu,
   Copy,
   Database,
+  Download,
   DollarSign,
   GitFork,
   Globe,
@@ -106,6 +107,7 @@ export const IconGlobe = fromLucide(Globe);
 export const IconFolderOpen = fromLucide(FolderOpen);
 export const IconClock = fromLucide(Clock);
 export const IconDatabase = fromLucide(Database);
+export const IconDownload = fromLucide(Download);
 export const IconType = fromLucide(Type);
 export const IconLayout = fromLucide(LayoutDashboard);
 export const IconSearch = fromLucide(Search);

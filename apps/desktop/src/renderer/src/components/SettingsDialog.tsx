@@ -56,6 +56,7 @@ import {
   IconFolderOpen,
   IconImage,
   IconEye,
+  IconDownload,
 } from "./icons";
 import {
   CHAT_REASONING_LEVELS,
@@ -3709,9 +3710,10 @@ function safeJsonRecord(raw: string): Record<string, unknown> {
 }
 
 function DiagnosticsTab(): React.JSX.Element {
-  const { t, f } = useT();
+  const { t, f, locale } = useT();
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const refresh = (): void => {
     setRefreshing(true);
@@ -3723,6 +3725,19 @@ function DiagnosticsTab(): React.JSX.Element {
 
   useEffect(refresh, []);
 
+  const exportLogs = async (): Promise<void> => {
+    setExporting(true);
+    try {
+      const result = await api.logs.export();
+      if (result === "saved") notify.success(t("toast.settings.logs.exported"));
+      else if (result === "empty") notify.success(t("toast.settings.logs.empty"));
+    } catch (error) {
+      notify.error(t("toast.settings.logs.exportFailed"), error, locale);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <section className="flex flex-col min-h-0 flex-1 -mx-5 -my-4">
       <div className="shrink-0 flex items-center justify-between gap-3 select-none px-5 py-4">
@@ -3730,10 +3745,21 @@ function DiagnosticsTab(): React.JSX.Element {
           <h3 className="text-base font-semibold">{t("settings.diagnostics.title")}</h3>
           <p className="mt-1 text-sm text-foreground/50">{t("settings.diagnostics.subtitle")}</p>
         </div>
-        <Button variant="secondary" size="sm" onPress={refresh} isDisabled={refreshing}>
-          <IconRotateCcw className={cn("size-4", refreshing && "animate-spin")} />
-          {t("main.refresh")}
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => void exportLogs()}
+            isPending={exporting}
+          >
+            <IconDownload className="size-4" />
+            {t("settings.diagnostics.exportLogs")}
+          </Button>
+          <Button variant="secondary" size="sm" onPress={refresh} isDisabled={refreshing}>
+            <IconRotateCcw className={cn("size-4", refreshing && "animate-spin")} />
+            {t("main.refresh")}
+          </Button>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4">

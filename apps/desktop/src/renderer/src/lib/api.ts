@@ -2,6 +2,7 @@ import type {
   AgentInput,
   AgentMemoryFileSnapshot,
   AgentProfile,
+  ErrorLogExportResult,
   Conversation,
   ArtifactInstallation,
   CatalogInstallInput,
@@ -180,6 +181,9 @@ export const api = {
     set: (key: string, value: string): Promise<boolean> => assertApi().settings.set(key, value),
     getAll: (keys: string[]): Promise<Record<string, string | null>> =>
       assertApi().settings.getAll(keys),
+  },
+  logs: {
+    export: (): Promise<ErrorLogExportResult> => assertApi().logs.export(),
   },
   apikeys: {
     list: (): Promise<string[]> => assertApi().apikeys.list(),
@@ -400,6 +404,7 @@ export type {
   AgentInput,
   AgentMemoryFileSnapshot,
   AgentProfile,
+  ErrorLogExportResult,
   Conversation,
   CustomModelInput,
   CustomProviderInput,

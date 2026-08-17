@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { electronAPI } from "@electron-toolkit/preload";
-import type { TrayAction, TrayMenuLabels } from "../shared/types";
+import type {
+  ErrorLogError,
+  ErrorLogExportResult,
+  ErrorLogInput,
+  TrayAction,
+  TrayMenuLabels,
+} from "../shared/types";
 
 /**
  * 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
@@ -11,6 +17,66 @@ import type { TrayAction, TrayMenuLabels } from "../shared/types";
  * - 鎵€鏈夋柟娉曡繑鍥?Promise锛坕pcRenderer.invoke 璇箟锛?
  * - API key 鏄庢枃涓嶅嚭涓昏繘绋嬶紙鏃?get 鏂规硶锛?
  */
+function sendRendererError(input: Omit<ErrorLogInput, "source">): void {
+  try {
+    ipcRenderer.send("logs:record", { ...input, source: "renderer" });
+  } catch {
+    // Error reporting must never interfere with the renderer.
+  }
+}
+
+function serializeRendererError(value: unknown): ErrorLogError | undefined {
+  if (value == null) return undefined;
+  if (value instanceof Error) {
+    return {
+      name: value.name || "Error",
+      message: value.message,
+      ...(value.stack ? { stack: value.stack } : {}),
+    };
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const message = typeof record.message === "string" ? record.message : String(value);
+    const name = typeof record.name === "string" ? record.name : "Error";
+    const stack = typeof record.stack === "string" ? record.stack : undefined;
+    return { name, message, ...(stack ? { stack } : {}) };
+  }
+  return { name: "Error", message: String(value) };
+}
+
+function installRendererErrorCapture(): void {
+  const windowRef = globalThis as typeof globalThis & {
+    addEventListener?: (type: string, listener: (event: unknown) => void) => void;
+  };
+  windowRef.addEventListener?.("error", (rawEvent) => {
+    const event = rawEvent as unknown as Record<string, unknown>;
+    const message = typeof event.message === "string" ? event.message : "Uncaught renderer error";
+    sendRendererError({
+      level: "error",
+      origin: "window-error",
+      message,
+      error: serializeRendererError(event.error),
+      details: {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      },
+    });
+  });
+  windowRef.addEventListener?.("unhandledrejection", (rawEvent) => {
+    const event = rawEvent as unknown as Record<string, unknown>;
+    const reason = event.reason;
+    sendRendererError({
+      level: "error",
+      origin: "unhandledrejection",
+      message: serializeRendererError(reason)?.message || "Unhandled renderer promise rejection",
+      error: serializeRendererError(reason),
+    });
+  });
+}
+
+installRendererErrorCapture();
+
 const api = {
   windowControls: {
     minimize: () => ipcRenderer.invoke("window:minimize"),
@@ -90,6 +156,9 @@ const api = {
     get: (key: string) => ipcRenderer.invoke("settings:get", key),
     set: (key: string, value: string) => ipcRenderer.invoke("settings:set", key, value),
     getAll: (keys: string[]) => ipcRenderer.invoke("settings:getAll", keys),
+  },
+  logs: {
+    export: (): Promise<ErrorLogExportResult> => ipcRenderer.invoke("logs:export"),
   },
   apikeys: {
     list: () => ipcRenderer.invoke("apikeys:list"),

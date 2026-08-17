@@ -727,6 +727,43 @@ export interface RuntimeEvent {
   sequence?: number | null;
 }
 
+export type ErrorLogSource = "main" | "renderer";
+export type ErrorLogLevel = "warning" | "error";
+export type ErrorLogOrigin =
+  | "console"
+  | "window-error"
+  | "unhandledrejection"
+  | "uncaughtException";
+
+export interface ErrorLogError {
+  name: string;
+  message: string;
+  stack?: string;
+}
+
+export interface ErrorLogInput {
+  source: ErrorLogSource;
+  level: ErrorLogLevel;
+  origin: ErrorLogOrigin;
+  message?: string;
+  args?: unknown[];
+  details?: unknown;
+  error?: unknown;
+  timestamp?: number;
+}
+
+export interface ErrorLogRecord {
+  timestamp: string;
+  source: ErrorLogSource;
+  level: ErrorLogLevel;
+  origin: ErrorLogOrigin;
+  message: string;
+  details?: unknown;
+  error?: ErrorLogError;
+}
+
+export type ErrorLogExportResult = "saved" | "empty" | "cancelled";
+
 export type SandboxIsolationMode = "docker" | "local";
 export type SandboxStatus = "active" | "stopped" | "failed";
 

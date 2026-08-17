@@ -1069,6 +1069,7 @@ const entries = {
     en: "Review recent model, tool, approval, sandbox, and error events.",
   },
   "settings.diagnostics.empty": { zh: "暂无诊断事件", en: "No diagnostics events yet" },
+  "settings.diagnostics.exportLogs": { zh: "导出错误日志", en: "Export error log" },
   "settings.diagnostics.subtitle": {
     zh: "查看运行时的诊断信息",
     en: "Inspect runtime diagnostics",
@@ -1291,6 +1292,12 @@ const entries = {
   "toast.settings.resetScopeFailed": { zh: "重置 {scope} 失败", en: "Failed to reset {scope}" },
   "toast.settings.resetting": { zh: "正在重置设置…", en: "Resetting settings…" },
   "toast.settings.resettingScope": { zh: "正在重置 {scope}…", en: "Resetting {scope}…" },
+  "toast.settings.logs.exported": { zh: "错误日志已导出", en: "Error log exported" },
+  "toast.settings.logs.empty": { zh: "今天暂无错误日志", en: "No error log entries for today" },
+  "toast.settings.logs.exportFailed": {
+    zh: "导出错误日志失败",
+    en: "Failed to export error log",
+  },
   "toast.trash.loadAgentsFailed": { zh: "加载智能体列表失败", en: "Failed to load agents" },
   "toast.trash.loadFailed": { zh: "加载回收站失败", en: "Failed to load trash" },
   "toast.trash.loadMcpFailed": {
