@@ -13,6 +13,7 @@ export const Textarea = forwardRef<
         className,
       )}
       {...props}
+      data-slot="textarea"
     />
   );
 });

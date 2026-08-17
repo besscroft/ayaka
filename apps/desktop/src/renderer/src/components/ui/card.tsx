@@ -9,6 +9,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>): R
         className,
       )}
       {...props}
+      data-slot="card"
     />
   );
 }

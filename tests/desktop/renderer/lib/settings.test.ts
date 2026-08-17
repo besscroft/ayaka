@@ -21,6 +21,11 @@ void describe("parseSettings", () => {
     assert.equal(settings.language, "zh-CN");
     assert.equal(settings.skin, "yaka");
 
+    const arkSettings = parseSettings({
+      [SettingKey.Skin]: "ark",
+    } as Record<string, string | null>);
+    assert.equal(arkSettings.skin, "ark");
+
     const legacyIds = [
       ["nova-light", "white"],
       ["nova-dark", "black"],

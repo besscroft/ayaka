@@ -2035,7 +2035,7 @@ export interface WorkspaceMediaSaveResult {
 // ============================================================
 
 /** 涓婚妯″紡 */
-export type SkinId = "white" | "black" | "yaka";
+export type SkinId = "white" | "black" | "yaka" | "ark";
 
 export interface SkinTokenValues {
   background: string;
@@ -2194,6 +2194,76 @@ const YAKA_EXTENSIONS = {
   "--skin-code-border": "oklch(0.922 0 0)",
 } satisfies NonNullable<SkinDefinition["extensions"]>;
 
+const ARK_TOKENS: SkinTokenValues = {
+  ...WHITE_TOKENS,
+  background: "#eef2f3",
+  foreground: "#1d2a32",
+  surface: "#f8faf9",
+  surfaceForeground: "#1d2a32",
+  overlay: "#ffffff",
+  overlayForeground: "#1d2a32",
+  fieldBackground: "#e6ecee",
+  fieldForeground: "#1d2a32",
+  primary: "#4aabea",
+  primaryForeground: "#10212c",
+  secondary: "#cfc2d1",
+  secondaryForeground: "#2a2630",
+  muted: "#e2e8e9",
+  mutedForeground: "#5a6870",
+  border: "#9aa8ad",
+  separator: "#c9d2d5",
+  accent: "#f1c644",
+  accentForeground: "#2c2709",
+  focus: "#268fc5",
+  link: "#1c7daf",
+  success: "#3c9b73",
+  successForeground: "#ffffff",
+  warning: "#f1c644",
+  warningForeground: "#2c2709",
+  danger: "#d4554b",
+  dangerForeground: "#ffffff",
+};
+
+const ARK_EXTENSIONS = {
+  "--skin-input": "#cbd6da",
+  "--skin-ring": "#268fc5",
+  "--skin-sidebar": "#2C2E31",
+  "--skin-sidebar-foreground": "#eef4f5",
+  "--skin-sidebar-primary": "#4aabea",
+  "--skin-sidebar-primary-foreground": "#10212c",
+  "--skin-sidebar-accent": "#34434b",
+  "--skin-sidebar-accent-foreground": "#ffffff",
+  "--skin-sidebar-border": "#42545c",
+  "--skin-sidebar-ring": "#f1c644",
+  "--skin-header": "#f8faf9",
+  "--skin-header-foreground": "#1d2a32",
+  "--skin-footer": "#f8faf9",
+  "--skin-footer-foreground": "#1d2a32",
+  "--skin-code": "#202b31",
+  "--skin-code-foreground": "#ecf2f2",
+  "--skin-code-highlight": "#34434b",
+  "--skin-code-number": "#b6c3c7",
+  "--skin-code-selection": "#526b77",
+  "--skin-code-border": "#42545c",
+  "--skin-chart-1": "#4aabea",
+  "--skin-chart-2": "#f1c644",
+  "--skin-chart-3": "#d8dd5a",
+  "--skin-chart-4": "#cfc2d1",
+  "--skin-chart-5": "#9c9c9c",
+  "--skin-command-font": "'Noto Serif SC', 'Source Serif Pro', 'Songti SC', serif",
+  "--skin-cut-sm": "6px",
+  "--skin-cut-md": "10px",
+  "--skin-cut-lg": "14px",
+  "--skin-line-hairline": "1px",
+  "--skin-line-strong": "2px",
+  "--skin-shadow-panel": "0 8px 24px -18px rgb(13 26 32 / 65%)",
+  "--skin-signal-low": "#9c9c9c",
+  "--skin-signal-basic": "#d8dd5a",
+  "--skin-signal-info": "#4aabea",
+  "--skin-signal-action": "#f1c644",
+  "--skin-signal-secondary": "#cfc2d1",
+} satisfies NonNullable<SkinDefinition["extensions"]>;
+
 export const SKIN_DEFINITIONS: SkinDefinition[] = [
   {
     id: "white",
@@ -2243,6 +2313,23 @@ export const SKIN_DEFINITIONS: SkinDefinition[] = [
     fontStack: NOVA_FONT_STACK,
     monoFontStack: NOVA_MONO_FONT_STACK,
     extensions: YAKA_EXTENSIONS,
+  },
+  {
+    id: "ark",
+    labelKey: "skin.ark",
+    descKey: "skin.ark.desc",
+    colorScheme: "light",
+    preview: {
+      background: "#eef2f3",
+      surface: "#f8faf9",
+      accent: "#4aabea",
+      foreground: "#1d2a32",
+    },
+    tokens: ARK_TOKENS,
+    radius: 4,
+    fontStack: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
+    monoFontStack: "'JetBrains Mono', 'Fira Code', 'Sarasa Mono SC', ui-monospace, monospace",
+    extensions: ARK_EXTENSIONS,
   },
 ];
 

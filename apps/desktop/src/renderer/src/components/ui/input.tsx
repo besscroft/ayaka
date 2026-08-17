@@ -12,6 +12,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
           className,
         )}
         {...props}
+        data-slot="input"
       />
     );
   },

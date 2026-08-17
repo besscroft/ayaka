@@ -98,7 +98,7 @@
   /* User font overrides are inline; empty overrides fall back to the active skin. */
   --app-font-sans: var(--skin-font-stack);
   --app-font-mono: var(--skin-mono-font-stack);
-  --display-family: var(--app-font-sans);
+  --display-family: var(--skin-command-font, var(--app-font-sans));
   --body-family: var(--app-font-sans);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
@@ -363,6 +363,268 @@ code {
 :root[data-skin="yaka"] [data-slot="calendar"] [data-selected="true"]:last-child button {
   border-top-right-radius: var(--cell-radius) !important;
   border-bottom-right-radius: var(--cell-radius) !important;
+}
+
+/* ============================================================
+   Ark Terminal light skin
+   ============================================================ */
+
+:root[data-skin="ark"] {
+  --font-display-weight: 700;
+  --font-display-tracking: -0.02em;
+}
+
+:root[data-skin="ark"] :is(h1, h2, h3, [data-slot="dialog-title"]) {
+  font-family: var(--font-display-family);
+}
+
+:root[data-skin="ark"] [data-slot="window-titlebar"] {
+  position: relative;
+  background: var(--header);
+  color: var(--header-foreground);
+  border-bottom-color: var(--skin-signal-info);
+  border-bottom-width: var(--skin-line-strong);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--skin-signal-info) 22%, transparent);
+}
+
+:root[data-skin="ark"] [data-slot="window-titlebar"]::after {
+  position: absolute;
+  inset-block-end: calc(-1 * var(--skin-line-strong));
+  inset-inline-start: 0;
+  width: 5rem;
+  height: var(--skin-line-strong);
+  background: var(--skin-signal-action);
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-skin="ark"] [data-slot="window-sidebar-toggle"] {
+  border-inline-end: var(--skin-line-hairline) solid var(--separator);
+  color: var(--header-foreground);
+}
+
+:root[data-skin="ark"] [data-slot="window-sidebar-toggle"]:hover,
+:root[data-skin="ark"] [data-slot="window-sidebar-toggle"]:focus-visible {
+  background: color-mix(in oklch, var(--skin-signal-info) 12%, transparent);
+  color: var(--skin-signal-info);
+}
+
+:root[data-skin="ark"] [data-slot="window-sidebar-toggle"][aria-expanded="true"] {
+  border-inline-start: var(--skin-line-strong) solid var(--skin-signal-action);
+}
+
+:root[data-skin="ark"] [data-slot="window-brand"] {
+  color: var(--header-foreground);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+:root[data-skin="ark"] [data-slot="window-controls"] {
+  border-inline-start: var(--skin-line-hairline) solid var(--separator);
+}
+
+:root[data-skin="ark"] [data-slot="window-controls"] .window-control-button {
+  color: color-mix(in oklch, var(--header-foreground) 68%, transparent);
+}
+
+:root[data-skin="ark"] [data-slot="window-controls"] .window-control-button:hover,
+:root[data-skin="ark"] [data-slot="window-controls"] .window-control-button:focus-visible {
+  background: color-mix(in oklch, var(--skin-signal-info) 12%, transparent);
+  color: var(--header-foreground);
+}
+
+:root[data-skin="ark"] [data-slot="window-controls"] .window-close-button:hover,
+:root[data-skin="ark"] [data-slot="window-controls"] .window-close-button:focus-visible {
+  background: var(--danger);
+  color: var(--danger-foreground);
+}
+
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="ghost"],
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="tertiary"] {
+  color: var(--sidebar-foreground);
+}
+
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="ghost"]:hover,
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="tertiary"]:hover,
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="ghost"]:focus-visible,
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="tertiary"]:focus-visible {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="ghost"]:focus-visible,
+:root[data-skin="ark"] .app-sidebar [data-slot="button"][data-variant="tertiary"]:focus-visible {
+  outline: 2px solid var(--sidebar-ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+:root[data-skin="ark"] .app-sidebar {
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+  box-shadow: inset -1px 0 0 var(--sidebar-border);
+}
+
+:root[data-skin="ark"][data-translucent-sidebar="true"] aside.app-sidebar {
+  background-color: var(--sidebar);
+}
+
+:root[data-skin="ark"] .app-sidebar button[aria-current="page"] {
+  border-inline-start: var(--skin-line-strong) solid var(--skin-signal-action);
+  border-radius: 2px;
+}
+
+:root[data-skin="ark"] .app-sidebar input,
+:root[data-skin="ark"] [data-slot="input"],
+:root[data-skin="ark"] [data-slot="textarea"],
+:root[data-skin="ark"] [data-slot="select-trigger"] {
+  border-radius: 2px;
+  border-color: var(--skin-input);
+  background-color: var(--field-background);
+  box-shadow: none;
+}
+
+:root[data-skin="ark"]
+  :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):focus-visible {
+  border-color: var(--skin-ring);
+  outline: 2px solid var(--skin-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--skin-ring) 22%, transparent);
+}
+
+:root[data-skin="ark"] [data-slot="button"] {
+  border-radius: 2px;
+  box-shadow: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+:root[data-skin="ark"] [data-slot="button"]:is([data-variant="default"], [data-variant="primary"]) {
+  box-shadow: inset var(--skin-line-strong) 0 0 var(--skin-signal-info);
+}
+
+:root[data-skin="ark"]
+  [data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"]) {
+  border-inline-start: var(--skin-line-strong) solid var(--skin-signal-info);
+}
+
+:root[data-skin="ark"] [data-slot="button"][data-variant="destructive"] {
+  box-shadow: inset var(--skin-line-strong) 0 0 var(--danger);
+}
+
+:root[data-skin="ark"] [data-slot="button"]:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:root[data-skin="ark"] [data-slot="button"]:focus-visible {
+  outline: 2px solid var(--skin-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--skin-ring) 22%, transparent);
+}
+
+:root[data-skin="ark"] [data-slot="message-content"][data-from="user"] {
+  position: relative;
+  max-width: min(42rem, 82%);
+  border: var(--skin-line-hairline) solid
+    color-mix(in oklch, var(--skin-signal-info) 40%, var(--border));
+  border-inline-start: var(--skin-line-strong) solid var(--skin-signal-info);
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--skin-signal-info) 14%, var(--surface));
+  color: var(--foreground);
+  box-shadow: var(--skin-shadow-panel);
+}
+
+:root[data-skin="ark"] [data-slot="message-content"][data-from="user"]::after {
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline-end: -1px;
+  width: var(--skin-cut-sm);
+  height: var(--skin-line-strong);
+  background: var(--skin-signal-action);
+  content: "";
+  pointer-events: none;
+  transform: skewX(-45deg);
+  transform-origin: right center;
+}
+
+:root[data-skin="ark"] [data-slot="message-content"][data-from="user"] :where(a) {
+  color: var(--link);
+}
+
+:root[data-skin="ark"] [data-slot="card"] {
+  position: relative;
+  border-radius: 2px;
+  border-inline-start: var(--skin-line-strong) solid var(--skin-signal-info);
+  box-shadow: var(--skin-shadow-panel);
+}
+
+:root[data-skin="ark"] [data-slot="card"]::after {
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline-end: -1px;
+  width: var(--skin-cut-md);
+  height: var(--skin-line-strong);
+  background: var(--skin-signal-action);
+  content: "";
+  pointer-events: none;
+  transform: skewX(-45deg);
+  transform-origin: right center;
+}
+
+:root[data-skin="ark"]
+  :is([data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]) {
+  border-radius: 2px;
+  border-color: var(--border);
+  box-shadow: var(--skin-shadow-panel);
+}
+
+:root[data-skin="ark"] [data-slot="dialog-header"],
+:root[data-skin="ark"] [data-slot="dialog-footer"] {
+  border-color: var(--separator);
+}
+
+:root[data-skin="ark"] [data-slot="badge"] {
+  border-radius: 2px;
+  letter-spacing: 0.03em;
+}
+
+:root[data-skin="ark"] [data-slot="tabs-list"] {
+  border: var(--skin-line-hairline) solid var(--border);
+  border-radius: 2px;
+  background: var(--muted);
+}
+
+:root[data-skin="ark"] [data-slot="tabs-trigger"] {
+  border-radius: 1px;
+}
+
+:root[data-skin="ark"] [data-slot="tabs-trigger"][data-active] {
+  box-shadow: inset 0 calc(-1 * var(--skin-line-strong)) 0 var(--skin-signal-action);
+}
+
+:root[data-skin="ark"] :is(pre, .rich-content pre) {
+  border: var(--skin-line-hairline) solid var(--code-border);
+  border-radius: 2px;
+  background: var(--code);
+  color: var(--code-foreground);
+}
+
+:root[data-skin="ark"] :is(code, .rich-content :where(code):not(pre code)) {
+  border-radius: 2px;
+  background-color: color-mix(in oklch, var(--skin-signal-info) 12%, transparent);
+}
+
+:root[data-skin="ark"] .rich-content :where(pre code) {
+  background: transparent;
+  color: var(--code-foreground);
+}
+
+:root[data-skin="ark"] main > header[data-streaming="true"] {
+  border-bottom-color: var(--skin-signal-action);
 }
 
 /* ============================================================

@@ -47,6 +47,7 @@ function PopoverContent({
             "z-50 min-w-32 rounded-md border border-border bg-popover text-popover-foreground shadow-md outline-none transition data-closed:translate-y-1 data-closed:opacity-0 data-open:translate-y-0 data-open:opacity-100",
             className,
           )}
+          data-slot="popover-content"
         >
           {children}
         </PopoverPrimitive.Popup>

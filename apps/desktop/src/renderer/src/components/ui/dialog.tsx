@@ -21,6 +21,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
         className,
       )}
       {...props}
+      data-slot="dialog-overlay"
     />
   );
 }
@@ -45,6 +46,7 @@ function DialogContent({ className, ...props }: DialogPrimitive.Popup.Props) {
             className,
           )}
           {...props}
+          data-slot="dialog-content"
         />
       </DialogViewport>
     </DialogPrimitive.Portal>
@@ -56,6 +58,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={cn("flex flex-col gap-1.5 border-b border-border px-6 py-4", className)}
       {...props}
+      data-slot="dialog-header"
     />
   );
 }
@@ -68,12 +71,19 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
         className,
       )}
       {...props}
+      data-slot="dialog-footer"
     />
   );
 }
 
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
-  return <DialogPrimitive.Title className={cn("text-base font-semibold", className)} {...props} />;
+  return (
+    <DialogPrimitive.Title
+      className={cn("text-base font-semibold", className)}
+      {...props}
+      data-slot="dialog-title"
+    />
+  );
 }
 
 function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {

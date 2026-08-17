@@ -157,6 +157,32 @@ void describe("applyTheme", () => {
     assert.notEqual(yaka.tokens.background, white.tokens.background);
   });
 
+  void it("applies the Ark Terminal light palette and extensions", () => {
+    const applied = applyTheme(
+      themeSettings({
+        skin: "ark",
+        fontSize: "base",
+        density: "comfortable",
+      }),
+    );
+
+    assert.equal(applied, "ark");
+    assert.equal(root.dataset.skin, "ark");
+    assert.equal(root.style.getPropertyValue("color-scheme"), "light");
+    assert.equal(root.classList.contains("light"), true);
+    assert.equal(root.classList.contains("dark"), false);
+    assert.equal(root.style.getPropertyValue("--skin-radius"), "4px");
+    assert.equal(root.style.getPropertyValue("--skin-background"), "#eef2f3");
+    assert.equal(root.style.getPropertyValue("--skin-primary"), "#4aabea");
+    assert.equal(root.style.getPropertyValue("--skin-accent"), "#f1c644");
+    assert.equal(root.style.getPropertyValue("--skin-sidebar"), "#2C2E31");
+    assert.equal(
+      root.style.getPropertyValue("--skin-command-font"),
+      "'Noto Serif SC', 'Source Serif Pro', 'Songti SC', serif",
+    );
+    assert.equal(root.style.getPropertyValue("--skin-cut-md"), "10px");
+  });
+
   void it("defines every required semantic token for every built-in skin", () => {
     const required = [
       "background",
@@ -218,7 +244,13 @@ void describe("applyTheme", () => {
 
     assert.match(css, /--input\s*:\s*var\(--skin-input,\s*var\(--border\)\)/);
     assert.match(css, /--ring\s*:\s*var\(--skin-ring,\s*var\(--focus\)\)/);
-    assert.match(css, /:root\[data-skin="yaka"\]\s+:is\(/);
+    assert.match(css, /:root\[data-skin=['"]yaka['"]\]\s+:is\(/);
+    assert.match(css, /:root\[data-skin=['"]ark['"]\]/);
+    assert.match(css, /data-slot=['"]button['"]/);
+    assert.match(css, /data-slot=['"]window-titlebar['"]/);
+    assert.match(css, /data-slot=['"]window-brand['"]/);
+    assert.match(css, /data-slot=['"]message-content['"]\]\[data-from=['"]user['"]\]/);
+    assert.match(css, /app-sidebar\s+\[data-slot=['"]button['"]\]\[data-variant=['"]ghost['"]\]/);
     assert.match(css, /@utility font-display/);
     assert.match(css, /@utility font-body/);
   });

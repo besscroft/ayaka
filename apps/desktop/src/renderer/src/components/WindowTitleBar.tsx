@@ -39,10 +39,14 @@ export function WindowTitleBar({
   };
 
   return (
-    <header className="window-drag-region flex h-10 shrink-0 select-none items-center border-b border-border bg-background">
+    <header
+      className="window-drag-region flex h-10 shrink-0 select-none items-center border-b border-border bg-background"
+      data-slot="window-titlebar"
+    >
       <button
         type="button"
         className="window-no-drag flex h-full w-11 items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+        data-slot="window-sidebar-toggle"
         onClick={onToggleSidebar}
         aria-label={t(sidebarExpanded ? "shell.sidebar.collapse" : "shell.sidebar.expand")}
         aria-expanded={sidebarExpanded}
@@ -55,12 +59,15 @@ export function WindowTitleBar({
       </button>
 
       <div className="flex min-w-0 flex-1 items-center px-2">
-        <span className="truncate text-[11px] font-medium tracking-wide text-muted-foreground">
+        <span
+          className="truncate text-[11px] font-medium tracking-wide text-muted-foreground"
+          data-slot="window-brand"
+        >
           {t("shell.brand")}
         </span>
       </div>
 
-      <div className="window-no-drag flex h-full items-stretch">
+      <div className="window-no-drag flex h-full items-stretch" data-slot="window-controls">
         <button
           type="button"
           className="window-control-button"

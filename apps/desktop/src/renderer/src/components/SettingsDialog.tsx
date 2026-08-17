@@ -493,7 +493,7 @@ function AppearanceTab({
           desc={t("appearance.skin.desc")}
           icon={<IconPalette className="size-3.5" />}
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {SKIN_DEFINITIONS.map((skin) => (
               <SkinPreviewCard
                 key={skin.id}

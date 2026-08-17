@@ -69,6 +69,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         if (!event.defaultPrevented) onPress?.();
       }}
       {...props}
+      data-slot="button"
+      data-variant={variant ?? "secondary"}
+      data-size={isIconOnly ? "icon" : (size ?? "default")}
     >
       {isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
       {children}
