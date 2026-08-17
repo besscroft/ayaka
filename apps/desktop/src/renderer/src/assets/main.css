@@ -7,6 +7,12 @@
 @theme inline {
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
+  --font-display-family: var(--display-family);
+  --font-display-weight: 500;
+  --font-display-tracking: 0em;
+  --font-body-family: var(--body-family);
+  --font-body-weight: 400;
+  --font-body-tracking: 0em;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -32,6 +38,11 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -40,6 +51,28 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-footer: var(--footer);
+  --color-footer-foreground: var(--footer-foreground);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-highlight: var(--code-highlight);
+  --color-code-number: var(--code-number);
+  --color-code-selection: var(--code-selection);
+  --color-code-border: var(--code-border);
+}
+
+@utility font-display {
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+}
+
+@utility font-body {
+  font-family: var(--font-body-family);
+  font-weight: var(--font-body-weight);
+  letter-spacing: var(--font-body-tracking);
 }
 
 /* ============================================================
@@ -65,6 +98,8 @@
   /* User font overrides are inline; empty overrides fall back to the active skin. */
   --app-font-sans: var(--skin-font-stack);
   --app-font-mono: var(--skin-mono-font-stack);
+  --display-family: var(--app-font-sans);
+  --body-family: var(--app-font-sans);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
 
@@ -101,17 +136,34 @@
   --popover-foreground: var(--overlay-foreground);
   --destructive: var(--danger);
   --destructive-foreground: var(--danger-foreground);
-  --input: var(--border);
-  --ring: var(--focus);
+  --input: var(--skin-input, var(--border));
+  --ring: var(--skin-ring, var(--focus));
 
-  --sidebar: var(--background);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  --sidebar: var(--skin-sidebar, var(--background));
+  --sidebar-foreground: var(--skin-sidebar-foreground, var(--foreground));
+  --sidebar-primary: var(--skin-sidebar-primary, var(--primary));
+  --sidebar-primary-foreground: var(--skin-sidebar-primary-foreground, var(--primary-foreground));
+  --sidebar-accent: var(--skin-sidebar-accent, var(--accent));
+  --sidebar-accent-foreground: var(--skin-sidebar-accent-foreground, var(--accent-foreground));
+  --sidebar-border: var(--skin-sidebar-border, var(--border));
+  --sidebar-ring: var(--skin-sidebar-ring, var(--ring));
+
+  --chart-1: var(--skin-chart-1, var(--primary));
+  --chart-2: var(--skin-chart-2, var(--primary));
+  --chart-3: var(--skin-chart-3, var(--primary));
+  --chart-4: var(--skin-chart-4, var(--primary));
+  --chart-5: var(--skin-chart-5, var(--primary));
+
+  --header: var(--skin-header, var(--surface));
+  --header-foreground: var(--skin-header-foreground, var(--surface-foreground));
+  --footer: var(--skin-footer, var(--surface));
+  --footer-foreground: var(--skin-footer-foreground, var(--surface-foreground));
+  --code: var(--skin-code, var(--surface));
+  --code-foreground: var(--skin-code-foreground, var(--muted-foreground));
+  --code-highlight: var(--skin-code-highlight, var(--foreground));
+  --code-number: var(--skin-code-number, var(--muted-foreground));
+  --code-selection: var(--skin-code-selection, var(--border));
+  --code-border: var(--skin-code-border, var(--border));
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -138,7 +190,7 @@ body,
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-body-family);
   background-color: var(--color-background);
   color: var(--color-foreground);
   /* 允许文本选择（聊天内容需要复制） */
@@ -225,6 +277,92 @@ code {
 .rich-content :where(pre code) {
   background-color: transparent;
   padding: 0;
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="default"],
+    [data-slot="tooltip-trigger"][data-variant="default"],
+    [data-slot="sidebar-menu-button"].bg-primary
+  ) {
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: none;
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="default"],
+    [data-slot="tooltip-trigger"][data-variant="default"],
+    [data-slot="sidebar-menu-button"].bg-primary
+  ):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="outline"],
+    [data-slot="tooltip-trigger"][data-variant="outline"],
+    [data-slot="button"][data-variant="secondary"],
+    [data-slot="tooltip-trigger"][data-variant="secondary"]
+  ) {
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: none;
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="outline"],
+    [data-slot="tooltip-trigger"][data-variant="outline"],
+    [data-slot="button"][data-variant="secondary"],
+    [data-slot="tooltip-trigger"][data-variant="secondary"]
+  ):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="ghost"],
+    [data-slot="tooltip-trigger"][data-variant="ghost"]
+  ) {
+  border-radius: calc(var(--radius) - 2px);
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="destructive"],
+    [data-slot="tooltip-trigger"][data-variant="destructive"]
+  ) {
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: none;
+}
+
+:root[data-skin="yaka"]
+  :is(
+    [data-slot="button"][data-variant="destructive"],
+    [data-slot="tooltip-trigger"][data-variant="destructive"]
+  ):focus-visible {
+  border-color: color-mix(in oklab, var(--destructive) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+}
+
+:root[data-skin="yaka"] [data-slot="calendar"] {
+  --cell-radius: calc(var(--radius) - 2px);
+}
+
+:root[data-skin="yaka"] [data-slot="calendar"] [data-range-middle="true"] {
+  border-radius: 0 !important;
+}
+
+:root[data-skin="yaka"] [data-slot="calendar"] [data-selected="true"]:first-child button {
+  border-top-left-radius: var(--cell-radius) !important;
+  border-bottom-left-radius: var(--cell-radius) !important;
+}
+
+:root[data-skin="yaka"] [data-slot="calendar"] [data-selected="true"]:last-child button {
+  border-top-right-radius: var(--cell-radius) !important;
+  border-bottom-right-radius: var(--cell-radius) !important;
 }
 
 /* ============================================================

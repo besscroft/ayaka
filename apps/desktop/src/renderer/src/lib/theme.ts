@@ -47,6 +47,12 @@ export function applySkin(skin: SkinId): SkinId {
   const root = document.documentElement;
   const definition = getSkin(skin);
 
+  for (const extensionName of new Set(
+    SKIN_DEFINITIONS.flatMap((candidate) => Object.keys(candidate.extensions ?? {})),
+  )) {
+    root.style.removeProperty(extensionName);
+  }
+
   root.setAttribute("data-skin", definition.id);
   root.style.setProperty("color-scheme", definition.colorScheme);
   root.classList.toggle("light", definition.colorScheme === "light");

@@ -94,6 +94,7 @@ void describe("applyTheme", () => {
     assert.equal(root.dataset.density, "compact");
     assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
     assert.equal(root.style.getPropertyValue("--skin-primary"), "oklch(0.922 0 0)");
+    assert.equal(root.style.getPropertyValue("--skin-input"), "");
     assert.equal(root.style.fontSize, "16px");
   });
 
@@ -107,7 +108,9 @@ void describe("applyTheme", () => {
     );
     assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
     assert.equal(root.dataset.skin, "yaka");
-    assert.equal(root.style.getPropertyValue("--skin-primary"), "oklch(0.42 0.12 232)");
+    assert.equal(root.style.getPropertyValue("--skin-primary"), "oklch(0.789 0.154 211.53)");
+    assert.equal(root.style.getPropertyValue("--skin-input"), "oklch(0.922 0 0)");
+    assert.equal(root.style.getPropertyValue("--skin-ring"), "oklch(0.708 0 0)");
     assert.equal(root.classList.contains("light"), true);
     assert.equal(root.classList.contains("dark"), false);
 
@@ -120,9 +123,11 @@ void describe("applyTheme", () => {
     );
     assert.equal(root.style.getPropertyValue("--skin-radius"), "10px");
     assert.equal(root.dataset.skin, "white");
+    assert.equal(root.style.getPropertyValue("--skin-input"), "");
+    assert.equal(root.style.getPropertyValue("--skin-ring"), "");
   });
 
-  void it("keeps yaka geometry aligned with White while using the yaka palette", () => {
+  void it("uses the supplied light palette for yaka while keeping its existing geometry", () => {
     const white = SKIN_DEFINITIONS.find((skin) => skin.id === "white");
     const yaka = SKIN_DEFINITIONS.find((skin) => skin.id === "yaka");
     assert.ok(white);
@@ -131,11 +136,22 @@ void describe("applyTheme", () => {
     assert.equal(yaka.fontStack, white.fontStack);
     assert.equal(yaka.monoFontStack, white.monoFontStack);
     assert.equal(yaka.colorScheme, white.colorScheme);
-    assert.equal(yaka.tokens.primary, "oklch(0.42 0.12 232)");
-    assert.equal(yaka.tokens.background, "oklch(0.96 0.02 232)");
-    assert.equal(yaka.tokens.surface, "oklch(0.975 0.018 232)");
-    assert.equal(yaka.tokens.overlay, "oklch(0.985 0.012 232)");
-    assert.equal(yaka.tokens.fieldBackground, "oklch(0.875 0.055 232)");
+    assert.equal(yaka.tokens.background, "oklch(0.984 0.014 180.72)");
+    assert.equal(yaka.tokens.foreground, "oklch(0.145 0 0)");
+    assert.equal(yaka.tokens.surface, "oklch(0.977 0.013 236.62)");
+    assert.equal(yaka.tokens.overlay, "oklch(0.984 0.014 180.72)");
+    assert.equal(yaka.tokens.primary, "oklch(0.789 0.154 211.53)");
+    assert.equal(yaka.tokens.primaryForeground, "oklch(0.984 0.014 180.72)");
+    assert.equal(yaka.tokens.secondary, "oklch(0.97 0 0)");
+    assert.equal(yaka.tokens.muted, "oklch(0.951 0.026 236.824)");
+    assert.equal(yaka.tokens.accent, "oklch(0.984 0.014 180.72)");
+    assert.equal(yaka.tokens.border, "oklch(0.901 0.058 230.902)");
+    assert.equal(yaka.tokens.danger, "oklch(0.637 0.237 25.331)");
+    assert.equal(yaka.extensions?.["--skin-input"], "oklch(0.922 0 0)");
+    assert.equal(yaka.extensions?.["--skin-ring"], "oklch(0.708 0 0)");
+    assert.equal(yaka.extensions?.["--skin-sidebar"], "oklch(0.901 0.058 230.902)");
+    assert.equal(yaka.extensions?.["--skin-header"], "oklch(1 0 0)");
+    assert.equal(yaka.extensions?.["--skin-code-highlight"], "oklch(0.27 0 0)");
     assert.notEqual(yaka.tokens.surface, "oklch(1 0 0)");
     assert.notEqual(yaka.tokens.primary, white.tokens.primary);
     assert.notEqual(yaka.tokens.background, white.tokens.background);
@@ -199,5 +215,11 @@ void describe("applyTheme", () => {
       const re = new RegExp(`${name}\\s*:\\s*[^;]*var\\(--radius\\)`);
       assert.match(block, re, `${name} 必须基于 var(--radius) 派生`);
     }
+
+    assert.match(css, /--input\s*:\s*var\(--skin-input,\s*var\(--border\)\)/);
+    assert.match(css, /--ring\s*:\s*var\(--skin-ring,\s*var\(--focus\)\)/);
+    assert.match(css, /:root\[data-skin="yaka"\]\s+:is\(/);
+    assert.match(css, /@utility font-display/);
+    assert.match(css, /@utility font-body/);
   });
 });
