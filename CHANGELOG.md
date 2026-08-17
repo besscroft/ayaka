@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.1.26]
+
+### 中文
+
+#### 新增
+
+- 新增桌面端错误日志系统，自动捕获主进程与渲染进程的控制台错误、未捕获异常和未处理 Promise 拒绝，支持日志持久化、敏感信息脱敏及自动清理。
+- 在设置的诊断页面新增错误日志导出功能，支持一键导出当天错误日志。
+
+#### 变更
+
+- 新增并重构 yaka 主题皮肤，优化主题切换逻辑，自动清理旧主题扩展样式，并补充全局 CSS 变量与皮肤专属配色。
+- 更新 yaka 皮肤描述及多语言文案。
+
+#### 修复
+
+- 修复永久删除智能体时未清理其 Soul 文件的问题。
+
+### English
+
+#### Added
+
+- Added a desktop error-logging system that captures console errors, uncaught exceptions, and unhandled promise rejections from the main and renderer processes, with persistence, sensitive-data redaction, and automatic cleanup.
+- Added one-click export for the current day's error log in Settings diagnostics.
+
+#### Changed
+
+- Added and redesigned the yaka skin with improved theme switching, automatic cleanup of old skin extension styles, and expanded global and skin-specific CSS variables.
+- Updated the yaka skin description and localized copy.
+
+#### Fixed
+
+- Fixed permanent agent deletion leaving its Soul files behind.
+
 ## [0.1.25]
 
 ### 中文
