@@ -889,7 +889,32 @@ export async function restoreAgent(id: string): Promise<AgentProfile> {
 
 /** 永久删除智能体：硬删除 agents 表行；不允许删除 root/locked agent。 */
 export async function deleteAgent(id: string): Promise<void> {
-  if (shouldRouteWrites()) return writeDb<void>("deleteAgent", [id]);
+  if (shouldRouteWrites()) {
+    await writeDb<void>("deleteAgentRecord", [id]);
+  } else {
+    deleteAgentRecord(id);
+  }
+  agentRuntimeStates.delete(id);
+
+  try {
+    removeAgentSoulFiles(id);
+  } catch (error) {
+    try {
+      insertRuntimeEvent({
+        kind: "diagnostic",
+        title: "Agent soul file cleanup failed",
+        status: "failed",
+        detail: { agentId: id, error: formatAgentDeletionError(error) },
+      });
+    } catch {
+      // Preserve the filesystem error when diagnostic persistence is unavailable.
+    }
+    throw error;
+  }
+}
+
+/** Delete only the database-owned records for an agent; the caller owns file cleanup. */
+export function deleteAgentRecord(id: string): void {
   const existing = getRequiredAgentRow(id);
   assertAgentEditable(existing);
   if (existing.kind === "main") throw new Error("Root agent cannot be deleted.");
@@ -921,23 +946,6 @@ export async function deleteAgent(id: string): Promise<void> {
     tx.delete(agentPolicies).where(eq(agentPolicies.agent_id, id)).run();
     tx.delete(agents).where(eq(agents.id, id)).run();
   });
-  agentRuntimeStates.delete(id);
-
-  try {
-    removeAgentSoulFiles(id);
-  } catch (error) {
-    try {
-      insertRuntimeEvent({
-        kind: "diagnostic",
-        title: "Agent soul file cleanup failed",
-        status: "failed",
-        detail: { agentId: id, error: formatAgentDeletionError(error) },
-      });
-    } catch {
-      // Preserve the filesystem error when diagnostic persistence is unavailable.
-    }
-    throw error;
-  }
 }
 
 function formatAgentDeletionError(error: unknown): string {
