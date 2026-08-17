@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.25]
+
+### 中文
+
+#### 新增
+
+- 新增 Windows 系统托盘支持，可从托盘打开 Ayaka、新建聊天、打开设置或退出应用。
+- 新增托盘菜单多语言支持与托盘图标资源。
+
+#### 变更
+
+- 重构代理循环与工具回合控制逻辑，简化任务完成判断和停止条件。
+- 优化窗口生命周期管理，支持关闭窗口后保留应用在系统托盘运行，并在重复启动时唤醒已有窗口。
+
+### English
+
+#### Added
+
+- Added Windows system-tray support for opening Ayaka, starting a new chat, opening Settings, or quitting the app.
+- Added localized tray-menu labels and tray icon resources.
+
+#### Changed
+
+- Refactored agent-loop and tool-turn control to simplify task-completion decisions and stopping conditions.
+- Improved window lifecycle handling so closing the window keeps the app running in the system tray and launching the app again focuses the existing window.
+
 ## [0.1.24]
 
 ### 中文
