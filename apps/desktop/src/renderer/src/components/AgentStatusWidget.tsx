@@ -312,8 +312,6 @@ export function AgentStatusWidget({
             </div>
             <button
               type="button"
-              data-icon-only="true"
-              data-icon-tone="neutral"
               className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               onClick={() => onOpenChange(false)}
               aria-label={t("agentStatus.close")}

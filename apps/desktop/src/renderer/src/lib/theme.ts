@@ -50,10 +50,6 @@ export function applyCodeFontSize(px: number): void {
   document.documentElement.style.setProperty("--code-font-size", safe + "px");
 }
 
-export function applyTranslucentSidebar(enabled: boolean): void {
-  document.documentElement.setAttribute("data-translucent-sidebar", enabled ? "true" : "false");
-}
-
 export function applyPointerCursor(enabled: boolean): void {
   document.documentElement.setAttribute("data-pointer-cursor", enabled ? "true" : "false");
 }
@@ -84,7 +80,6 @@ export function applyTheme(
     | "skin"
     | "fontFamily"
     | "monoFontFamily"
-    | "translucentSidebar"
     | "usePointerCursor"
     | "reduceMotion"
     | "codeFontSizePx"
@@ -96,7 +91,6 @@ export function applyTheme(
   const appliedSkin = applySkin(settings.skin);
   applyFonts(settings.fontFamily, settings.monoFontFamily);
   applyCodeFontSize(settings.codeFontSizePx);
-  applyTranslucentSidebar(settings.translucentSidebar);
   applyPointerCursor(settings.usePointerCursor);
   applyReduceMotion(settings.reduceMotion);
   applyDiffMark(settings.diffMark);

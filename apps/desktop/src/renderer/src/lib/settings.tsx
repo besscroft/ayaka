@@ -30,7 +30,6 @@ const APP_SETTING_KEYS: string[] = [
   SettingKey.Skin,
   SettingKey.FontFamily,
   SettingKey.MonoFontFamily,
-  SettingKey.TranslucentSidebar,
   SettingKey.UsePointerCursor,
   SettingKey.ReduceMotion,
   SettingKey.FontSize,
@@ -54,7 +53,6 @@ const RESET_PATCHES: Record<SettingsResetScope, Partial<AppSettings>> = {
     skin: DEFAULT_SETTINGS.skin,
     fontFamily: DEFAULT_SETTINGS.fontFamily,
     monoFontFamily: DEFAULT_SETTINGS.monoFontFamily,
-    translucentSidebar: DEFAULT_SETTINGS.translucentSidebar,
     usePointerCursor: DEFAULT_SETTINGS.usePointerCursor,
     reduceMotion: DEFAULT_SETTINGS.reduceMotion,
     fontSize: DEFAULT_SETTINGS.fontSize,
@@ -105,10 +103,6 @@ export function parseSettings(map: Record<string, string | null>): AppSettings {
   const skin = parseSkin(map[SettingKey.Skin]);
   const fontFamily = (map[SettingKey.FontFamily] ?? "").slice(0, 500);
   const monoFontFamily = (map[SettingKey.MonoFontFamily] ?? "").slice(0, 500);
-  const translucentSidebar = parseBool(
-    map[SettingKey.TranslucentSidebar],
-    DEFAULT_SETTINGS.translucentSidebar,
-  );
   const usePointerCursor = parseBool(
     map[SettingKey.UsePointerCursor],
     DEFAULT_SETTINGS.usePointerCursor,
@@ -153,7 +147,6 @@ export function parseSettings(map: Record<string, string | null>): AppSettings {
     skin,
     fontFamily,
     monoFontFamily,
-    translucentSidebar,
     usePointerCursor,
     reduceMotion,
     fontSize,
@@ -233,10 +226,6 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
       writes.push(api.settings.set(SettingKey.FontFamily, patch.fontFamily));
     if (patch.monoFontFamily !== undefined)
       writes.push(api.settings.set(SettingKey.MonoFontFamily, patch.monoFontFamily));
-    if (patch.translucentSidebar !== undefined)
-      writes.push(
-        api.settings.set(SettingKey.TranslucentSidebar, String(patch.translucentSidebar)),
-      );
     if (patch.usePointerCursor !== undefined)
       writes.push(api.settings.set(SettingKey.UsePointerCursor, String(patch.usePointerCursor)));
     if (patch.reduceMotion !== undefined)

@@ -90,10 +90,6 @@
   box-shadow: inset -1px 0 0 var(--sidebar-border);
 }
 
-:root[data-skin="ark"][data-translucent-sidebar="true"] aside.app-sidebar {
-  background-color: var(--sidebar);
-}
-
 :root[data-skin="ark"] .app-sidebar button[aria-current="page"] {
   border-inline-start: var(--skin-line-strong) solid var(--skin-signal-action);
   border-radius: 2px;

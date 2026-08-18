@@ -590,18 +590,6 @@ function AppearanceTab({
         {/* 鈥斺€?浜や簰 鈥斺€?*/}
         <SettingSection title={t("appearance.interaction")}>
           <SettingItem
-            title={t("appearance.translucent")}
-            desc={t("appearance.translucent.desc")}
-            control={
-              <Switch
-                size="sm"
-                isSelected={settings.translucentSidebar}
-                onChange={(v) => void update({ translucentSidebar: v })}
-                aria-label={t("appearance.translucent")}
-              />
-            }
-          />
-          <SettingItem
             title={t("appearance.pointer")}
             desc={t("appearance.pointer.desc")}
             control={

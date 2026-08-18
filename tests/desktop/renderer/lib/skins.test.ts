@@ -362,6 +362,10 @@ void describe("skin CSS contract", () => {
     assert.match(switchCss, /--zzz-switch-thumb-size:\s*24px/);
     assert.match(switchCss, /--zzz-switch-label-inset:\s*18px/);
     assert.match(switchCss, /--zzz-switch-label-size:\s*14px/);
+    assert.match(
+      switchCss,
+      /:root\[data-skin="zzz"\] \[data-slot="switch"\] \{[\s\S]*?color:\s*#ffffff;/,
+    );
     assert.match(switchCss, /width:\s*85px/);
     assert.match(switchCss, /height:\s*34px/);
     assert.match(switchCss, /padding-inline:\s*var\(--zzz-switch-label-inset\)/);

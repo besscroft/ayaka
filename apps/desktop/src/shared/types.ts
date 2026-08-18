@@ -1946,8 +1946,6 @@ export const SettingKey = {
   FontFamily: "font_family",
   /** 绛夊瀛椾綋 CSS font-family锛涚┖瀛楃涓茶〃绀烘部鐢ㄤ富棰橀粯璁?*/
   MonoFontFamily: "mono_font_family",
-  /** 鍗婇€忔槑渚ц竟鏍忥細鏄惁浣跨敤 backdrop-blur */
-  TranslucentSidebar: "translucent_sidebar",
   /** 浜や簰鍏冪礌浣跨敤鎸囬拡鍏夋爣 */
   UsePointerCursor: "use_pointer_cursor",
   /** 鍑忓皯鍔ㄦ€佹晥鏋滐細'system' | 'on' | 'off' */
@@ -2131,7 +2129,6 @@ export interface AppSettings {
   skin: SkinId;
   fontFamily: string;
   monoFontFamily: string;
-  translucentSidebar: boolean;
   usePointerCursor: boolean;
   reduceMotion: ReduceMotion;
   fontSize: FontSizeLevel;
@@ -2155,7 +2152,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   skin: "white",
   fontFamily: "",
   monoFontFamily: "",
-  translucentSidebar: true,
   usePointerCursor: true,
   reduceMotion: "system",
   fontSize: "base",

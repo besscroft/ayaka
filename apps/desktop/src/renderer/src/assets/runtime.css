@@ -2,13 +2,6 @@
    外观设置（运行时数据属性驱动）
    ============================================================ */
 
-/* 半透明侧边栏（data-translucent-sidebar="true"） */
-[data-translucent-sidebar="true"] aside.app-sidebar {
-  background-color: color-mix(in oklch, var(--color-background) 65%, transparent);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-}
-
 /* 减少动态效果（data-reduce-motion="on"） */
 [data-reduce-motion="on"] *,
 [data-reduce-motion="on"] *::before,
