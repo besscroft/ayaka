@@ -13,11 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import {
-  DefaultChatTransport,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  type UIMessage,
-} from "ai";
+import type { UIMessage } from "ai";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { McpInputDialog } from "./McpWorkspace";
@@ -61,10 +57,11 @@ import {
 } from "../lib/chat-reconciliation";
 import {
   isResumableBlockedRun,
-  readChatRunIdHeader,
   selectChatRetryRun,
   shouldFallbackToFreshRun,
 } from "../lib/chat-retry";
+import { chatSessionRegistry, type ChatSessionFinishEvent } from "../lib/chat-session-registry";
+import { createIncrementalTokenCache } from "../lib/chat-token-cache";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import {
@@ -73,12 +70,10 @@ import {
   type ConversationStatusKind,
   type FilePartLike,
 } from "./ai-elements";
-import { estimateTokens } from "./ai-elements/context";
 import {
   CHAT_SESSION_HEADER,
   DEFAULT_CHAT_TOOL_SELECTION,
   DEFAULT_SETTINGS,
-  DEFAULT_AGENT_ID,
   SettingKey,
   getChatToolSelectionForConversation,
   isChatReasoningLevel,
@@ -91,6 +86,7 @@ import {
   type ProviderInfo,
   type ToolsSnapshot,
 } from "@shared/types";
+import type { RevisionRef } from "../lib/chat-persistence";
 
 interface ChatViewProps {
   conversationId: string;
@@ -180,26 +176,24 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const reasoningLevelRef = useRef<ChatReasoningLevel>(DEFAULT_SETTINGS.chatReasoningLevel);
   const reasoningModelKeyRef = useRef<string | null>(null);
   const toolSelectionRef = useRef<ChatToolSelectionRequest>(DEFAULT_CHAT_TOOL_SELECTION);
-  const runIdRef = useRef<string | null>(null);
-  const runModeRef = useRef<"start" | "resume">("start");
-  const reconciliationRef = useRef<{
-    runId: string | null;
-    attempts: number;
-    timer: number | null;
-  }>({ runId: null, attempts: 0, timer: null });
   const latestMessagesRef = useRef<UIMessage[]>([]);
   const lastNonEmptyMessagesRef = useRef<UIMessage[]>([]);
   const explicitEmptyMessagesRef = useRef(false);
   const manualMessageMutationRef = useRef(false);
   const hydrationAppliedRef = useRef<string | null>(null);
   const hydrationStateRef = useRef<"loading" | "ready" | "error">("loading");
-  const revisionRef = useRef(0);
+  const revisionRef = useRef<RevisionRef>({ current: 0, persisted: new Map() });
   const persistenceDirtyRef = useRef(false);
   const learningQueueKeyRef = useRef<string | null>(null);
   const chatFailureRef = useRef(false);
   const errorReportedRef = useRef(false);
   const retryFallbackRef = useRef({ active: false, attempted: false });
   const followupRequestRef = useRef<string | null>(null);
+  const tokenCacheRef = useRef(createIncrementalTokenCache());
+  const session = chatSessionRegistry.getOrCreate({ conversationId, serverInfo });
+  const runIdRef = session.runIdRef;
+  const runModeRef = session.runModeRef;
+  const reconciliationRef = session.reconciliationRef;
   const chatRef = useRef<{
     regenerate: () => Promise<void>;
     clearError: () => void;
@@ -209,7 +203,12 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     () =>
       createSnapshotPersistenceQueue<MessagePersistenceRequest>(
         async (request) => {
-          await persistMessagesPatch(conversationId, request, createdAtRef.current, revisionRef);
+          await persistMessagesPatch(
+            conversationId,
+            request,
+            createdAtRef.current,
+            revisionRef.current,
+          );
           await api.conversations.touch(conversationId);
           persistenceDirtyRef.current = false;
         },
@@ -270,6 +269,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       if (info.code === "cancelled" || errorReportedRef.current) return;
       errorReportedRef.current = true;
       chatFailureRef.current = true;
+      session.errorMessage = info.message;
+      session.errorRetryable = info.retryable;
       setChatError(info.message);
       setChatErrorRetryable(info.retryable);
       console.error(`[chat] ${source} failed:`, info.code, info.message);
@@ -282,7 +283,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       }
       notify.error(t(opts.toastKey ?? "toast.chat.failed"), info.message, locale);
     },
-    [locale, persistenceQueue, t],
+    [locale, persistenceQueue, session, t],
   );
 
   /**
@@ -379,11 +380,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   useEffect(() => {
     selectedModelRef.current = selectedModel;
-  }, [selectedModel]);
+    chatSessionRegistry.updateRequestConfig(conversationId, { model: selectedModel });
+  }, [conversationId, selectedModel]);
 
   useEffect(() => {
     reasoningLevelRef.current = reasoningLevel;
-  }, [reasoningLevel]);
+    chatSessionRegistry.updateRequestConfig(conversationId, { reasoning: reasoningLevel });
+  }, [conversationId, reasoningLevel]);
 
   useEffect(() => {
     if (!selectedModel || providers.length === 0) {
@@ -411,7 +414,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   useEffect(() => {
     toolSelectionRef.current = toolSelection;
-  }, [toolSelection]);
+    chatSessionRegistry.updateRequestConfig(conversationId, { toolSelection });
+  }, [conversationId, toolSelection]);
 
   useEffect(() => {
     const offInput = api.mcp.onInputRequested((request) => {
@@ -420,60 +424,42 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     return offInput;
   }, [conversationId]);
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: `http://127.0.0.1:${serverInfo.port}/api/chat`,
-        headers: () => ({ [CHAT_SESSION_HEADER]: serverInfo.token }),
-        fetch: async (input, init) => {
-          const response = await globalThis.fetch(input, init);
-          const effectiveRunId = readChatRunIdHeader(response);
-          if (effectiveRunId) {
-            const reconciliation = reconciliationRef.current;
-            if (reconciliation.runId !== effectiveRunId && reconciliation.timer !== null) {
-              window.clearTimeout(reconciliation.timer);
-            }
-            runIdRef.current = effectiveRunId;
-            runModeRef.current = "resume";
-            reconciliationRef.current = { runId: effectiveRunId, attempts: 0, timer: null };
-          }
-          return response;
-        },
-        body: () => ({
-          model: selectedModelRef.current ?? undefined,
-          agentId: DEFAULT_AGENT_ID,
-          conversationId,
-          reasoning: reasoningLevelRef.current,
-          toolSelection: toolSelectionRef.current,
-          runId: runIdRef.current ?? undefined,
-          mode: runModeRef.current,
-        }),
-      }),
-    [conversationId, serverInfo.port, serverInfo.token],
-  );
-
   useEffect(() => {
+    const alreadyHydrated = session.hydrated;
     setHydrationState("loading");
     hydrationStateRef.current = "loading";
-    setChatError(null);
-    setChatErrorRetryable(false);
-    setIsStopped(false);
-    chatFailureRef.current = false;
-    errorReportedRef.current = false;
-    retryFallbackRef.current = { active: false, attempted: false };
+    setChatError(alreadyHydrated ? session.errorMessage : null);
+    setChatErrorRetryable(alreadyHydrated ? session.errorRetryable : false);
+    setIsStopped(alreadyHydrated ? session.isStopped : false);
+    if (!alreadyHydrated) {
+      chatFailureRef.current = false;
+      errorReportedRef.current = false;
+      retryFallbackRef.current = { active: false, attempted: false };
+    } else {
+      errorReportedRef.current = session.errorMessage !== null;
+    }
     followupRequestRef.current = null;
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
-    runIdRef.current = null;
-    runModeRef.current = "start";
-    reconciliationRef.current = { runId: null, attempts: 0, timer: null };
-    createdAtRef.current = new Map();
-    revisionRef.current = 0;
-    persistenceDirtyRef.current = false;
-    latestMessagesRef.current = [];
-    lastNonEmptyMessagesRef.current = [];
-    explicitEmptyMessagesRef.current = false;
-    manualMessageMutationRef.current = false;
+    if (!alreadyHydrated) {
+      runIdRef.current = null;
+      runModeRef.current = "start";
+      reconciliationRef.current = { runId: null, attempts: 0, timer: null };
+      createdAtRef.current = new Map();
+      revisionRef.current = { current: 0, persisted: new Map() };
+      persistenceDirtyRef.current = false;
+      latestMessagesRef.current = [];
+      lastNonEmptyMessagesRef.current = [];
+      explicitEmptyMessagesRef.current = false;
+      manualMessageMutationRef.current = false;
+    }
     hydrationAppliedRef.current = null;
+    if (alreadyHydrated) {
+      const cachedMessages = session.chat.messages;
+      setInitialMessages(cachedMessages);
+      latestMessagesRef.current = cachedMessages;
+      lastNonEmptyMessagesRef.current = cachedMessages.length > 0 ? cachedMessages : [];
+      explicitEmptyMessagesRef.current = cachedMessages.length === 0;
+    }
     // 涓嶉噸缃?titledRef锛氫繚鐣欒法浼氳瘽璁板綍锛岄伩鍏嶉噸澶嶇敓鎴愶紙鍒囨崲鍥炲埌鏃у璇濅篃涓嶉噸鐢熸垚锛?
 
     let cancelled = false;
@@ -488,6 +474,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           explicitEmptyMessagesRef.current = true;
           setInitialMessages([]);
           setIsPersistedConversation(false);
+          session.hydrated = true;
           setHydrationState("ready");
           hydrationStateRef.current = "ready";
           return null;
@@ -504,10 +491,14 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         const hydratedMessages = rows.map(hydrateStoredMessage);
         const messages = hydratedMessages.filter(isNonEmptyUIMessage);
         createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
-        revisionRef.current = snapshot.revision;
+        revisionRef.current.current = snapshot.revision;
+        revisionRef.current.persisted = new Map(
+          messages.map((message) => [message.id, { message, content: JSON.stringify(message) }]),
+        );
         latestMessagesRef.current = messages;
         lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
         explicitEmptyMessagesRef.current = messages.length === 0;
+        session.hydrated = true;
         setInitialMessages(messages);
         setHydrationState("ready");
         hydrationStateRef.current = "ready";
@@ -531,16 +522,13 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       cancelled = true;
       followupRequestRef.current = null;
     };
-  }, [conversationId, hydrationRetry, locale, persistenceQueue]);
+  }, [conversationId, hydrationRetry, locale, persistenceQueue, session]);
 
-  const chat = useChat({
-    id: conversationId,
-    messages: initialMessages,
-    transport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-    onFinish: ({ messages, isError, isAbort }) => {
-      // onFinish is the authoritative client snapshot. Update the ref before
-      // any throttled persistence or follow-up work can observe an older one.
+  const chat = useChat({ chat: session.chat, experimental_throttle: 50 });
+  chatRef.current = chat;
+
+  const handleChatFinish = useCallback(
+    ({ messages, isError, isAbort }: ChatSessionFinishEvent): void => {
       if (messages.length > 0) {
         latestMessagesRef.current = messages;
         lastNonEmptyMessagesRef.current = messages;
@@ -549,9 +537,12 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       if (!isError) {
         chatFailureRef.current = false;
         errorReportedRef.current = false;
+        session.errorMessage = null;
+        session.errorRetryable = false;
         setChatError(null);
         setChatErrorRetryable(false);
       }
+      session.isStopped = false;
       setIsStopped(false);
       const learningKey = isAbort
         ? null
@@ -575,9 +566,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           }
           console.error("[chat] failed to persist messages or queue learning:", err);
         });
-      // 鑷姩鐢熸垚鏍囬锛氭湰杞彂閫佷簡娑堟伅 + assistant 瀹屾暣浜х敓 + 杩樻病鐢熸垚杩?
+
       if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titleStateRef);
-      // 异步生成追问建议
       if (!isError && !isAbort) {
         const assistantMessage = [...messages]
           .reverse()
@@ -602,7 +592,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         }
       }
     },
-    onError: (err) => {
+    [conversationId, fetchFollowupSuggestions, persistAndTouch, persistInBackground, session],
+  );
+
+  const handleChatError = useCallback(
+    (err: Error): void => {
       const info = getChatErrorInfo(err, locale);
       const retryFallback = retryFallbackRef.current;
       if (
@@ -619,6 +613,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         runIdRef.current = freshRun.runId;
         runModeRef.current = freshRun.mode;
         reconciliationRef.current = { runId: freshRun.runId, attempts: 0, timer: null };
+        session.errorMessage = null;
+        session.errorRetryable = false;
         setChatError(null);
         setChatErrorRetryable(false);
         chatFailureRef.current = false;
@@ -627,9 +623,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           const currentChat = chatRef.current;
           if (!currentChat) {
             retryFallback.active = false;
-            reportChatError("streaming", err, {
-              persistSnapshot: latestMessagesRef.current,
-            });
+            reportChatError("streaming", err, { persistSnapshot: latestMessagesRef.current });
             return;
           }
           currentChat.clearError();
@@ -648,12 +642,17 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         return;
       }
       retryFallback.active = false;
-      reportChatError("streaming", err, {
-        persistSnapshot: latestMessagesRef.current,
-      });
+      reportChatError("streaming", err, { persistSnapshot: latestMessagesRef.current });
     },
-  });
-  chatRef.current = chat;
+    [locale, persistInBackground, reportChatError, session],
+  );
+
+  useEffect(() => {
+    return chatSessionRegistry.subscribe(conversationId, (event) => {
+      if (event.type === "finish") handleChatFinish(event.payload);
+      else handleChatError(event.error);
+    });
+  }, [conversationId, handleChatError, handleChatFinish]);
 
   const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
   const mergedChatMessages = isChatLoading
@@ -869,13 +868,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   /* ---------- Context usage ---------- */
   const contextMetrics = useMemo(() => {
-    const usedTokens = renderedMessages.reduce((sum, m) => {
-      const text = (m.parts ?? [])
-        .filter((p) => p.type === "text")
-        .map((p) => (p as { text: string }).text)
-        .join("");
-      return sum + estimateTokens(text);
-    }, 0);
+    const usedTokens = tokenCacheRef.current.estimate(renderedMessages);
     const maxTokens = getContextWindowForModel(
       selectedModel,
       selectedModel ? modelContextWindows.get(selectedModel) : undefined,
@@ -938,6 +931,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
     setChatError(null);
     setChatErrorRetryable(false);
+    session.errorMessage = null;
+    session.errorRetryable = false;
+    session.isStopped = false;
     setIsStopped(false);
     manualMessageMutationRef.current = false;
     chatFailureRef.current = false;
@@ -1028,6 +1024,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     ]).finally(() => {
       runIdRef.current = null;
       runModeRef.current = "start";
+      session.isStopped = true;
       setIsStopped(true);
       persistInBackground(latestMessagesRef.current, "stopped response");
     });
@@ -1059,6 +1056,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     persistInBackground(snapshot.messages, "cleared failed response", snapshot.deleteIds);
     setChatError(null);
     setChatErrorRetryable(false);
+    session.errorMessage = null;
+    session.errorRetryable = false;
+    session.isStopped = false;
     setIsStopped(false);
     chatFailureRef.current = false;
     errorReportedRef.current = false;
@@ -1072,6 +1072,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const handleDismissError = (): void => {
     setChatError(null);
     setChatErrorRetryable(false);
+    session.errorMessage = null;
+    session.errorRetryable = false;
+    session.isStopped = false;
     setIsStopped(false);
     chat.clearError();
   };
@@ -1087,6 +1090,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const handleToolSelectionChange = (next: ChatToolSelectionRequest): void => {
     setToolSelection(next);
     toolSelectionRef.current = next;
+    chatSessionRegistry.updateRequestConfig(conversationId, { toolSelection: next });
     void api.settings
       .get(SettingKey.ChatTools)
       .then((raw) =>
@@ -1127,6 +1131,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       "edited message",
       renderedMessages.slice(idx + 1).map((message) => message.id),
     );
+    session.errorMessage = null;
+    session.errorRetryable = false;
+    session.isStopped = false;
     setIsStopped(false);
     setChatError(null);
     chat.clearError();
@@ -1153,6 +1160,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     latestMessagesRef.current = nextMessages;
     if (nextMessages.length > 0) lastNonEmptyMessagesRef.current = nextMessages;
     explicitEmptyMessagesRef.current = nextMessages.length === 0;
+    session.errorMessage = null;
+    session.errorRetryable = false;
+    session.isStopped = false;
     setIsStopped(false);
     setChatError(null);
     chat.clearError();
@@ -1203,7 +1213,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     notify.success(t("chat.messageDeleted"));
   };
 
-  if (hydrationState === "loading") {
+  const hydrationIsStale =
+    hydrationState === "ready" &&
+    !session.hydrated &&
+    hydrationAppliedRef.current !== conversationId;
+  if (hydrationState === "loading" || hydrationIsStale) {
     return <LoadingIndicator className="flex flex-1" label={t("chat.loadingHistory")} />;
   }
 

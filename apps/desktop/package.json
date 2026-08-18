@@ -1,6 +1,6 @@
 {
   "name": "ayaka-desktop",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Ayaka 是一个本地优先的 AI 桌面工作台",
   "homepage": "https://ai.zzzvoid.com/",
   "author": "Bess Croft",
@@ -50,6 +50,7 @@
     "@streamdown/code": "catalog:",
     "@streamdown/math": "catalog:",
     "@streamdown/mermaid": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
     "ai": "catalog:",
     "better-sqlite3": "catalog:",
     "cheerio": "catalog:",

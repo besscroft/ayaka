@@ -123,6 +123,68 @@ void describe("chat snapshot persistence queue", () => {
     assert.equal(revision.current, 5);
   });
 
+  void it("upserts only new or changed message references", async () => {
+    const patches: Array<{ upserts: Array<{ id: string }>; baseRevision: number }> = [];
+    const previousWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        api: {
+          messages: {
+            applyPatch: async (patch: { upserts: Array<{ id: string }>; baseRevision: number }) => {
+              patches.push({ upserts: patch.upserts, baseRevision: patch.baseRevision });
+              return { applied: true, revision: patches.length };
+            },
+          },
+        } as unknown as NonNullable<Window["api"]>,
+      },
+    });
+
+    const first = {
+      id: "u1",
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "hello" }],
+    };
+    const answer = {
+      id: "a1",
+      role: "assistant" as const,
+      parts: [{ type: "text" as const, text: "answer" }],
+    };
+    const revision = { current: 0, persisted: new Map() };
+    try {
+      await persistMessagesPatch(
+        "conversation-1",
+        { messages: [first, answer] },
+        new Map(),
+        revision,
+      );
+      await persistMessagesPatch(
+        "conversation-1",
+        { messages: [first, answer] },
+        new Map(),
+        revision,
+      );
+      await persistMessagesPatch(
+        "conversation-1",
+        {
+          messages: [first, { ...answer, parts: [{ type: "text", text: "answer updated" }] }],
+        },
+        new Map(),
+        revision,
+      );
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: previousWindow,
+      });
+    }
+
+    assert.deepEqual(
+      patches.map((patch) => patch.upserts.map((row) => row.id)),
+      [["u1", "a1"], ["a1"]],
+    );
+  });
+
   void it("coalesces explicit deletes while keeping the newest message snapshot", () => {
     const merged = mergeMessagePersistenceRequests(
       { messages: [], deleteIds: ["old-a"] },

@@ -183,6 +183,7 @@ export const ReasoningTrigger = memo(function ReasoningTrigger({
 
 export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & {
   children: string;
+  isStreaming?: boolean;
 };
 
 interface StreamdownContentProps {
@@ -208,6 +209,7 @@ const StreamdownContent = lazy(async () => {
 export const ReasoningContent = memo(function ReasoningContent({
   className,
   children,
+  isStreaming = false,
   ...props
 }: ReasoningContentProps): React.JSX.Element {
   return (
@@ -223,9 +225,15 @@ export const ReasoningContent = memo(function ReasoningContent({
       )}
       {...props}
     >
-      <Suspense fallback={<RichContent value={children} />}>
-        <StreamdownContent>{children}</StreamdownContent>
-      </Suspense>
+      {isStreaming ? (
+        <div data-streaming="true" className="whitespace-pre-wrap break-words">
+          {children}
+        </div>
+      ) : (
+        <Suspense fallback={<RichContent value={children} />}>
+          <StreamdownContent>{children}</StreamdownContent>
+        </Suspense>
+      )}
     </CollapsibleContent>
   );
 });

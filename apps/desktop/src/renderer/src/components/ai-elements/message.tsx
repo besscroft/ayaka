@@ -59,13 +59,27 @@ export function MessageContent({
 
 interface MessageResponseProps extends HTMLAttributes<HTMLDivElement> {
   children?: string;
+  streaming?: boolean;
 }
 
 export function MessageResponse({
   children,
+  streaming = false,
   className,
   ...rest
 }: MessageResponseProps): React.JSX.Element {
+  if (streaming) {
+    return (
+      <div
+        data-slot="message-response"
+        data-streaming="true"
+        className={cn("whitespace-pre-wrap break-words", className)}
+        {...rest}
+      >
+        {children ?? ""}
+      </div>
+    );
+  }
   return (
     <RichContent
       data-slot="message-response"

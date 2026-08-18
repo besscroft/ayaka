@@ -10,6 +10,7 @@ import { AppI18nProvider, useT } from "./lib/i18n";
 import { SettingKey, type LocalServerInfo, type UpdateState } from "@shared/types";
 import { Toaster, toast } from "sonner";
 import { MotionConfig } from "motion/react";
+import { chatSessionRegistry } from "./lib/chat-session-registry";
 
 function App(): React.JSX.Element {
   return (
@@ -142,6 +143,7 @@ function AppContent(): React.JSX.Element {
 
   const handleDelete = useCallback(
     (id: string): void => {
+      chatSessionRegistry.delete(id);
       setActiveId((current) => {
         if (current === id) {
           void api.conversations.list().then((list) => {
@@ -192,7 +194,7 @@ function AppContent(): React.JSX.Element {
           aria-hidden={activeView !== "chat"}
         >
           {activeId && serverInfo !== null ? (
-            <ChatView key={activeId} conversationId={activeId} serverInfo={serverInfo} />
+            <ChatView conversationId={activeId} serverInfo={serverInfo} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-foreground/40">
               {t("chat.initializing")}

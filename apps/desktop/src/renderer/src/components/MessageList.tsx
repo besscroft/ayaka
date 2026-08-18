@@ -16,6 +16,7 @@
  */
 import { Fragment, memo, useCallback, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { MEDIA_GENERATION_TOOL_NAME, type MediaGenerationResponse } from "@shared/types";
 import {
@@ -57,6 +58,7 @@ import {
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
 import { IconBrain, IconCopy } from "./icons";
+import { useConversationScroll } from "./ai-elements/use-conversation-scroll";
 
 interface MessageListProps {
   conversationId?: string;
@@ -180,35 +182,21 @@ export function MessageList({
 
   return (
     <Conversation>
-      <ConversationContent>
-        {messages.map((message, index) => (
-          <motion.div
-            key={message.id}
-            layout={isLoading ? false : "position"}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <MemoMessageItem
-              conversationId={conversationId}
-              message={message}
-              isLastMessage={index === messages.length - 1}
-              isStreaming={isMessageStreaming(isLoading, index, messages.length - 1)}
-              onEdit={onEditMessage ? stableEditMessage : undefined}
-              onResend={onResendMessage ? stableResendMessage : undefined}
-              onDelete={onDeleteMessage ? stableDeleteMessage : undefined}
-              onRetry={onRetryMessage ? stableRetryMessage : undefined}
-              onToolApprovalResponse={
-                onToolApprovalResponse ? stableToolApprovalResponse : undefined
-              }
-            />
-          </motion.div>
-        ))}
+      <ConversationContent className="gap-0">
+        <VirtualMessageRows
+          conversationId={conversationId}
+          messages={messages}
+          isLoading={isLoading}
+          onEdit={onEditMessage ? stableEditMessage : undefined}
+          onResend={onResendMessage ? stableResendMessage : undefined}
+          onDelete={onDeleteMessage ? stableDeleteMessage : undefined}
+          onRetry={onRetryMessage ? stableRetryMessage : undefined}
+          onToolApprovalResponse={onToolApprovalResponse ? stableToolApprovalResponse : undefined}
+        />
 
         {shouldShowFollowups ? (
           <motion.div
             key="followup-suggestions"
-            layout="position"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
@@ -226,7 +214,6 @@ export function MessageList({
         {showLiveThinking && activityStatus ? (
           <motion.div
             key="live-thinking"
-            layout={isLoading ? false : "position"}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
@@ -267,6 +254,85 @@ export function MessageList({
       </ConversationContent>
       <ConversationScrollButton />
     </Conversation>
+  );
+}
+
+interface VirtualMessageRowsProps {
+  conversationId?: string;
+  messages: UIMessage[];
+  isLoading: boolean;
+  onEdit?: (messageId: string, text: string) => Promise<void> | void;
+  onResend?: (messageId: string) => Promise<void> | void;
+  onDelete?: (messageId: string) => void;
+  onRetry?: (messageId: string) => Promise<void> | void;
+  onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+}
+
+function VirtualMessageRows({
+  conversationId,
+  messages,
+  isLoading,
+  onEdit,
+  onResend,
+  onDelete,
+  onRetry,
+  onToolApprovalResponse,
+}: VirtualMessageRowsProps): React.JSX.Element {
+  const { containerRef } = useConversationScroll();
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 112,
+    getItemKey: (index) => messages[index]?.id ?? index,
+    measureElement: (element) => element.getBoundingClientRect().height,
+    overscan: 6,
+  });
+  const virtualItems = virtualizer.getVirtualItems();
+  const renderItems =
+    virtualItems.length > 0
+      ? virtualItems.map((item) => ({ index: item.index, start: item.start }))
+      : typeof window === "undefined"
+        ? messages.map((_, index) => ({ index, start: index * 112 }))
+        : [];
+
+  return (
+    <div
+      data-slot="message-list"
+      data-virtualized="true"
+      className="relative w-full"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {renderItems.map((virtualItem) => {
+        const message = messages[virtualItem.index];
+        if (!message) return null;
+        return (
+          <div
+            key={message.id}
+            ref={virtualizer.measureElement}
+            data-index={virtualItem.index}
+            data-message-id={message.id}
+            className="absolute left-0 top-0 w-full pb-6"
+            style={{
+              transform: `translateY(${virtualItem.start}px)`,
+              contentVisibility: "auto",
+              containIntrinsicSize: "0 112px",
+            }}
+          >
+            <MemoMessageItem
+              conversationId={conversationId}
+              message={message}
+              isLastMessage={virtualItem.index === messages.length - 1}
+              isStreaming={isMessageStreaming(isLoading, virtualItem.index, messages.length - 1)}
+              onEdit={onEdit}
+              onResend={onResend}
+              onDelete={onDelete}
+              onRetry={onRetry}
+              onToolApprovalResponse={onToolApprovalResponse}
+            />
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -579,7 +645,9 @@ function MessageItem({
                     streaming ? t("msg.cot.reasoningActive") : t("msg.cot.reasoned")
                   }
                 />
-                <ReasoningContent>{display.text}</ReasoningContent>
+                <ReasoningContent isStreaming={display.isStreaming}>
+                  {display.text}
+                </ReasoningContent>
               </Reasoning>
             );
           }
@@ -600,7 +668,11 @@ function MessageItem({
           }
 
           if (part.type === "text") {
-            return <MessageResponse key={key}>{part.text}</MessageResponse>;
+            return (
+              <MessageResponse key={key} streaming={messageStreaming}>
+                {part.text}
+              </MessageResponse>
+            );
           }
 
           if (isToolPart(part)) {

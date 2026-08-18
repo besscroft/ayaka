@@ -66,6 +66,24 @@ export function snapshotUIMessages(messages: UIMessage[]): UIMessage[] {
 }
 
 /**
+ * AI SDK keeps unchanged message objects stable, while replacing the message
+ * whose parts changed. Reuse the previous object whenever its shallow message
+ * structure is unchanged so memoized rows do not render again.
+ */
+export function areUIMessagePartsStable(previous: UIMessage, next: UIMessage): boolean {
+  if (previous === next) return true;
+  if (previous.id !== next.id || previous.role !== next.role) return false;
+  if (previous.metadata !== next.metadata || previous.parts.length !== next.parts.length) {
+    return false;
+  }
+  return previous.parts.every((part, index) => part === next.parts[index]);
+}
+
+function reconcileMessageReference(previous: UIMessage | undefined, next: UIMessage): UIMessage {
+  return previous && areUIMessagePartsStable(previous, next) ? previous : snapshotUIMessage(next);
+}
+
+/**
  * Prefer the live useChat state while a response is streaming. A transient
  * empty state can occur while the transport is catching up, so keep the last
  * non-empty renderer snapshot in that case.
@@ -74,7 +92,21 @@ export function selectLiveChatMessages(
   liveMessages: UIMessage[],
   fallbackMessages: UIMessage[],
 ): UIMessage[] {
-  return liveMessages.length > 0 ? snapshotUIMessages(liveMessages) : fallbackMessages;
+  if (liveMessages.length === 0) return fallbackMessages;
+  if (fallbackMessages.length === 0) return snapshotUIMessages(liveMessages);
+
+  const fallbackById = new Map(fallbackMessages.map((message) => [message.id, message]));
+  let changed = liveMessages.length !== fallbackMessages.length;
+  const selected = liveMessages.map((message, index) => {
+    const previous =
+      fallbackMessages[index]?.id === message.id
+        ? fallbackMessages[index]
+        : fallbackById.get(message.id);
+    const resolved = reconcileMessageReference(previous, message);
+    if (resolved !== previous) changed = true;
+    return resolved;
+  });
+  return changed ? selected : fallbackMessages;
 }
 
 /**
@@ -101,16 +133,20 @@ export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): 
     : -1;
   if (tailIndex < 0) return null;
 
+  let changed = current.length !== incoming.length;
   const merged = current.map((message) => {
     const incomingMessage = incomingById.get(message.id);
     // User messages are locally authoritative: persisted stream snapshots can
     // still contain the pre-edit text while a regenerated run is finishing.
-    return message.role === "user" || !incomingMessage
-      ? message
-      : snapshotUIMessage(incomingMessage);
+    if (message.role === "user" || !incomingMessage) return message;
+    const resolved = reconcileMessageReference(message, incomingMessage);
+    if (resolved !== message) changed = true;
+    return resolved;
   });
-  merged.push(...incoming.slice(tailIndex + 1).map(snapshotUIMessage));
-  return merged;
+  const appended = incoming.slice(tailIndex + 1).map((message) => snapshotUIMessage(message));
+  if (appended.length > 0) changed = true;
+  merged.push(...appended);
+  return changed ? merged : current;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai";
+import type { MessageRow } from "@shared/types";
 import { api } from "./api";
-import { buildMessageSnapshotRows } from "./chat-messages";
 
 export interface MessagePersistenceRequest {
   messages: UIMessage[];
@@ -9,6 +9,12 @@ export interface MessagePersistenceRequest {
 
 export interface RevisionRef {
   current: number;
+  persisted?: Map<string, PersistedMessageRef>;
+}
+
+export interface PersistedMessageRef {
+  message: UIMessage;
+  content: string;
 }
 
 export interface SnapshotPersistenceQueue<T> {
@@ -70,10 +76,12 @@ export async function persistMessagesPatch(
   createdAtById: Map<string, number>,
   revision: RevisionRef,
 ): Promise<void> {
-  const rows = buildMessageSnapshotRows({
+  const persisted = revision.persisted ?? (revision.persisted = new Map());
+  const rows = buildChangedMessageSnapshotRows({
     conversationId,
     messages: request.messages,
     createdAtById,
+    persisted,
   });
   const deleteIds = [...new Set(request.deleteIds ?? [])];
   if (rows.length === 0 && deleteIds.length === 0) return;
@@ -87,8 +95,16 @@ export async function persistMessagesPatch(
     });
     if (result.applied) {
       revision.current = result.revision;
-      for (const row of rows) createdAtById.set(row.id, row.created_at);
-      for (const id of deleteIds) createdAtById.delete(id);
+      const messagesById = new Map(request.messages.map((message) => [message.id, message]));
+      for (const row of rows) {
+        createdAtById.set(row.id, row.created_at);
+        const message = messagesById.get(row.id);
+        if (message) persisted.set(row.id, { message, content: row.content });
+      }
+      for (const id of deleteIds) {
+        createdAtById.delete(id);
+        persisted.delete(id);
+      }
       return;
     }
 
@@ -99,4 +115,46 @@ export async function persistMessagesPatch(
     }
   }
   throw new Error("Message history changed repeatedly while saving. Please retry.");
+}
+
+function buildChangedMessageSnapshotRows({
+  conversationId,
+  messages,
+  createdAtById,
+  persisted,
+  now = Date.now(),
+}: {
+  conversationId: string;
+  messages: UIMessage[];
+  createdAtById: Map<string, number>;
+  persisted: Map<string, PersistedMessageRef>;
+  now?: number;
+}): MessageRow[] {
+  let newMessageIndex = 0;
+  const rows: MessageRow[] = [];
+
+  for (const message of messages) {
+    if (!Array.isArray(message.parts) || message.parts.length === 0) continue;
+    const previous = persisted.get(message.id);
+    if (previous?.message === message) continue;
+
+    const content = JSON.stringify(message);
+    if (previous?.content === content) {
+      // A new wrapper with identical content is still safe to remember without
+      // paying for another IPC upsert.
+      persisted.set(message.id, { message, content });
+      continue;
+    }
+
+    const createdAt = createdAtById.get(message.id) ?? now + newMessageIndex++;
+    rows.push({
+      id: message.id,
+      conversation_id: conversationId,
+      role: message.role,
+      content,
+      created_at: createdAt,
+    });
+  }
+
+  return rows;
 }

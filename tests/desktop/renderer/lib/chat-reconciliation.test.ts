@@ -106,6 +106,25 @@ void describe("chat reconciliation", () => {
     assert.notEqual(selected.at(-1), live.at(-1));
   });
 
+  void it("replaces only the changed tail during a stream", () => {
+    const firstUser = user("u1", "Question");
+    const secondUser = user("u2", "Follow-up");
+    const previous = [firstUser, assistant("a1", "Answer"), secondUser];
+    const live = [
+      firstUser,
+      previous[1],
+      secondUser,
+      { id: "a2", role: "assistant", parts: [{ type: "text", text: "Streaming" }] },
+    ] as UIMessage[];
+
+    const selected = selectLiveChatMessages(live, previous);
+    assert.equal(selected[0], firstUser);
+    assert.equal(selected[1], previous[1]);
+    assert.equal(selected[2], secondUser);
+    assert.notEqual(selected[3], live[3]);
+    assert.equal(selected[3]?.parts[0]?.type, "text");
+  });
+
   void it("keeps the last non-empty snapshot during a transient empty stream state", () => {
     const previous = [user("u1", "Question"), assistant("a1", "partial reasoning")];
     assert.equal(selectLiveChatMessages([], previous), previous);

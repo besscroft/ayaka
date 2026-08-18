@@ -359,6 +359,44 @@ void describe("execution details", () => {
     assert.equal((html.match(/1\.3/g) ?? []).length, 1);
   });
 
+  void it("uses plain text for the active stream and rich content after completion", () => {
+    const streamingHtml = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: assistant([{ type: "text", text: "**streaming**\nnext line" }]),
+        isLoading: true,
+        status: "streaming",
+      }),
+    );
+    const completedHtml = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: assistant([{ type: "text", text: "**completed**" }]),
+        isLoading: false,
+        status: "ready",
+      }),
+    );
+
+    assert.match(streamingHtml, /data-streaming="true"/);
+    assert.doesNotMatch(streamingHtml, /data-slot="rich-content"/);
+    assert.match(completedHtml, /class="rich-content/);
+  });
+
+  void it("renders virtual rows with stable message ids", () => {
+    const html = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: [
+          userMessage("u1", "one"),
+          { id: "a1", role: "assistant", parts: [{ type: "text", text: "two" }] },
+        ],
+        isLoading: false,
+        status: "ready",
+      }),
+    );
+
+    assert.match(html, /data-slot="message-list" data-virtualized="true"/);
+    assert.match(html, /data-message-id="u1"/);
+    assert.match(html, /data-message-id="a1"/);
+  });
+
   void it("renders the live fallback as a non-interactive status row", () => {
     const html = renderToStaticMarkup(
       createElement(LiveThinkingPanel, {
