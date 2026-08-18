@@ -430,7 +430,15 @@ void describe("skin CSS contract", () => {
     assert.match(app, /position=\{isZzzSkin \? ["']top-center["'] : ["']top-right["']\}/);
     assert.match(app, /duration=\{isZzzSkin \? 1500 : 1000\}/);
     assert.match(app, /visibleToasts=\{isZzzSkin \? 1 : 3\}/);
-    assert.match(css, /:root\[data-skin=["']zzz["']\] \[data-sonner-toaster\]/);
+    assert.match(app, /toasterId:\s*ORIGINAL_TOASTER_ID/);
+    assert.match(app, /className:\s*ORIGINAL_TOAST_CLASS/);
+    assert.match(app, /id=\{ORIGINAL_TOASTER_ID\}/);
+    assert.match(app, /className=\{ORIGINAL_TOASTER_CLASS\}/);
+    assert.match(
+      css,
+      /:root\[data-skin=["']zzz["']\] \[data-sonner-toaster\]:not\(\.ayaka-original-toaster\)/,
+    );
+    assert.match(css, /\[data-sonner-toast\]:not\(\.ayaka-original-toast\)/);
     assert.match(css, /top:\s*23px/);
     assert.match(css, /width:\s*max-content/);
     assert.match(css, /height:\s*34px/);
@@ -451,7 +459,10 @@ void describe("skin CSS contract", () => {
     assert.match(css, /zzz-sonner-message-size-reverse\s+0\.42s\s+linear/);
     assert.match(css, /zzz-sonner-message-flash-reverse\s+0\.07s\s+linear\s+3\s+alternate/);
     assert.match(css, /data-type=["']loading["']/);
-    assert.match(css, /:not\(\[data-type=["']loading["']\]\) \[data-icon\][\s\S]*display:\s*none/);
+    assert.match(
+      css,
+      /:not\(\.ayaka-original-toast\):not\(\[data-type=["']loading["']\]\)\s+\[data-icon\][\s\S]*display:\s*none/,
+    );
     assert.match(css, /\[data-close-button\][\s\S]*display:\s*none/);
     assert.match(css, /\[data-button\][\s\S]*display:\s*flex/);
     assert.match(css, /--swipe-amount-y/);

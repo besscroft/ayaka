@@ -12,6 +12,10 @@ import { Toaster, toast } from "sonner";
 import { MotionConfig } from "motion/react";
 import { chatSessionRegistry } from "./lib/chat-session-registry";
 
+const ORIGINAL_TOASTER_ID = "original";
+const ORIGINAL_TOAST_CLASS = "ayaka-original-toast";
+const ORIGINAL_TOASTER_CLASS = "ayaka-original-toaster";
+
 function App(): React.JSX.Element {
   return (
     <AppProviders>
@@ -101,6 +105,8 @@ function AppContent(): React.JSX.Element {
       }
       announcedUpdateVersion.current = state.availableVersion;
       toast.info(t("about.update.toast", { version: state.availableVersion }), {
+        toasterId: ORIGINAL_TOASTER_ID,
+        className: ORIGINAL_TOAST_CLASS,
         duration: 6_000,
         action: {
           label: t("about.update.open"),
@@ -217,6 +223,15 @@ function AppContent(): React.JSX.Element {
         position={isZzzSkin ? "top-center" : "top-right"}
         duration={isZzzSkin ? 1500 : 1000}
         visibleToasts={isZzzSkin ? 1 : 3}
+      />
+      <Toaster
+        id={ORIGINAL_TOASTER_ID}
+        richColors
+        closeButton
+        position="top-right"
+        duration={1000}
+        visibleToasts={3}
+        className={ORIGINAL_TOASTER_CLASS}
       />
     </>
   );
