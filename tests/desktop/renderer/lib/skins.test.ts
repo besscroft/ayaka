@@ -10,30 +10,10 @@ const SKINS_ROOT = resolve(import.meta.dirname, "../../../../apps/desktop/src/re
 const TOKEN_FILE_BY_ID: Record<SkinId, string> = {
   white: "white/tokens.css",
   black: "black/tokens.css",
-  yaka: "yaka/tokens.css",
-  ark: "ark/tokens.css",
   zzz: "zzz/tokens.css",
 };
 
 const COMPONENT_HOOKS = {
-  yaka: ["button", "tooltip-trigger", "sidebar-menu-button", "calendar"],
-  ark: [
-    "window-titlebar",
-    "window-sidebar-toggle",
-    "window-brand",
-    "window-controls",
-    "button",
-    "message-content",
-    "card",
-    "dialog-content",
-    "popover-content",
-    "select-content",
-    "dialog-header",
-    "dialog-footer",
-    "badge",
-    "tabs-list",
-    "tabs-trigger",
-  ],
   zzz: [
     "window-titlebar",
     "window-sidebar-toggle",
@@ -183,7 +163,7 @@ void describe("skin CSS contract", () => {
   void it("keeps component overrides isolated to their owning skin", () => {
     const indexCss = readFileSync(resolve(SKINS_ROOT, "index.css"), "utf8");
 
-    for (const skinId of ["yaka", "ark", "zzz"] as const) {
+    for (const skinId of ["zzz"] as const) {
       const css = readFileSync(resolve(SKINS_ROOT, skinId, "components.css"), "utf8");
       assert.match(css, new RegExp(`:root\\[data-skin=["']${skinId}["']\\]`));
       assert.match(indexCss, new RegExp(`@import ["']\\./${skinId}/components\\.css["']`));

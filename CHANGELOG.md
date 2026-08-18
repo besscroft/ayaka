@@ -62,7 +62,6 @@
 
 #### 新增
 
-- 新增“明日方舟”主题皮肤，提供完整的颜色、字体、组件几何与交互样式定义。
 - 为基础 UI 组件补充 `data-slot` 属性，便于皮肤和自定义样式进行精准定位。
 
 #### 变更
@@ -75,7 +74,6 @@
 
 #### Added
 
-- Added an Arknights skin with complete color tokens, typography, component geometry, and interaction styles.
 - Added `data-slot` attributes to base UI components for precise skin and custom-style targeting.
 
 #### Changed
@@ -95,9 +93,6 @@
 
 #### 变更
 
-- 新增并重构 yaka 主题皮肤，优化主题切换逻辑，自动清理旧主题扩展样式，并补充全局 CSS 变量与皮肤专属配色。
-- 更新 yaka 皮肤描述及多语言文案。
-
 #### 修复
 
 - 修复永久删除智能体时未清理其 Soul 文件的问题。
@@ -110,9 +105,6 @@
 - Added one-click export for the current day's error log in Settings diagnostics.
 
 #### Changed
-
-- Added and redesigned the yaka skin with improved theme switching, automatic cleanup of old skin extension styles, and expanded global and skin-specific CSS variables.
-- Updated the yaka skin description and localized copy.
 
 #### Fixed
 

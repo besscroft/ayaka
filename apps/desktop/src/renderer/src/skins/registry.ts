@@ -1,16 +1,12 @@
 import type { SkinId } from "@shared/types";
-import { arkSkin } from "./ark/definition";
 import { blackSkin } from "./black/definition";
 import { whiteSkin } from "./white/definition";
-import { yakaSkin } from "./yaka/definition";
 import { zzzSkin } from "./zzz/definition";
 import type { SkinDefinition } from "./types";
 
 export const SKIN_DEFINITIONS = [
   whiteSkin,
   blackSkin,
-  yakaSkin,
-  arkSkin,
   zzzSkin,
 ] as const satisfies readonly SkinDefinition[];
 

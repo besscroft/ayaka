@@ -12,24 +12,26 @@ void describe("parseSettings", () => {
     assert.equal(settings.chatReasoningLevel, "provider-default");
   });
 
-  void it("keeps explicit language and skin values", () => {
+  void it("keeps explicit language and supported skin values", () => {
     const settings = parseSettings({
       [SettingKey.Language]: "zh-CN",
-      [SettingKey.Skin]: "yaka",
+      [SettingKey.Skin]: "black",
     } as Record<string, string | null>);
 
     assert.equal(settings.language, "zh-CN");
-    assert.equal(settings.skin, "yaka");
-
-    const arkSettings = parseSettings({
-      [SettingKey.Skin]: "ark",
-    } as Record<string, string | null>);
-    assert.equal(arkSettings.skin, "ark");
+    assert.equal(settings.skin, "black");
 
     const zzzSettings = parseSettings({
       [SettingKey.Skin]: "zzz",
     } as Record<string, string | null>);
     assert.equal(zzzSettings.skin, "zzz");
+
+    for (const removedSkin of ["yaka", "ark"]) {
+      const removedSettings = parseSettings({
+        [SettingKey.Skin]: removedSkin,
+      } as Record<string, string | null>);
+      assert.equal(removedSettings.skin, "white");
+    }
 
     const legacyIds = [
       ["nova-light", "white"],
