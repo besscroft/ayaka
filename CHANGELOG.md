@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.29]
+
+### 中文
+
+#### 新增
+
+- 新增消息列表虚拟化渲染，按需渲染可见消息，提升长对话的渲染性能。
+- 新增聊天会话注册表与增量 Token 缓存，支持跨会话保留 AI Chat 实例并降低 Token 估算开销。
+
+#### 变更
+
+- 优化聊天消息协调与持久化，仅更新发生变化的消息并复用稳定的消息引用，减少不必要的重渲染和写入。
+- 完善消息及推理内容的流式状态处理，改善流式响应期间的展示。
+- 移除半透明侧边栏功能及相关设置、样式、主题应用逻辑和国际化文案。
+
+### English
+
+#### Added
+
+- Added virtualized message-list rendering that only mounts visible messages for better long-conversation performance.
+- Added a chat-session registry and incremental token cache to preserve AI chat instances across conversations and reduce token-estimation work.
+
+#### Changed
+
+- Optimized chat reconciliation and persistence by reusing stable message references and writing only changed messages, reducing unnecessary rerenders and writes.
+- Improved streaming-state handling for message and reasoning content during streamed responses.
+- Removed the translucent-sidebar feature and its related setting, styles, theme application logic, and localized copy.
+
 ## [0.1.28]
 
 ### 中文
