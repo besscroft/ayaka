@@ -24,6 +24,7 @@ import {
   validateMediaGenerationRequest,
 } from "../lib/media-generation";
 import { chatErrorResponse, chatErrorStatus, classifyChatError } from "../lib/chat-errors";
+import { normalizeChatMediaInputs } from "../lib/conversation-workspace";
 
 const ALLOWED_ORIGIN_PATTERNS = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/];
 
@@ -176,9 +177,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     }
 
     try {
-      const materializedMessages = await (
-        await import("../lib/conversation-workspace")
-      ).normalizeChatMediaInputs(body.conversationId, messages);
+      const materializedMessages = await normalizeChatMediaInputs(body.conversationId, messages);
       const resolveModel = options.resolveModel ?? (await import("../lib/providers")).resolveModel;
       const buildAgentSystemPrompt =
         options.buildAgentSystemPrompt ?? (await import("../lib/db")).buildAgentSystemPrompt;

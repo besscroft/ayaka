@@ -164,9 +164,11 @@ import {
   openWorkspaceOrphan,
   openWorkspaceParent,
   prepareConversationWorkspace,
+  readWorkspaceFileContent,
   revealWorkspaceFile,
   removeWorkspaceOrphan,
   rollbackConversationWorkspacePreparation,
+  saveWorkspaceAttachments,
   saveWorkspaceMediaAs,
   selectWorkspaceParent,
 } from "../lib/conversation-workspace";
@@ -310,10 +312,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
         conversationId: string;
         attachments: Array<{ filename?: string; mediaType?: string; dataUrl: string }>;
       },
-    ) =>
-      import("../lib/conversation-workspace").then(({ saveWorkspaceAttachments }) =>
-        saveWorkspaceAttachments(input.conversationId, input.attachments),
-      ),
+    ) => saveWorkspaceAttachments(input.conversationId, input.attachments),
   );
   ipcMain.handle("workspace:saveMediaAs", (_e, input: WorkspaceMediaSaveInput) =>
     saveWorkspaceMediaAs(input),
@@ -321,10 +320,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   ipcMain.handle("workspace:revealFile", (_e, input: { conversationId: string; path: string }) =>
     revealWorkspaceFile(input.conversationId, input.path),
   );
-  ipcMain.handle("workspace:read", async (_e, input: { conversationId: string; path: string }) => {
-    const { readWorkspaceFileContent } = await import("../lib/conversation-workspace");
-    return readWorkspaceFileContent(input.conversationId, input.path);
-  });
+  ipcMain.handle("workspace:read", (_e, input: { conversationId: string; path: string }) =>
+    readWorkspaceFileContent(input.conversationId, input.path),
+  );
   ipcMain.handle("workspace:rollback", (_e, conversationId: string) =>
     rollbackConversationWorkspacePreparation(conversationId),
   );

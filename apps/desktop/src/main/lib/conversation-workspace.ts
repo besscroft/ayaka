@@ -8,9 +8,11 @@ import {
   createConversation,
   getConversation,
   getConversationWorkspace,
+  getSetting,
   listMessages,
   listConversationWorkspaces,
   rollbackConversationPreparation,
+  setSetting,
 } from "./db";
 import type {
   WorkspaceFileContent,
@@ -50,7 +52,6 @@ export function normalizeWorkspaceParent(value: string | null | undefined): stri
 }
 
 export async function getWorkspaceParent(): Promise<string> {
-  const { getSetting } = await import("./db");
   return normalizeWorkspaceParent(getSetting("workspace_parent_directory"));
 }
 
@@ -97,7 +98,6 @@ async function prepareConversationWorkspaceInternal(
   if (existing) return toWorkspaceInfo(existing);
   const existingConversation = getConversation(conversationId);
 
-  const { getSetting } = await import("./db");
   const parent = normalizeWorkspaceParent(getSetting("workspace_parent_directory"));
   await mkdir(parent, { recursive: true });
   if (!(await stat(parent)).isDirectory()) throw new Error("Workspace parent is not a directory.");
@@ -170,7 +170,6 @@ export async function selectWorkspaceParent(): Promise<boolean> {
   const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
   if (result.canceled || !result.filePaths[0]) return false;
   const parent = path.resolve(result.filePaths[0]);
-  const { setSetting } = await import("./db");
   await setSetting("workspace_parent_directory", parent);
   return true;
 }
@@ -190,7 +189,6 @@ export async function openWorkspaceParent(): Promise<boolean> {
 }
 
 export async function getWorkspaceParentState(): Promise<{ configured: boolean; path: string }> {
-  const { getSetting } = await import("./db");
   return {
     configured: Boolean(getSetting("workspace_parent_directory")?.trim()),
     path: await getWorkspaceParent(),
@@ -520,7 +518,6 @@ async function getWorkspaceOrphanParents(
 ): Promise<Set<string>> {
   const parents = new Set(rows.map((row) => path.resolve(row.parent_path)));
   parents.add(resolveDefaultWorkspaceParent());
-  const { getSetting } = await import("./db");
   parents.add(normalizeWorkspaceParent(getSetting("workspace_parent_directory")));
   return parents;
 }
