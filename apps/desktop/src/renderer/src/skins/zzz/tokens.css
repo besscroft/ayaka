@@ -3,7 +3,7 @@
   --skin-radius: 4px;
   --skin-font-stack: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --skin-mono-font-stack: "JetBrains Mono", "Fira Code", "Sarasa Mono SC", ui-monospace, monospace;
-  --skin-background: #edf2f4;
+  --skin-background: #323232;
   --skin-foreground: #1c1c1c;
   --skin-surface: #ffffff;
   --skin-surface-foreground: #1c1c1c;
@@ -49,6 +49,16 @@
   --skin-button-disabled-color: #2e2e2e;
   --skin-button-disabled-background: #737373;
   --skin-button-hollow-disabled-color: #666666;
+
+  /* Switch colors and the metal knob follow the reference switch.scss. */
+  --skin-switch-background: #323232;
+  --skin-switch-checked-background: #00cc0d;
+  --skin-switch-disabled-background: #1c1c1c;
+  --skin-switch-checked-disabled-background: #2e2e2e;
+  --skin-switch-disabled-color: #666666;
+  --skin-switch-knob: #585858;
+  --skin-switch-border: #000000;
+  --skin-switch-highlight: rgb(255 255 255 / 25%);
 
   --font-display-weight: 700;
   --font-display-tracking: -0.02em;

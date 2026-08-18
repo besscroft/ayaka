@@ -84,6 +84,8 @@ export function ReasoningSelector({
         type="button"
         disabled={disabled}
         data-slot="reasoning-selector-trigger"
+        data-icon-only="true"
+        data-icon-tone="neutral"
         data-open={open}
         className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition motion-reduce:transition-none hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         onClick={() => setOpen((next) => !next)}

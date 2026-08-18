@@ -17,6 +17,7 @@ void describe("shared form controls", () => {
   void it("renders a Switch control before ordinary text children", () => {
     const html = renderToStaticMarkup(<Switch>Enabled</Switch>);
 
+    assert.match(html, /data-size="md"/);
     assert.match(html, /h-6 w-11/);
     assert.match(html, />Enabled<\/span>/);
     assert.doesNotMatch(html, /Enabled.*h-6 w-11/);
@@ -34,6 +35,7 @@ void describe("shared form controls", () => {
       </Switch>,
     );
 
+    assert.match(html, /data-size="sm"/);
     assert.match(html, /h-5 w-9/);
     assert.match(html, /size-4 data-checked:translate-x-4/);
     assert.match(html, /data-checked/);

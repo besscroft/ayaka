@@ -429,6 +429,7 @@ function McpReviewModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >
@@ -624,6 +625,7 @@ function AddMcpModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={close}
               aria-label={t("common.close")}
             >

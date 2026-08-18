@@ -264,6 +264,8 @@ export function MessageInput({
                 <div className="inline-flex w-fit min-w-0 max-w-[calc(100%-2.75rem)] flex-wrap items-center gap-1.5">
                   <button
                     type="button"
+                    data-icon-only="true"
+                    data-icon-tone="neutral"
                     onClick={() => fileInputRef.current?.click()}
                     aria-label={t("input.attach")}
                     title={t("input.attach")}
@@ -321,6 +323,8 @@ export function MessageInput({
                 {isRunActive && onStop ? (
                   <button
                     type="button"
+                    data-icon-only="true"
+                    data-icon-tone="danger"
                     onClick={onStop}
                     aria-label={t("input.stop")}
                     data-slot="prompt-input-stop"

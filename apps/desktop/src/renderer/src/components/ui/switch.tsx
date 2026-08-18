@@ -65,7 +65,9 @@ function SwitchRoot({
   return (
     <SwitchSizeContext.Provider value={size}>
       <SwitchPrimitive.Root
+        {...props}
         data-slot="switch"
+        data-size={size}
         checked={isSelected}
         disabled={isDisabled}
         onCheckedChange={onChange}
@@ -73,7 +75,6 @@ function SwitchRoot({
           "group inline-flex items-center gap-2 rounded-md text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
-        {...props}
       >
         {compound ? (
           children

@@ -128,8 +128,30 @@ void describe("Button API", () => {
     );
 
     assert.match(html, /data-size="icon"/);
+    assert.match(html, /data-icon-only="true"/);
     assert.match(html, /size-9/);
     assert.match(html, /<svg aria-hidden="true"><\/svg>/);
+
+    const explicitIconSize = renderToStaticMarkup(
+      <Button size="icon" aria-label="Open">
+        <svg aria-hidden="true" />
+      </Button>,
+    );
+    assert.match(explicitIconSize, /data-icon-only="true"/);
+  });
+
+  void it("marks every icon-only semantic variant for the skin layer", () => {
+    for (const variant of ["ghost", "tertiary", "link"] as const) {
+      const html = renderToStaticMarkup(
+        <Button variant={variant} isIconOnly aria-label={variant}>
+          <svg aria-hidden="true" />
+        </Button>,
+      );
+
+      assert.match(html, /data-icon-only="true"/);
+      assert.match(html, /data-size="icon"/);
+      assert.match(html, new RegExp(`data-variant="${variant}"`));
+    }
   });
 
   void it("preserves disabled behavior independently from pending state", () => {

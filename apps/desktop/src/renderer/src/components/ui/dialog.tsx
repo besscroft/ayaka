@@ -96,7 +96,7 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
 }
 
 function DialogClose({ className, ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close className={cn(className)} {...props} />;
+  return <DialogPrimitive.Close className={cn(className)} {...props} data-slot="dialog-close" />;
 }
 
 export {

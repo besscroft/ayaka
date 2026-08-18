@@ -544,6 +544,7 @@ export function ToolDetailModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >
@@ -747,6 +748,7 @@ function AddSkillModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={close}
               aria-label={t("common.close")}
             >
@@ -1312,6 +1314,7 @@ function CatalogDetailModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               aria-label={t("common.close")}
               onPress={onClose}
             >

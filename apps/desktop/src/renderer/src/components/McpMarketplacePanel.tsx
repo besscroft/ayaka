@@ -467,6 +467,7 @@ function McpMarketplaceDetailModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >

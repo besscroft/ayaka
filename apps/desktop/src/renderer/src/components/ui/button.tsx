@@ -77,6 +77,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 ) {
   const disabled = isDisabled || isPending;
   const implicitDefault = variant == null;
+  const iconOnly = isIconOnly || size === "icon";
   const effectivePlain = plain && !hollow;
   const effectiveRound = round && !circle;
 
@@ -85,7 +86,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       disabled={disabled}
-      className={cn(buttonVariants({ variant, size: isIconOnly ? "icon" : size }), className)}
+      className={cn(buttonVariants({ variant, size: iconOnly ? "icon" : size }), className)}
       onClick={(event) => {
         onClick?.(event);
         if (!event.defaultPrevented) onPress?.();
@@ -93,7 +94,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {...props}
       data-slot="button"
       data-variant={variant ?? "secondary"}
-      data-size={isIconOnly ? "icon" : (size ?? "default")}
+      data-size={iconOnly ? "icon" : (size ?? "default")}
+      data-icon-only={iconOnly ? "true" : undefined}
       data-implicit-default={implicitDefault ? "true" : undefined}
       data-plain={effectivePlain ? "true" : undefined}
       data-hollow={hollow ? "true" : undefined}

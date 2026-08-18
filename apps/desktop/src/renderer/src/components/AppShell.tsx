@@ -258,6 +258,8 @@ export function AppShell({
                     {searchQuery && (
                       <button
                         type="button"
+                        data-icon-only="true"
+                        data-icon-tone="neutral"
                         onClick={() => setSearchQuery("")}
                         aria-label={t("common.close")}
                         className="absolute right-1.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-foreground/40 transition hover:text-foreground"
@@ -309,6 +311,8 @@ export function AppShell({
                                   <span className="flex-1 truncate text-xs">{conv.title}</span>
                                   <button
                                     type="button"
+                                    data-icon-only="true"
+                                    data-icon-tone="danger"
                                     className="opacity-0 transition group-hover/conv:opacity-100 hover:text-danger"
                                     onClick={(event) => {
                                       event.stopPropagation();

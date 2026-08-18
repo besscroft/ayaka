@@ -301,6 +301,15 @@ void describe("skin CSS contract", () => {
     assert.match(css, /data-slot=["']tool-deny["']/);
     assert.match(css, /data-slot=["']prompt-input-submit["']/);
     assert.match(css, /data-slot=["']prompt-input-stop["']/);
+    assert.match(css, /data-icon-only/);
+    assert.match(css, /border-radius:\s*50%/);
+    assert.match(css, /data-icon-tone/);
+    assert.match(css, /data-slot=["']window-control["']/);
+    assert.match(css, /data-slot=["']window-sidebar-toggle["']/);
+    assert.match(css, /flex:\s*0\s+0\s+2\.75rem/);
+    assert.match(css, /window-control[\s\S]*min-width:\s*2\.75rem/);
+    assert.match(css, /window-control[\s\S]*width:\s*2rem[\s\S]*height:\s*2rem/);
+    assert.match(css, /window-control[\s\S]*transform:\s*translate\(-50%,\s*-50%\)/);
   });
 
   void it("keeps the ZZZ tabs active pill fully rounded", () => {
@@ -318,4 +327,89 @@ void describe("skin CSS contract", () => {
     assert.match(activeTabRule, /border-radius:\s*9999px/);
     assert.doesNotMatch(activeTabRule, /clip-path:/);
   });
+
+  void it("defines the complete ZZZ reference switch contract", () => {
+    const tokens = readFileSync(resolve(SKINS_ROOT, "zzz/tokens.css"), "utf8");
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const switchStart = css.indexOf(':root[data-skin="zzz"] [data-slot="switch"] {');
+    const switchEnd = css.indexOf(
+      ':root[data-skin="zzz"] [data-slot="checkbox-control"]',
+      switchStart,
+    );
+    const switchCss = css.slice(switchStart, switchEnd);
+
+    assert.ok(switchStart >= 0);
+    assert.ok(switchEnd > switchStart);
+
+    for (const token of [
+      "background",
+      "checked-background",
+      "disabled-background",
+      "checked-disabled-background",
+      "disabled-color",
+      "knob",
+      "border",
+      "highlight",
+    ]) {
+      assert.match(tokens, new RegExp(`--skin-switch-${token}\\s*:`), token);
+    }
+
+    for (const value of ["#323232", "#00cc0d", "#1c1c1c", "#2e2e2e", "#585858"]) {
+      assert.match(tokens, new RegExp(escapeRegExp(value), "i"), value);
+    }
+
+    assert.match(css, /data-size=["']sm["']/);
+    assert.match(css, /data-size=["']md["']/);
+    assert.match(switchCss, /border-radius:\s*9999px/);
+    assert.match(switchCss, /background-size:\s*6px\s+6px/);
+    assert.match(switchCss, /inset\s+-1px\s+-1px\s+2px/);
+    assert.match(switchCss, /inset\s+0\s+0\s+0\s+4px\s+var\(--skin-switch-background\)/);
+    assert.match(switchCss, /conic-gradient/);
+    assert.match(switchCss, /radial-gradient/);
+    assert.match(switchCss, /content:\s*["']OFF["']/);
+    assert.match(switchCss, /content:\s*["']ON["']/);
+    assert.match(switchCss, /data-checked/);
+    assert.match(switchCss, /data-disabled/);
+    assert.match(switchCss, /focus-visible/);
+    assert.match(switchCss, /:active/);
+    assert.match(switchCss, /prefers-reduced-motion/);
+    assert.doesNotMatch(switchCss, /var\(--primary\)/);
+  });
+
+  void it("scopes the gray striped light surface to the requested ZZZ pages", () => {
+    const tokens = readFileSync(resolve(SKINS_ROOT, "zzz/tokens.css"), "utf8");
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const pageBackgroundStart = css.lastIndexOf(
+      ':root[data-skin="zzz"]\n  :is(\n    [data-page="chat-page"]',
+    );
+    const pageBackgroundCss = css.slice(pageBackgroundStart);
+
+    assert.ok(pageBackgroundStart >= 0);
+    assert.match(pageBackgroundCss, /background-color:\s*#b8b8b8/);
+    assert.match(pageBackgroundCss, /background-image:\s*var\(--skin-pattern-stripes\)/);
+    assert.match(pageBackgroundCss, /background-repeat:\s*repeat/);
+
+    for (const page of [
+      "chat-page",
+      "agents-page",
+      "tools-page",
+      "mcp-page",
+      "skills-page",
+      "automation-page",
+      "memory-page",
+    ]) {
+      assert.match(pageBackgroundCss, new RegExp(`data-page=["']${page}["']`), page);
+    }
+
+    assert.match(
+      pageBackgroundCss,
+      /data-page=["']chat-page["']\]\s*>\s*header[\s\S]*background-image:\s*var\(--skin-pattern-stripes\)/,
+    );
+    assert.match(tokens, /--skin-background:\s*#edf2f4/);
+    assert.match(tokens, /--skin-surface:\s*#ffffff/);
+  });
 });
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

@@ -47,6 +47,8 @@ export function WindowTitleBar({
         type="button"
         className="window-no-drag flex h-full w-11 items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
         data-slot="window-sidebar-toggle"
+        data-icon-only="true"
+        data-icon-tone="neutral"
         onClick={onToggleSidebar}
         aria-label={t(sidebarExpanded ? "shell.sidebar.collapse" : "shell.sidebar.expand")}
         aria-expanded={sidebarExpanded}
@@ -71,6 +73,9 @@ export function WindowTitleBar({
         <button
           type="button"
           className="window-control-button"
+          data-slot="window-control"
+          data-icon-only="true"
+          data-icon-tone="neutral"
           onClick={() => void api.windowControls.minimize()}
           aria-label={t("window.minimize")}
         >
@@ -79,6 +84,9 @@ export function WindowTitleBar({
         <button
           type="button"
           className="window-control-button"
+          data-slot="window-control"
+          data-icon-only="true"
+          data-icon-tone="neutral"
           onClick={toggleMaximize}
           aria-label={t(maximized ? "window.restore" : "window.maximize")}
         >
@@ -91,6 +99,9 @@ export function WindowTitleBar({
         <button
           type="button"
           className="window-control-button window-close-button"
+          data-slot="window-control"
+          data-icon-only="true"
+          data-icon-tone="danger"
           onClick={() => void api.windowControls.close()}
           aria-label={t("window.close")}
         >

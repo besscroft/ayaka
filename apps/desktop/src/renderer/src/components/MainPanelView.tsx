@@ -831,6 +831,8 @@ function MemoryEditModal({
           </DialogTitle>
           <button
             type="button"
+            data-icon-only="true"
+            data-icon-tone="danger"
             className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t("common.close")}

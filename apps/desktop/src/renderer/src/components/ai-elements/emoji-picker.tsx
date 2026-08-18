@@ -715,6 +715,8 @@ export function EmojiPicker({
         />
         <button
           type="button"
+          data-icon-only="true"
+          data-icon-tone="neutral"
           onClick={() => onOpenChange(false)}
           className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground"
           aria-label={t("ai.emoji.close")}

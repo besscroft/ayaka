@@ -204,6 +204,8 @@ export function SettingsDialog({
             </div>
             <button
               type="button"
+              data-icon-only="true"
+              data-icon-tone="danger"
               className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               onClick={onClose}
               aria-label={t("common.close")}
@@ -1496,6 +1498,7 @@ function ModelEditorDialog({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >
@@ -2210,6 +2213,7 @@ function ProviderModelWorkbench({
                 type="button"
                 variant="ghost"
                 size="icon"
+                data-icon-tone="neutral"
                 className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
                 aria-label={t("common.clear")}
                 onPress={() => setProviderQuery("")}
@@ -2676,6 +2680,7 @@ function AddProviderDialog({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >
@@ -2880,6 +2885,7 @@ function ModelOptionsDialog({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >

@@ -706,6 +706,7 @@ function AgentDetailModal({
               isIconOnly
               size="sm"
               variant="tertiary"
+              data-icon-tone="danger"
               onPress={onClose}
               aria-label={t("common.close")}
             >
@@ -947,6 +948,7 @@ function AgentEditorModal({
             isIconOnly
             size="sm"
             variant="tertiary"
+            data-icon-tone="danger"
             onPress={onClose}
             aria-label={t("common.close")}
           >

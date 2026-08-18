@@ -224,6 +224,8 @@ export function PromptInputSubmit({
     <button
       type="submit"
       data-slot="prompt-input-submit"
+      data-icon-only="true"
+      data-icon-tone={computedDisabled ? "disabled" : isLoading ? "danger" : "primary"}
       data-status={status}
       disabled={computedDisabled}
       aria-label={rest["aria-label"] ?? (isLoading ? t("input.stop") : t("input.send"))}
