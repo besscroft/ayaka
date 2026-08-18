@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.28]
+
+### 中文
+
+#### 新增
+
+- 新增“绝区零”主题皮肤，提供完整的颜色令牌、组件样式、交互状态和界面装饰。
+- 新增绝区零主题的 Toast 通知样式，支持与主题配套的提示卡片、状态色和动效。
+
+#### 变更
+
+- 完善绝区零主题的按钮、图标按钮、窗口控件及基础 UI 组件样式，提升主题覆盖的一致性。
+- 统一图标按钮及相关交互元素的 `data-*` 属性标记，便于主题样式按语义进行定制。
+- 根据当前皮肤动态调整 Toast 通知的位置、显示数量和持续时间。
+
+### English
+
+#### Added
+
+- Added a Zenless Zone Zero skin with complete color tokens, component styles, interaction states, and UI decoration.
+- Added ZZZ-specific toast notification styles with themed status cards, colors, and motion.
+
+#### Changed
+
+- Expanded ZZZ styling for buttons, icon buttons, window controls, and base UI components for more consistent theme coverage.
+- Standardized `data-*` attributes on icon buttons and related interactive elements for semantic skin customization.
+- Adjusted toast position, visible count, and duration based on the active skin.
+
 ## [0.1.27]
 
 ### 中文
