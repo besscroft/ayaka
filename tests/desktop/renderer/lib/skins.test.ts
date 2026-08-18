@@ -358,14 +358,22 @@ void describe("skin CSS contract", () => {
       assert.match(tokens, new RegExp(escapeRegExp(value), "i"), value);
     }
 
-    assert.match(css, /data-size=["']sm["']/);
-    assert.match(css, /data-size=["']md["']/);
+    assert.match(switchCss, /--zzz-switch-thumb-offset:\s*4px/);
+    assert.match(switchCss, /--zzz-switch-thumb-size:\s*24px/);
+    assert.match(switchCss, /--zzz-switch-label-inset:\s*18px/);
+    assert.match(switchCss, /--zzz-switch-label-size:\s*14px/);
+    assert.match(switchCss, /width:\s*85px/);
+    assert.match(switchCss, /height:\s*34px/);
+    assert.match(switchCss, /padding-inline:\s*var\(--zzz-switch-label-inset\)/);
+    assert.match(switchCss, /inset-inline-end:\s*var\(--zzz-switch-label-inset\)/);
+    assert.match(switchCss, /inset-inline:\s*var\(--zzz-switch-label-inset\) auto/);
     assert.match(switchCss, /border-radius:\s*9999px/);
     assert.match(switchCss, /background-size:\s*6px\s+6px/);
     assert.match(switchCss, /inset\s+-1px\s+-1px\s+2px/);
     assert.match(switchCss, /inset\s+0\s+0\s+0\s+4px\s+var\(--skin-switch-background\)/);
     assert.match(switchCss, /conic-gradient/);
     assert.match(switchCss, /radial-gradient/);
+    assert.match(switchCss, /translate:\s*none/);
     assert.match(switchCss, /content:\s*["']OFF["']/);
     assert.match(switchCss, /content:\s*["']ON["']/);
     assert.match(switchCss, /data-checked/);
@@ -407,6 +415,25 @@ void describe("skin CSS contract", () => {
     );
     assert.match(tokens, /--skin-background:\s*#edf2f4/);
     assert.match(tokens, /--skin-surface:\s*#ffffff/);
+  });
+
+  void it("keeps ZZZ chat text readable on dark surfaces", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const assistantMessageStart = css.indexOf(
+      ':root[data-skin="zzz"]\n  [data-page="chat-page"]\n  [data-slot="message"][data-from="assistant"]',
+    );
+    const assistantMessageCss = css.slice(assistantMessageStart);
+    const placeholderStart = css.indexOf(
+      ':root[data-skin="zzz"]\n  [data-page="chat-page"]\n  [data-slot="prompt-input-textarea"]::placeholder',
+    );
+    const placeholderCss = css.slice(placeholderStart);
+
+    assert.ok(assistantMessageStart >= 0);
+    assert.match(assistantMessageCss, /--foreground:\s*var\(--skin-dark-foreground\)/);
+    assert.match(assistantMessageCss, /--muted-foreground:\s*var\(--skin-dark-muted\)/);
+    assert.ok(placeholderStart >= 0);
+    assert.match(placeholderCss, /color:\s*var\(--skin-dark-muted\)/);
+    assert.match(placeholderCss, /opacity:\s*1/);
   });
 });
 

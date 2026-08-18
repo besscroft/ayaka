@@ -44,7 +44,7 @@
 }
 
 :root[data-skin="zzz"] [data-slot="window-sidebar-toggle"] {
-  margin-inline-start: 4px;
+  padding-block: 4px;
   border-inline-end: 1px solid rgb(255 255 255 / 20%);
   color: var(--header-foreground);
 }
@@ -68,7 +68,7 @@
 }
 
 :root[data-skin="zzz"] [data-slot="window-controls"] {
-  margin-inline-end: 4px;
+  padding-block: 4px;
   border-inline-start: 1px solid rgb(255 255 255 / 20%);
 }
 
@@ -97,6 +97,10 @@
   background-size: 6px 6px;
   color: var(--sidebar-foreground);
   box-shadow: inset -4px 0 0 #000000;
+}
+
+:root[data-skin="zzz"] .app-sidebar [data-slot="conversation-list"] > ul > li > p {
+  color: rgb(255 255 255 / 68%);
 }
 
 :root[data-skin="zzz"] .app-sidebar > div {
@@ -1175,38 +1179,29 @@
   border-bottom-color: var(--skin-signal-action);
 }
 
-/* The Switch follows the reference switch.scss while retaining the local
-   sm/md control and thumb dimensions. */
+/* The Switch follows the reference switch.scss dimensions even when shared
+   call sites request the compact sm size. */
 :root[data-skin="zzz"] [data-slot="switch"] {
-  --zzz-switch-thumb-offset: 2px;
-  --zzz-switch-thumb-size: 20px;
-  --zzz-switch-knob-inner-size: 12px;
-  --zzz-switch-knob-marker-left: 5px;
-  --zzz-switch-label-size: 9px;
+  --zzz-switch-thumb-offset: 4px;
+  --zzz-switch-thumb-size: 24px;
+  --zzz-switch-knob-inner-size: 16px;
+  --zzz-switch-knob-marker-left: 6px;
+  --zzz-switch-label-inset: 18px;
+  --zzz-switch-label-size: 14px;
   position: relative;
   isolation: isolate;
   color: #000000;
   transition: transform 120ms ease;
 }
 
-:root[data-skin="zzz"] [data-slot="switch"][data-size="sm"] {
-  --zzz-switch-thumb-size: 16px;
-  --zzz-switch-knob-inner-size: 10px;
-  --zzz-switch-knob-marker-left: 4px;
-  --zzz-switch-label-size: 8px;
-}
-
-:root[data-skin="zzz"] [data-slot="switch"][data-size="md"] {
-  --zzz-switch-thumb-size: 20px;
-  --zzz-switch-knob-inner-size: 12px;
-  --zzz-switch-knob-marker-left: 5px;
-  --zzz-switch-label-size: 9px;
-}
-
 :root[data-skin="zzz"] [data-slot="switch-control"] {
   position: relative;
   isolation: isolate;
   overflow: visible;
+  width: 85px;
+  height: 34px;
+  box-sizing: border-box;
+  padding-inline: var(--zzz-switch-label-inset);
   border: 1px solid var(--skin-switch-border);
   border-radius: 9999px;
   background-color: var(--skin-switch-background);
@@ -1232,7 +1227,7 @@
 :root[data-skin="zzz"] [data-slot="switch-control"]::before {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: var(--zzz-switch-thumb-offset);
+  inset-inline-end: var(--zzz-switch-label-inset);
   z-index: 0;
   color: currentColor;
   content: "OFF";
@@ -1244,7 +1239,7 @@
 }
 
 :root[data-skin="zzz"] [data-slot="switch"][data-checked] [data-slot="switch-control"]::before {
-  inset-inline: var(--zzz-switch-thumb-offset) auto;
+  inset-inline: var(--zzz-switch-label-inset) auto;
   content: "ON";
 }
 
@@ -1269,6 +1264,7 @@
       transparent
     );
   transform: translateY(-50%);
+  translate: none;
   transition: inset-inline-start 200ms ease;
 }
 
@@ -1838,6 +1834,12 @@
   color: var(--foreground);
 }
 
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message"][data-from="assistant"] {
+  --foreground: var(--skin-dark-foreground);
+  --muted-foreground: var(--skin-dark-muted);
+  color: var(--foreground);
+}
+
 :root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-content"][data-from="user"] {
   border-radius: 14px 14px 2px 14px;
   background-color: var(--skin-primary);
@@ -1871,6 +1873,11 @@
 :root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-action-button"]:focus-visible {
   outline: 2px solid var(--skin-ring);
   outline-offset: 3px;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="prompt-input-textarea"]::placeholder {
+  color: var(--skin-dark-muted);
+  opacity: 1;
 }
 
 :root[data-skin="zzz"] [data-page="chat-page"] [data-slot="conversation-scroll-button"] {
@@ -2356,8 +2363,8 @@
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 50%;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   box-sizing: border-box;
   border: 1px solid #000000;
   border-radius: 50%;
@@ -2378,8 +2385,8 @@
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 50%;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   box-sizing: border-box;
   border-radius: 50%;
   box-shadow:

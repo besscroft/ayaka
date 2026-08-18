@@ -116,8 +116,6 @@ function ActionButton({
   return (
     <button
       data-slot="message-action-button"
-      data-icon-only="true"
-      data-icon-tone={tone === "danger" ? "danger" : "neutral"}
       data-tone={tone}
       type="button"
       onClick={onClick}
