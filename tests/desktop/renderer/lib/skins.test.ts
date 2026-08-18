@@ -435,6 +435,48 @@ void describe("skin CSS contract", () => {
     assert.match(placeholderCss, /color:\s*var\(--skin-dark-muted\)/);
     assert.match(placeholderCss, /opacity:\s*1/);
   });
+
+  void it("defines the ZZZ Sonner message contract", () => {
+    const imports = readFileSync(resolve(SKINS_ROOT, "index.css"), "utf8");
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/sonner.css"), "utf8");
+    const app = readFileSync(resolve(SKINS_ROOT, "..", "App.tsx"), "utf8");
+
+    assert.match(imports, /@import ["']\.\/zzz\/sonner\.css["'];/);
+    assert.match(app, /const isZzzSkin = settings\.skin === ["']zzz["']/);
+    assert.match(app, /position=\{isZzzSkin \? ["']top-center["'] : ["']top-right["']\}/);
+    assert.match(app, /duration=\{isZzzSkin \? 1500 : 1000\}/);
+    assert.match(app, /visibleToasts=\{isZzzSkin \? 1 : 3\}/);
+    assert.match(css, /:root\[data-skin=["']zzz["']\] \[data-sonner-toaster\]/);
+    assert.match(css, /top:\s*23px/);
+    assert.match(css, /width:\s*max-content/);
+    assert.match(css, /height:\s*34px/);
+    assert.match(css, /padding:\s*0 17px/);
+    assert.match(css, /border-radius:\s*9999px/);
+    assert.match(css, /--zzz-sonner-background:\s*#000000/);
+    assert.match(css, /--zzz-sonner-foreground:\s*#ffffff/);
+    assert.match(css, /--y:\s*translateY\(0\)/);
+    assert.match(css, /transform:\s*var\(--y\);/);
+
+    for (const value of ["#006607", "#80e686", "#600e00", "#e08e80", "#806200", "#ffe180"]) {
+      assert.match(css, new RegExp(escapeRegExp(value), "i"), value);
+    }
+
+    assert.match(css, /zzz-sonner-message-flash\s+0\.07s\s+linear\s+3\s+alternate/);
+    assert.match(css, /zzz-sonner-message-size\s+0\.63s\s+linear/);
+    assert.match(css, /zzz-sonner-message-opacity\s+0\.42s\s+linear/);
+    assert.match(css, /zzz-sonner-message-size-reverse\s+0\.42s\s+linear/);
+    assert.match(css, /zzz-sonner-message-flash-reverse\s+0\.07s\s+linear\s+3\s+alternate/);
+    assert.match(css, /data-type=["']loading["']/);
+    assert.match(css, /:not\(\[data-type=["']loading["']\]\) \[data-icon\][\s\S]*display:\s*none/);
+    assert.match(css, /\[data-close-button\][\s\S]*display:\s*none/);
+    assert.match(css, /\[data-button\][\s\S]*display:\s*flex/);
+    assert.match(css, /--swipe-amount-y/);
+    assert.match(css, /prefers-reduced-motion:\s*reduce/);
+    assert.match(
+      css,
+      /prefers-reduced-motion:[\s\S]*data-mounted=["']true["'][\s\S]*data-visible=["']true["'][\s\S]*data-content[\s\S]*opacity:\s*1/,
+    );
+  });
 });
 
 function escapeRegExp(value: string): string {

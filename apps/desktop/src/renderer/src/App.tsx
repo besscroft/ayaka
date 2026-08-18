@@ -40,7 +40,8 @@ function AppRoot({ children }: { children: ReactNode }): React.JSX.Element {
 
 function AppContent(): React.JSX.Element {
   const { t } = useT();
-  const { resolvedLanguage } = useSettings();
+  const { resolvedLanguage, settings } = useSettings();
+  const isZzzSkin = settings.skin === "zzz";
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AppView>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -208,7 +209,13 @@ function AppContent(): React.JSX.Element {
         initialTab={settingsInitialTab}
         onClose={() => setSettingsOpen(false)}
       />
-      <Toaster richColors closeButton position="top-right" duration={1000} />
+      <Toaster
+        richColors
+        closeButton
+        position={isZzzSkin ? "top-center" : "top-right"}
+        duration={isZzzSkin ? 1500 : 1000}
+        visibleToasts={isZzzSkin ? 1 : 3}
+      />
     </>
   );
 }
