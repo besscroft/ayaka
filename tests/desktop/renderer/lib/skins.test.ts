@@ -420,6 +420,22 @@ void describe("skin CSS contract", () => {
     assert.match(placeholderCss, /opacity:\s*1/);
   });
 
+  void it("keeps ZZZ management page text readable", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const pageTextStart = css.indexOf(
+      ':root[data-skin="zzz"]\n  :is(\n    [data-page="tools-page"]',
+    );
+    const pageTextCss = css.slice(pageTextStart);
+
+    assert.ok(pageTextStart >= 0);
+    for (const page of ["tools-page", "mcp-page", "skills-page", "automation-page"]) {
+      assert.match(pageTextCss, new RegExp(`data-page=["']${page}["']`), page);
+    }
+    assert.match(pageTextCss, /--foreground:\s*var\(--skin-dark-foreground\)/);
+    assert.match(pageTextCss, /--muted-foreground:\s*var\(--skin-dark-muted\)/);
+    assert.match(pageTextCss, /color:\s*var\(--skin-dark-foreground\)/);
+  });
+
   void it("defines the ZZZ Sonner message contract", () => {
     const imports = readFileSync(resolve(SKINS_ROOT, "index.css"), "utf8");
     const css = readFileSync(resolve(SKINS_ROOT, "zzz/sonner.css"), "utf8");

@@ -1403,9 +1403,9 @@
   box-shadow: inset 0 0 0 3px #333333;
 }
 
+/* 不需要背景颜色 */
 :root[data-skin="zzz"] [data-slot="dialog-content"] section {
   border-color: #353535;
-  background: #222222;
   color: #ffffff;
   --card: #1c1c1c;
   --card-foreground: #ffffff;
@@ -1645,6 +1645,19 @@
 :root[data-skin="zzz"] [data-slot="card-title"],
 :root[data-skin="zzz"] [data-slot="card-description"] {
   color: inherit;
+}
+
+/* Keep the top-level management page copy readable on ZZZ's dark surfaces. */
+:root[data-skin="zzz"]
+  :is(
+    [data-page="tools-page"],
+    [data-page="mcp-page"],
+    [data-page="skills-page"],
+    [data-page="automation-page"]
+  ) {
+  --foreground: var(--skin-dark-foreground);
+  --muted-foreground: var(--skin-dark-muted);
+  color: var(--skin-dark-foreground);
 }
 
 :root[data-skin="zzz"] [data-slot="memory-nav-item"][data-active="true"] {
