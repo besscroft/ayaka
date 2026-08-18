@@ -213,4 +213,109 @@ void describe("skin CSS contract", () => {
       /:root\[data-skin=["']zzz["']\]\s+\[data-page=["']chat-page["']\]\s+\[data-slot=["']prompt-input-textarea["']\][\s\S]*border-radius:\s*10px[\s\S]*padding:\s*8px\s+10px/,
     );
   });
+
+  void it("defines the complete ZZZ reference button contract", () => {
+    const tokens = readFileSync(resolve(SKINS_ROOT, "zzz/tokens.css"), "utf8");
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const buttonStart = css.indexOf(':root[data-skin="zzz"] [data-slot="button"] {');
+    const buttonEnd = css.indexOf(
+      ':root[data-skin="zzz"] [data-slot="tooltip-trigger"]',
+      buttonStart,
+    );
+    const buttonCss = css.slice(buttonStart, buttonEnd);
+
+    assert.ok(buttonStart >= 0);
+    assert.ok(buttonEnd > buttonStart);
+
+    for (const token of [
+      "default",
+      "primary",
+      "success",
+      "info",
+      "warning",
+      "danger",
+      "ether",
+      "fire",
+      "electric",
+      "ice",
+      "physical",
+      "highlight-start",
+      "highlight-end",
+      "border",
+      "plain-background",
+      "disabled-color",
+      "disabled-background",
+      "hollow-disabled-color",
+    ]) {
+      assert.match(tokens, new RegExp(`--skin-button-${token}\\s*:`), token);
+    }
+
+    for (const variant of [
+      "default",
+      "primary",
+      "secondary",
+      "outline",
+      "ghost",
+      "tertiary",
+      "link",
+      "success",
+      "info",
+      "warning",
+      "danger",
+      "destructive",
+      "ether",
+      "fire",
+      "electric",
+      "ice",
+      "physical",
+    ]) {
+      assert.match(css, new RegExp(`data-variant=["']${variant}["']`), variant);
+    }
+
+    for (const modifier of ["plain", "hollow", "highlight", "circle", "round"]) {
+      assert.match(css, new RegExp(`data-${modifier}`), modifier);
+    }
+
+    assert.match(css, /data-implicit-default/);
+    assert.match(buttonCss, /border:\s*1px\s+solid\s+#000000/);
+    assert.match(buttonCss, /border-radius:\s*6px/);
+    assert.match(buttonCss, /font-style:\s*italic/);
+    assert.match(buttonCss, /letter-spacing:\s*1px/);
+    assert.match(buttonCss, /background-size:\s*6px\s+6px/);
+    assert.match(buttonCss, /inset\s+0\s+1px\s+2px/);
+    assert.match(buttonCss, /inset\s+0\s+0\s+0\s+3px/);
+    assert.match(buttonCss, /inset\s+0\s+0\s+0\s+4px/);
+    assert.match(buttonCss, /data-slot="button-loader"/);
+    assert.match(buttonCss, /data-slot="button-content"/);
+    assert.doesNotMatch(buttonCss, /overflow:\s*hidden/);
+    assert.doesNotMatch(buttonCss, /clip-path:/);
+    assert.doesNotMatch(buttonCss, /filter:\s*brightness/);
+    assert.doesNotMatch(buttonCss, /skin-checker-light/);
+    assert.match(css, /@keyframes zzz-button-highlight/);
+    assert.match(css, /@keyframes zzz-button-loading/);
+    assert.match(css, /prefers-reduced-motion/);
+    assert.match(css, /rotate\(1turn\)/);
+    assert.match(css, /data-slot="message-action-button"/);
+    assert.match(css, /data-slot="conversation-scroll-button"/);
+    assert.match(css, /data-slot=["']tool-approve["']/);
+    assert.match(css, /data-slot=["']tool-deny["']/);
+    assert.match(css, /data-slot=["']prompt-input-submit["']/);
+    assert.match(css, /data-slot=["']prompt-input-stop["']/);
+  });
+
+  void it("keeps the ZZZ tabs active pill fully rounded", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const tabsListRule = css.match(
+      /:root\[data-skin=["']zzz["']\]\s+\[data-slot=["']tabs-list["']\]\s*\{([\s\S]*?)\n\}/,
+    )?.[1];
+    const activeTabRule = css.match(
+      /:root\[data-skin=["']zzz["']\]\s+\[data-slot=["']tabs-trigger["']\]\[data-active\]\s*\{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    assert.ok(tabsListRule);
+    assert.match(tabsListRule, /gap:\s*2px/);
+    assert.ok(activeTabRule);
+    assert.match(activeTabRule, /border-radius:\s*9999px/);
+    assert.doesNotMatch(activeTabRule, /clip-path:/);
+  });
 });

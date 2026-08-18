@@ -10,6 +10,14 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         primary: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        success: "bg-success text-success-foreground shadow-xs hover:bg-success/90",
+        info: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
+        warning: "bg-warning text-warning-foreground shadow-xs hover:bg-warning/90",
+        ether: "bg-accent text-accent-foreground shadow-xs hover:bg-accent/90",
+        fire: "bg-danger text-danger-foreground shadow-xs hover:bg-danger/90",
+        electric: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        ice: "bg-accent text-accent-foreground shadow-xs hover:bg-accent/90",
+        physical: "bg-warning text-warning-foreground shadow-xs hover:bg-warning/90",
         secondary:
           "border border-border bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         outline: "border border-border bg-background text-foreground shadow-xs hover:bg-muted",
@@ -38,6 +46,11 @@ export interface ButtonProps
   isDisabled?: boolean;
   isPending?: boolean;
   isIconOnly?: boolean;
+  plain?: boolean;
+  hollow?: boolean;
+  highlight?: boolean;
+  circle?: boolean;
+  round?: boolean;
   onPress?: () => void;
 }
 
@@ -50,6 +63,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     isDisabled,
     isPending,
     isIconOnly,
+    plain = false,
+    hollow = false,
+    highlight = false,
+    circle = false,
+    round = true,
     onPress,
     onClick,
     type = "button",
@@ -58,6 +76,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref,
 ) {
   const disabled = isDisabled || isPending;
+  const implicitDefault = variant == null;
+  const effectivePlain = plain && !hollow;
+  const effectiveRound = round && !circle;
+
   return (
     <button
       ref={ref}
@@ -72,9 +94,26 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       data-slot="button"
       data-variant={variant ?? "secondary"}
       data-size={isIconOnly ? "icon" : (size ?? "default")}
+      data-implicit-default={implicitDefault ? "true" : undefined}
+      data-plain={effectivePlain ? "true" : undefined}
+      data-hollow={hollow ? "true" : undefined}
+      data-highlight={highlight ? "true" : undefined}
+      data-circle={circle ? "true" : undefined}
+      data-round={effectiveRound ? "true" : "false"}
+      data-loading={isPending ? "true" : undefined}
+      aria-busy={isPending || undefined}
     >
-      {isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-      {children}
+      {isPending ? (
+        <Loader2
+          data-slot="button-loader"
+          data-icon="inline-start"
+          className="animate-spin"
+          aria-hidden="true"
+        />
+      ) : null}
+      <span data-slot="button-content" className="relative z-[1] inline-flex items-center gap-2">
+        {children}
+      </span>
     </button>
   );
 });

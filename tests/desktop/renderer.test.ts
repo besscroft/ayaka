@@ -10,6 +10,7 @@ import "./renderer/components/MessageInput.test.tsx";
 import "./renderer/components/MessageList.test.ts";
 import "./renderer/components/ReasoningSelector.test.ts";
 import "./renderer/components/ToolsPanel.test.tsx";
+import "./renderer/components/ui/button.test.tsx";
 import "./renderer/components/ui/controls.test.tsx";
 import "./renderer/lib/agent-config.test.ts";
 import "./renderer/lib/agent-drawer-model.test.ts";

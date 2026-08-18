@@ -30,6 +30,26 @@
   --skin-danger: #c01c00;
   --skin-danger-foreground: #ffffff;
 
+  /* Button colors follow the reference component's semantic and attribute palette. */
+  --skin-button-default: #000000;
+  --skin-button-primary: #008bff;
+  --skin-button-success: #00cc0d;
+  --skin-button-info: #cccccc;
+  --skin-button-warning: #ffc300;
+  --skin-button-danger: #c01c00;
+  --skin-button-ether: #fe427e;
+  --skin-button-fire: #ff5522;
+  --skin-button-electric: #2eb6ff;
+  --skin-button-ice: #98eff0;
+  --skin-button-physical: #f0d12a;
+  --skin-button-highlight-start: #ffea00;
+  --skin-button-highlight-end: #91bc00;
+  --skin-button-border: #333333;
+  --skin-button-plain-background: rgb(255 255 255 / 60%);
+  --skin-button-disabled-color: #2e2e2e;
+  --skin-button-disabled-background: #737373;
+  --skin-button-hollow-disabled-color: #666666;
+
   --font-display-weight: 700;
   --font-display-tracking: -0.02em;
   --skin-input: #000000;
@@ -78,20 +98,8 @@
     rgb(255 255 255 / 7%) 5px 10px
   );
   --skin-checker-dark:
-    linear-gradient(
-      45deg,
-      rgb(255 255 255 / 6%) 25%,
-      transparent 25%,
-      transparent 75%,
-      rgb(255 255 255 / 6%) 75%
-    ),
-    linear-gradient(
-      45deg,
-      rgb(255 255 255 / 6%) 25%,
-      transparent 25%,
-      transparent 75%,
-      rgb(255 255 255 / 6%) 75%
-    );
+    linear-gradient(45deg, rgb(255 255 255 / 6%) 25%, transparent 0 75%, rgb(255 255 255 / 6%) 0),
+    linear-gradient(45deg, rgb(255 255 255 / 6%) 25%, transparent 0 75%, rgb(255 255 255 / 6%) 0);
   --skin-checker-light:
     linear-gradient(
       45deg,
