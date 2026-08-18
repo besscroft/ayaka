@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.30]
+
+### 中文
+
+#### 新增
+
+#### 变更
+
+- 移除 yaka 和明日方舟主题皮肤及相关样式、注册信息与本地化文案。
+- 修复绝区零主题样式覆盖原生 Toast 通知的问题，保留原生通知的默认布局与展示效果。
+- 优化绝区零主题管理页面的文字可读性，并移除管理弹窗中不必要的背景色。
+
+### English
+
+#### Added
+
+#### Changed
+
+- Removed the yaka and Arknights skins with their related styles, registry entries, and localized copy.
+- Fixed the ZZZ skin overriding native toast notifications by keeping the original notification layout and presentation.
+- Improved management-page text readability under the ZZZ skin and removed unnecessary backgrounds from management dialogs.
+
 ## [0.1.29]
 
 ### 中文
