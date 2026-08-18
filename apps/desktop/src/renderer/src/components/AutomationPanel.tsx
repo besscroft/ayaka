@@ -173,7 +173,7 @@ export function AutomationPanel(): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
+    <div data-slot="automation-panel" className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <header className="flex items-start justify-between gap-4 select-none">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{t("automation.title")}</h1>

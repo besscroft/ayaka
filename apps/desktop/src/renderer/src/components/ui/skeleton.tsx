@@ -5,5 +5,11 @@ export function Skeleton({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>): React.JSX.Element {
-  return <div className={cn("animate-pulse rounded-md bg-muted", className)} {...props} />;
+  return (
+    <div
+      data-slot="loading"
+      className={cn("animate-pulse rounded-md bg-muted", className)}
+      {...props}
+    />
+  );
 }

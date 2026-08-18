@@ -161,7 +161,10 @@ export function AppShell({
   }, [conversations, searchQuery, t]);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div
+      data-slot="app-shell"
+      className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground"
+    >
       <WindowTitleBar
         sidebarExpanded={sidebarExpanded}
         onToggleSidebar={() => setSidebarExpanded((expanded) => !expanded)}
@@ -191,6 +194,7 @@ export function AppShell({
         >
           <div className="flex h-full w-[280px] flex-col border-r border-sidebar-border">
             <nav
+              data-slot="sidebar-primary-nav"
               className="flex select-none flex-col gap-1 px-2 py-3"
               aria-label={t("shell.nav.primary")}
             >
@@ -219,7 +223,10 @@ export function AppShell({
               })}
             </nav>
 
-            <div className="flex min-h-0 flex-1 flex-col border-t border-sidebar-border">
+            <div
+              data-slot="sidebar-conversations"
+              className="flex min-h-0 flex-1 flex-col border-t border-sidebar-border"
+            >
               <div className="flex items-center justify-between gap-2 px-3 py-3">
                 <span className="select-none text-xs font-medium text-sidebar-foreground/60">
                   {t("shell.conversations")}
@@ -263,6 +270,7 @@ export function AppShell({
               )}
 
               <nav
+                data-slot="conversation-list"
                 className="min-h-0 flex-1 select-none overflow-y-auto px-2 pb-2"
                 aria-label={t("shell.nav.conversations")}
               >
@@ -335,7 +343,9 @@ export function AppShell({
           </div>
         </motion.aside>
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
+        <main data-slot="app-main" className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </main>
       </div>
 
       <ConfirmDialog

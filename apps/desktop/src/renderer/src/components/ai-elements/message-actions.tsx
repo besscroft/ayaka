@@ -115,6 +115,8 @@ function ActionButton({
 }: ActionButtonProps): React.JSX.Element {
   return (
     <button
+      data-slot="message-action-button"
+      data-tone={tone}
       type="button"
       onClick={onClick}
       aria-label={label}

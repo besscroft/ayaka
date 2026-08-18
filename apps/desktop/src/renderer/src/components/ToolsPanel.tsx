@@ -644,7 +644,10 @@ export function ToolDetailModal({
                 return instructions ? (
                   <div className="flex flex-col gap-2">
                     <h4 className="text-sm font-medium">{t("tools.detail.instructions")}</h4>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    <pre
+                      data-slot="code-surface"
+                      className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+                    >
                       {instructions}
                     </pre>
                   </div>
@@ -1075,7 +1078,10 @@ export function CatalogDiscover(): React.JSX.Element {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden select-none">
+    <div
+      data-slot="tools-catalog"
+      className="flex h-full flex-col gap-4 overflow-hidden select-none"
+    >
       <div className="flex shrink-0 flex-col gap-3">
         <div className="flex flex-col gap-2 md:flex-row">
           <label className="relative min-w-0 flex-1">

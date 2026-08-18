@@ -212,6 +212,7 @@ export const ReasoningContent = memo(function ReasoningContent({
 }: ReasoningContentProps): React.JSX.Element {
   return (
     <CollapsibleContent
+      data-slot="reasoning-content"
       className={cn(
         "h-[var(--collapsible-panel-height)] max-h-[min(42rem,60vh)] overflow-y-auto pr-2 text-[13px] leading-6 text-muted-foreground outline-none",
         "[&_.rich-content]:gap-2.5 [&_p]:leading-6 [&_pre]:my-2 [&_ul]:my-1 [&_ol]:my-1",

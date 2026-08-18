@@ -20,6 +20,7 @@ const CheckboxContent = ({ className, ...props }: React.ComponentProps<"span">) 
 
 const CheckboxControl = ({ className, children, ...props }: React.ComponentProps<"span">) => (
   <span
+    data-slot="checkbox-control"
     className={cn(
       "flex size-4 shrink-0 items-center justify-center rounded border border-border bg-background text-primary-foreground group-data-checked:border-primary group-data-checked:bg-primary",
       className,
@@ -56,6 +57,7 @@ function CheckboxRoot({
   );
   return (
     <CheckboxPrimitive.Root
+      data-slot="checkbox"
       checked={isSelected}
       indeterminate={isIndeterminate}
       disabled={isDisabled}

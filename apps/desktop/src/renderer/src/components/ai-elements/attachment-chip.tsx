@@ -129,6 +129,7 @@ export function AttachmentChip({
       {/* 移除按钮 */}
       {onRemove && (
         <button
+          data-slot="attachment-remove"
           type="button"
           onClick={() => onRemove(item.id)}
           aria-label={t("attachment.remove", { name: item.name })}

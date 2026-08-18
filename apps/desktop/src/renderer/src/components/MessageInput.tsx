@@ -267,6 +267,7 @@ export function MessageInput({
                     onClick={() => fileInputRef.current?.click()}
                     aria-label={t("input.attach")}
                     title={t("input.attach")}
+                    data-slot="prompt-input-attach"
                     className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
                   >
                     <IconPaperclip className="size-4" />
@@ -281,7 +282,10 @@ export function MessageInput({
                     aria-hidden
                   />
 
-                  <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+                  <span
+                    data-slot="prompt-input-separator"
+                    className="mx-1 h-4 w-px shrink-0 bg-border"
+                  />
 
                   <ToolSelector
                     value={toolSelection}

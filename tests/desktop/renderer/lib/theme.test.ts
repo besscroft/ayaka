@@ -97,12 +97,12 @@ void describe("applyTheme", () => {
   void it("switches skin attributes without writing token values inline", () => {
     applyTheme(
       themeSettings({
-        skin: "yaka",
+        skin: "zzz",
         fontSize: "base",
         density: "comfortable",
       }),
     );
-    assert.equal(root.dataset.skin, "yaka");
+    assert.equal(root.dataset.skin, "zzz");
     assert.equal(root.classList.contains("light"), true);
     assert.equal(root.classList.contains("dark"), false);
     assert.equal(root.style.getPropertyValue("--skin-radius"), "");
@@ -130,15 +130,20 @@ void describe("applyTheme", () => {
   void it("keeps the skin metadata and previews in the renderer registry", () => {
     const yaka = SKIN_DEFINITIONS.find((skin) => skin.id === "yaka");
     const ark = SKIN_DEFINITIONS.find((skin) => skin.id === "ark");
+    const zzz = SKIN_DEFINITIONS.find((skin) => skin.id === "zzz");
 
     assert.ok(yaka);
     assert.ok(ark);
+    assert.ok(zzz);
     assert.equal(yaka.colorScheme, "light");
     assert.equal(yaka.preview.background, "oklch(0.984 0.014 180.72)");
     assert.equal(yaka.preview.accent, "oklch(0.789 0.154 211.53)");
     assert.equal(ark.colorScheme, "light");
     assert.equal(ark.preview.background, "#eef2f3");
     assert.equal(ark.preview.accent, "#4aabea");
+    assert.equal(zzz.colorScheme, "light");
+    assert.equal(zzz.preview.background, "#edf2f4");
+    assert.equal(zzz.preview.accent, "#008bff");
   });
 
   void it("keeps the public semantic variable bridge in base.css", () => {

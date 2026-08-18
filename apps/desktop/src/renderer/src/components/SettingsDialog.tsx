@@ -191,9 +191,12 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] p-0">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div data-page="settings-dialog" className="flex h-full min-h-0 flex-col overflow-hidden">
           {/* 澶撮儴 */}
-          <div className="flex items-center justify-between border-b border-border px-6 py-3.5">
+          <div
+            data-slot="settings-header"
+            className="flex items-center justify-between border-b border-border px-6 py-3.5"
+          >
             <div>
               <DialogTitle id="settings-title" className="text-base font-semibold select-none">
                 {t("settings.title")}
@@ -210,9 +213,10 @@ export function SettingsDialog({
           </div>
 
           {/* 涓讳綋锛氬鑸?+ 鍐呭锛岀獎灞忕旱鍚戝竷灞€ */}
-          <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div data-slot="settings-layout" className="flex min-h-0 flex-1 overflow-hidden">
             {/* 瀵艰埅 */}
             <nav
+              data-slot="settings-nav"
               aria-label={t("settings.nav")}
               className="flex w-full shrink-0 flex-col gap-1 border-r border-border bg-muted/40 p-2 md:w-48 select-none"
             >
@@ -222,6 +226,8 @@ export function SettingsDialog({
                   <button
                     key={id}
                     type="button"
+                    data-slot="settings-nav-item"
+                    data-active={active ? "true" : "false"}
                     onClick={() => setTab(id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
@@ -240,7 +246,10 @@ export function SettingsDialog({
             </nav>
 
             {/* 鍐呭 */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col">
+            <div
+              data-slot="settings-detail"
+              className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col"
+            >
               {tab === "appearance" && (
                 <AppearanceTab
                   settings={settings}
@@ -3059,6 +3068,7 @@ function ModelOptionsDialog({
             <TextField className="md:col-span-2" isInvalid={!!jsonError}>
               <Label>{t("model.options.providerOptions")}</Label>
               <TextArea
+                data-slot="code-surface"
                 rows={8}
                 value={form.providerOptionsJson}
                 onChange={(event) => handleJsonChange(event.target.value)}

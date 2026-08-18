@@ -1,0 +1,110 @@
+:root[data-skin="zzz"] {
+  color-scheme: light;
+  --skin-radius: 4px;
+  --skin-font-stack: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --skin-mono-font-stack: "JetBrains Mono", "Fira Code", "Sarasa Mono SC", ui-monospace, monospace;
+  --skin-background: #edf2f4;
+  --skin-foreground: #1c1c1c;
+  --skin-surface: #ffffff;
+  --skin-surface-foreground: #1c1c1c;
+  --skin-overlay: #1c1c1c;
+  --skin-overlay-foreground: #ffffff;
+  --skin-field-background: #1c1c1c;
+  --skin-field-foreground: #ffffff;
+  --skin-primary: #008bff;
+  --skin-primary-foreground: #ffffff;
+  --skin-secondary: #cccccc;
+  --skin-secondary-foreground: #000000;
+  --skin-muted: #e0e3e4;
+  --skin-muted-foreground: #626262;
+  --skin-border: #000000;
+  --skin-separator: #c2c6c8;
+  --skin-accent: #98eff0;
+  --skin-accent-foreground: #1c1c1c;
+  --skin-focus: #008bff;
+  --skin-link: #006fba;
+  --skin-success: #00cc0d;
+  --skin-success-foreground: #ffffff;
+  --skin-warning: #ffc300;
+  --skin-warning-foreground: #211a00;
+  --skin-danger: #c01c00;
+  --skin-danger-foreground: #ffffff;
+
+  --font-display-weight: 700;
+  --font-display-tracking: -0.02em;
+  --skin-input: #000000;
+  --skin-ring: #008bff;
+  --skin-sidebar: #1c1c1c;
+  --skin-sidebar-foreground: #ffffff;
+  --skin-sidebar-primary: #008bff;
+  --skin-sidebar-primary-foreground: #ffffff;
+  --skin-sidebar-accent: #323232;
+  --skin-sidebar-accent-foreground: #ffffff;
+  --skin-sidebar-border: #000000;
+  --skin-sidebar-ring: #ffc300;
+  --skin-header: #1c1c1c;
+  --skin-header-foreground: #ffffff;
+  --skin-footer: #edf2f4;
+  --skin-footer-foreground: #1c1c1c;
+  --skin-code: #1c1c1c;
+  --skin-code-foreground: #ecf2f2;
+  --skin-code-highlight: #34424d;
+  --skin-code-number: #b9c5cb;
+  --skin-code-selection: #526b77;
+  --skin-code-border: #000000;
+  --skin-chart-1: #008bff;
+  --skin-chart-2: #ffc300;
+  --skin-chart-3: #98eff0;
+  --skin-chart-4: #fe427e;
+  --skin-chart-5: #c01c00;
+  --skin-signal-low: #8d9aa3;
+  --skin-signal-basic: #98eff0;
+  --skin-signal-info: #2eb6ff;
+  --skin-signal-action: #ffc300;
+  --skin-signal-secondary: #fe427e;
+  --skin-dark-0: #000000;
+  --skin-dark-1: #1c1c1c;
+  --skin-dark-2: #222222;
+  --skin-dark-3: #323232;
+  --skin-dark-border: #4a4a4a;
+  --skin-dark-foreground: #ffffff;
+  --skin-dark-muted: #b4b4b4;
+  --skin-dark-subtle: #8f8f8f;
+  --skin-page-card: #222222;
+  --skin-page-card-foreground: #ffffff;
+  --skin-pattern-stripes: repeating-linear-gradient(
+    40deg,
+    transparent 0 5px,
+    rgb(255 255 255 / 7%) 5px 10px
+  );
+  --skin-checker-dark:
+    linear-gradient(
+      45deg,
+      rgb(255 255 255 / 6%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 6%) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgb(255 255 255 / 6%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 6%) 75%
+    );
+  --skin-checker-light:
+    linear-gradient(
+      45deg,
+      rgb(0 0 0 / 4%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(0 0 0 / 4%) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgb(0 0 0 / 4%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(0 0 0 / 4%) 75%
+    );
+}

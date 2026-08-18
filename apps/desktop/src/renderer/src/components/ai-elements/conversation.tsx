@@ -101,6 +101,7 @@ export function ConversationScrollButton({
 
   return (
     <button
+      data-slot="conversation-scroll-button"
       type="button"
       aria-label={t("ai.scroll.toLatest")}
       onClick={scrollToLatest}

@@ -19,15 +19,30 @@ function Alert({
   variant,
   ...props
 }: ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
-  return <div role="alert" className={cn(alertVariants({ variant }), className)} {...props} />;
+  return (
+    <div
+      data-slot="alert"
+      role="alert"
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
+  );
 }
 
 function AlertTitle({ className, ...props }: ComponentProps<"h5">) {
-  return <h5 className={cn("mb-1 font-medium leading-none", className)} {...props} />;
+  return (
+    <h5
+      data-slot="alert-title"
+      className={cn("mb-1 font-medium leading-none", className)}
+      {...props}
+    />
+  );
 }
 
 function AlertDescription({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("text-sm opacity-90", className)} {...props} />;
+  return (
+    <div data-slot="alert-description" className={cn("text-sm opacity-90", className)} {...props} />
+  );
 }
 
 export { Alert, AlertTitle, AlertDescription, alertVariants };

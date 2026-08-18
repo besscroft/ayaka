@@ -21,6 +21,7 @@ function AlertDialogTrigger({ className, ...props }: AlertDialogPrimitive.Trigge
 function AlertDialogContent({ className, ...props }: AlertDialogPrimitive.Popup.Props) {
   return (
     <AlertDialogPrimitive.Popup
+      data-slot="alert-dialog-content"
       className={cn(
         "fixed inset-x-4 top-1/2 z-50 mx-auto flex max-w-lg -translate-y-1/2 flex-col gap-4 rounded-lg border border-border bg-background p-6 text-foreground shadow-lg outline-none",
         className,
@@ -33,6 +34,7 @@ function AlertDialogContent({ className, ...props }: AlertDialogPrimitive.Popup.
 function AlertDialogOverlay({ className, ...props }: AlertDialogPrimitive.Backdrop.Props) {
   return (
     <AlertDialogPrimitive.Backdrop
+      data-slot="alert-dialog-overlay"
       className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-sm", className)}
       {...props}
     />
@@ -41,13 +43,18 @@ function AlertDialogOverlay({ className, ...props }: AlertDialogPrimitive.Backdr
 
 function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.Title.Props) {
   return (
-    <AlertDialogPrimitive.Title className={cn("text-base font-semibold", className)} {...props} />
+    <AlertDialogPrimitive.Title
+      data-slot="alert-dialog-title"
+      className={cn("text-base font-semibold", className)}
+      {...props}
+    />
   );
 }
 
 function AlertDialogDescription({ className, ...props }: AlertDialogPrimitive.Description.Props) {
   return (
     <AlertDialogPrimitive.Description
+      data-slot="alert-dialog-description"
       className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />

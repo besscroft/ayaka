@@ -13,7 +13,11 @@ import type { ComponentProps } from "react";
 export type SourcesProps = ComponentProps<typeof Collapsible>;
 
 export const Sources = ({ className, ...props }: SourcesProps): React.JSX.Element => (
-  <Collapsible className={cn("not-prose mb-4 text-xs text-primary", className)} {...props} />
+  <Collapsible
+    data-slot="sources"
+    className={cn("not-prose mb-4 text-xs text-primary", className)}
+    {...props}
+  />
 );
 
 export type SourcesTriggerProps = ComponentProps<typeof CollapsibleTrigger> & { count: number };
@@ -24,7 +28,11 @@ export const SourcesTrigger = ({
   children,
   ...props
 }: SourcesTriggerProps): React.JSX.Element => (
-  <CollapsibleTrigger className={cn("flex items-center gap-2", className)} {...props}>
+  <CollapsibleTrigger
+    data-slot="sources-trigger"
+    className={cn("flex items-center gap-2", className)}
+    {...props}
+  >
     {children ?? (
       <>
         <p className="font-medium">Used {count} sources</p>
@@ -38,6 +46,7 @@ export type SourcesContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const SourcesContent = ({ className, ...props }: SourcesContentProps): React.JSX.Element => (
   <CollapsibleContent
+    data-slot="sources-content"
     className={cn(
       "mt-3 flex w-fit flex-col gap-2 outline-none",
       "motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=open]:animate-in motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:slide-out-to-top-2 motion-safe:data-[state=open]:slide-in-from-top-2",
@@ -59,6 +68,7 @@ export const Source = ({
   const safeHref = href ? sanitizeRichContentUrl(href, "link") : null;
   return (
     <a
+      data-slot="source"
       className={cn("flex items-center gap-2", className)}
       href={safeHref ?? undefined}
       rel={safeHref ? "noreferrer noopener" : undefined}

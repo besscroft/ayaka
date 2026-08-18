@@ -384,7 +384,7 @@ export function AgentsPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div data-slot="agents-panel" className="flex h-full min-h-0 flex-col gap-4">
       <div className="shrink-0 select-none grid gap-3 md:grid-cols-3">
         <MetricCard label={t("agents.metric.total")} value={agents.length} />
         <MetricCard label={t("agents.metric.running")} value={runningCount(runtime)} />
@@ -678,7 +678,7 @@ function AgentDetailModal({
   const toolPolicy = normalizeAgentToolPolicy(agent.tool_policy_json);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[88vh] max-w-2xl p-0">
+      <DialogContent data-page="agent-detail-dialog" className="max-h-[88vh] max-w-2xl p-0">
         <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <AgentAvatar

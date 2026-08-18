@@ -272,6 +272,7 @@ export function TextField({
 }: HTMLAttributes<HTMLDivElement> & { isInvalid?: boolean }): React.JSX.Element {
   return (
     <div
+      data-slot="text-field"
       data-invalid={isInvalid ? "true" : undefined}
       className={cn("grid min-w-0 gap-1.5", className)}
       {...props}
@@ -296,6 +297,7 @@ export function Chip({
 }): React.JSX.Element {
   return (
     <ShadcnBadge
+      data-slot="chip"
       variant={
         variant === "secondary"
           ? "secondary"

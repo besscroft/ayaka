@@ -105,7 +105,7 @@ export function MainPanelView({
 
   if (section === "tools") {
     return (
-      <main className="flex min-h-0 flex-1 overflow-hidden p-6">
+      <main data-page="tools-page" className="flex min-h-0 flex-1 overflow-hidden p-6">
         <ToolsPanel />
       </main>
     );
@@ -113,7 +113,7 @@ export function MainPanelView({
 
   if (section === "mcp") {
     return (
-      <main className="flex min-h-0 flex-1 overflow-hidden p-6">
+      <main data-page="mcp-page" className="flex min-h-0 flex-1 overflow-hidden p-6">
         <McpPanel activeConversationId={activeConversationId} />
       </main>
     );
@@ -121,7 +121,7 @@ export function MainPanelView({
 
   if (section === "skills") {
     return (
-      <main className="flex min-h-0 flex-1 overflow-hidden p-6">
+      <main data-page="skills-page" className="flex min-h-0 flex-1 overflow-hidden p-6">
         <SkillsPanel />
       </main>
     );
@@ -129,14 +129,17 @@ export function MainPanelView({
 
   if (section === "automations") {
     return (
-      <main className="flex min-h-0 flex-1 overflow-hidden p-6">
+      <main data-page="automation-page" className="flex min-h-0 flex-1 overflow-hidden p-6">
         <AutomationPanel />
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 overflow-hidden p-6">
+    <main
+      data-page={section === "agents" ? "agents-page" : "memory-page"}
+      className="flex min-h-0 flex-1 overflow-hidden p-6"
+    >
       <div className="flex h-full w-full min-h-0 flex-col gap-5">
         {section === "agents" && (
           <AgentsPanel
@@ -226,9 +229,12 @@ function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element 
   ];
 
   return (
-    <div className="flex h-full gap-4 overflow-hidden">
+    <div data-slot="memory-layout" className="flex h-full gap-4 overflow-hidden">
       {/* 左侧记忆导航 */}
-      <div className="flex w-56 shrink-0 flex-col gap-2 self-stretch overflow-y-auto rounded-lg border border-border bg-card p-3 select-none">
+      <div
+        data-slot="memory-list"
+        className="flex w-56 shrink-0 flex-col gap-2 self-stretch overflow-y-auto rounded-lg border border-border bg-card p-3 select-none"
+      >
         <h2 className="px-1 py-1 text-sm font-semibold">{t("main.title.memory")}</h2>
 
         <div className="flex flex-col gap-1">
@@ -239,6 +245,8 @@ function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element 
                 key={item.key}
                 type="button"
                 onClick={() => setActiveTab(item.key)}
+                data-slot="memory-nav-item"
+                data-active={isActive ? "true" : "false"}
                 className={cn(
                   "flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 text-left text-sm transition-colors",
                   isActive
@@ -264,7 +272,10 @@ function MemoryPanel({ agents }: { agents: AgentProfile[] }): React.JSX.Element 
       </div>
 
       {/* 右侧内容区域 */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        data-slot="memory-detail"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
         {activeTab === "entries" && <MemoryEntriesPanel />}
         {activeTab !== "entries" && memoryFiles && (
           <MemoryFilePanel
@@ -340,7 +351,10 @@ export function MemoryFilePanel({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+    <div
+      data-slot="memory-file"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold uppercase">{kind}.md</h2>
         <div className="flex items-center gap-2">
@@ -412,7 +426,10 @@ export function MemoryFilePanel({
         />
       ) : (
         <div className="max-h-[480px] overflow-auto rounded-md border border-border bg-background p-3">
-          <pre className="whitespace-pre-wrap font-mono text-sm text-foreground">
+          <pre
+            data-slot="code-surface"
+            className="whitespace-pre-wrap font-mono text-sm text-foreground"
+          >
             {snapshot.content}
           </pre>
         </div>
@@ -659,6 +676,8 @@ function MemoryListRow({
   const { t, f } = useT();
   return (
     <div
+      data-slot="memory-row"
+      data-active={active ? "true" : "false"}
       className={cn(
         "rounded-md px-2 py-2.5 transition",
         active ? "bg-muted/50" : "hover:bg-muted/30",

@@ -114,7 +114,11 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
     }
     case "code":
       return (
-        <div key={key} className="overflow-hidden rounded-lg border border-border">
+        <div
+          data-slot="rich-content-code"
+          key={key}
+          className="overflow-hidden rounded-lg border border-border"
+        >
           {block.lang ? (
             <div className="border-b border-border bg-muted px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {block.lang}
@@ -163,7 +167,11 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
     }
     case "table":
       return (
-        <div key={key} className="max-w-full overflow-x-auto rounded-lg border border-border">
+        <div
+          data-slot="rich-content-table"
+          key={key}
+          className="max-w-full overflow-x-auto rounded-lg border border-border"
+        >
           <table className="w-full border-collapse text-left text-xs">
             <thead className="bg-muted text-muted-foreground">
               <tr>
@@ -230,6 +238,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(
         href ? (
           <a
+            data-slot="rich-content-link"
             key={`${keyPrefix}-a-${matchIndex}`}
             href={href}
             title={match[6]}

@@ -54,6 +54,7 @@ export function QuickReactions({
           const label = REACTION_LABELS[emoji] ?? emoji;
           return (
             <motion.button
+              data-slot="quick-reaction-item"
               key={emoji}
               type="button"
               onClick={(event) => {

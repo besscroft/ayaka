@@ -143,8 +143,11 @@ export function McpWorkspace({
 
   return (
     <>
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <Card className="min-h-0 overflow-hidden">
+      <div
+        data-slot="mcp-workspace"
+        className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)]"
+      >
+        <Card data-slot="mcp-server-list" className="min-h-0 overflow-hidden">
           <Card.Header className="border-b border-border p-3">
             <Card.Title className="text-sm">{t("tools.metric.mcp")}</Card.Title>
           </Card.Header>
@@ -158,6 +161,8 @@ export function McpWorkspace({
                   <button
                     key={server.id}
                     type="button"
+                    data-slot="mcp-server-item"
+                    data-active={active ? "true" : "false"}
                     className={cn(
                       "flex items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors",
                       active
@@ -184,7 +189,7 @@ export function McpWorkspace({
           </Card.Content>
         </Card>
 
-        <Card className="min-h-0 overflow-hidden">
+        <Card data-slot="mcp-server-detail" className="min-h-0 overflow-hidden">
           {selected ? (
             <>
               <Card.Header className="border-b border-border p-4">
@@ -540,7 +545,10 @@ function ResourceWorkspace({
         ))}
       </div>
       {result ? (
-        <pre className="max-h-80 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs">
+        <pre
+          data-slot="code-surface"
+          className="max-h-80 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs"
+        >
           {JSON.stringify(result, null, 2)}
         </pre>
       ) : null}
@@ -660,7 +668,10 @@ function PromptWorkspace({
             </Button>
           </div>
           {result ? (
-            <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3 text-xs">
+            <pre
+              data-slot="code-surface"
+              className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3 text-xs"
+            >
               {JSON.stringify(result, null, 2)}
             </pre>
           ) : null}

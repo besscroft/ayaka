@@ -75,6 +75,7 @@ export function MessageAttachments({
     <div data-slot="message-attachments" className={cn("flex w-full flex-col gap-2", className)}>
       {images.length > 0 && (
         <div
+          data-slot="message-image-grid"
           className={cn(
             "grid max-w-[420px] gap-1.5",
             images.length === 1
@@ -104,7 +105,7 @@ export function MessageAttachments({
       )}
 
       {audio.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div data-slot="message-audio-list" className="flex flex-col gap-1.5">
           {audio.map((item) => (
             <AudioAttachment
               key={item.id}
@@ -119,7 +120,7 @@ export function MessageAttachments({
       )}
 
       {videos.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div data-slot="message-video-list" className="grid gap-2 sm:grid-cols-2">
           {videos.map((item) => (
             <VideoAttachment
               key={item.id}
@@ -134,7 +135,7 @@ export function MessageAttachments({
       )}
 
       {files.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div data-slot="message-file-list" className="flex flex-wrap gap-1.5">
           {files.map((it) => (
             <AttachmentChip key={it.id} item={it} compact />
           ))}

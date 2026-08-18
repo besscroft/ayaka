@@ -171,7 +171,7 @@ export function McpPanel({
   };
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
+    <div data-slot="mcp-panel" className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 items-start justify-between gap-3">
         <div className="min-w-0 select-none">
           <h1 className="text-xl font-semibold tracking-tight select-none">

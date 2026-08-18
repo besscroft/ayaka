@@ -91,10 +91,12 @@ export function ModelSelector({
   const menuPlacement = placement === "top" ? "bottom-full mb-2 left-0" : "top-full mt-2 right-0";
 
   return (
-    <div ref={ref} className="relative min-w-0">
+    <div ref={ref} data-slot="model-selector" className="relative min-w-0">
       <button
         type="button"
         disabled={disabled}
+        data-slot="model-selector-trigger"
+        data-open={open}
         className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 text-[13px] shadow-xs transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
@@ -110,11 +112,15 @@ export function ModelSelector({
         <div
           role="listbox"
           aria-label={t("model.selector.label")}
+          data-slot="model-selector-content"
           className={`absolute z-50 max-h-80 w-72 select-none overflow-y-auto rounded-lg border border-border bg-popover shadow-lg ${menuPlacement}`}
         >
           {enabledProviders.map((p) => (
-            <div key={p.id}>
-              <div className="border-b border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+            <div key={p.id} data-slot="model-selector-group">
+              <div
+                data-slot="model-selector-label"
+                className="border-b border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+              >
                 {p.label}
               </div>
               {p.models.map((m) => {
@@ -126,6 +132,8 @@ export function ModelSelector({
                     type="button"
                     role="option"
                     aria-selected={selected}
+                    data-slot="model-selector-item"
+                    data-selected={selected}
                     className={[
                       "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition",
                       selected ? "bg-accent text-accent-foreground" : "hover:bg-muted",

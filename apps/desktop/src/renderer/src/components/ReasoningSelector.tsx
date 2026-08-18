@@ -79,10 +79,12 @@ export function ReasoningSelector({
   };
 
   return (
-    <div ref={ref} className="relative min-w-0">
+    <div ref={ref} data-slot="reasoning-selector" className="relative min-w-0">
       <button
         type="button"
         disabled={disabled}
+        data-slot="reasoning-selector-trigger"
+        data-open={open}
         className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition motion-reduce:transition-none hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         onClick={() => setOpen((next) => !next)}
         aria-haspopup="listbox"
@@ -98,6 +100,7 @@ export function ReasoningSelector({
           role="listbox"
           aria-label={t("reasoning.selector.label")}
           onKeyDown={handleListKeyDown}
+          data-slot="reasoning-selector-content"
           className={`absolute z-50 w-56 select-none overflow-hidden rounded-lg border border-border bg-popover shadow-lg ${menuPlacement}`}
         >
           <div className="border-b border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground">
@@ -115,6 +118,8 @@ export function ReasoningSelector({
                   aria-selected={selected}
                   aria-disabled={!supported}
                   disabled={!supported}
+                  data-slot="reasoning-selector-item"
+                  data-selected={selected}
                   className={[
                     "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition",
                     selected ? "bg-accent text-accent-foreground" : "hover:bg-muted",

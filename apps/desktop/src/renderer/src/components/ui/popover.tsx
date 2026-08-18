@@ -57,11 +57,17 @@ function PopoverContent({
 }
 
 function PopoverDialog({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("outline-none", className)} {...props} />;
+  return <div data-slot="popover-dialog" className={cn("outline-none", className)} {...props} />;
 }
 
 function PopoverHeading({ className, ...props }: PopoverPrimitive.Title.Props) {
-  return <PopoverPrimitive.Title className={cn("font-semibold", className)} {...props} />;
+  return (
+    <PopoverPrimitive.Title
+      data-slot="popover-heading"
+      className={cn("font-semibold", className)}
+      {...props}
+    />
+  );
 }
 
 export { Popover, PopoverTrigger, PopoverContent, PopoverDialog, PopoverHeading };

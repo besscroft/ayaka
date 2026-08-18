@@ -49,7 +49,7 @@ export function PromptSuggestions({
             {title}
           </p>
         )}
-        <div className="flex w-full flex-wrap gap-2">
+        <div data-slot="prompt-suggestions-list" className="flex w-full flex-wrap gap-2">
           {SUGGESTION_SKELETON_WIDTHS.map((w, i) => (
             <div key={i} className={cn("h-7 animate-pulse rounded-md bg-muted", w)} />
           ))}
@@ -69,9 +69,10 @@ export function PromptSuggestions({
           {title}
         </p>
       )}
-      <div className="flex w-full flex-wrap gap-2">
+      <div data-slot="prompt-suggestions-list" className="flex w-full flex-wrap gap-2">
         {suggestions.map((s) => (
           <button
+            data-slot="prompt-suggestion"
             key={s}
             type="button"
             onClick={() => onSelect(s)}

@@ -1230,11 +1230,14 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const isEmpty = renderedMessages.length === 0 && !isLoading;
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden">
+    <div data-page="chat-page" className="relative flex flex-1 flex-col overflow-hidden">
       <ChatHeader status={statusKind} workspace={workspace} />
 
       <div className="relative flex min-h-0 flex-1">
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main
+          data-slot="chat-main"
+          className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
+        >
           {isEmpty ? (
             <EmptyState
               title={t("chat.empty.title")}

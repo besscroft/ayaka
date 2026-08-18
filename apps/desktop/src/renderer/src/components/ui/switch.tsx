@@ -23,6 +23,7 @@ function SwitchControl({ className, ...props }: React.ComponentProps<"span">) {
   const size = React.useContext(SwitchSizeContext);
   return (
     <span
+      data-slot="switch-control"
       className={cn(
         "relative inline-flex shrink-0 items-center rounded-full bg-muted-foreground/35 transition-colors group-data-checked:bg-primary",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
@@ -37,6 +38,7 @@ function SwitchThumb({ className, ...props }: SwitchPrimitive.Thumb.Props) {
   const size = React.useContext(SwitchSizeContext);
   return (
     <SwitchPrimitive.Thumb
+      data-slot="switch-thumb"
       className={cn(
         "block rounded-full bg-background shadow-sm transition-transform",
         size === "sm" ? "size-4 data-checked:translate-x-4" : "size-5 data-checked:translate-x-5",
@@ -63,6 +65,7 @@ function SwitchRoot({
   return (
     <SwitchSizeContext.Provider value={size}>
       <SwitchPrimitive.Root
+        data-slot="switch"
         checked={isSelected}
         disabled={isDisabled}
         onCheckedChange={onChange}

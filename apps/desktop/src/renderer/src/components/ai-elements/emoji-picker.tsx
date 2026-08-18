@@ -696,7 +696,10 @@ export function EmojiPicker({
       )}
     >
       {/* 搜索框 */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div
+        data-slot="emoji-picker-search"
+        className="flex items-center gap-2 border-b border-border px-3 py-2"
+      >
         <IconSearch className="size-4 shrink-0 text-muted-foreground" />
         <input
           ref={searchRef}
@@ -726,6 +729,7 @@ export function EmojiPicker({
           const isActive = cat.id === activeCategory;
           return (
             <button
+              data-slot="emoji-picker-category"
               key={cat.id}
               type="button"
               role="tab"
@@ -755,6 +759,7 @@ export function EmojiPicker({
         ) : (
           visibleEntries.map((entry) => (
             <button
+              data-slot="emoji-picker-item"
               key={entry.char}
               type="button"
               onClick={() => {

@@ -12,6 +12,7 @@ const TOKEN_FILE_BY_ID: Record<SkinId, string> = {
   black: "black/tokens.css",
   yaka: "yaka/tokens.css",
   ark: "ark/tokens.css",
+  zzz: "zzz/tokens.css",
 };
 
 const COMPONENT_HOOKS = {
@@ -33,7 +34,80 @@ const COMPONENT_HOOKS = {
     "tabs-list",
     "tabs-trigger",
   ],
+  zzz: [
+    "window-titlebar",
+    "window-sidebar-toggle",
+    "window-brand",
+    "window-controls",
+    "button",
+    "tooltip-trigger",
+    "tooltip-content",
+    "message-content",
+    "card",
+    "dialog-content",
+    "popover-content",
+    "select-content",
+    "select-item",
+    "dialog-header",
+    "dialog-footer",
+    "badge",
+    "tabs-list",
+    "tabs-trigger",
+    "switch-control",
+    "checkbox-control",
+    "slider-track",
+    "slider-range",
+    "slider-thumb",
+    "toggle-group",
+    "toggle-group-item",
+    "prompt-input",
+    "prompt-input-textarea",
+    "prompt-input-submit",
+    "prompt-input-stop",
+    "model-selector-trigger",
+    "model-selector-content",
+    "model-selector-item",
+    "reasoning-selector-trigger",
+    "reasoning-selector-content",
+    "reasoning-selector-item",
+    "prompt-input-attach",
+    "prompt-input-separator",
+    "alert-dialog-content",
+    "field-label",
+    "command",
+    "table-wrapper",
+    "card-header",
+    "code-surface",
+    "empty",
+    "loading",
+    "alert",
+    "memory-nav-item",
+    "memory-row",
+  ],
 } as const;
+
+const ZZZ_PAGE_HOOKS = [
+  [
+    "components/AppShell.tsx",
+    ["app-shell", "app-main", "sidebar-primary-nav", "conversation-list"],
+  ],
+  [
+    "components/MainPanelView.tsx",
+    [
+      "tools-page",
+      "mcp-page",
+      "skills-page",
+      "memory-page",
+      "agents-page",
+      "memory-layout",
+      "memory-detail",
+    ],
+  ],
+  ["components/ChatView.tsx", ["chat-page", "chat-main"]],
+  ["components/SettingsDialog.tsx", ["settings-dialog", "settings-nav", "settings-detail"]],
+  ["components/AgentsPanel.tsx", ["agent-detail-dialog"]],
+  ["components/McpWorkspace.tsx", ["mcp-workspace", "mcp-server-item", "mcp-server-detail"]],
+] as const;
 
 const REQUIRED_TOKENS = [
   "background",
@@ -93,13 +167,14 @@ void describe("skin CSS contract", () => {
   void it("keeps the public, skin, and runtime CSS entry order", () => {
     const mainCss = readFileSync(resolve(SKINS_ROOT, "../assets/main.css"), "utf8");
     const imports = [
-      "@import './base.css';",
-      "@import '../skins/index.css';",
-      "@import './runtime.css';",
+      /@import ["']\.\/base\.css["'];/,
+      /@import ["']\.\.\/skins\/index\.css["'];/,
+      /@import ["']\.\/runtime\.css["'];/,
     ];
     let previousIndex = -1;
     for (const entry of imports) {
-      const index = mainCss.indexOf(entry);
+      const match = mainCss.match(entry);
+      const index = match?.index ?? -1;
       assert.ok(index > previousIndex, `missing or out-of-order import: ${entry}`);
       previousIndex = index;
     }
@@ -108,7 +183,7 @@ void describe("skin CSS contract", () => {
   void it("keeps component overrides isolated to their owning skin", () => {
     const indexCss = readFileSync(resolve(SKINS_ROOT, "index.css"), "utf8");
 
-    for (const skinId of ["yaka", "ark"] as const) {
+    for (const skinId of ["yaka", "ark", "zzz"] as const) {
       const css = readFileSync(resolve(SKINS_ROOT, skinId, "components.css"), "utf8");
       assert.match(css, new RegExp(`:root\\[data-skin=["']${skinId}["']\\]`));
       assert.match(indexCss, new RegExp(`@import ["']\\./${skinId}/components\\.css["']`));
@@ -116,5 +191,26 @@ void describe("skin CSS contract", () => {
         assert.match(css, new RegExp(`data-slot=["']${hook}["']`), `${skinId}.${hook}`);
       }
     }
+  });
+
+  void it("keeps ZZZ page boundaries and business hooks in the renderer", () => {
+    for (const [relativePath, hooks] of ZZZ_PAGE_HOOKS) {
+      const source = readFileSync(resolve(SKINS_ROOT, "..", relativePath), "utf8");
+      for (const hook of hooks) {
+        assert.match(source, new RegExp(`(?:data-page|data-slot)(?:=|=\\{)[^>]*${hook}`), hook);
+      }
+    }
+  });
+
+  void it("uses a compact radius for every ZZZ multiline field", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    assert.match(
+      css,
+      /:root\[data-skin=["']zzz["']\][\s\S]*:is\(textarea,\s*\[data-slot=["']textarea["']\],\s*\[data-slot=["']prompt-input-textarea["']\]\)[\s\S]*border-radius:\s*10px/,
+    );
+    assert.match(
+      css,
+      /:root\[data-skin=["']zzz["']\]\s+\[data-page=["']chat-page["']\]\s+\[data-slot=["']prompt-input-textarea["']\][\s\S]*border-radius:\s*10px[\s\S]*padding:\s*8px\s+10px/,
+    );
   });
 });

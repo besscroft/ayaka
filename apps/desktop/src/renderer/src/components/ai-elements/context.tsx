@@ -92,6 +92,7 @@ export function Context({
       {...rest}
     >
       <button
+        data-slot="context-trigger"
         type="button"
         onClick={() => setInternalExpanded((v) => !v)}
         className="flex w-full items-center gap-2 text-left"
@@ -334,6 +335,7 @@ export function ContextPopover({
       {/* 弹层：完整 Context 详情 */}
       {isOpen && (
         <div
+          data-slot="context-details"
           role="dialog"
           aria-label={t("ai.context.details")}
           className={cn(

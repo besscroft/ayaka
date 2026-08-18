@@ -1,0 +1,1639 @@
+:root[data-skin="zzz"] #root > .bg-background {
+  background-image: repeating-linear-gradient(40deg, transparent 0 9px, rgb(0 0 0 / 3%) 9px 10px);
+}
+
+:root[data-skin="zzz"] ::selection {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] ::-webkit-scrollbar-thumb {
+  border: 2px solid var(--background);
+  border-radius: 9999px;
+  background: #1c1c1c;
+}
+
+:root[data-skin="zzz"] :is(h1, h2, h3, [data-slot="dialog-title"]) {
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+}
+
+:root[data-skin="zzz"] [data-slot="window-titlebar"] {
+  position: relative;
+  background-color: var(--header);
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: var(--header-foreground);
+  border-bottom: 3px solid #000000;
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 20%);
+}
+
+:root[data-skin="zzz"] [data-slot="window-titlebar"]::after {
+  position: absolute;
+  inset-block-end: -3px;
+  inset-inline-start: 0;
+  width: 5rem;
+  height: 3px;
+  background: var(--skin-signal-action);
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-skin="zzz"] [data-slot="window-sidebar-toggle"] {
+  border-inline-end: 1px solid rgb(255 255 255 / 20%);
+  color: var(--header-foreground);
+}
+
+:root[data-skin="zzz"] [data-slot="window-sidebar-toggle"]:hover,
+:root[data-skin="zzz"] [data-slot="window-sidebar-toggle"]:focus-visible {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="window-sidebar-toggle"][aria-expanded="true"] {
+  box-shadow: inset 0 -3px 0 var(--skin-signal-action);
+}
+
+:root[data-skin="zzz"] [data-slot="window-brand"] {
+  color: var(--header-foreground);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+:root[data-skin="zzz"] [data-slot="window-controls"] {
+  border-inline-start: 1px solid rgb(255 255 255 / 20%);
+}
+
+:root[data-skin="zzz"] [data-slot="window-controls"] .window-control-button {
+  color: rgb(255 255 255 / 68%);
+}
+
+:root[data-skin="zzz"] [data-slot="window-controls"] .window-control-button:hover,
+:root[data-skin="zzz"] [data-slot="window-controls"] .window-control-button:focus-visible {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="window-controls"] .window-close-button:hover,
+:root[data-skin="zzz"] [data-slot="window-controls"] .window-close-button:focus-visible {
+  background: var(--danger);
+  color: var(--danger-foreground);
+}
+
+:root[data-skin="zzz"] .app-sidebar {
+  background-color: var(--sidebar);
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: var(--sidebar-foreground);
+  box-shadow: inset -4px 0 0 #000000;
+}
+
+:root[data-skin="zzz"] .app-sidebar > div {
+  border-inline-end-color: #000000;
+}
+
+:root[data-skin="zzz"] .app-sidebar > div > nav:first-child > button {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+:root[data-skin="zzz"] .app-sidebar > div > nav:first-child > button:hover {
+  background: rgb(255 255 255 / 10%);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] .app-sidebar > div > nav:first-child > button[aria-current="page"] {
+  border-color: #000000;
+  background-color: var(--warning);
+  background-image: var(--skin-checker-light);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: #000000;
+  box-shadow:
+    inset 0 0 0 3px rgb(255 255 255 / 28%),
+    0 2px 0 #000000;
+}
+
+:root[data-skin="zzz"] .app-sidebar > div > nav:first-child > button[aria-current="page"]::after {
+  position: absolute;
+  inset-inline-end: 8px;
+  width: 22px;
+  height: 3px;
+  background: var(--skin-signal-action);
+  content: "";
+  transform: skewX(-28deg);
+}
+
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="ghost"],
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="tertiary"] {
+  color: var(--sidebar-foreground);
+}
+
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="ghost"]:hover,
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="tertiary"]:hover,
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="ghost"]:focus-visible,
+:root[data-skin="zzz"] .app-sidebar [data-slot="button"][data-variant="tertiary"]:focus-visible {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+:root[data-skin="zzz"] .app-sidebar input:not([type="checkbox"]),
+:root[data-skin="zzz"] [data-slot="input"],
+:root[data-skin="zzz"] [data-slot="select-trigger"] {
+  border: 1px solid #000000;
+  border-radius: 9999px;
+  background-color: var(--field-background);
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: var(--field-foreground);
+  box-shadow: inset 0 0 0 3px #323232;
+}
+
+:root[data-skin="zzz"] [data-slot="textarea"] {
+  min-height: 7rem;
+  border: 1px solid #000000;
+  border-radius: 16px;
+  background-color: #000000;
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 3px #323232;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    .app-sidebar input:not([type="checkbox"]),
+    [data-slot="input"],
+    [data-slot="select-trigger"]
+  ):focus-visible {
+  border-color: #000000;
+  outline: 2px solid var(--skin-signal-info);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 3px #323232,
+    0 0 0 4px rgb(0 139 255 / 24%);
+}
+
+:root[data-skin="zzz"] :is([data-slot="input"], [data-slot="textarea"])::placeholder {
+  color: #565656;
+}
+
+:root[data-skin="zzz"] [data-slot="textarea"]:focus-visible {
+  border-color: #000000;
+  outline: 2px solid var(--skin-signal-info);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 3px #323232,
+    0 0 0 4px rgb(0 139 255 / 24%);
+}
+
+:root[data-skin="zzz"] [data-slot="button"] {
+  border-radius: 6px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+:root[data-skin="zzz"] [data-slot="tooltip-trigger"] {
+  border-radius: 6px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+:root[data-skin="zzz"] [data-slot="tooltip-content"] {
+  border: 2px solid #000000;
+  border-radius: 20px 20px 0 20px;
+  background: #1c1c1c;
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+  box-shadow: 0 3px 0 #000000;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-content"], [data-slot="reasoning-selector-content"]) {
+  position: absolute;
+  isolation: isolate;
+  overflow: hidden;
+  border: 3px solid #000000;
+  border-radius: 20px 0 20px 20px;
+  outline: 3px solid rgb(66 66 66 / 66%);
+  background: linear-gradient(170deg, #222222, #000000 80%);
+  color: #ffffff;
+  box-shadow: 0 0 10px #000000;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-content"], [data-slot="reasoning-selector-content"])::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(
+      65deg,
+      rgb(255 255 255 / 4%) 12%,
+      transparent 12% 88%,
+      rgb(255 255 255 / 4%) 88%
+    ),
+    linear-gradient(
+      115deg,
+      rgb(255 255 255 / 4%) 12%,
+      transparent 12% 88%,
+      rgb(255 255 255 / 4%) 88%
+    );
+  background-position:
+    0 0,
+    4px 7px;
+  background-size: 8px 14px;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-content"], [data-slot="reasoning-selector-content"])
+  > * {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-label"],
+    [data-slot="reasoning-selector-content"] > div:first-child
+  ) {
+  border-color: #353535;
+  color: #8f8f8f;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-trigger"], [data-slot="reasoning-selector-trigger"]) {
+  border: 1px solid #000000;
+  border-radius: 9999px;
+  background-color: #000000;
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 2px #333333;
+}
+
+:root[data-skin="zzz"] [data-slot="model-selector-trigger"] {
+  max-width: 18rem;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-trigger"], [data-slot="reasoning-selector-trigger"]):hover,
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-trigger"],
+    [data-slot="reasoning-selector-trigger"]
+  )[data-open="true"] {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-trigger"],
+    [data-slot="reasoning-selector-trigger"]
+  ):focus-visible {
+  outline: 2px solid var(--skin-signal-info);
+  outline-offset: 2px;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-item"], [data-slot="reasoning-selector-item"]) {
+  border-radius: 6px;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-item"], [data-slot="reasoning-selector-item"]):hover,
+:root[data-skin="zzz"]
+  :is([data-slot="model-selector-item"], [data-slot="reasoning-selector-item"]):focus-visible {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-item"],
+    [data-slot="reasoning-selector-item"]
+  )[aria-selected="true"],
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-item"],
+    [data-slot="reasoning-selector-item"]
+  )[data-selected="true"] {
+  background: var(--warning);
+  color: #000000;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-item"],
+    [data-slot="reasoning-selector-item"]
+  )[aria-selected="true"]:hover,
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="model-selector-item"],
+    [data-slot="reasoning-selector-item"]
+  )[data-selected="true"]:hover {
+  background: var(--warning);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="prompt-input-attach"] {
+  border-radius: 6px;
+  color: #b7b7b7;
+}
+
+:root[data-skin="zzz"] [data-slot="prompt-input-attach"]:hover,
+:root[data-skin="zzz"] [data-slot="prompt-input-attach"]:focus-visible {
+  background: #323232;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="prompt-input-separator"] {
+  background: #4c4c4c;
+}
+
+:root[data-skin="zzz"]
+  [data-slot="button"]:is(
+    [data-variant="default"],
+    [data-variant="primary"],
+    [data-variant="secondary"],
+    [data-variant="outline"],
+    [data-variant="destructive"],
+    [data-variant="danger"]
+  ) {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #000000;
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  box-shadow:
+    inset 0 1px 2px rgb(255 255 255 / 20%),
+    inset 0 0 0 3px #333333,
+    inset 0 0 0 4px #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="button"][data-variant="default"] {
+  background-color: #000000;
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="button"][data-variant="primary"] {
+  background-color: var(--primary);
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="button"][data-variant="secondary"] {
+  background-color: var(--secondary);
+  background-image: var(--skin-checker-light);
+  color: var(--secondary-foreground);
+}
+
+:root[data-skin="zzz"] [data-slot="button"][data-variant="outline"] {
+  background-color: #ffffff;
+  background-image: var(--skin-checker-light);
+  color: #000000;
+}
+
+:root[data-skin="zzz"]
+  [data-slot="button"]:is([data-variant="destructive"], [data-variant="danger"]) {
+  background-color: var(--danger);
+  background-image: var(--skin-checker-dark);
+  color: var(--danger-foreground);
+}
+
+:root[data-skin="zzz"]
+  [data-slot="button"]:is(
+    [data-variant="ghost"],
+    [data-variant="tertiary"],
+    [data-variant="link"]
+  ) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-skin="zzz"] [data-slot="button"]:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+:root[data-skin="zzz"]
+  [data-slot="button"]:is([data-variant="default"], [data-variant="primary"]):hover {
+  filter: brightness(1.08);
+}
+
+:root[data-skin="zzz"] [data-slot="button"][data-variant="secondary"]:hover,
+:root[data-skin="zzz"] [data-slot="button"][data-variant="outline"]:hover {
+  filter: brightness(0.96);
+}
+
+:root[data-skin="zzz"] [data-slot="button"]:focus-visible {
+  outline: 2px solid var(--skin-ring);
+  outline-offset: 3px;
+}
+
+:root[data-skin="zzz"] main > header {
+  border-bottom: 2px solid #000000;
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(40deg, transparent 0 9px, rgb(0 0 0 / 3%) 9px 10px);
+}
+
+:root[data-skin="zzz"] main div:has(> div > [data-slot="prompt-input"]) {
+  border: 2px solid #000000;
+  border-radius: 20px 20px 0 20px;
+  background: #1c1c1c;
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  box-shadow: 0 3px 0 #000000;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input"] {
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input-textarea"] {
+  color: #ffffff;
+  --foreground: #ffffff;
+  --muted-foreground: #8f8f8f;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input-textarea"]::placeholder {
+  color: #565656;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input-submit"] {
+  border: 1px solid #000000;
+  background-color: var(--primary);
+  background-image: var(--skin-checker-dark);
+  box-shadow:
+    inset 0 1px 2px rgb(255 255 255 / 20%),
+    inset 0 0 0 3px #008bff,
+    inset 0 0 0 4px #000000;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input-submit"]:disabled {
+  background-color: #323232;
+  color: #737373;
+  box-shadow:
+    inset 0 1px 2px rgb(255 255 255 / 20%),
+    inset 0 0 0 3px #737373,
+    inset 0 0 0 4px transparent;
+}
+
+:root[data-skin="zzz"] main [data-slot="prompt-input-stop"] {
+  border-color: #000000;
+  background: var(--warning);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="message-content"][data-from="user"] {
+  position: relative;
+  max-width: min(42rem, 82%);
+  overflow: hidden;
+  border: 2px solid #000000;
+  border-radius: 14px 14px 2px 14px;
+  background-color: var(--primary);
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: #ffffff;
+  box-shadow: 0 3px 0 #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="message-content"][data-from="user"]::after {
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline-end: 8px;
+  width: 34px;
+  height: 3px;
+  background: var(--skin-signal-action);
+  content: "";
+  pointer-events: none;
+  transform: skewX(-35deg);
+}
+
+:root[data-skin="zzz"] [data-slot="message-content"][data-from="user"] :where(a) {
+  color: #ffffff;
+  text-decoration-color: var(--skin-signal-action);
+}
+
+:root[data-skin="zzz"] [data-slot="card"] {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #000000;
+  border-radius: 20px 20px 0 20px;
+  background-color: #222222;
+  color: #ffffff;
+  box-shadow: none;
+  --card-foreground: #ffffff;
+  --foreground: #ffffff;
+  --muted-foreground: #b4b4b4;
+  --border: #353535;
+}
+
+:root[data-skin="zzz"] :is([data-slot="dialog-overlay"]) {
+  background: repeating-linear-gradient(40deg, transparent 0 5px, rgb(255 255 255 / 7%) 5px 10px)
+    rgb(0 0 0 / 42%);
+  backdrop-filter: blur(4px);
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 3px solid #000000;
+  border-radius: 20px 0 20px 20px;
+  outline: 3px solid rgb(66 66 66 / 66%);
+  background: linear-gradient(170deg, #222222, #000000 80%);
+  color: #ffffff;
+  box-shadow: 0 0 10px #000000;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"]
+  )::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(65deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(65deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(115deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(115deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%);
+  background-position:
+    0 0,
+    4px 7px,
+    0 0,
+    4px 7px;
+  background-size: 8px 14px;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"])
+  > * {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-skin="zzz"] [data-slot="select-item"] {
+  border-radius: 6px;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="select-item"][data-highlighted],
+:root[data-skin="zzz"] [data-slot="select-item"][data-selected] {
+  background: var(--warning);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="select-item"]:focus {
+  background: var(--warning);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="select-item"][data-highlighted] svg,
+:root[data-skin="zzz"] [data-slot="select-item"][data-selected] svg {
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-header"],
+:root[data-skin="zzz"] [data-slot="dialog-footer"] {
+  border-color: #3d3d3d;
+  background: linear-gradient(#1c1c1c, #080808);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-header"] {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-header"]::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(65deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(65deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(115deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%),
+    linear-gradient(115deg, rgb(0 0 0 / 20%) 12%, transparent 12% 88%, rgb(0 0 0 / 20%) 88%);
+  background-position:
+    0 0,
+    4px 7px,
+    0 0,
+    4px 7px;
+  background-size: 8px 14px;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-header"] > * {
+  position: relative;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-content"] > div > div > nav[aria-label] {
+  border-color: #000000;
+  background: #1c1c1c;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-content"] > div > div > nav[aria-label] > button {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  color: #c2c2c2;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-content"] > div > div > nav[aria-label] > button:hover {
+  background: #323232;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-slot="dialog-content"]
+  > div
+  > div
+  > nav[aria-label]
+  > button[aria-current="page"] {
+  border-color: #000000;
+  background: var(--warning);
+  background-image: var(--skin-checker-light);
+  color: #000000;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 24%);
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-title"] {
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"] {
+  border: 2px solid #000000;
+  border-radius: 5px;
+  min-height: 1.5rem;
+  padding-inline: 0.65rem;
+  letter-spacing: 0.03em;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="default"] {
+  border-color: #222222;
+  background: #1c1c1c;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="primary"] {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="secondary"] {
+  border-color: #000000;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="outline"] {
+  border-color: #000000;
+  background: #ffffff;
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="destructive"] {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="success"] {
+  background: var(--success);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="badge"][data-variant="warning"] {
+  background: var(--warning);
+  color: var(--warning-foreground);
+}
+
+:root[data-skin="zzz"] [data-slot="tabs-list"] {
+  border: 1px solid #000000;
+  border-radius: 9999px;
+  background-color: #000000;
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  box-shadow:
+    inset 0 1px 2px rgb(255 255 255 / 20%),
+    inset 0 0 0 3px #333333;
+}
+
+:root[data-skin="zzz"] [data-slot="tabs-trigger"] {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: rgb(255 255 255 / 76%);
+  min-width: 5.5rem;
+}
+
+:root[data-skin="zzz"] [data-slot="tabs-trigger"]:hover {
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="tabs-trigger"][data-active] {
+  border-color: #000000;
+  background-color: var(--warning);
+  color: #000000;
+  box-shadow: inset 0 0 0 3px #333333;
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+}
+
+:root[data-skin="zzz"] [data-slot="tabs-trigger"]::after {
+  content: none;
+}
+
+:root[data-skin="zzz"] :is(pre, .rich-content pre) {
+  border: 2px solid #000000;
+  border-radius: 14px 14px 2px 14px;
+  background-color: var(--code);
+  background-image: var(--skin-checker-dark);
+  background-position:
+    0 0,
+    3px 3px;
+  background-size: 6px 6px;
+  color: var(--code-foreground);
+  box-shadow: 0 3px 0 #000000;
+}
+
+:root[data-skin="zzz"] :is(code, .rich-content :where(code):not(pre code)) {
+  border-radius: 5px;
+  background-color: color-mix(in oklch, var(--skin-signal-info) 18%, transparent);
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"] .rich-content :where(pre code) {
+  background: transparent;
+  color: var(--code-foreground);
+}
+
+:root[data-skin="zzz"] main > header[data-streaming="true"] {
+  border-bottom-color: var(--skin-signal-action);
+}
+
+/* The remaining controls use the same black shell as the reference library. */
+:root[data-skin="zzz"] [data-slot="switch-control"] {
+  border: 1px solid #000000;
+  background: #000000;
+  background-image: var(--skin-checker-dark);
+  box-shadow: inset 0 0 0 2px #333333;
+}
+
+:root[data-skin="zzz"] [data-slot="switch"][data-checked] [data-slot="switch-control"] {
+  background-color: var(--primary);
+  box-shadow: inset 0 0 0 2px #006fba;
+}
+
+:root[data-skin="zzz"] [data-slot="switch-thumb"] {
+  border: 1px solid #000000;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 35%);
+}
+
+:root[data-skin="zzz"] [data-slot="checkbox-control"] {
+  border: 2px solid #000000;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: inset 0 0 0 2px #d7dcde;
+}
+
+:root[data-skin="zzz"] [data-slot="checkbox"][data-checked] [data-slot="checkbox-control"] {
+  border-color: #000000;
+  background: var(--primary);
+  box-shadow: inset 0 0 0 2px #006fba;
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-slot="slider-track"] {
+  height: 6px;
+  border: 1px solid #000000;
+  border-radius: 9999px;
+  background: #1c1c1c;
+  background-image: var(--skin-checker-dark);
+}
+
+:root[data-skin="zzz"] [data-slot="slider-range"] {
+  background: var(--primary);
+}
+
+:root[data-skin="zzz"] [data-slot="slider-thumb"] {
+  border: 2px solid #000000;
+  background: var(--warning);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 30%);
+}
+
+:root[data-skin="zzz"] [data-slot="toggle-group"] {
+  border: 1px solid #000000;
+  border-radius: 9999px;
+  background: #000000;
+  background-image: var(--skin-checker-dark);
+  box-shadow:
+    inset 0 1px 2px rgb(255 255 255 / 20%),
+    inset 0 0 0 3px #333333;
+}
+
+:root[data-skin="zzz"] [data-slot="toggle-group-item"] {
+  border-radius: 9999px;
+  color: rgb(255 255 255 / 78%);
+}
+
+:root[data-skin="zzz"] [data-slot="toggle-group-item"][data-pressed] {
+  background: var(--warning);
+  color: #000000;
+  box-shadow: inset 0 0 0 3px #333333;
+}
+
+:root[data-skin="zzz"] [data-slot="dialog-content"] section {
+  border-color: #353535;
+  background: #222222;
+  color: #ffffff;
+  --card: #1c1c1c;
+  --card-foreground: #ffffff;
+  --surface: #222222;
+  --surface-foreground: #ffffff;
+  --foreground: #ffffff;
+  --muted-foreground: #b4b4b4;
+  --border: #353535;
+  --input: #000000;
+}
+
+:root[data-skin="zzz"]
+  [data-slot="dialog-content"]
+  section
+  :is(.text-foreground\/50, .text-foreground\/60) {
+  color: #8f8f8f;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ZZZ visual system: page surfaces, dark command surfaces, and signal states */
+/* -------------------------------------------------------------------------- */
+
+:root[data-skin="zzz"] [data-slot="window-titlebar"]::after,
+:root[data-skin="zzz"] [data-slot="message-content"][data-from="user"]::after {
+  display: none;
+  content: none;
+}
+
+:root[data-skin="zzz"] [data-slot="alert-dialog-overlay"] {
+  background: repeating-linear-gradient(40deg, transparent 0 5px, rgb(255 255 255 / 7%) 5px 10px)
+    rgb(0 0 0 / 52%);
+  backdrop-filter: blur(4px);
+}
+
+:root[data-skin="zzz"] :is([data-slot="app-shell"], [data-slot="app-main"], [data-page]) {
+  font-family: var(--skin-font-stack);
+}
+
+:root[data-skin="zzz"] [data-slot="app-main"],
+:root[data-skin="zzz"] [data-page]:not([data-page$="dialog"]) {
+  background-color: var(--background);
+  background-image: repeating-linear-gradient(40deg, transparent 0 9px, rgb(0 0 0 / 3%) 9px 10px);
+}
+
+/* All modal-like surfaces share one readable dark semantic context.  This is
+   deliberately variable-based so utility classes such as text-foreground/50,
+   bg-muted, bg-card, border-border, and text-danger remain coherent inside
+   every nested form and custom panel. */
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"],
+    [data-slot="command"],
+    [data-slot="context-popover"],
+    [data-slot="model-selector-content"],
+    [data-slot="reasoning-selector-content"],
+    [data-page="settings-dialog"],
+    [data-page="agent-detail-dialog"]
+  ) {
+  --background: var(--skin-dark-2);
+  --foreground: var(--skin-dark-foreground);
+  --surface: var(--skin-dark-2);
+  --surface-foreground: var(--skin-dark-foreground);
+  --overlay: var(--skin-dark-1);
+  --overlay-foreground: var(--skin-dark-foreground);
+  --card: var(--skin-dark-1);
+  --card-foreground: var(--skin-dark-foreground);
+  --popover: var(--skin-dark-1);
+  --popover-foreground: var(--skin-dark-foreground);
+  --muted: var(--skin-dark-3);
+  --muted-foreground: var(--skin-dark-muted);
+  --border: var(--skin-dark-border);
+  --separator: #3d3d3d;
+  --input: var(--skin-dark-0);
+  --field-background: var(--skin-dark-0);
+  --field-foreground: var(--skin-dark-foreground);
+  --accent: var(--skin-signal-info);
+  --accent-foreground: var(--skin-dark-foreground);
+  --primary: var(--skin-primary);
+  --primary-foreground: var(--skin-dark-foreground);
+  --secondary: #d7d7d7;
+  --secondary-foreground: #111111;
+  --ring: var(--skin-signal-info);
+  --code: var(--skin-dark-0);
+  --code-foreground: var(--skin-dark-foreground);
+  --code-border: var(--skin-dark-border);
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"],
+    [data-slot="command"],
+    [data-slot="context-popover"],
+    [data-slot="model-selector-content"],
+    [data-slot="reasoning-selector-content"],
+    [data-page="settings-dialog"],
+    [data-page="agent-detail-dialog"]
+  )
+  :is(
+    .bg-background,
+    .bg-card,
+    .bg-popover,
+    .bg-muted,
+    [class*="bg-background"],
+    [class*="bg-card"],
+    [class*="bg-muted"]
+  ) {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"],
+    [data-slot="command"],
+    [data-slot="context-popover"],
+    [data-page="settings-dialog"],
+    [data-page="agent-detail-dialog"]
+  )
+  :is([class*="text-muted-foreground"], [class*="text-foreground/"]) {
+  color: var(--muted-foreground);
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"],
+    [data-slot="command"],
+    [data-slot="context-popover"],
+    [data-page="settings-dialog"],
+    [data-page="agent-detail-dialog"]
+  )
+  :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]),
+:root[data-skin="zzz"] [data-page="settings-dialog"] :is(input, textarea, [role="combobox"]) {
+  border-color: var(--skin-dark-border);
+  background-color: var(--skin-dark-0);
+  color: var(--skin-dark-foreground);
+  caret-color: var(--skin-signal-info);
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"])::placeholder {
+  color: #737373;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="dialog-header"],
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-title"],
+    [data-slot="alert-dialog-description"],
+    [data-slot="popover-heading"],
+    [data-slot="field-label"],
+    [data-slot="field-description"],
+    [data-slot="field-error"]
+  ) {
+  color: inherit;
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"])
+  :is(a, [data-slot="link"]) {
+  color: var(--skin-signal-info);
+  text-decoration-color: var(--skin-signal-action);
+}
+
+:root[data-skin="zzz"]
+  :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"])
+  :is(pre, [data-slot="code-surface"], [data-slot="rich-content-code"]) {
+  background: var(--skin-dark-0);
+  color: var(--skin-dark-foreground);
+  border-color: var(--skin-dark-border);
+}
+
+/* Business panels use the black-and-white checker/surface language from the
+   reference components, while the surrounding canvas stays light. */
+:root[data-skin="zzz"]
+  :is(
+    [data-page],
+    [data-slot="memory-layout"],
+    [data-slot="tools-catalog"],
+    [data-slot="mcp-panel"]
+  )
+  :is(.bg-card, [data-slot="card"]) {
+  --background: var(--skin-dark-2);
+  --foreground: var(--skin-dark-foreground);
+  --surface: var(--skin-dark-2);
+  --surface-foreground: var(--skin-dark-foreground);
+  --card: var(--skin-dark-2);
+  --card-foreground: var(--skin-dark-foreground);
+  --muted: var(--skin-dark-3);
+  --muted-foreground: var(--skin-dark-muted);
+  --border: var(--skin-dark-border);
+  background-color: var(--skin-page-card);
+  background-image: var(--skin-checker-dark);
+  color: var(--skin-page-card-foreground);
+  border-color: var(--skin-dark-0);
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-page],
+    [data-slot="memory-layout"],
+    [data-slot="tools-catalog"],
+    [data-slot="mcp-panel"]
+  )
+  :is(.bg-muted, [class*="bg-muted"], .bg-background, [class*="bg-background"]) {
+  background-color: var(--skin-dark-1);
+  color: var(--skin-dark-foreground);
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-page],
+    [data-slot="memory-layout"],
+    [data-slot="tools-catalog"],
+    [data-slot="mcp-panel"]
+  )
+  :is([class*="text-muted-foreground"], [class*="text-foreground/"]) {
+  color: var(--skin-dark-muted);
+}
+
+:root[data-skin="zzz"] [data-slot="card-header"],
+:root[data-skin="zzz"] [data-slot="card-content"],
+:root[data-skin="zzz"] [data-slot="card-footer"],
+:root[data-skin="zzz"] [data-slot="card-title"],
+:root[data-skin="zzz"] [data-slot="card-description"] {
+  color: inherit;
+}
+
+:root[data-skin="zzz"] [data-slot="memory-nav-item"][data-active="true"] {
+  border: 2px solid var(--skin-dark-0);
+  background-color: var(--skin-signal-action);
+  background-image: var(--skin-checker-light);
+  color: #000000;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 28%);
+}
+
+:root[data-skin="zzz"]
+  [data-slot="memory-nav-item"][data-active="true"]
+  [class*="text-primary-foreground"] {
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-slot="memory-row"] {
+  border-inline-start: 3px solid transparent;
+}
+
+:root[data-skin="zzz"] [data-slot="memory-row"][data-active="true"] {
+  border-inline-start-color: var(--skin-signal-action);
+  background: var(--skin-dark-3);
+}
+
+:root[data-skin="zzz"] [data-slot="memory-file"] :is([data-slot="textarea"], pre) {
+  background-color: var(--skin-dark-0);
+  background-image: var(--skin-checker-dark);
+  color: var(--skin-dark-foreground);
+  border-color: var(--skin-dark-border);
+}
+
+/* Menus, dropdowns, command palettes, and listboxes are dark signal panels. */
+:root[data-skin="zzz"] :is([role="menu"], [role="listbox"], [data-slot="command"]) {
+  --background: var(--skin-dark-1);
+  --foreground: var(--skin-dark-foreground);
+  --muted: var(--skin-dark-3);
+  --muted-foreground: var(--skin-dark-muted);
+  --border: var(--skin-dark-border);
+  --popover: var(--skin-dark-1);
+  --popover-foreground: var(--skin-dark-foreground);
+  border: 2px solid var(--skin-dark-0);
+  background-color: var(--skin-dark-1);
+  background-image: var(--skin-checker-dark);
+  color: var(--skin-dark-foreground);
+  box-shadow: 0 3px 0 var(--skin-dark-0);
+}
+
+:root[data-skin="zzz"] :is([role="menuitem"], [role="option"], [data-slot="command-item"]) {
+  color: var(--skin-dark-foreground);
+  border-radius: 4px;
+}
+
+:root[data-skin="zzz"]
+  :is([role="menuitem"], [role="option"], [data-slot="command-item"]):is(
+    :hover,
+    :focus-visible,
+    [data-highlighted]
+  ) {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  :is([role="menuitem"], [role="option"], [data-slot="command-item"])[aria-selected="true"],
+:root[data-skin="zzz"] [data-slot="select-item"][data-selected="true"] {
+  background: var(--skin-signal-action);
+  color: #000000;
+}
+
+/* Zenless-style controls on every application page. */
+:root[data-skin="zzz"]
+  [data-page]
+  :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"],
+    input:not([type="checkbox"]),
+    textarea
+  ) {
+  border: 2px solid var(--skin-dark-0);
+  background-color: var(--skin-dark-0);
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 2px var(--skin-dark-3);
+}
+
+:root[data-skin="zzz"] [data-page] :is([data-slot="textarea"], textarea) {
+  border-radius: 12px;
+  min-height: 5rem;
+}
+
+:root[data-skin="zzz"]
+  [data-page]
+  :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"],
+    input,
+    textarea
+  ):focus-visible {
+  border-color: var(--skin-dark-0);
+  outline: 2px solid var(--skin-signal-info);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 2px var(--skin-dark-3),
+    0 0 0 4px rgb(0 139 255 / 24%);
+}
+
+:root[data-skin="zzz"]
+  [data-page]
+  :is([data-slot="input"], [data-slot="textarea"], input, textarea)::placeholder {
+  color: #737373;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="field"] > [data-slot="field-label"],
+:root[data-skin="zzz"] [data-page] label {
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="field-description"],
+:root[data-skin="zzz"] [data-page] [data-slot="field-error"] {
+  color: var(--skin-dark-muted);
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="field-error"] {
+  color: #ff7661;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="badge"],
+:root[data-skin="zzz"] [data-page] [data-slot="chip"] {
+  border-color: var(--skin-dark-0);
+  background: var(--skin-dark-3);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="badge"][data-variant="warning"],
+:root[data-skin="zzz"] [data-page] [data-slot="chip"][data-variant="soft"] {
+  background: var(--skin-signal-action);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="tabs-list"] {
+  background-color: var(--skin-dark-0);
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="tabs-trigger"][data-active] {
+  background: var(--skin-signal-action);
+  color: #000000;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="table-wrapper"] {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="table-header"],
+:root[data-skin="zzz"] [data-page] [data-slot="table-footer"] {
+  background: var(--skin-dark-3);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="table-row"]:hover {
+  background: rgb(46 182 255 / 12%);
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="empty"],
+:root[data-skin="zzz"] [data-page] [data-slot="loading"],
+:root[data-skin="zzz"] [data-page] [aria-busy="true"] {
+  color: var(--skin-dark-muted);
+}
+
+:root[data-skin="zzz"] [data-page] [data-slot="calendar"] {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+/* Chat surface and AI Elements. */
+:root[data-skin="zzz"] [data-page="chat-page"] > header {
+  border-bottom: 2px solid var(--skin-dark-0);
+  background: var(--background);
+  background-image: repeating-linear-gradient(40deg, transparent 0 9px, rgb(0 0 0 / 3%) 9px 10px);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message"] {
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-content"][data-from="user"] {
+  border-radius: 14px 14px 2px 14px;
+  background-color: var(--skin-primary);
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+  box-shadow: 0 3px 0 var(--skin-dark-0);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-actions"] {
+  padding: 2px;
+  border: 1px solid var(--skin-dark-border);
+  border-radius: 4px;
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-action-button"] {
+  color: #b4b4b4;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-action-button"]:hover,
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="message-action-button"]:focus-visible {
+  background: var(--skin-signal-info);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="conversation-scroll-button"] {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+  box-shadow: 0 2px 0 var(--skin-dark-0);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="conversation-scroll-button"]:hover {
+  background: var(--skin-signal-info);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  [data-slot="message-attachments"]
+  :is(img, video, audio, [data-slot="attachment-chip"]) {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="attachment-chip"] {
+  border-radius: 4px;
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="reasoning"],
+    [data-slot="chain-of-thought"],
+    [data-slot="task"],
+    [data-slot="tool"],
+    [data-slot="queue"],
+    [data-slot="context-details"]
+  ) {
+  border: 2px solid var(--skin-dark-0);
+  border-radius: 8px;
+  background: var(--skin-dark-1);
+  background-image: var(--skin-checker-dark);
+  color: #ffffff;
+  --background: var(--skin-dark-1);
+  --foreground: #ffffff;
+  --card: var(--skin-dark-1);
+  --card-foreground: #ffffff;
+  --muted: var(--skin-dark-3);
+  --muted-foreground: var(--skin-dark-muted);
+  --border: var(--skin-dark-border);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="reasoning-trigger"],
+    [data-slot="chain-of-thought-trigger"],
+    [data-slot="task-trigger"],
+    [data-slot="queue-section-trigger"],
+    [data-slot="tool-header"]
+  ):hover {
+  background: var(--skin-dark-3);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="reasoning-content"],
+    [data-slot="chain-of-thought-content"],
+    [data-slot="task-content"],
+    [data-slot="tool-content"],
+    [data-slot="queue-list"]
+  ) {
+  border-color: var(--skin-dark-border);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="tool-input"],
+    [data-slot="tool-output"],
+    [data-slot="chain-of-thought-search-results"],
+    [data-slot="chain-of-thought-search-result"]
+  ) {
+  border: 1px solid var(--skin-dark-border);
+  border-radius: 4px;
+  background: var(--skin-dark-0);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="tool-approval"] {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is([data-slot="tool-approve"], [data-slot="tool-deny"]) {
+  border: 1px solid var(--skin-dark-0);
+  border-radius: 4px;
+  background: var(--skin-dark-3);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="tool-approve"] {
+  background: var(--skin-success);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="tool-deny"] {
+  background: var(--skin-danger);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="tool-status"],
+    [data-slot="task-trigger"][data-status="in_progress"],
+    [data-slot="queue-item"][data-status="running"]
+  ) {
+  color: var(--skin-signal-info);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is([data-slot="tool"][data-state="error"], [data-slot="tool-status"][data-status="error"]) {
+  border-color: var(--skin-danger);
+  color: #ff7661;
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is([data-slot="prompt-suggestions"], [data-slot="quick-reactions"], [data-slot="sources"]) {
+  color: var(--skin-signal-info);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="prompt-suggestion"],
+    [data-slot="quick-reaction-item"],
+    [data-slot="sources-trigger"]
+  ) {
+  border: 1px solid var(--skin-dark-border);
+  border-radius: 4px;
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="prompt-suggestion"],
+    [data-slot="quick-reaction-item"],
+    [data-slot="sources-trigger"]
+  ):hover {
+  border-color: var(--skin-signal-info);
+  background: var(--skin-dark-3);
+}
+
+:root[data-skin="zzz"]
+  [data-page="chat-page"]
+  :is(
+    [data-slot="sources-content"],
+    [data-slot="source"],
+    [data-slot="editable-message"],
+    [data-slot="rich-content-table"],
+    [data-slot="rich-content-code"]
+  ) {
+  border-color: var(--skin-dark-border);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="rich-content"] :is(th, td) {
+  border-color: var(--skin-dark-border);
+}
+
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="rich-content-link"] {
+  color: var(--skin-signal-info);
+  text-decoration-color: var(--skin-signal-action);
+}
+
+:root[data-skin="zzz"] [data-slot="emoji-picker"] {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+  --background: var(--skin-dark-1);
+  --foreground: #ffffff;
+  --muted: var(--skin-dark-3);
+  --muted-foreground: var(--skin-dark-muted);
+  --border: var(--skin-dark-border);
+}
+
+:root[data-skin="zzz"]
+  [data-slot="emoji-picker"]
+  :is([data-slot="emoji-picker-search"], [data-slot="emoji-picker-category"]) {
+  border-color: var(--skin-dark-border);
+  color: var(--skin-dark-muted);
+}
+
+:root[data-skin="zzz"] [data-slot="emoji-picker-item"]:hover,
+:root[data-skin="zzz"] [data-slot="emoji-picker-item"]:focus-visible {
+  background: var(--skin-signal-action);
+  color: #000000;
+}
+
+/* Settings, agent, MCP, and the remaining page dialogs get the same contrast
+   treatment even when their content is built from plain divs instead of Card. */
+:root[data-skin="zzz"]
+  :is([data-page="settings-dialog"], [data-page="agent-detail-dialog"], [data-slot="mcp-panel"])
+  :is(section, article, [role="region"], [class*="border-border"]):not(
+    [data-slot="dialog-header"]
+  ):not([data-slot="dialog-footer"]) {
+  border-color: var(--skin-dark-border);
+}
+
+:root[data-skin="zzz"]
+  [data-page="settings-dialog"]
+  :is(.bg-muted, [class*="bg-muted"], .bg-card, [class*="bg-card"]) {
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"]
+  [data-page="settings-dialog"]
+  :is([class*="text-foreground/"], [class*="text-muted-foreground"]) {
+  color: var(--skin-dark-muted);
+}
+
+:root[data-skin="zzz"]
+  [data-page="settings-dialog"]
+  :is(
+    [data-slot="provider-list"],
+    [data-slot="model-list"],
+    [data-slot="settings-list"],
+    [data-slot="code-surface"]
+  ) {
+  background: var(--skin-dark-0);
+  color: #ffffff;
+  border-color: var(--skin-dark-border);
+}
+
+:root[data-skin="zzz"]
+  [data-page="settings-dialog"]
+  :is([data-active="true"], [aria-selected="true"]) {
+  border-color: var(--skin-signal-info);
+  background: rgb(46 182 255 / 18%);
+}
+
+:root[data-skin="zzz"]
+  [data-page="settings-dialog"]
+  [data-slot="settings-nav-item"][data-active="true"] {
+  border-color: var(--skin-dark-0);
+  background: var(--skin-signal-action);
+  color: #000000;
+}
+
+:root[data-skin="zzz"]
+  :is(
+    [data-slot="modal"],
+    [data-slot="drawer"],
+    [data-slot="alert"],
+    [data-slot="empty"],
+    [data-slot="loading"]
+  ) {
+  color: var(--foreground);
+}
+
+:root[data-skin="zzz"] :is([data-slot="backtop"], [data-slot="scrollbar-thumb"]) {
+  border: 2px solid var(--skin-dark-0);
+  background: var(--skin-dark-1);
+  color: #ffffff;
+}
+
+:root[data-skin="zzz"] :is([data-slot="backtop"], [data-slot="scrollbar-thumb"]):hover {
+  background: var(--skin-signal-info);
+}
+
+/* Textareas use a compact radius instead of the pill shape used by the
+   single-line controls. This includes the Chat composer textarea. */
+:root[data-skin="zzz"] :is(textarea, [data-slot="textarea"], [data-slot="prompt-input-textarea"]) {
+  border-radius: 10px;
+}
+
+/* The Chat composer is nested inside a page-scoped control rule. Keep its
+   textarea angular enough to read as a ZZZ panel instead of a pill. */
+:root[data-skin="zzz"] [data-page="chat-page"] [data-slot="prompt-input-textarea"] {
+  border-radius: 10px;
+  padding: 8px 10px;
+}

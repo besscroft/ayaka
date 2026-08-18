@@ -2035,7 +2035,7 @@ export interface WorkspaceMediaSaveResult {
 // ============================================================
 
 /** 涓婚妯″紡 */
-export type SkinId = "white" | "black" | "yaka" | "ark";
+export type SkinId = "white" | "black" | "yaka" | "ark" | "zzz";
 
 /** 瀛楀彿绾у埆 */
 export type FontSizeLevel = "xs" | "sm" | "base" | "lg" | "xl";
