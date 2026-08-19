@@ -23,6 +23,7 @@ import "./renderer/lib/chat-retry.test.ts";
 import "./renderer/lib/chat-session-registry.test.ts";
 import "./renderer/lib/chat-tools.test.ts";
 import "./renderer/lib/chat-token-cache.test.ts";
+import "./renderer/lib/custom-provider-api-format.test.ts";
 import "./renderer/lib/errors.test.ts";
 import "./renderer/lib/generated-tool-ui.test.ts";
 import "./renderer/lib/i18n.test.ts";

@@ -60,6 +60,8 @@ import {
 } from "./icons";
 import {
   CHAT_REASONING_LEVELS,
+  CUSTOM_PROVIDER_API_FORMATS,
+  DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   MODEL_CAPABILITY_KEYS,
   SettingKey,
   type AgentProfile,
@@ -67,6 +69,7 @@ import {
   FONT_PRESETS,
   MONO_FONT_PRESETS,
   type Conversation,
+  type CustomProviderApiFormat,
   type CustomProviderInput,
   type FontPreset,
   type ManagedModelInfo,
@@ -96,6 +99,21 @@ interface SettingsDialogProps {
   /** 鍏抽棴鍥炶皟 */
   onClose: () => void;
   initialTab?: SettingsTabId;
+}
+
+const CUSTOM_PROVIDER_API_FORMAT_LABEL_KEYS: Record<CustomProviderApiFormat, TranslationKey> = {
+  "chat-completions": "model.apiFormat.chatCompletions",
+  responses: "model.apiFormat.responses",
+  "anthropic-messages": "model.apiFormat.anthropicMessages",
+};
+
+function customProviderApiFormatOptions(
+  t: (key: string) => string,
+): Array<{ value: string; label: string }> {
+  return CUSTOM_PROVIDER_API_FORMATS.map((value) => ({
+    value,
+    label: t(CUSTOM_PROVIDER_API_FORMAT_LABEL_KEYS[value]),
+  }));
 }
 
 /** Tab 瀹氫箟 */
@@ -1343,6 +1361,7 @@ function ModelEditorDialog({
     label: "",
     baseUrl: "",
     helpUrl: "",
+    apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
   const [modelForm, setModelForm] = useState<ModelFormState>(() =>
     createEmptyModelForm(providers[0]?.id ?? ""),
@@ -1359,6 +1378,7 @@ function ModelEditorDialog({
         label: model.providerLabel,
         baseUrl: model.providerBaseUrl ?? "",
         helpUrl: model.providerHelpUrl,
+        apiFormat: model.providerApiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       });
       setModelForm({
         providerId: model.providerId,
@@ -1375,7 +1395,13 @@ function ModelEditorDialog({
     }
 
     setAddMode("existing");
-    setProviderForm({ id: "", label: "", baseUrl: "", helpUrl: "" });
+    setProviderForm({
+      id: "",
+      label: "",
+      baseUrl: "",
+      helpUrl: "",
+      apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+    });
     setModelForm(createEmptyModelForm(providers[0]?.id ?? ""));
     setApiKey("");
     setHasApiKey(false);
@@ -1570,6 +1596,26 @@ function ModelEditorDialog({
                     }
                   />
                 </TextField>
+                <label className="select-none text-sm">
+                  <span className="mb-1 block text-xs text-foreground/60">
+                    {t("model.apiFormat")}
+                  </span>
+                  <SelectField
+                    value={providerForm.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT}
+                    options={customProviderApiFormatOptions(t)}
+                    onChange={(value) =>
+                      setProviderForm((prev) => ({
+                        ...prev,
+                        apiFormat: CUSTOM_PROVIDER_API_FORMATS.includes(
+                          value as CustomProviderApiFormat,
+                        )
+                          ? (value as CustomProviderApiFormat)
+                          : DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+                      }))
+                    }
+                    ariaLabel={t("model.apiFormat")}
+                  />
+                </label>
                 <TextField>
                   <Label>{t("model.helpUrl")}</Label>
                   <Input
@@ -1856,6 +1902,7 @@ function ProviderModelWorkbench({
     label: "",
     baseUrl: "",
     helpUrl: "",
+    apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
   const [providerApiKey, setProviderApiKey] = useState("");
   const [addProviderOpen, setAddProviderOpen] = useState(false);
@@ -1912,6 +1959,7 @@ function ProviderModelWorkbench({
       label: selectedProvider.label,
       baseUrl: selectedProvider.baseUrl ?? "",
       helpUrl: selectedProvider.helpUrl,
+      apiFormat: selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     });
     setProviderApiKey("");
   }, [
@@ -1919,6 +1967,7 @@ function ProviderModelWorkbench({
     selectedProvider?.helpUrl,
     selectedProvider?.id,
     selectedProvider?.label,
+    selectedProvider?.apiFormat,
   ]);
 
   const filteredProviders = useMemo(() => {
@@ -2021,6 +2070,7 @@ function ProviderModelWorkbench({
         label: providerForm.label,
         baseUrl: providerForm.baseUrl,
         helpUrl: providerForm.helpUrl,
+        apiFormat: providerForm.apiFormat,
       });
 
       if (providerApiKey.trim()) {
@@ -2279,7 +2329,13 @@ function ProviderModelWorkbench({
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="truncate text-base font-semibold">{selectedProvider.label}</h4>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                      {selectedProvider.kind}
+                      {selectedProvider.source === "custom"
+                        ? t(
+                            CUSTOM_PROVIDER_API_FORMAT_LABEL_KEYS[
+                              selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT
+                            ],
+                          )
+                        : selectedProvider.kind}
                     </span>
                     <span
                       className={[
@@ -2384,6 +2440,28 @@ function ProviderModelWorkbench({
                     }
                   />
                 </TextField>
+                {canEditProvider && (
+                  <label className="select-none text-sm">
+                    <span className="mb-1 block text-xs text-foreground/60">
+                      {t("model.apiFormat")}
+                    </span>
+                    <SelectField
+                      value={providerForm.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT}
+                      options={customProviderApiFormatOptions(t)}
+                      onChange={(value) =>
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          apiFormat: CUSTOM_PROVIDER_API_FORMATS.includes(
+                            value as CustomProviderApiFormat,
+                          )
+                            ? (value as CustomProviderApiFormat)
+                            : DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+                        }))
+                      }
+                      ariaLabel={t("model.apiFormat")}
+                    />
+                  </label>
+                )}
                 <TextField>
                   <Label>{t("model.helpUrl")}</Label>
                   <Input
@@ -2630,10 +2708,19 @@ function AddProviderDialog({
     label: "",
     baseUrl: "",
     helpUrl: "",
+    apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
 
   useEffect(() => {
-    if (open) setForm({ id: "", label: "", baseUrl: "", helpUrl: "" });
+    if (open) {
+      setForm({
+        id: "",
+        label: "",
+        baseUrl: "",
+        helpUrl: "",
+        apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+      });
+    }
   }, [open]);
 
   const canSave = form.label.trim().length > 0 && form.baseUrl.trim().length > 0;
@@ -2720,6 +2807,24 @@ function AddProviderDialog({
                 }
               />
             </TextField>
+            <label className="select-none text-sm">
+              <span className="mb-1 block text-xs text-foreground/60">{t("model.apiFormat")}</span>
+              <SelectField
+                value={form.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT}
+                options={customProviderApiFormatOptions(t)}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    apiFormat: CUSTOM_PROVIDER_API_FORMATS.includes(
+                      value as CustomProviderApiFormat,
+                    )
+                      ? (value as CustomProviderApiFormat)
+                      : DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+                  }))
+                }
+                ariaLabel={t("model.apiFormat")}
+              />
+            </label>
             <TextField>
               <Label>{t("model.helpUrl")}</Label>
               <Input

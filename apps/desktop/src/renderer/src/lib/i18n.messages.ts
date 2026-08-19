@@ -1767,6 +1767,10 @@ const entries = {
 } as const;
 
 const zhOverrides: Dict = {
+  "model.apiFormat": "API \u683c\u5f0f",
+  "model.apiFormat.chatCompletions": "Chat Completions (/chat/completions)",
+  "model.apiFormat.responses": "Responses (/responses)",
+  "model.apiFormat.anthropicMessages": "Anthropic Messages (/v1/messages)",
   "skin.zzz": "绝区零",
   "skin.zzz.desc": "以霓虹蓝、石墨黑与黄色信号线构成的浅色战术终端。",
   "Runtime.kind.agent": "智能体",
@@ -2428,6 +2432,10 @@ const mediaZh: Dict = {
 };
 
 const enOverrides: Dict = {
+  "model.apiFormat": "API format",
+  "model.apiFormat.chatCompletions": "Chat Completions (/chat/completions)",
+  "model.apiFormat.responses": "Responses (/responses)",
+  "model.apiFormat.anthropicMessages": "Anthropic Messages (/v1/messages)",
   "agents.concurrency.title": "Subagent concurrency",
   "agents.concurrency.description":
     "Set how many child agents can run at the same time across the team. The main agent stays locked while this limit remains adjustable.",

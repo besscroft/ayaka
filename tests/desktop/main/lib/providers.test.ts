@@ -273,6 +273,114 @@ void describe("provider helpers", () => {
     }
   });
 
+  void it("persists custom provider API formats and uses protocol-specific model list auth", async () => {
+    const previousFetch = globalThis.fetch;
+    const requests: Array<{ url: string; headers: Headers }> = [];
+    globalThis.fetch = (async (input, init) => {
+      requests.push({ url: String(input), headers: new Headers(init?.headers) });
+      return new Response(JSON.stringify({ data: [{ id: "format-model" }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      for (const [apiFormat, expectedHeaders] of [
+        ["chat-completions", { authorization: "Bearer format-key" }],
+        ["responses", { authorization: "Bearer format-key" }],
+        ["anthropic-messages", { "x-api-key": "format-key", "anthropic-version": "2023-06-01" }],
+      ] as const) {
+        const provider = await providerHelpers.upsertCustomProvider({
+          id: "format-provider",
+          label: "Format Provider",
+          baseUrl: "https://format.example/v1",
+          apiFormat,
+        });
+        assert.equal(provider.apiFormat, apiFormat);
+        await providerHelpers.saveProviderApiKey("format-provider", "format-key");
+
+        const result = await providerHelpers.syncAvailableModels("format-provider");
+        assert.equal(result.discovered, 1);
+        assert.equal(requests.at(-1)?.url, "https://format.example/v1/models");
+        for (const [name, value] of Object.entries(expectedHeaders)) {
+          assert.equal(requests.at(-1)?.headers.get(name), value);
+        }
+        assert.equal(providerHelpers.getProviderConfig("format-provider")?.apiFormat, apiFormat);
+      }
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
+  void it("defaults legacy custom providers to Chat Completions", () => {
+    const catalog: ModelCatalogSettings = {
+      providers: [
+        {
+          id: "legacy-format",
+          label: "Legacy Format",
+          kind: "openai-compatible",
+          baseUrl: "https://legacy-format.example/v1",
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      models: [],
+      modelStates: [],
+    };
+    settings.set(SettingKey.ModelCatalog, JSON.stringify(catalog));
+
+    assert.equal(providerHelpers.getProviderConfig("legacy-format")?.apiFormat, "chat-completions");
+  });
+
+  void it("routes custom text models to the selected API format", async () => {
+    const previousFetch = globalThis.fetch;
+    const requests: Array<{ url: string; headers: Headers }> = [];
+    globalThis.fetch = (async (input, init) => {
+      requests.push({ url: String(input), headers: new Headers(init?.headers) });
+      return new Response("unsupported test endpoint", { status: 400 });
+    }) as typeof fetch;
+
+    try {
+      for (const [apiFormat, expectedPath, expectedHeader] of [
+        ["chat-completions", "/chat/completions", ["Authorization", "Bearer route-key"]],
+        ["responses", "/responses", ["Authorization", "Bearer route-key"]],
+        ["anthropic-messages", "/messages", ["x-api-key", "route-key"]],
+      ] as const) {
+        const providerId = `route-${apiFormat}`;
+        await providerHelpers.upsertCustomProvider({
+          id: providerId,
+          label: providerId,
+          baseUrl: "https://route.example/v1",
+          apiFormat,
+        });
+        await providerHelpers.upsertCustomModel({
+          providerId,
+          id: "route-model",
+          enabled: true,
+          capabilities,
+        });
+        await providerHelpers.saveProviderApiKey(providerId, "route-key");
+
+        const resolved = providerHelpers.resolveModel(`${providerId}/route-model`);
+        await assert.rejects(
+          (
+            resolved.model as unknown as {
+              doGenerate(options: { prompt: unknown[] }): Promise<unknown>;
+            }
+          ).doGenerate({
+            prompt: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+          }),
+        );
+
+        const request = requests.at(-1);
+        assert.equal(request?.url, `https://route.example/v1${expectedPath}`);
+        assert.equal(request?.headers.get(expectedHeader[0]), expectedHeader[1]);
+      }
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   void it("parses remote model list responses from supported providers", () => {
     const openaiModels = providerHelpers.parseOpenAIModelListResponse({
       data: [

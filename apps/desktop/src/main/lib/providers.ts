@@ -19,7 +19,9 @@ import {
 } from "./db";
 import {
   SettingKey,
+  DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   type CustomModelInput,
+  type CustomProviderApiFormat,
   type CustomProviderInput,
   type ChatToolId,
   type JsonObject,
@@ -37,6 +39,7 @@ import {
   type ProviderInfo,
   type ProviderTestResult,
   isChatReasoningLevel,
+  isCustomProviderApiFormat,
 } from "../../shared/types";
 
 type ProviderConfig = Omit<ProviderInfo, "hasApiKey" | "hasProviderApiKey">;
@@ -46,6 +49,18 @@ const DEFAULT_MODEL_TEMPERATURE = 0.7;
 const DEFAULT_MODEL_TOP_P = 1;
 const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_MODEL_CONTEXT_WINDOW = 32_000;
+
+function normalizeCustomProviderApiFormat(raw: unknown): CustomProviderApiFormat {
+  return isCustomProviderApiFormat(raw) ? raw : DEFAULT_CUSTOM_PROVIDER_API_FORMAT;
+}
+
+function getCustomProviderApiFormat(
+  provider: Pick<ProviderInfo, "source" | "apiFormat">,
+): CustomProviderApiFormat | undefined {
+  return provider.source === "custom"
+    ? normalizeCustomProviderApiFormat(provider.apiFormat)
+    : undefined;
+}
 
 const DEFAULT_CAPABILITIES: ModelCapabilities = {
   textGeneration: true,
@@ -254,6 +269,7 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
           kind: "openai-compatible" as const,
           baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
           helpUrl: normalizeOptionalUrl(provider.helpUrl),
+          apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
           createdAt: Number(provider.createdAt) || Date.now(),
           updatedAt: Number(provider.updatedAt) || Date.now(),
         }))
@@ -635,6 +651,7 @@ export function listProviders(): ProviderInfo[] {
     source: "custom",
     baseUrl: provider.baseUrl,
     helpUrl: provider.helpUrl ?? provider.baseUrl,
+    apiFormat: provider.apiFormat,
     models: [],
   }));
 
@@ -659,6 +676,7 @@ export function listManagedModels(): ManagedModelInfo[] {
       providerKind: provider.kind,
       providerSource: provider.source,
       providerBaseUrl: provider.baseUrl,
+      providerApiFormat: provider.apiFormat,
       providerHelpUrl: provider.helpUrl,
       modelId: model.id,
       modelLabel: model.label,
@@ -710,6 +728,7 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
     kind: "openai-compatible" as const,
     baseUrl,
     helpUrl: normalizeOptionalUrl(input.helpUrl),
+    apiFormat: normalizeCustomProviderApiFormat(input.apiFormat),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -1211,6 +1230,23 @@ async function fetchRemoteModels(
   provider: ProviderInfo,
   apiKey: string,
 ): Promise<RemoteModelInfo[]> {
+  const customApiFormat = getCustomProviderApiFormat(provider);
+  if (customApiFormat) {
+    if (!provider.baseUrl) throw new Error(provider.label + " base URL is not configured.");
+    const url = new URL(provider.baseUrl.replace(/\/+$/, "") + "/models");
+    const headers: Record<string, string> =
+      customApiFormat === "anthropic-messages"
+        ? {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          }
+        : { Authorization: "Bearer " + apiKey };
+    const json = await fetchJson(url, { headers });
+    return customApiFormat === "anthropic-messages"
+      ? parseAnthropicModelListResponse(json)
+      : parseOpenAIModelListResponse(json);
+  }
+
   switch (provider.kind) {
     case "openai":
     case "openai-compatible": {
@@ -1491,6 +1527,10 @@ function createMediaModel(
   modelId: string,
   kind: MediaGenerationKind,
 ): ImageModel | SpeechModel | TranscriptionModel {
+  if (getCustomProviderApiFormat(config) === "anthropic-messages") {
+    throw new Error("Custom Anthropic Messages providers do not support media generation.");
+  }
+
   switch (config.kind) {
     case "openai":
     case "openai-compatible": {
@@ -1543,6 +1583,14 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     );
   }
 
+  const customApiFormat = getCustomProviderApiFormat(config);
+  const providerOptions =
+    customApiFormat && customApiFormat !== "chat-completions"
+      ? (model.providerOptions as ProviderOptions)
+      : config.kind === "openai-compatible"
+        ? normalizeOpenAICompatibleProviderOptions(config.id, model.providerOptions)
+        : (model.providerOptions as ProviderOptions);
+
   return {
     model: createLanguageModel(config, apiKey, modelId),
     providerId,
@@ -1557,10 +1605,7 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     topP: model.topP,
     maxOutputTokens: model.maxOutputTokens,
     contextWindow: model.contextWindow,
-    providerOptions:
-      config.kind === "openai-compatible"
-        ? normalizeOpenAICompatibleProviderOptions(config.id, model.providerOptions)
-        : (model.providerOptions as ProviderOptions),
+    providerOptions,
     nativeTools: createNativeChatTools(config, apiKey, modelId, model.providerOptions),
     countInputTokens:
       config.kind === "openai"
@@ -1603,6 +1648,30 @@ async function countOpenAIInputTokens(
 }
 
 function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: string): LanguageModel {
+  const customApiFormat = getCustomProviderApiFormat(config);
+  if (customApiFormat) {
+    if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
+    switch (customApiFormat) {
+      case "chat-completions":
+        return createOpenAICompatible({
+          apiKey,
+          baseURL: config.baseUrl,
+          name: config.id,
+          includeUsage: true,
+        })(modelId);
+      case "responses":
+        return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id }).responses(
+          modelId,
+        );
+      case "anthropic-messages":
+        return createAnthropic({
+          apiKey,
+          baseURL: config.baseUrl,
+          name: config.id,
+        }).messages(modelId);
+    }
+  }
+
   switch (config.kind) {
     case "openai":
       return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id })(modelId);

@@ -1625,6 +1625,20 @@ export interface SyncState {
 export type ModelProviderKind = "openai" | "openai-compatible" | "anthropic" | "google";
 export type ModelCatalogSource = "builtin" | "custom";
 
+export const CUSTOM_PROVIDER_API_FORMATS = [
+  "chat-completions",
+  "responses",
+  "anthropic-messages",
+] as const;
+
+export type CustomProviderApiFormat = (typeof CUSTOM_PROVIDER_API_FORMATS)[number];
+
+export const DEFAULT_CUSTOM_PROVIDER_API_FORMAT: CustomProviderApiFormat = "chat-completions";
+
+export function isCustomProviderApiFormat(value: unknown): value is CustomProviderApiFormat {
+  return (CUSTOM_PROVIDER_API_FORMATS as readonly unknown[]).includes(value);
+}
+
 export type JsonObject = Record<string, unknown>;
 
 export const CHAT_REASONING_LEVELS = [
@@ -1701,6 +1715,8 @@ export interface ProviderInfo {
   models: ModelOption[];
   helpUrl: string;
   baseUrl?: string;
+  /** Text API protocol used by custom providers. Built-in providers use fixed adapters. */
+  apiFormat?: CustomProviderApiFormat;
   /** Provider-level or legacy model-level API key is available. */
   hasApiKey: boolean;
   /** A provider-level API key is configured. */
@@ -1712,6 +1728,7 @@ export interface CustomProviderInput {
   label: string;
   baseUrl: string;
   helpUrl?: string;
+  apiFormat?: CustomProviderApiFormat;
 }
 
 export interface CustomModelInput {
@@ -1738,6 +1755,7 @@ export interface ModelCatalogSettings {
     kind: "openai-compatible";
     baseUrl: string;
     helpUrl?: string;
+    apiFormat?: CustomProviderApiFormat;
     createdAt: number;
     updatedAt: number;
   }>;
@@ -1774,6 +1792,7 @@ export interface ManagedModelInfo {
   providerKind: ModelProviderKind;
   providerSource: ModelCatalogSource;
   providerBaseUrl?: string;
+  providerApiFormat?: CustomProviderApiFormat;
   providerHelpUrl: string;
   modelId: string;
   modelLabel?: string;
