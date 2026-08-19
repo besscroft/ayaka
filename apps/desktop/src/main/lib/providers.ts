@@ -268,7 +268,6 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
           label: String(provider.label ?? "").trim(),
           kind: "openai-compatible" as const,
           baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
-          helpUrl: normalizeOptionalUrl(provider.helpUrl),
           apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
           createdAt: Number(provider.createdAt) || Date.now(),
           updatedAt: Number(provider.updatedAt) || Date.now(),
@@ -377,16 +376,6 @@ function normalizeBaseUrl(raw: string): string {
     throw new Error("Base URL must start with http:// or https://");
   }
   return url.toString().replace(/\/+$/, "");
-}
-
-function normalizeOptionalUrl(raw: unknown): string | undefined {
-  const text = primitiveToString(raw).trim();
-  if (!text) return undefined;
-  const url = new URL(text);
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Help URL must start with http:// or https://");
-  }
-  return url.toString();
 }
 
 function primitiveToString(raw: unknown): string {
@@ -650,7 +639,6 @@ export function listProviders(): ProviderInfo[] {
     kind: provider.kind,
     source: "custom",
     baseUrl: provider.baseUrl,
-    helpUrl: provider.helpUrl ?? provider.baseUrl,
     apiFormat: provider.apiFormat,
     models: [],
   }));
@@ -727,7 +715,6 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
     label,
     kind: "openai-compatible" as const,
     baseUrl,
-    helpUrl: normalizeOptionalUrl(input.helpUrl),
     apiFormat: normalizeCustomProviderApiFormat(input.apiFormat),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,

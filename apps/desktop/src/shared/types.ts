@@ -1713,7 +1713,8 @@ export interface ProviderInfo {
   kind: ModelProviderKind;
   source: ModelCatalogSource;
   models: ModelOption[];
-  helpUrl: string;
+  /** API-key help link for built-in providers. Custom providers do not store one. */
+  helpUrl?: string;
   baseUrl?: string;
   /** Text API protocol used by custom providers. Built-in providers use fixed adapters. */
   apiFormat?: CustomProviderApiFormat;
@@ -1727,7 +1728,6 @@ export interface CustomProviderInput {
   id?: string;
   label: string;
   baseUrl: string;
-  helpUrl?: string;
   apiFormat?: CustomProviderApiFormat;
 }
 
@@ -1754,7 +1754,6 @@ export interface ModelCatalogSettings {
     label: string;
     kind: "openai-compatible";
     baseUrl: string;
-    helpUrl?: string;
     apiFormat?: CustomProviderApiFormat;
     createdAt: number;
     updatedAt: number;
@@ -1793,7 +1792,8 @@ export interface ManagedModelInfo {
   providerSource: ModelCatalogSource;
   providerBaseUrl?: string;
   providerApiFormat?: CustomProviderApiFormat;
-  providerHelpUrl: string;
+  /** API-key help link for built-in providers. Custom providers do not expose one. */
+  providerHelpUrl?: string;
   modelId: string;
   modelLabel?: string;
   modelSource: ModelCatalogSource;

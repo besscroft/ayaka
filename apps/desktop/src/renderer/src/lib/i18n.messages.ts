@@ -801,10 +801,6 @@ const entries = {
     zh: "未找到自定义服务商",
     en: "Custom provider not found",
   },
-  "error.provider.helpUrlProtocol": {
-    zh: "API Key 页面必须以 http:// 或 https:// 开头",
-    en: "API Key page must start with http:// or https://",
-  },
   "error.provider.invalidModelReference": {
     zh: "模型引用无效，应为 provider/model 格式",
     en: "Invalid model reference. Use provider/model format",
@@ -896,7 +892,6 @@ const entries = {
   "model.editModel.desc": { zh: "修改模型配置", en: "Edit model configuration" },
   "model.empty": { zh: "暂无模型", en: "No models yet" },
   "model.enabled": { zh: "已启用", en: "Enabled" },
-  "model.helpUrl": { zh: "帮助链接", en: "Help URL" },
   "model.maxTokens": { zh: "最大 Token", en: "Max tokens" },
   "model.maxTokens.hint": { zh: "单次回复的最大 token 数", en: "Max tokens per response" },
   "model.modelId": { zh: "模型 ID", en: "Model ID" },
@@ -921,7 +916,6 @@ const entries = {
     zh: "https://api.example.com/v1",
     en: "https://api.example.com/v1",
   },
-  "model.placeholder.helpUrl": { zh: "https://docs.example.com", en: "https://docs.example.com" },
   "model.placeholder.modelId": { zh: "例如 gpt-5", en: "e.g. gpt-5" },
   "model.placeholder.modelName": { zh: "显示名称", en: "Display name" },
   "model.placeholder.providerId": { zh: "小写英文标识", en: "lowercase identifier" },

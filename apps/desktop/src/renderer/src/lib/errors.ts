@@ -135,8 +135,6 @@ function mapKnownError(rawMessage: string, locale: ErrorLocale, status?: number)
 
   if (lower.includes("base url must start with"))
     return text(locale, "error.provider.baseUrlProtocol");
-  if (lower.includes("help url must start with"))
-    return text(locale, "error.provider.helpUrlProtocol");
   if (lower === "provider id is required") return text(locale, "error.provider.providerIdRequired");
   if (lower === "built-in providers cannot be overwritten")
     return text(locale, "error.provider.builtinOverwrite");

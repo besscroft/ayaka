@@ -1360,7 +1360,6 @@ function ModelEditorDialog({
     id: "",
     label: "",
     baseUrl: "",
-    helpUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
   const [modelForm, setModelForm] = useState<ModelFormState>(() =>
@@ -1377,7 +1376,6 @@ function ModelEditorDialog({
         id: model.providerId,
         label: model.providerLabel,
         baseUrl: model.providerBaseUrl ?? "",
-        helpUrl: model.providerHelpUrl,
         apiFormat: model.providerApiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       });
       setModelForm({
@@ -1399,7 +1397,6 @@ function ModelEditorDialog({
       id: "",
       label: "",
       baseUrl: "",
-      helpUrl: "",
       apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     });
     setModelForm(createEmptyModelForm(providers[0]?.id ?? ""));
@@ -1414,11 +1411,13 @@ function ModelEditorDialog({
 
   const isEditing = mode === "edit";
   const canEditProvider = isEditing && model?.providerSource === "custom";
-  const providerHelpUrl = isEditing
-    ? providerForm.helpUrl || model?.providerHelpUrl
-    : addMode === "custom"
-      ? providerForm.helpUrl
-      : providers.find((provider) => provider.id === modelForm.providerId)?.helpUrl;
+  const providerHelpUrl = (
+    isEditing
+      ? providers.find((provider) => provider.id === model?.providerId)
+      : addMode === "existing"
+        ? providers.find((provider) => provider.id === modelForm.providerId)
+        : undefined
+  )?.helpUrl;
 
   const canSave =
     modelForm.id.trim().length > 0 &&
@@ -1616,19 +1615,6 @@ function ModelEditorDialog({
                     ariaLabel={t("model.apiFormat")}
                   />
                 </label>
-                <TextField>
-                  <Label>{t("model.helpUrl")}</Label>
-                  <Input
-                    value={providerForm.helpUrl ?? ""}
-                    placeholder={t("model.placeholder.helpUrl")}
-                    onChange={(e) =>
-                      setProviderForm((prev) => ({
-                        ...prev,
-                        helpUrl: (e.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
               </>
             )}
 
@@ -1901,7 +1887,6 @@ function ProviderModelWorkbench({
     id: "",
     label: "",
     baseUrl: "",
-    helpUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
   const [providerApiKey, setProviderApiKey] = useState("");
@@ -1958,13 +1943,11 @@ function ProviderModelWorkbench({
       id: selectedProvider.id,
       label: selectedProvider.label,
       baseUrl: selectedProvider.baseUrl ?? "",
-      helpUrl: selectedProvider.helpUrl,
       apiFormat: selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     });
     setProviderApiKey("");
   }, [
     selectedProvider?.baseUrl,
-    selectedProvider?.helpUrl,
     selectedProvider?.id,
     selectedProvider?.label,
     selectedProvider?.apiFormat,
@@ -2069,7 +2052,6 @@ function ProviderModelWorkbench({
         id: selectedProvider.id,
         label: providerForm.label,
         baseUrl: providerForm.baseUrl,
-        helpUrl: providerForm.helpUrl,
         apiFormat: providerForm.apiFormat,
       });
 
@@ -2462,20 +2444,6 @@ function ProviderModelWorkbench({
                     />
                   </label>
                 )}
-                <TextField>
-                  <Label>{t("model.helpUrl")}</Label>
-                  <Input
-                    className="select-text"
-                    value={providerForm.helpUrl ?? ""}
-                    disabled={!canEditProvider}
-                    onChange={(event) =>
-                      setProviderForm((prev) => ({
-                        ...prev,
-                        helpUrl: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
                 <TextField className="md:col-span-2">
                   <Label>{t("model.apiKey")}</Label>
                   <Input
@@ -2707,7 +2675,6 @@ function AddProviderDialog({
     id: "",
     label: "",
     baseUrl: "",
-    helpUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
 
@@ -2717,7 +2684,6 @@ function AddProviderDialog({
         id: "",
         label: "",
         baseUrl: "",
-        helpUrl: "",
         apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       });
     }
@@ -2825,20 +2791,6 @@ function AddProviderDialog({
                 ariaLabel={t("model.apiFormat")}
               />
             </label>
-            <TextField>
-              <Label>{t("model.helpUrl")}</Label>
-              <Input
-                className="select-text"
-                value={form.helpUrl ?? ""}
-                placeholder={t("model.placeholder.helpUrl")}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    helpUrl: (event.target as HTMLInputElement).value,
-                  }))
-                }
-              />
-            </TextField>
           </div>
         </div>
         <DialogFooter>

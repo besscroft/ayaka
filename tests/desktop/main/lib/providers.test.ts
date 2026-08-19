@@ -147,7 +147,6 @@ void describe("provider helpers", () => {
           label: "Legacy SiliconFlow",
           kind: "openai-compatible",
           baseUrl: "https://legacy.example/v1",
-          helpUrl: "https://legacy.example/keys",
           createdAt: 1,
           updatedAt: 1,
         },
@@ -189,7 +188,6 @@ void describe("provider helpers", () => {
       id: "siliconflow-cn",
       label: "Updated SiliconFlow",
       baseUrl: "https://updated.example/v1/",
-      helpUrl: "https://updated.example/keys",
     });
     assert.equal(provider.source, "custom");
     assert.equal(provider.label, "Updated SiliconFlow");
@@ -297,6 +295,7 @@ void describe("provider helpers", () => {
           apiFormat,
         });
         assert.equal(provider.apiFormat, apiFormat);
+        assert.equal(provider.helpUrl, undefined);
         await providerHelpers.saveProviderApiKey("format-provider", "format-key");
 
         const result = await providerHelpers.syncAvailableModels("format-provider");
