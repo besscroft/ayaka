@@ -1,6 +1,6 @@
 {
   "name": "ayaka-desktop",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "Ayaka 是一个本地优先的 AI 桌面工作台",
   "homepage": "https://ai.zzzvoid.com/",
   "author": "Bess Croft",
@@ -19,6 +19,7 @@
     "setup": "pnpm install && pnpm run rebuild:native",
     "dev": "pnpm run rebuild:native && electron-vite dev",
     "build": "pnpm run rebuild:native && npm run typecheck && electron-vite build",
+    "verify:renderer-css": "node scripts/verify-renderer-css.mjs",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",

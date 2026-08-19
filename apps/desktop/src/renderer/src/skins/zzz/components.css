@@ -1264,7 +1264,8 @@
       transparent
     );
   transform: translateY(-50%);
-  translate: none;
+  /* Keep this independent translate reset intact through production CSS minification. */
+  translate: none !important;
   transition: inset-inline-start 200ms ease;
 }
 

@@ -357,7 +357,7 @@ void describe("skin CSS contract", () => {
     assert.match(switchCss, /inset\s+0\s+0\s+0\s+4px\s+var\(--skin-switch-background\)/);
     assert.match(switchCss, /conic-gradient/);
     assert.match(switchCss, /radial-gradient/);
-    assert.match(switchCss, /translate:\s*none/);
+    assert.match(switchCss, /translate:\s*none\s*!important/);
     assert.match(switchCss, /content:\s*["']OFF["']/);
     assert.match(switchCss, /content:\s*["']ON["']/);
     assert.match(switchCss, /data-checked/);
