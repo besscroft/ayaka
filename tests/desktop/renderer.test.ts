@@ -17,6 +17,7 @@ import "./renderer/lib/agent-drawer-model.test.ts";
 import "./renderer/lib/changelog.test.ts";
 import "./renderer/lib/chat-media.test.ts";
 import "./renderer/lib/chat-messages.test.ts";
+import "./renderer/lib/conversation-workspace.test.ts";
 import "./renderer/lib/chat-persistence.test.ts";
 import "./renderer/lib/chat-reconciliation.test.ts";
 import "./renderer/lib/chat-retry.test.ts";

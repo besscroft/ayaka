@@ -279,15 +279,17 @@ export function AgentStatusWidget({
 
   return (
     <motion.aside
-      initial={false}
-      animate={{ width: open ? 320 : 40 }}
+      initial={open ? { width: 0, opacity: 0 } : false}
+      animate={{ width: open ? 320 : 80 }}
+      exit={open ? { width: 0, opacity: 0 } : { opacity: 0 }}
       transition={
         reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34, mass: 0.8 }
       }
       className={cn(
-        "absolute inset-y-0 right-0 z-40 flex max-w-[calc(100vw-2.5rem)] shrink-0 overflow-hidden border-l border-border bg-background",
-        "lg:relative lg:z-10",
-        open && "shadow-lg",
+        "max-w-[calc(100vw-2.5rem)] min-w-0 shrink-0 overflow-hidden",
+        open
+          ? "relative h-full border-l border-border bg-background shadow-lg"
+          : "relative h-10 border-l-0 bg-transparent",
       )}
       data-open={open}
       role="complementary"
@@ -407,18 +409,39 @@ export function AgentStatusWidget({
           ) : null}
         </div>
       ) : (
-        <button
-          type="button"
-          className="flex h-full select-none w-10 flex-col items-center gap-2 border-0 bg-background px-2 py-3 text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
-          onClick={() => onOpenChange(true)}
-          aria-label={t("agentStatus.open")}
-          aria-expanded={false}
-          title={t("agentStatus.open")}
+        <div
+          className="flex h-full items-center gap-1 px-1"
+          data-slot="agent-status-toolbar"
+          role="group"
+          aria-label={title}
         >
-          <StatusIcon status={status} />
-          <IconPanelRightOpen className="size-4" aria-hidden="true" />
-          <span className="sr-only">{title}</span>
-        </button>
+          <button
+            type="button"
+            className="relative flex size-8 shrink-0 items-center justify-center rounded-md text-foreground/50"
+            data-slot="agent-status-indicator"
+            data-icon-only="true"
+            data-icon-tone="neutral"
+            onClick={() => onOpenChange(true)}
+            aria-label={t("agentStatus.open")}
+            aria-expanded={false}
+            title={title}
+          >
+            <StatusIcon status={status} />
+          </button>
+          <button
+            type="button"
+            className="relative flex size-8 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+            data-slot="agent-status-toggle"
+            data-icon-only="true"
+            data-icon-tone="neutral"
+            onClick={() => onOpenChange(true)}
+            aria-label={t("agentStatus.open")}
+            aria-expanded={false}
+            title={t("agentStatus.open")}
+          >
+            <IconPanelRightOpen className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       )}
     </motion.aside>
   );

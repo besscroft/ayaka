@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
+import { AnimatePresence } from "motion/react";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { McpInputDialog } from "./McpWorkspace";
@@ -64,6 +65,7 @@ import { chatSessionRegistry, type ChatSessionFinishEvent } from "../lib/chat-se
 import { createIncrementalTokenCache } from "../lib/chat-token-cache";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
+import { getConversationWorkspaceForHeader } from "../lib/conversation-workspace";
 import {
   ConversationStatus,
   PromptSuggestions,
@@ -428,6 +430,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     const alreadyHydrated = session.hydrated;
     setHydrationState("loading");
     hydrationStateRef.current = "loading";
+    setIsPersistedConversation(false);
+    setWorkspace(null);
     setChatError(alreadyHydrated ? session.errorMessage : null);
     setChatErrorRetryable(alreadyHydrated ? session.errorRetryable : false);
     setIsStopped(alreadyHydrated ? session.isStopped : false);
@@ -467,8 +471,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     void api.conversations
       .get(conversationId)
       .then((conversation) => {
+        if (cancelled) return null;
         if (!conversation) {
-          if (cancelled) return;
           latestMessagesRef.current = [];
           lastNonEmptyMessagesRef.current = [];
           explicitEmptyMessagesRef.current = true;
@@ -481,7 +485,9 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         }
         loadedConversationTitle = conversation.title;
         setIsPersistedConversation(true);
-        void api.workspace.get(conversationId).then(setWorkspace);
+        void api.workspace.get(conversationId).then((nextWorkspace) => {
+          if (!cancelled) setWorkspace(nextWorkspace);
+        });
         return api.messages.list(conversationId);
       })
       .then((snapshot) => {
@@ -1242,77 +1248,93 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }
 
   const isEmpty = renderedMessages.length === 0 && !isLoading;
+  const renderAgentStatusWidget = (open: boolean) => (
+    <AgentStatusWidget
+      key={open ? "expanded" : "collapsed"}
+      conversationId={conversationId}
+      snapshot={runtimeSnapshot}
+      profiles={agentProfiles}
+      providers={providers}
+      selectedModel={selectedModel}
+      reasoningLevel={reasoningLevel}
+      toolSelection={toolSelection}
+      tools={toolsSnapshot}
+      chatStatus={statusKind}
+      isChatActive={isChatLoading}
+      open={open}
+      onOpenChange={setRuntimePanelOpen}
+      onStop={handleStop}
+    />
+  );
 
   return (
-    <div data-page="chat-page" className="relative flex flex-1 flex-col overflow-hidden">
-      <ChatHeader status={statusKind} workspace={workspace} />
-
-      <div className="relative flex min-h-0 flex-1">
-        <main
-          data-slot="chat-main"
-          className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
-        >
-          {isEmpty ? (
-            <EmptyState
-              title={t("chat.empty.title")}
-              subtitle={t("chat.empty.subtitle")}
-              suggestions={starterSuggestions}
-              loading={starterLoading}
-              onSuggestion={handleSuggestion}
-            />
-          ) : (
-            <MessageList
-              conversationId={conversationId}
-              messages={renderedMessages}
-              isLoading={isLoading}
-              status={statusKind}
-              error={chat.error}
-              errorDetail={chatError}
-              emptySuggestions={starterSuggestions}
-              followupSuggestions={followupSuggestions}
-              onRetry={chatErrorRetryable ? handleRetry : undefined}
-              onDismissError={handleDismissError}
-              onEditMessage={handleEditMessage}
-              onResendMessage={handleResendMessage}
-              onDeleteMessage={handleDeleteMessage}
-              onToolApprovalResponse={chat.addToolApprovalResponse}
-              onSuggestion={handleSuggestion}
-            />
-          )}
-
-          <MessageInput
-            conversationId={conversationId}
-            isLoading={isLoading}
-            isRunActive={isAgentRunActive}
-            onSend={handleSend}
-            onStop={isAgentRunActive ? handleStop : undefined}
-            selectedModel={selectedModel}
-            reasoningLevel={reasoningLevel}
-            onModelChange={setSelectedModel}
-            onReasoningLevelChange={setReasoningLevel}
-            toolSelection={toolSelection}
-            onToolSelectionChange={handleToolSelectionChange}
-            providers={providers}
-            contextMetrics={contextMetrics}
-          />
-        </main>
-
-        <AgentStatusWidget
-          conversationId={conversationId}
-          snapshot={runtimeSnapshot}
-          profiles={agentProfiles}
-          providers={providers}
-          selectedModel={selectedModel}
-          reasoningLevel={reasoningLevel}
-          toolSelection={toolSelection}
-          tools={toolsSnapshot}
-          chatStatus={statusKind}
-          isChatActive={isChatLoading}
-          open={runtimePanelOpen}
-          onOpenChange={setRuntimePanelOpen}
-          onStop={handleStop}
+    <div data-page="chat-page" className="relative flex min-w-0 flex-1 overflow-hidden">
+      <div data-slot="chat-surface" className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <ChatHeader
+          status={statusKind}
+          workspace={getConversationWorkspaceForHeader(workspace, conversationId)}
+          agentStatus={
+            <AnimatePresence initial={false}>
+              {runtimePanelOpen ? null : renderAgentStatusWidget(false)}
+            </AnimatePresence>
+          }
         />
+
+        <div className="relative flex min-h-0 flex-1">
+          <main
+            data-slot="chat-main"
+            className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
+          >
+            {isEmpty ? (
+              <EmptyState
+                title={t("chat.empty.title")}
+                subtitle={t("chat.empty.subtitle")}
+                suggestions={starterSuggestions}
+                loading={starterLoading}
+                onSuggestion={handleSuggestion}
+              />
+            ) : (
+              <MessageList
+                conversationId={conversationId}
+                messages={renderedMessages}
+                isLoading={isLoading}
+                status={statusKind}
+                error={chat.error}
+                errorDetail={chatError}
+                emptySuggestions={starterSuggestions}
+                followupSuggestions={followupSuggestions}
+                onRetry={chatErrorRetryable ? handleRetry : undefined}
+                onDismissError={handleDismissError}
+                onEditMessage={handleEditMessage}
+                onResendMessage={handleResendMessage}
+                onDeleteMessage={handleDeleteMessage}
+                onToolApprovalResponse={chat.addToolApprovalResponse}
+                onSuggestion={handleSuggestion}
+              />
+            )}
+
+            <MessageInput
+              conversationId={conversationId}
+              isLoading={isLoading}
+              isRunActive={isAgentRunActive}
+              onSend={handleSend}
+              onStop={isAgentRunActive ? handleStop : undefined}
+              selectedModel={selectedModel}
+              reasoningLevel={reasoningLevel}
+              onModelChange={setSelectedModel}
+              onReasoningLevelChange={setReasoningLevel}
+              toolSelection={toolSelection}
+              onToolSelectionChange={handleToolSelectionChange}
+              providers={providers}
+              contextMetrics={contextMetrics}
+            />
+          </main>
+        </div>
       </div>
+
+      <AnimatePresence initial={false}>
+        {runtimePanelOpen ? renderAgentStatusWidget(true) : null}
+      </AnimatePresence>
       <McpInputDialog request={mcpInputRequest} onClose={() => setMcpInputRequest(null)} />
     </div>
   );
@@ -1323,19 +1345,20 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 interface ChatHeaderProps {
   status: ConversationStatusKind;
   workspace: import("@shared/types").WorkspaceInfo | null;
+  agentStatus: React.ReactNode;
 }
 
 /**
  * 澶撮儴鍙睍绀?瀵硅瘽鍚?+ 鐘舵€佸窘绔?锛涗笂涓嬫枃鐢ㄩ噺宸茶縼鑷宠緭鍏ユ鐨?ContextPopover銆?
  */
-function ChatHeader({ status, workspace }: ChatHeaderProps): React.JSX.Element {
+function ChatHeader({ status, workspace, agentStatus }: ChatHeaderProps): React.JSX.Element {
   const { t } = useT();
   return (
     <header
-      className="relative z-30 flex shrink-0 select-none items-center border-b border-border px-4 py-2.5 sm:px-6"
+      className="relative z-30 flex shrink-0 select-none items-center justify-between gap-3 border-b border-border px-4 py-2.5 sm:px-6"
       data-streaming={status === "streaming" || status === "submitted"}
     >
-      <div className="flex min-w-0 items-center gap-2.5 lg:min-h-9">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:min-h-9">
         <span
           className="flex size-2 shrink-0 rounded-full bg-success/80 ring-2 ring-success/20"
           aria-hidden
@@ -1357,6 +1380,7 @@ function ChatHeader({ status, workspace }: ChatHeaderProps): React.JSX.Element {
           <span className="text-xs text-muted-foreground">{t("workspace.notCreated")}</span>
         )}
       </div>
+      {agentStatus ? <div className="-mr-2 shrink-0 sm:-mr-3">{agentStatus}</div> : null}
     </header>
   );
 }

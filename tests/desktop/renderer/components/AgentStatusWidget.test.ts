@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { RuntimeRun, RuntimeStep } from "@shared/types";
+import { DEFAULT_CHAT_TOOL_SELECTION, type RuntimeRun, type RuntimeStep } from "@shared/types";
 import {
+  AgentStatusWidget,
   getRecentRuntimeSteps,
   formatElapsed,
   resolveAgentPanelStatus,
@@ -107,5 +108,57 @@ void describe("agent status widget runtime helpers", () => {
     assert.match(html, /border-primary\/25/);
     assert.match(html, /border-t-primary/);
     assert.doesNotMatch(html, /border-accent/);
+  });
+
+  void it("keeps the collapsed status controls horizontal and centered in the chat header", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentStatusWidget, {
+        conversationId: "conversation-1",
+        snapshot: null,
+        profiles: [],
+        providers: [],
+        selectedModel: null,
+        reasoningLevel: "provider-default",
+        toolSelection: DEFAULT_CHAT_TOOL_SELECTION,
+        tools: null,
+        chatStatus: "ready",
+        isChatActive: false,
+        open: false,
+        onOpenChange: () => undefined,
+        onStop: () => undefined,
+      }),
+    );
+
+    assert.match(html, /data-slot="agent-status-toolbar"/);
+    assert.match(html, /<button[^>]*data-slot="agent-status-indicator"/);
+    assert.match(html, /data-slot="agent-status-toggle"/);
+    assert.match(html, /class="flex h-full items-center gap-1 px-1"/);
+    assert.match(html, /relative h-10 border-l-0 bg-transparent/);
+    assert.doesNotMatch(html, /top-1\/2|translate-y-1\/2/);
+    assert.match(html, /border-l-0 bg-transparent/);
+  });
+
+  void it("joins the chat layout instead of floating when expanded", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentStatusWidget, {
+        conversationId: "conversation-1",
+        snapshot: null,
+        profiles: [],
+        providers: [],
+        selectedModel: null,
+        reasoningLevel: "provider-default",
+        toolSelection: DEFAULT_CHAT_TOOL_SELECTION,
+        tools: null,
+        chatStatus: "ready",
+        isChatActive: false,
+        open: true,
+        onOpenChange: () => undefined,
+        onStop: () => undefined,
+      }),
+    );
+
+    assert.match(html, /data-open="true"/);
+    assert.match(html, /class="[^"]*relative h-full[^"]*shadow-lg/);
+    assert.doesNotMatch(html, /absolute right-0 top-0 z-40 h-10/);
   });
 });
