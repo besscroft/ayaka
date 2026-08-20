@@ -78,13 +78,13 @@
 
 :root[data-skin="zzz"] [data-slot="window-controls"] .window-control-button:hover,
 :root[data-skin="zzz"] [data-slot="window-controls"] .window-control-button:focus-visible {
-  background: var(--skin-signal-info);
+  background: transparent;
   color: #ffffff;
 }
 
 :root[data-skin="zzz"] [data-slot="window-controls"] .window-close-button:hover,
 :root[data-skin="zzz"] [data-slot="window-controls"] .window-close-button:focus-visible {
-  background: var(--danger);
+  background: transparent;
   color: var(--danger-foreground);
 }
 
@@ -2363,6 +2363,11 @@
   background: transparent;
   color: var(--zzz-button-foreground);
   outline: none;
+}
+
+:root[data-skin="zzz"] [data-slot="window-controls"] [data-slot="window-control"] {
+  flex-basis: 2.5rem;
+  min-width: 2.5rem;
 }
 
 :root[data-skin="zzz"]

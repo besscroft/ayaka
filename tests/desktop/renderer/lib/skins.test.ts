@@ -288,6 +288,16 @@ void describe("skin CSS contract", () => {
     assert.match(css, /data-slot=["']window-sidebar-toggle["']/);
     assert.match(css, /flex:\s*0\s+0\s+2\.75rem/);
     assert.match(css, /window-control[\s\S]*min-width:\s*2\.75rem/);
+    assert.match(css, /window-controls[\s\S]*window-control[\s\S]*flex-basis:\s*2\.5rem/);
+    assert.match(css, /window-controls[\s\S]*window-control[\s\S]*min-width:\s*2\.5rem/);
+    assert.match(
+      css,
+      /window-controls[\s\S]*window-control-button:hover[\s\S]*background:\s*transparent/,
+    );
+    assert.match(
+      css,
+      /window-controls[\s\S]*window-close-button:hover[\s\S]*background:\s*transparent/,
+    );
     assert.match(css, /window-control[\s\S]*width:\s*2rem[\s\S]*height:\s*2rem/);
     assert.match(css, /window-control[\s\S]*transform:\s*translate\(-50%,\s*-50%\)/);
   });
