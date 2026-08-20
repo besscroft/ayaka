@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.1.31]
+
+### 中文
+
+#### 新增
+
+- 新增自定义服务商 API 协议格式选择，支持 Chat Completions、Responses 和 Anthropic Messages，并完善类型校验、本地化文案与请求路由。
+
+#### 变更
+
+- 优化对话工作区处理，切换会话时仅在聊天头部显示当前会话的工作区信息。
+- 重构聊天页面布局，将智能体状态面板整合到聊天头部，支持更自然的折叠、展开动画与布局适配。
+- 优化虚拟消息列表渲染，提取可复用的渲染逻辑，减少切换会话时的渲染异常。
+- 移除自定义服务商的帮助链接配置与相关界面，保留内置服务商的帮助链接。
+- 优化绝区零主题窗口控件的尺寸及交互样式。
+
+#### 修复
+
+- 修复生产环境 CSS 压缩导致绝区零主题开关位置偏移的问题。
+
+### English
+
+#### Added
+
+- Added custom-provider API format selection for Chat Completions, Responses, and Anthropic Messages, with matching type validation, localized copy, and request routing.
+
+#### Changed
+
+- Improved conversation workspace handling so the chat header only shows the workspace for the current conversation.
+- Restructured the chat layout by integrating the agent-status panel into the chat header with smoother collapse, expansion, and responsive layout behavior.
+- Improved virtualized message-list rendering with reusable render-item logic to reduce rendering issues when switching conversations.
+- Removed custom-provider help-link configuration and related UI while preserving help links for built-in providers.
+- Improved ZZZ skin window-control sizing and interaction styles.
+
+#### Fixed
+
+- Fixed ZZZ skin switch positioning being offset after production CSS minification.
+
 ## [0.1.30]
 
 ### 中文
