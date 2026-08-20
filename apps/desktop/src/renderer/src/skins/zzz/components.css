@@ -640,7 +640,8 @@
   :is([data-slot="model-selector-content"], [data-slot="reasoning-selector-content"]) {
   position: absolute;
   isolation: isolate;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 3px solid #000000;
   border-radius: 20px 0 20px 20px;
   outline: 3px solid rgb(66 66 66 / 66%);

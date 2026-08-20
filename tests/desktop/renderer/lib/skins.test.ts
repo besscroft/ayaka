@@ -182,6 +182,21 @@ void describe("skin CSS contract", () => {
     }
   });
 
+  void it("keeps ZZZ model and reasoning selectors vertically scrollable", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const selectorStart = css.indexOf(
+      ':root[data-skin="zzz"]\n  :is([data-slot="model-selector-content"], [data-slot="reasoning-selector-content"]) {',
+    );
+    const selectorEnd = css.indexOf("\n}", selectorStart);
+    const selectorCss = css.slice(selectorStart, selectorEnd);
+
+    assert.ok(selectorStart >= 0);
+    assert.ok(selectorEnd > selectorStart);
+    assert.match(selectorCss, /overflow-x:\s*hidden/);
+    assert.match(selectorCss, /overflow-y:\s*auto/);
+    assert.doesNotMatch(selectorCss, /overflow:\s*hidden/);
+  });
+
   void it("uses a compact radius for every ZZZ multiline field", () => {
     const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
     assert.match(
