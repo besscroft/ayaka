@@ -9,9 +9,12 @@ import {
   validateMcpPresetDefinition,
 } from "@desktop-main/lib/mcp-presets";
 
-test("ships the reviewed filesystem MCP preset from JSON", () => {
+test("ships the reviewed MCP presets from JSON", () => {
   assert.deepEqual(MCP_PRESETS, rawMcpPresets);
-  assert.equal(MCP_PRESETS.length, 1);
+  assert.deepEqual(
+    MCP_PRESETS.map((preset) => preset.id),
+    ["filesystem", "feishu", "dingtalk", "vercel", "supabase", "sequential-thinking"],
+  );
   assert.equal(MCP_PRESETS[0]?.id, "filesystem");
   assert.equal(MCP_PRESETS[0]?.transport, "stdio");
   assert.deepEqual(MCP_PRESETS[0]?.args, [
@@ -19,10 +22,20 @@ test("ships the reviewed filesystem MCP preset from JSON", () => {
     "@modelcontextprotocol/server-filesystem",
     "/path/to/folder",
   ]);
+  const feishu = MCP_PRESETS.find((preset) => preset.id === "feishu");
+  assert.deepEqual(feishu?.secretKeys, ["APP_ID", "APP_SECRET"]);
+  assert.deepEqual(feishu?.env, {
+    APP_ID: "$secret:APP_ID",
+    APP_SECRET: "$secret:APP_SECRET",
+  });
+  const dingtalk = MCP_PRESETS.find((preset) => preset.id === "dingtalk");
+  assert.equal(dingtalk?.env?.ACTIVE_PROFILES, "dingtalk-contacts,dingtalk-calendar");
+  assert.equal(MCP_PRESETS.find((preset) => preset.id === "vercel")?.transport, "http");
+  assert.equal(MCP_PRESETS.find((preset) => preset.id === "supabase")?.transport, "http");
   const result = searchMcpPresets({ page: 1, pageSize: 24 });
   assert.deepEqual(
     result.items.map((item) => item.externalId),
-    ["filesystem"],
+    ["filesystem", "dingtalk", "feishu", "sequential-thinking", "supabase", "vercel"],
   );
   assert.equal(result.hasMore, false);
 });

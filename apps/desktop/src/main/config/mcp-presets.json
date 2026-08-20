@@ -13,5 +13,80 @@
     "warnings": [
       "请将 /path/to/folder 替换为实际允许访问的目录，并在启用前确认命令、参数和目录权限。"
     ]
+  },
+  {
+    "id": "feishu",
+    "name": "飞书",
+    "description": "访问飞书文档、日历、消息与 OpenAPI。",
+    "version": "0.5.1",
+    "author": "Ayaka",
+    "category": "沟通协作",
+    "tags": ["Feishu", "Lark"],
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@larksuiteoapi/lark-mcp@0.5.1", "mcp"],
+    "env": {
+      "APP_ID": "$secret:APP_ID",
+      "APP_SECRET": "$secret:APP_SECRET"
+    },
+    "secretKeys": ["APP_ID", "APP_SECRET"],
+    "warnings": ["需要 App ID 与 App Secret。请确认命令、参数和权限后，在审查窗口输入密钥并启用。"]
+  },
+  {
+    "id": "dingtalk",
+    "name": "钉钉",
+    "description": "管理联系人、日历、待办与协作信息。",
+    "version": "1.1.21",
+    "author": "Ayaka",
+    "category": "沟通协作",
+    "tags": ["DingTalk"],
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "dingtalk-mcp@1.1.21"],
+    "env": {
+      "DINGTALK_Client_ID": "$secret:DINGTALK_Client_ID",
+      "DINGTALK_Client_Secret": "$secret:DINGTALK_Client_Secret",
+      "ACTIVE_PROFILES": "dingtalk-contacts,dingtalk-calendar"
+    },
+    "secretKeys": ["DINGTALK_Client_ID", "DINGTALK_Client_Secret"],
+    "warnings": [
+      "需要 Client ID 与 Client Secret。请确认命令、参数和权限后，在审查窗口输入密钥并启用。"
+    ]
+  },
+  {
+    "id": "vercel",
+    "name": "Vercel",
+    "description": "检查项目、部署状态、日志与平台文档。",
+    "version": "1.0.0",
+    "author": "Ayaka",
+    "category": "设计与开发",
+    "tags": ["Vercel"],
+    "transport": "http",
+    "url": "https://mcp.vercel.com",
+    "warnings": ["需要通过浏览器完成登录授权，请确认远程服务地址后再启用。"]
+  },
+  {
+    "id": "supabase",
+    "name": "Supabase",
+    "description": "管理数据库、项目配置、迁移与 Edge Functions。",
+    "version": "1.0.0",
+    "author": "Ayaka",
+    "category": "设计与开发",
+    "tags": ["Supabase"],
+    "transport": "http",
+    "url": "https://mcp.supabase.com/mcp",
+    "warnings": ["需要通过浏览器完成登录授权，请确认远程服务地址后再启用。"]
+  },
+  {
+    "id": "sequential-thinking",
+    "name": "序列思考",
+    "description": "为复杂问题提供可修正、可验证的结构化推理。",
+    "version": "1.0.0",
+    "author": "Ayaka",
+    "category": "推理与规划",
+    "tags": ["ST"],
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
   }
 ]

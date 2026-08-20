@@ -4,7 +4,7 @@ Ayaka 的 MCP 预设由客户端内置 JSON 配置维护，不再从线上 MCP �
 
 ## 添加预设
 
-编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。当前已内置 `filesystem` 预设；示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
+编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。当前已内置 `filesystem`、`feishu`、`dingtalk`、`vercel`、`supabase` 和 `sequential-thinking` 预设；示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
 
 ```json
 {
@@ -26,6 +26,8 @@ Ayaka 的 MCP 预设由客户端内置 JSON 配置维护，不再从线上 MCP �
 ```
 
 远程 MCP 使用 `transport: "http"` 或 `transport: "sse"` 和 HTTPS URL；仅允许 localhost、127.0.0.1 或 ::1 使用 HTTP。stdio 预设必须提供 command，远程预设不能提供 command。
+
+旧配置中的 `streamable-http` 对应当前格式的 `transport: "http"`；搜索别名使用 `tags` 表达。预设不声明 `enabled`，安装始终先保持禁用，用户完成审查后才能启用。
 
 HTTP 预设示例：
 

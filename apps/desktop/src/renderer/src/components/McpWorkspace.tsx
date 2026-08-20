@@ -144,9 +144,9 @@ export function McpWorkspace({
     <>
       <div
         data-slot="mcp-workspace"
-        className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)]"
+        className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
       >
-        <Card data-slot="mcp-server-list" className="min-h-0 overflow-hidden">
+        <Card data-slot="mcp-server-list" className="h-full min-h-0 overflow-hidden">
           <Card.Header className="border-b border-border p-3">
             <Card.Title className="text-sm">{t("tools.metric.mcp")}</Card.Title>
           </Card.Header>

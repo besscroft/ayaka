@@ -22,6 +22,8 @@ void describe("MCP workspace", () => {
     );
 
     assert.match(html, /lg:grid-cols-\[250px_minmax\(0,1fr\)\]/);
+    assert.match(html, /lg:grid-rows-\[minmax\(0,1fr\)\]/);
+    assert.match(html, /class="[^\"]*h-full min-h-0 overflow-hidden"/);
     assert.match(html, />Weather MCP</);
     assert.match(html, />概览</);
     assert.match(html, />工具发现</);

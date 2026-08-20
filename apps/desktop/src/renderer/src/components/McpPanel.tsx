@@ -213,7 +213,7 @@ export function McpPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto select-none">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto select-none">
         {tab === "presets" ? (
           <McpPresetsPanel
             onInstalled={(installation, item, savedSecretKeys) => {
@@ -230,7 +230,7 @@ export function McpPanel({
         ) : null}
 
         {tab === "installed" && snapshot ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px]">
               <label className="relative min-w-0">
                 <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/35" />
