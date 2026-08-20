@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import rawMcpPresets from "../config/mcp-presets.json";
 import type {
   CatalogFacet,
   CatalogFacets,
@@ -16,10 +17,10 @@ export const MCP_PRESET_SOURCE_URL = "builtin://mcp-presets";
 export const MCP_PRESET_SOURCE_NAME = "Ayaka built-in MCP presets";
 
 /**
- * Add reviewed MCP definitions here. Keep this list empty until a preset has
- * been deliberately selected, configured, and tested for the shipped client.
+ * Keep this export mutable for focused tests and catalog installation updates;
+ * the shipped definitions are maintained in the adjacent JSON config file.
  */
-export const MCP_PRESETS: McpPresetDefinition[] = [];
+export const MCP_PRESETS: McpPresetDefinition[] = rawMcpPresets;
 
 export interface McpPresetSearchResult {
   items: CatalogAdapterItem[];

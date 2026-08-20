@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import rawMcpPresets from "../../../../apps/desktop/src/main/config/mcp-presets.json";
 import {
   MCP_PRESETS,
   searchMcpPresets,
@@ -9,6 +10,7 @@ import {
 } from "@desktop-main/lib/mcp-presets";
 
 test("ships an explicit empty MCP preset list until presets are reviewed", () => {
+  assert.deepEqual(rawMcpPresets, []);
   assert.deepEqual(MCP_PRESETS, []);
   const result = searchMcpPresets({ page: 1, pageSize: 24 });
   assert.deepEqual(result.items, []);

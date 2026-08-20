@@ -1716,8 +1716,8 @@ const entries = {
   "catalog.mcp.loadFailed": { zh: "MCP 预设加载失败", en: "MCP presets failed to load" },
   "catalog.mcp.empty": { zh: "暂无可用的 MCP 预设", en: "No MCP presets available" },
   "catalog.mcp.maintenanceHint": {
-    zh: "MCP 预设由源码维护，请在 apps/desktop/src/main/lib/mcp-presets.ts 中添加。",
-    en: "MCP presets are maintained in apps/desktop/src/main/lib/mcp-presets.ts.",
+    zh: "MCP 预设由客户端内置配置维护，请编辑 apps/desktop/src/main/config/mcp-presets.json。",
+    en: "MCP presets are maintained in apps/desktop/src/main/config/mcp-presets.json.",
   },
   "catalog.mcp.author": { zh: "作者", en: "Author" },
   "catalog.mcp.tools": { zh: "工具数量", en: "Tools" },
