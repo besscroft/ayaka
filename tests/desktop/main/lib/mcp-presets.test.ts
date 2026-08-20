@@ -13,7 +13,28 @@ test("ships the reviewed MCP presets from JSON", () => {
   assert.deepEqual(MCP_PRESETS, rawMcpPresets);
   assert.deepEqual(
     MCP_PRESETS.map((preset) => preset.id),
-    ["filesystem", "feishu", "dingtalk", "vercel", "supabase", "sequential-thinking"],
+    [
+      "filesystem",
+      "feishu",
+      "dingtalk",
+      "vercel",
+      "supabase",
+      "sequential-thinking",
+      "fetch",
+      "time",
+      "knowledge-graph-memory-server",
+      "sqlite",
+      "playwright",
+      "git",
+      "workers-mcp",
+      "zhipu-web-search",
+      "puppeteer",
+      "amap-maps",
+      "tyc-mcp",
+      "slack",
+      "github",
+      "mcd-mcp-server",
+    ],
   );
   assert.equal(MCP_PRESETS[0]?.id, "filesystem");
   assert.equal(MCP_PRESETS[0]?.transport, "stdio");
@@ -32,11 +53,20 @@ test("ships the reviewed MCP presets from JSON", () => {
   assert.equal(dingtalk?.env?.ACTIVE_PROFILES, "dingtalk-contacts,dingtalk-calendar");
   assert.equal(MCP_PRESETS.find((preset) => preset.id === "vercel")?.transport, "http");
   assert.equal(MCP_PRESETS.find((preset) => preset.id === "supabase")?.transport, "http");
-  const result = searchMcpPresets({ page: 1, pageSize: 24 });
-  assert.deepEqual(
-    result.items.map((item) => item.externalId),
-    ["filesystem", "dingtalk", "feishu", "sequential-thinking", "supabase", "vercel"],
+  const zhipu = MCP_PRESETS.find((preset) => preset.id === "zhipu-web-search");
+  assert.deepEqual(zhipu?.headers, { Authorization: "$secret:API_KEY" });
+  assert.equal(MCP_PRESETS.find((preset) => preset.id === "amap-maps")?.transport, "stdio");
+  assert.equal(
+    MCP_PRESETS.find((preset) => preset.id === "tyc-mcp")?.url,
+    "https://mcp.tianyancha.com/v1",
   );
+  assert.equal(
+    MCP_PRESETS.find((preset) => preset.id === "mcd-mcp-server")?.url,
+    "https://mcp.mcd.cn",
+  );
+  const result = searchMcpPresets({ page: 1, pageSize: 24 });
+  assert.equal(result.items.length, MCP_PRESETS.length);
+  assert.equal(result.items.length, 20);
   assert.equal(result.hasMore, false);
 });
 
@@ -116,7 +146,11 @@ test("keeps preset IDs stable while updating metadata and supports local filters
     tags: ["docs", "local"],
     featured: true,
   };
-  const updated = { ...first, version: "1.1.0", description: "Search and summarize documentation" };
+  const updated = {
+    ...first,
+    version: "1.1.0",
+    description: "Search and summarize documentation",
+  };
   const firstItem = toMcpPresetCatalogItem(first);
   const repeatedItem = toMcpPresetCatalogItem(first);
   const updatedItem = toMcpPresetCatalogItem(updated);
@@ -134,10 +168,14 @@ test("keeps preset IDs stable while updating metadata and supports local filters
     result.items.map((item) => item.externalId),
     ["docs-server"],
   );
-  const detail = result.items[0]?.detail.mcp as { config: { command: string | null } };
+  const detail = result.items[0]?.detail.mcp as {
+    config: { command: string | null };
+  };
   assert.equal(detail.config.command, "node");
 
-  const categoryQuery = searchMcpPresetDefinitions([first], { query: "research" });
+  const categoryQuery = searchMcpPresetDefinitions([first], {
+    query: "research",
+  });
   assert.deepEqual(
     categoryQuery.items.map((item) => item.externalId),
     ["docs-server"],
