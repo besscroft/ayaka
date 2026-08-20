@@ -14,6 +14,7 @@ import {
   buildMcpInput,
   buildSkillInput,
   buildSkillInputFromMarkdown,
+  formatMcpEnvironment,
   parseSkillMarkdown,
 } from "@renderer/lib/tools-form";
 import { McpPresetsPanel } from "@renderer/components/McpPresetsPanel";
@@ -159,6 +160,14 @@ void describe("ToolsPanel data helpers", () => {
     assert.equal(input.args, '["-y","@modelcontextprotocol/server-filesystem","C:/Long Path"]');
     assert.equal(input.env, '{"ROOT":"C:/Long Path","TOKEN":"${MCP_TOKEN}"}');
     assert.equal(input.timeout_seconds, 45);
+  });
+
+  void it("formats stored MCP environment JSON as KEY=value lines", () => {
+    assert.equal(
+      formatMcpEnvironment('{"ROOT":"C:/Long Path","TOKEN":"$secret:TOKEN"}'),
+      "ROOT=C:/Long Path\nTOKEN=$secret:TOKEN",
+    );
+    assert.equal(formatMcpEnvironment("{}"), "");
   });
 
   void it("builds Skill input without executable steps", () => {

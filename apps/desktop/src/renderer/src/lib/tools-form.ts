@@ -68,6 +68,18 @@ export function buildMcpInput(form: McpFormState): ToolServerInput {
   };
 }
 
+export function formatMcpEnvironment(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "";
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    if (entries.some(([, value]) => typeof value !== "string")) return "";
+    return entries.map(([key, value]) => `${key}=${value}`).join("\n");
+  } catch {
+    return "";
+  }
+}
+
 export function buildSkillInput(form: SkillFormState): ToolSkillInput {
   const name = form.name.trim();
   if (!name) throw new Error("Name is required.");

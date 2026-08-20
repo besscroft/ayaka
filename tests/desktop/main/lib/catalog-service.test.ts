@@ -118,7 +118,9 @@ void describe("MCP preset catalog installation", () => {
       version: "1.1.0",
       description: "An updated test-only local MCP preset.",
     };
-    MCP_PRESETS.splice(0, 1, metadataUpdatedPreset);
+    const presetIndex = MCP_PRESETS.findIndex((preset) => preset.id === testPreset.id);
+    assert.notEqual(presetIndex, -1);
+    MCP_PRESETS.splice(presetIndex, 1, metadataUpdatedPreset);
     const refreshed = await catalog.searchCatalogMcp({ query: "Catalog Service Test" });
     const refreshedItem = refreshed.items[0];
     assert.ok(refreshedItem);

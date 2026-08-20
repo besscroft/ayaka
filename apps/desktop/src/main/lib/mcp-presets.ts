@@ -20,7 +20,7 @@ export const MCP_PRESET_SOURCE_NAME = "Ayaka built-in MCP presets";
  * Keep this export mutable for focused tests and catalog installation updates;
  * the shipped definitions are maintained in the adjacent JSON config file.
  */
-export const MCP_PRESETS: McpPresetDefinition[] = rawMcpPresets;
+export const MCP_PRESETS: McpPresetDefinition[] = rawMcpPresets as McpPresetDefinition[];
 
 export interface McpPresetSearchResult {
   items: CatalogAdapterItem[];

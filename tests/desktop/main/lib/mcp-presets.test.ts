@@ -9,11 +9,21 @@ import {
   validateMcpPresetDefinition,
 } from "@desktop-main/lib/mcp-presets";
 
-test("ships an explicit empty MCP preset list until presets are reviewed", () => {
-  assert.deepEqual(rawMcpPresets, []);
-  assert.deepEqual(MCP_PRESETS, []);
+test("ships the reviewed filesystem MCP preset from JSON", () => {
+  assert.deepEqual(MCP_PRESETS, rawMcpPresets);
+  assert.equal(MCP_PRESETS.length, 1);
+  assert.equal(MCP_PRESETS[0]?.id, "filesystem");
+  assert.equal(MCP_PRESETS[0]?.transport, "stdio");
+  assert.deepEqual(MCP_PRESETS[0]?.args, [
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/path/to/folder",
+  ]);
   const result = searchMcpPresets({ page: 1, pageSize: 24 });
-  assert.deepEqual(result.items, []);
+  assert.deepEqual(
+    result.items.map((item) => item.externalId),
+    ["filesystem"],
+  );
   assert.equal(result.hasMore, false);
 });
 

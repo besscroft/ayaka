@@ -17,7 +17,7 @@ import {
 import { api, type ToolsSnapshot } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
-import { buildMcpInput, type McpFormState } from "../lib/tools-form";
+import { buildMcpInput, formatMcpEnvironment, type McpFormState } from "../lib/tools-form";
 import { cn } from "../lib/utils";
 import type {
   ArtifactInstallation,
@@ -541,7 +541,7 @@ function mcpFormFromServer(server: ToolServer): McpFormState {
     args: formatJsonArray(server.args_json),
     url: server.url ?? "",
     headers: formatJsonObject(server.headers_json),
-    env: formatJsonObject(server.env_json),
+    env: formatMcpEnvironment(server.env_json),
     cwd: server.cwd ?? "",
     timeoutSeconds: String(server.timeout_seconds),
   };
@@ -698,13 +698,15 @@ function AddMcpModal({
               </Field>
             )}
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label={form.transport === "stdio" ? "环境变量（可选）" : "Headers（可选）"}>
+              <Field
+                label={form.transport === "stdio" ? t("tools.field.env") : t("tools.field.headers")}
+              >
                 <TextArea
                   rows={4}
                   value={form.transport === "stdio" ? form.env : form.headers}
                   placeholder={
                     form.transport === "stdio"
-                      ? "API_KEY=your-api-key"
+                      ? "KEY=value\nTOKEN=secret"
                       : "Authorization=Bearer token"
                   }
                   className="font-mono text-sm"

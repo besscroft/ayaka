@@ -4,7 +4,7 @@ Ayaka 的 MCP 预设由客户端内置 JSON 配置维护，不再从线上 MCP �
 
 ## 添加预设
 
-编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。首版数组为空，示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
+编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。当前已内置 `filesystem` 预设；示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
 
 ```json
 {
@@ -80,4 +80,4 @@ vp run ayaka-desktop#test:main
 vp run ayaka-desktop#test:renderer
 ```
 
-添加预设后，至少确认 JSON 可解析、它能在 MCP 预设页显示、详情配置正确、安装后保持禁用，并在输入所需 secret 后成功审查和启用。
+添加预设后，至少确认 JSON 可解析、它能在 MCP 预设页显示、详情配置正确、安装后保持禁用，并在输入所需 secret 后成功审查和启用。stdio 预设还应确认 command、args 和外部依赖由用户环境提供。

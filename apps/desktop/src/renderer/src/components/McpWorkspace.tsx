@@ -5,7 +5,6 @@ import type {
   McpInputRequest,
   McpPrompt,
   McpPromptResult,
-  McpReadResourceResult,
   ToolRecord,
   ToolServer,
 } from "@shared/types";
@@ -34,7 +33,7 @@ import { IconCheck, IconCopy, IconEdit, IconGlobe, IconRotateCcw } from "./icons
 import { cn } from "../lib/utils";
 import { Field, ReadStat } from "./ToolsPanel";
 
-type WorkspaceTab = "overview" | "tools" | "resources" | "prompts";
+type WorkspaceTab = "overview" | "tools" | "prompts";
 
 export interface McpWorkspaceProps {
   servers: ToolServer[];
@@ -254,9 +253,6 @@ export function McpWorkspace({
                   <TabsList aria-label={t("catalog.mcp.tabsLabel")}>
                     <TabsTrigger value="overview">{t("tools.mcp.workspace.overview")}</TabsTrigger>
                     <TabsTrigger value="tools">{t("tools.mcp.tools")}</TabsTrigger>
-                    <TabsTrigger value="resources">
-                      {t("tools.mcp.workspace.resources")}
-                    </TabsTrigger>
                     <TabsTrigger value="prompts">{t("tools.mcp.workspace.prompts")}</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -294,9 +290,6 @@ export function McpWorkspace({
                 ) : null}
                 {tab === "tools" ? (
                   <ToolWorkspace tools={selectedTools} busy={busy} onRefresh={onRefresh} />
-                ) : null}
-                {tab === "resources" ? (
-                  <ResourceWorkspace capabilities={capabilities} serverId={selected.id} />
                 ) : null}
                 {tab === "prompts" ? (
                   <PromptWorkspace
@@ -484,76 +477,6 @@ async function updateTool(
   } catch (error) {
     onError(error);
   }
-}
-
-function ResourceWorkspace({
-  capabilities,
-  serverId,
-}: {
-  capabilities: McpCapabilitySnapshot | null;
-  serverId: string;
-}): React.JSX.Element {
-  const { t, locale } = useT();
-  const [uri, setUri] = useState("");
-  const [result, setResult] = useState<McpReadResourceResult | null>(null);
-  const resources = capabilities?.resources ?? [];
-  const templates = capabilities?.resourceTemplates ?? [];
-  const read = async (): Promise<void> => {
-    if (!uri.trim()) return;
-    try {
-      setResult(await api.mcp.readResource({ serverId, uri: uri.trim() }));
-    } catch (error) {
-      notify.error(t("tools.toast.failed"), error, locale);
-    }
-  };
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-        <Input
-          value={uri}
-          onChange={(event) => setUri(event.target.value)}
-          placeholder={t("tools.mcp.workspace.uriPlaceholder")}
-        />
-        <Button variant="primary" onPress={() => void read()} isDisabled={!uri.trim()}>
-          {t("tools.mcp.workspace.read")}
-        </Button>
-      </div>
-      <div className="grid gap-2">
-        {resources.map((resource) => (
-          <button
-            key={resource.uri}
-            type="button"
-            className="rounded-md border border-border p-3 text-left hover:bg-muted/50"
-            onClick={() => setUri(resource.uri)}
-          >
-            <p className="text-sm font-medium">{resource.title || resource.name}</p>
-            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{resource.uri}</p>
-          </button>
-        ))}
-        {templates.map((template) => (
-          <button
-            key={template.uriTemplate}
-            type="button"
-            className="rounded-md border border-dashed border-border p-3 text-left hover:bg-muted/50"
-            onClick={() => setUri(template.uriTemplate)}
-          >
-            <p className="text-sm font-medium">{template.title || template.name}</p>
-            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-              {template.uriTemplate}
-            </p>
-          </button>
-        ))}
-      </div>
-      {result ? (
-        <pre
-          data-slot="code-surface"
-          className="max-h-80 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs"
-        >
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      ) : null}
-    </div>
-  );
 }
 
 function PromptWorkspace({

@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "id": "filesystem",
+    "name": "本地文件",
+    "description": "在指定目录中安全地读取、写入和管理文件。",
+    "version": "1.0.0",
+    "author": "Ayaka",
+    "category": "文件与知识",
+    "tags": ["FS", "本地"],
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"],
+    "warnings": [
+      "请将 /path/to/folder 替换为实际允许访问的目录，并在启用前确认命令、参数和目录权限。"
+    ]
+  }
+]
