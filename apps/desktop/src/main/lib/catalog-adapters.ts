@@ -7,7 +7,7 @@ export interface CatalogAdapterItem {
   name: string;
   description: string;
   version?: string;
-  installUrl: string;
+  installUrl: string | null;
   contentHash?: string;
   detail: JsonObject;
 }

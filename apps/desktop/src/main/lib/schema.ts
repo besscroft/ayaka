@@ -95,7 +95,7 @@ export const catalogSources = sqliteTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    kind: text("kind", { enum: ["modelscope-skills", "skills-sh", "mcp-so"] }).notNull(),
+    kind: text("kind", { enum: ["modelscope-skills", "skills-sh", "builtin-mcp"] }).notNull(),
     url: text("url").notNull(),
     enabled: integer("enabled").notNull().default(1),
     builtin: integer("builtin").notNull().default(0),

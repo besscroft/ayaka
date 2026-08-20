@@ -1692,12 +1692,12 @@ const entries = {
 
   // 工作流悬浮状态框（chat 页面右上角）
   "catalog.mcp.subtitle": {
-    zh: "浏览 mcp.so 服务器，先安装并审查，再启用连接。",
-    en: "Browse mcp.so servers, install for review, then enable connections.",
+    zh: "浏览 Ayaka 内置 MCP 预设，审查后再启用连接。",
+    en: "Browse Ayaka's built-in MCP presets, review them, then enable connections.",
   },
   "catalog.mcp.tabsLabel": { zh: "MCP 页面", en: "MCP views" },
   "catalog.mcp.installedTab": { zh: "已安装", en: "Installed" },
-  "catalog.mcp.marketplaceTab": { zh: "MCP 商店", en: "MCP marketplace" },
+  "catalog.mcp.presetsTab": { zh: "MCP 预设", en: "MCP presets" },
   "catalog.mcp.search": { zh: "搜索 MCP 服务器", en: "Search MCP servers" },
   "catalog.mcp.tag": { zh: "标签筛选", en: "Tag filter" },
   "catalog.mcp.allTags": { zh: "全部标签", en: "All tags" },
@@ -1709,23 +1709,19 @@ const entries = {
   "catalog.mcp.sortName": { zh: "名称", en: "Name" },
   "catalog.mcp.category": { zh: "分类", en: "Category" },
   "catalog.mcp.allCategories": { zh: "全部分类", en: "All categories" },
-  "catalog.mcp.cacheState": {
-    zh: "当前显示本地缓存 · 来源暂不可用",
-    en: "Showing local cache · source unavailable",
-  },
   "catalog.mcp.sourceState": {
-    zh: "来源：mcp.so · 按需加载",
-    en: "Source: mcp.so · loaded on demand",
+    zh: "来源：Ayaka 内置 MCP 预设",
+    en: "Source: Ayaka built-in MCP presets",
   },
-  "catalog.mcp.cacheWarning": {
-    zh: "网络请求失败，已回退缓存：",
-    en: "Network request failed; using cache: ",
+  "catalog.mcp.loadFailed": { zh: "MCP 预设加载失败", en: "MCP presets failed to load" },
+  "catalog.mcp.empty": { zh: "暂无可用的 MCP 预设", en: "No MCP presets available" },
+  "catalog.mcp.maintenanceHint": {
+    zh: "MCP 预设由源码维护，请在 apps/desktop/src/main/lib/mcp-presets.ts 中添加。",
+    en: "MCP presets are maintained in apps/desktop/src/main/lib/mcp-presets.ts.",
   },
-  "catalog.mcp.loadFailed": { zh: "MCP 商店加载失败", en: "MCP marketplace failed to load" },
-  "catalog.mcp.loadingMore": { zh: "正在加载更多 MCP", en: "Loading more MCP servers" },
-  "catalog.mcp.empty": { zh: "没有找到匹配的 MCP 服务器", en: "No matching MCP servers found" },
   "catalog.mcp.author": { zh: "作者", en: "Author" },
   "catalog.mcp.tools": { zh: "工具数量", en: "Tools" },
+  "catalog.mcp.version": { zh: "版本", en: "Version" },
   "catalog.mcp.allTransports": { zh: "全部传输方式", en: "All transports" },
   "catalog.mcp.warnings": { zh: "解析警告", en: "Parser warnings" },
   "catalog.mcp.configuration": { zh: "标准配置", en: "Standard configuration" },

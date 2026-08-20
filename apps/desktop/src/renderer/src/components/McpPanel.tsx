@@ -26,7 +26,7 @@ import type {
   McpTransportKind,
   ToolServer,
 } from "@shared/types";
-import { McpMarketplacePanel } from "./McpMarketplacePanel";
+import { McpPresetsPanel } from "./McpPresetsPanel";
 import { McpWorkspace } from "./McpWorkspace";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconCheck, IconClose, IconPlus, IconRotateCcw, IconSearch } from "./icons";
@@ -63,7 +63,7 @@ export function McpPanel({
   const [busy, setBusy] = useState(false);
   const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(() => new Set());
   const [mcpOpen, setMcpOpen] = useState(false);
-  const [tab, setTab] = useState<"installed" | "marketplace">("installed");
+  const [tab, setTab] = useState<"installed" | "presets">("installed");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "enabled" | "disabled" | "error">("all");
   const [transport, setTransport] = useState<"all" | McpTransportKind>("all");
@@ -181,11 +181,11 @@ export function McpPanel({
         <div className="flex flex-wrap items-center justify-end gap-3">
           <Tabs
             value={tab}
-            onValueChange={(value) => setTab(value === "marketplace" ? "marketplace" : "installed")}
+            onValueChange={(value) => setTab(value === "presets" ? "presets" : "installed")}
           >
             <TabsList aria-label={t("catalog.mcp.tabsLabel")}>
               <TabsTrigger value="installed">{t("catalog.mcp.installedTab")}</TabsTrigger>
-              <TabsTrigger value="marketplace">{t("catalog.mcp.marketplaceTab")}</TabsTrigger>
+              <TabsTrigger value="presets">{t("catalog.mcp.presetsTab")}</TabsTrigger>
             </TabsList>
           </Tabs>
           <MetricCard
@@ -214,8 +214,8 @@ export function McpPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto select-none">
-        {tab === "marketplace" ? (
-          <McpMarketplacePanel
+        {tab === "presets" ? (
+          <McpPresetsPanel
             onInstalled={(installation, item, savedSecretKeys) => {
               setTab("installed");
               setReviewTarget({ installation, item, savedSecretKeys });

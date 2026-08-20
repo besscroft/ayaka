@@ -73,7 +73,34 @@ void describe("runtime architecture", () => {
       "0000_initial.sql",
       "0001_romantic_blob.sql",
       "0002_remove_desktop_pet.sql",
+      "0003_remove_mcp_marketplace.sql",
     ]);
+  });
+
+  void it("removes the retired MCP catalog while preserving installed MCP state", () => {
+    const migration = readFileSync(
+      path.join(process.cwd(), "drizzle", "0003_remove_mcp_marketplace.sql"),
+      "utf8",
+    );
+    assert.match(migration, /UPDATE [`"]artifact_installations[`"]?/);
+    assert.match(migration, /SET [`"]item_id[`"]? = NULL, [`"]source_id[`"]? = NULL/);
+    assert.match(migration, /WHERE [`"]source_id[`"]? = 'catalog-mcp-so'/);
+    assert.match(
+      migration,
+      /SELECT [`"]id[`"]? FROM [`"]catalog_items[`"]? WHERE [`"]source_id[`"]? = 'catalog-mcp-so'/,
+    );
+    assert.match(
+      migration,
+      /DELETE FROM [`"]catalog_items[`"]? WHERE [`"]source_id[`"]? = 'catalog-mcp-so'/,
+    );
+    assert.match(
+      migration,
+      /DELETE FROM [`"]catalog_sources[`"]? WHERE [`"]id[`"]? = 'catalog-mcp-so'/,
+    );
+    assert.doesNotMatch(
+      migration,
+      /DELETE FROM [`"]tool_servers[`"]?|DELETE FROM [`"]tool_secrets[`"]?/,
+    );
   });
 
   void it("defines default seed data for agents and tools", () => {

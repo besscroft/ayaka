@@ -100,7 +100,7 @@ export interface CronJobInput {
 }
 
 export type CatalogArtifactType = "skill" | "mcp";
-export type CatalogSourceKind = "modelscope-skills" | "skills-sh" | "mcp-so";
+export type CatalogSourceKind = "modelscope-skills" | "skills-sh" | "builtin-mcp";
 export type CatalogSourceFilter = "all" | CatalogSourceKind;
 export type CatalogSort = "featured" | "latest" | "name";
 export type CatalogTagFilter = "featured" | "verified";
@@ -172,6 +172,30 @@ export interface CatalogMcpDetail {
   warnings: string[];
 }
 
+export interface McpPresetDefinition {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author?: string;
+  repositoryUrl?: string | null;
+  homepageUrl?: string | null;
+  docsUrl?: string | null;
+  tags?: string[];
+  category?: string | null;
+  featured?: boolean;
+  verified?: boolean;
+  transport: Exclude<McpTransportKind, "builtin">;
+  command?: string | null;
+  args?: string[];
+  url?: string | null;
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+  secretKeys?: string[];
+  tools?: CatalogMcpToolSummary[];
+  warnings?: string[];
+}
+
 export interface CatalogFacet {
   id: string;
   label: string;
@@ -226,7 +250,7 @@ export interface CatalogSearchInput {
 
 export interface CatalogSourceState {
   source: CatalogSourceKind;
-  status: "online" | "cache" | "error" | "idle";
+  status: "online" | "cache" | "error" | "idle" | "builtin";
   hasMore: boolean;
   error?: string;
 }

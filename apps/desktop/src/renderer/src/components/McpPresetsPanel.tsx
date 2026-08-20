@@ -15,7 +15,6 @@ import {
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
-import { cn } from "../lib/utils";
 import type {
   ArtifactInstallation,
   CatalogItem,
@@ -25,19 +24,10 @@ import type {
   CatalogSort,
   CatalogTagFilter,
 } from "@shared/types";
-import {
-  IconCheck,
-  IconClose,
-  IconGlobe,
-  IconInfo,
-  IconLink,
-  IconPlus,
-  IconRefresh,
-  IconSearch,
-} from "./icons";
+import { IconCheck, IconClose, IconGlobe, IconInfo, IconLink, IconPlus, IconSearch } from "./icons";
 import { EmptyTools, ReadStat } from "./ToolsPanel";
 
-export interface McpMarketplacePanelProps {
+export interface McpPresetsPanelProps {
   onInstalled: (
     installation: ArtifactInstallation,
     item: CatalogItem,
@@ -47,7 +37,7 @@ export interface McpMarketplacePanelProps {
 
 type TagFilter = "all" | CatalogTagFilter;
 
-export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): React.JSX.Element {
+export function McpPresetsPanel({ onInstalled }: McpPresetsPanelProps): React.JSX.Element {
   const { t, f, locale } = useT();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [query, setQuery] = useState("");
@@ -56,109 +46,49 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
   const [category, setCategory] = useState("");
   const [result, setResult] = useState<CatalogSearchResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<CatalogItem | null>(null);
   const [detail, setDetail] = useState<CatalogItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const loadingMoreRef = useRef(false);
-  const hasMoreRef = useRef(false);
   const requestIdRef = useRef(0);
 
-  const loadPage = useCallback(
-    async (nextPage: number, append: boolean, manual = false): Promise<void> => {
-      if (append && (loadingMoreRef.current || !hasMoreRef.current)) return;
-      const requestId = ++requestIdRef.current;
-      if (append) {
-        loadingMoreRef.current = true;
-        setLoadingMore(true);
-        setLoadMoreError(null);
-      } else {
-        loadingMoreRef.current = false;
-        hasMoreRef.current = false;
-        setLoading(true);
-        setLoadingMore(false);
-        setLoadMoreError(null);
-      }
-      if (manual) setRefreshing(true);
-      try {
-        const next = await api.catalog.search({
-          artifactType: "mcp",
-          page: nextPage,
-          pageSize: 36,
-          ...(query.trim() ? { query: query.trim() } : {}),
-          sort,
-          ...(tag !== "all" ? { tag } : {}),
-          ...(category ? { category } : {}),
-        });
-        if (requestId !== requestIdRef.current) return;
-        setResult(next);
-        setItems((current) => {
-          if (!append) return next.items;
-          const byId = new Map(current.map((item) => [item.id, item]));
-          next.items.forEach((item) => byId.set(item.id, item));
-          return [...byId.values()];
-        });
-        setPage(next.page);
-        hasMoreRef.current = next.hasMore;
-        setHasMore(next.hasMore);
-        setError(null);
-      } catch (reason) {
-        if (requestId !== requestIdRef.current) return;
-        const message = reason instanceof Error ? reason.message : String(reason);
-        if (append) setLoadMoreError(message);
-        setError(message);
-        if (!append) notify.error(t("catalog.mcp.loadFailed"), reason, locale);
-      } finally {
-        if (requestId === requestIdRef.current) {
-          setLoading(false);
-          if (append) {
-            loadingMoreRef.current = false;
-            setLoadingMore(false);
-          }
-          if (manual) setRefreshing(false);
-        }
-      }
-    },
-    [category, locale, query, sort, t, tag],
-  );
+  const loadPresets = useCallback(async (): Promise<void> => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const next = await api.catalog.search({
+        artifactType: "mcp",
+        page: 1,
+        pageSize: 100,
+        ...(query.trim() ? { query: query.trim() } : {}),
+        sort,
+        ...(tag !== "all" ? { tag } : {}),
+        ...(category ? { category } : {}),
+      });
+      if (requestId !== requestIdRef.current) return;
+      setResult(next);
+      setItems(next.items);
+      setError(null);
+    } catch (reason) {
+      if (requestId !== requestIdRef.current) return;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      setError(message);
+      notify.error(t("catalog.mcp.loadFailed"), reason, locale);
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, [category, locale, query, sort, t, tag]);
 
   useEffect(() => {
-    requestIdRef.current += 1;
     setItems([]);
     setResult(null);
-    setPage(0);
-    hasMoreRef.current = false;
-    setHasMore(false);
     setError(null);
-    setLoadMoreError(null);
     setLoading(true);
-    const timer = window.setTimeout(() => void loadPage(1, false), 220);
+    const timer = window.setTimeout(() => void loadPresets(), 220);
     return () => window.clearTimeout(timer);
-  }, [category, loadPage, query, sort, tag]);
-
-  useEffect(() => {
-    const sentinel = loadMoreRef.current;
-    const scrollContainer = scrollContainerRef.current;
-    if (!sentinel || !scrollContainer || loading || loadingMore || !hasMore || loadMoreError)
-      return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) void loadPage(page + 1, true);
-      },
-      { root: scrollContainer, rootMargin: "0px 0px 320px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadMoreError, loadPage, loading, loadingMore, page]);
+  }, [loadPresets]);
 
   const openDetail = (item: CatalogItem): void => {
     setDetailItem(item);
@@ -201,7 +131,6 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
     }
   };
 
-  const source = result?.sources.find((value) => value.source === "mcp-so");
   const categories = result?.facets?.categories ?? [];
 
   return (
@@ -239,26 +168,11 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
               onChange={(value) => setSort(value as CatalogSort)}
               ariaLabel={t("catalog.mcp.sort")}
             />
-            <Button
-              isIconOnly
-              size="md"
-              variant="secondary"
-              onPress={() => void loadPage(1, false, true)}
-              isDisabled={refreshing}
-              aria-label={t("main.refresh")}
-              title={t("main.refresh")}
-            >
-              <IconRefresh className={cn("size-4", refreshing && "animate-spin")} />
-            </Button>
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
           <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span className="truncate">
-              {source?.status === "cache"
-                ? t("catalog.mcp.cacheState")
-                : t("catalog.mcp.sourceState")}
-            </span>
+            <span className="truncate">{t("catalog.mcp.sourceState")}</span>
             <span className="shrink-0">
               {t("catalog.loaded", { count: f.number(items.length) })}
             </span>
@@ -278,30 +192,26 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
         </div>
       </div>
 
-      {source?.error ? (
-        <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          {source.status === "cache" ? t("catalog.mcp.cacheWarning") : t("catalog.sourceWarning")}{" "}
-          {source.error}
-        </p>
-      ) : null}
-      {error && !source?.error ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-danger/30 px-3 py-2 text-sm text-danger">
-          <span className="break-words">{error}</span>
-          <Button size="sm" variant="secondary" onPress={() => void loadPage(1, false, true)}>
-            {t("catalog.retry")}
-          </Button>
-        </div>
+      {error ? (
+        <p className="rounded-md border border-danger/30 px-3 py-2 text-sm text-danger">{error}</p>
       ) : null}
 
-      <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
+      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
         {loading && items.length === 0 ? (
-          <McpMarketplaceSkeleton />
+          <McpPresetsSkeleton />
         ) : items.length === 0 ? (
-          <EmptyTools message={t("catalog.mcp.empty")} />
+          <div className="flex flex-col gap-2">
+            <EmptyTools message={t("catalog.mcp.empty")} />
+            {!query && !category && tag === "all" ? (
+              <p className="px-3 text-center text-xs text-muted-foreground">
+                {t("catalog.mcp.maintenanceHint")}
+              </p>
+            ) : null}
+          </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {items.map((item) => (
-              <McpMarketplaceCard
+              <McpPresetCard
                 key={item.id}
                 item={item}
                 busy={busyId !== null}
@@ -310,30 +220,22 @@ export function McpMarketplacePanel({ onInstalled }: McpMarketplacePanelProps): 
             ))}
           </div>
         )}
-        {items.length > 0 && hasMore ? (
-          <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3">
-            {loadingMore ? (
-              <LoadingIndicator className="text-xs" label={t("catalog.mcp.loadingMore")} />
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
-      <McpMarketplaceDetailModal
+      <McpPresetDetailModal
         item={detailItem}
         detail={detail}
         loading={detailLoading}
         error={detailError}
         busy={detailItem !== null && busyId === detailItem.id}
         onClose={() => setDetailItem(null)}
-        onRetry={() => (detailItem ? openDetail(detailItem) : undefined)}
         onInstall={(item, secrets) => void install(item, secrets)}
       />
     </div>
   );
 }
 
-function McpMarketplaceSkeleton(): React.JSX.Element {
+function McpPresetsSkeleton(): React.JSX.Element {
   return (
     <div className="grid animate-pulse gap-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
       {[0, 1, 2, 3, 4, 5].map((id) => (
@@ -357,7 +259,7 @@ function McpMarketplaceSkeleton(): React.JSX.Element {
   );
 }
 
-function McpMarketplaceCard({
+function McpPresetCard({
   item,
   busy,
   onDetail,
@@ -422,14 +324,13 @@ function McpMarketplaceCard({
   );
 }
 
-function McpMarketplaceDetailModal({
+function McpPresetDetailModal({
   item,
   detail,
   loading,
   error,
   busy,
   onClose,
-  onRetry,
   onInstall,
 }: {
   item: CatalogItem | null;
@@ -438,14 +339,12 @@ function McpMarketplaceDetailModal({
   error: string | null;
   busy: boolean;
   onClose: () => void;
-  onRetry: () => void;
   onInstall: (item: CatalogItem, secrets: Record<string, string>) => void;
 }): React.JSX.Element {
   const { t, f } = useT();
   const secretRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const itemDetail = item?.detail.mcp as unknown as CatalogMcpDetail | undefined;
   const mcp = detail?.mcp ?? itemDetail;
-  const metric = item?.metrics.installs ?? item?.metrics.downloads ?? 0;
   const secretKeys = mcp?.config.secretKeys ?? [];
 
   useEffect(() => {
@@ -484,10 +383,7 @@ function McpMarketplaceDetailModal({
                 label={t("catalog.mcp.tools")}
                 value={mcp ? f.number(mcp.tools.length) : "-"}
               />
-              <ReadStat
-                label={t("catalog.installs")}
-                value={metric ? f.compactNumber(metric) : "-"}
-              />
+              <ReadStat label={t("catalog.mcp.version")} value={item.version || "-"} />
             </div>
           ) : null}
           {item?.description ? (
@@ -497,12 +393,7 @@ function McpMarketplaceDetailModal({
             <LoadingIndicator className="w-full py-8" label={t("catalog.detailLoading")} />
           ) : null}
           {error ? (
-            <div className="flex flex-col gap-2">
-              <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
-              <Button size="sm" variant="secondary" onPress={onRetry}>
-                {t("catalog.retry")}
-              </Button>
-            </div>
+            <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
           ) : null}
           {mcp ? (
             <>
@@ -551,7 +442,7 @@ function McpMarketplaceDetailModal({
                       <span>{key}</span>
                       <Input
                         type="password"
-                        placeholder="$secret:{key}"
+                        placeholder={`$secret:${key}`}
                         ref={(node) => {
                           secretRefs.current[key] = node;
                         }}
@@ -586,20 +477,9 @@ function McpMarketplaceDetailModal({
               ) : null}
             </>
           ) : null}
-          {item?.catalogUrl ? (
-            <a
-              className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
-              href={item.catalogUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <IconLink className="size-3.5" />
-              {t("catalog.openSource")}
-            </a>
-          ) : null}
           {mcp?.repositoryUrl ? (
             <a
-              className="ml-3 inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
+              className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
               href={mcp.repositoryUrl}
               target="_blank"
               rel="noreferrer"

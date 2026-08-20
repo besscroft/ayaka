@@ -1,4 +1,5 @@
 import "./main/lib/catalog-adapters.test.ts";
+import "./main/lib/catalog-service.test.ts";
 import "./main/lib/changelog.test.ts";
 import "./main/lib/default-workspace-assets.test.ts";
 import "./main/lib/chat-errors.test.ts";
@@ -6,7 +7,7 @@ import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";
 import "./main/lib/drizzle-metadata.test.ts";
 import "./main/lib/error-logger.test.ts";
-import "./main/lib/mcp-so-adapter.test.ts";
+import "./main/lib/mcp-presets.test.ts";
 import "./main/lib/mcp-client-manager.test.ts";
 import "./main/lib/media-generation.test.ts";
 import "./main/lib/memory-orchestrator.test.ts";

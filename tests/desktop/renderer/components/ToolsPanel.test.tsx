@@ -16,8 +16,16 @@ import {
   buildSkillInputFromMarkdown,
   parseSkillMarkdown,
 } from "@renderer/lib/tools-form";
+import { McpPresetsPanel } from "@renderer/components/McpPresetsPanel";
 
 void describe("ToolsPanel data helpers", () => {
+  void it("renders the empty built-in MCP preset state", () => {
+    const html = renderToStaticMarkup(<McpPresetsPanel onInstalled={() => undefined} />);
+
+    assert.match(html, /aria-busy="true"/);
+    assert.doesNotMatch(html, /mcp\.so/);
+  });
+
   void it("renders the marketplace skeleton while the first catalog request is pending", () => {
     const html = renderToStaticMarkup(<CatalogDiscover />);
 

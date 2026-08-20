@@ -1847,12 +1847,41 @@ export async function cacheCatalogItems(
   });
 }
 
+export async function deleteCatalogItemsExcept(
+  sourceId: string,
+  externalIds: string[],
+): Promise<void> {
+  if (shouldRouteWrites())
+    return writeDb<void>("deleteCatalogItemsExcept", [sourceId, externalIds]);
+  const rows = getDb()
+    .select({ id: catalogItems.id })
+    .from(catalogItems)
+    .where(eq(catalogItems.source_id, sourceId))
+    .all();
+  const keep = new Set(externalIds);
+  for (const row of rows) {
+    const item = getDb()
+      .select({ externalId: catalogItems.external_id })
+      .from(catalogItems)
+      .where(eq(catalogItems.id, row.id))
+      .get();
+    if (item && !keep.has(item.externalId)) {
+      getDb().delete(catalogItems).where(eq(catalogItems.id, row.id)).run();
+    }
+  }
+}
+
 export async function updateCatalogSource(
   id: string,
   patch: Partial<typeof catalogSources.$inferInsert>,
 ): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("updateCatalogSource", [id, patch]);
   getDb().update(catalogSources).set(patch).where(eq(catalogSources.id, id)).run();
+}
+
+export async function deleteCatalogSource(id: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteCatalogSource", [id]);
+  getDb().delete(catalogSources).where(eq(catalogSources.id, id)).run();
 }
 
 export async function upsertArtifactInstallation(
