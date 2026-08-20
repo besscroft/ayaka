@@ -1295,6 +1295,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
               />
             ) : (
               <MessageList
+                key={conversationId}
                 conversationId={conversationId}
                 messages={renderedMessages}
                 isLoading={isLoading}

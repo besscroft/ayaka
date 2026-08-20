@@ -268,6 +268,22 @@ interface VirtualMessageRowsProps {
   onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
 }
 
+const ESTIMATED_MESSAGE_SIZE = 112;
+
+interface MessageRenderItem {
+  index: number;
+  start: number;
+}
+
+export function getMessageRenderItems(
+  messages: readonly UIMessage[],
+  virtualItems: readonly MessageRenderItem[],
+): MessageRenderItem[] {
+  return virtualItems.length > 0
+    ? virtualItems.map((item) => ({ index: item.index, start: item.start }))
+    : messages.map((_, index) => ({ index, start: index * ESTIMATED_MESSAGE_SIZE }));
+}
+
 function VirtualMessageRows({
   conversationId,
   messages,
@@ -282,18 +298,13 @@ function VirtualMessageRows({
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 112,
+    estimateSize: () => ESTIMATED_MESSAGE_SIZE,
     getItemKey: (index) => messages[index]?.id ?? index,
     measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 6,
   });
   const virtualItems = virtualizer.getVirtualItems();
-  const renderItems =
-    virtualItems.length > 0
-      ? virtualItems.map((item) => ({ index: item.index, start: item.start }))
-      : typeof window === "undefined"
-        ? messages.map((_, index) => ({ index, start: index * 112 }))
-        : [];
+  const renderItems = getMessageRenderItems(messages, virtualItems);
 
   return (
     <div

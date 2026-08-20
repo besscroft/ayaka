@@ -5,6 +5,7 @@ import { Fragment, createElement } from "react";
 import type { UIMessage } from "ai";
 import {
   areMessageItemPropsEqual,
+  getMessageRenderItems,
   hasRenderableActivity,
   getMessageActivityStatus,
   getReasoningDisplays,
@@ -233,6 +234,19 @@ void describe("reasoning display", () => {
 });
 
 void describe("execution details", () => {
+  void it("renders estimated rows while the virtualizer is measuring", () => {
+    const messages = [userMessage("u1", "one"), userMessage("u2", "two")];
+
+    assert.deepEqual(getMessageRenderItems(messages, []), [
+      { index: 0, start: 0 },
+      { index: 1, start: 112 },
+    ]);
+    assert.deepEqual(getMessageRenderItems(messages, [{ index: 1, start: 248 }]), [
+      { index: 1, start: 248 },
+    ]);
+    assert.deepEqual(getMessageRenderItems([], []), []);
+  });
+
   void it("renders reasoning at its original message part positions", () => {
     const html = renderToStaticMarkup(
       createElement(MessageList, {

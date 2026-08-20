@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_CHAT_TOOL_SELECTION, type RuntimeRun, type RuntimeStep } from "@shared/types";
 import {
   AgentStatusWidget,
+  getAgentPanelAnimation,
   getRecentRuntimeSteps,
   formatElapsed,
   resolveAgentPanelStatus,
@@ -49,6 +50,11 @@ function makeStep(id: string, runId: string, startedAt: number): RuntimeStep {
 }
 
 void describe("agent status widget runtime helpers", () => {
+  void it("keeps the panel visible after its expand animation starts", () => {
+    assert.deepEqual(getAgentPanelAnimation(true), { width: 320, opacity: 1 });
+    assert.deepEqual(getAgentPanelAnimation(false), { width: 80, opacity: 1 });
+  });
+
   void it("selects the latest run for the active conversation only", () => {
     const runs = [
       makeRun("other", "conversation-2", 30),

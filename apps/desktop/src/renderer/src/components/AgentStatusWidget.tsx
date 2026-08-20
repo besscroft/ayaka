@@ -79,6 +79,10 @@ const ACTIVE_INSTANCE_STATUSES = new Set([
   "learning",
 ]);
 
+export function getAgentPanelAnimation(open: boolean): { width: number; opacity: number } {
+  return { width: open ? 320 : 80, opacity: 1 };
+}
+
 export function selectLatestConversationRun(
   runs: RuntimeRun[],
   conversationId: string,
@@ -280,7 +284,7 @@ export function AgentStatusWidget({
   return (
     <motion.aside
       initial={open ? { width: 0, opacity: 0 } : false}
-      animate={{ width: open ? 320 : 80 }}
+      animate={getAgentPanelAnimation(open)}
       exit={open ? { width: 0, opacity: 0 } : { opacity: 0 }}
       transition={
         reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34, mass: 0.8 }
