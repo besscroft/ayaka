@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   McpAuthStatus,
   McpCapabilitySnapshot,
@@ -64,49 +64,60 @@ export function McpWorkspace({
   const [capabilities, setCapabilities] = useState<McpCapabilitySnapshot | null>(null);
   const [auth, setAuth] = useState<McpAuthStatus | null>(null);
   const [loadingCapabilities, setLoadingCapabilities] = useState(false);
+  const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [pendingInput, setPendingInput] = useState<McpInputRequest | null>(null);
+  const capabilityRequestId = useRef(0);
 
   const selected = servers.find((server) => server.id === selectedId) ?? servers[0] ?? null;
   const selectedTools = selected ? (toolsByServer.get(selected.id) ?? []) : [];
   const selectedIsDiscovering = selected ? discoveringServerIds.has(selected.id) : false;
+  const displayedCapabilityError =
+    capabilityError ?? (selected?.status === "error" ? selected.last_error : null);
 
   useEffect(() => {
-    if (!selected || selected.id !== selectedId) {
+    if (selected?.id !== selectedId) {
       // The selected server can disappear after a refresh.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(selected?.id ?? null);
+      capabilityRequestId.current += 1;
+      setCapabilities(null);
+      setAuth(null);
+      setLoadingCapabilities(false);
+      setCapabilityError(null);
+      setTab("overview");
     }
-  }, [selected, selectedId]);
+  }, [selected?.id, selectedId]);
 
   const loadCapabilities = async (): Promise<void> => {
-    if (!selected || selected.enabled === 0) return;
+    const server = selected;
+    if (!server || server.enabled === 0) return;
+    const requestId = ++capabilityRequestId.current;
     setLoadingCapabilities(true);
     try {
       const [next, nextAuth] = await Promise.all([
-        api.mcp.capabilities(selected.id),
-        isMcpOAuthTransport(selected.transport)
-          ? api.mcp.authStatus(selected.id)
+        api.mcp.capabilities(server.id),
+        isMcpOAuthTransport(server.transport)
+          ? api.mcp.authStatus(server.id)
           : Promise.resolve({ status: "not_required" as const, expiresAt: null }),
       ]);
+      if (requestId !== capabilityRequestId.current || selectedId !== server.id) return;
       setCapabilities(next);
       setAuth(nextAuth);
-      void api.mcp.subscribe(selected.id).catch(() => undefined);
+      setCapabilityError(null);
+      void api.mcp.subscribe(server.id).catch(() => undefined);
+      onRefresh();
     } catch (error) {
-      notify.error(t("tools.toast.failed"), error, locale);
+      if (requestId === capabilityRequestId.current && selectedId === server.id) {
+        setCapabilityError(error instanceof Error ? error.message : String(error));
+        notify.error(t("tools.toast.failed"), error, locale);
+        onRefresh();
+      }
     } finally {
-      setLoadingCapabilities(false);
+      if (requestId === capabilityRequestId.current && selectedId === server.id) {
+        setLoadingCapabilities(false);
+      }
     }
   };
-
-  useEffect(() => {
-    // Selection changes intentionally reset the capability workspace.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCapabilities(null);
-    setTab("overview");
-    void loadCapabilities();
-    // A server selection is the intended refresh boundary for the workspace.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id]);
 
   useEffect(() => {
     const offCapabilities = api.mcp.onCapabilitiesChanged((event) => {
@@ -128,8 +139,14 @@ export function McpWorkspace({
   }, [selected?.id]);
 
   const selectServer = (server: ToolServer): void => {
+    if (server.id === selected?.id) return;
+    capabilityRequestId.current += 1;
     setSelectedId(server.id);
     setCapabilities(null);
+    setAuth(null);
+    setLoadingCapabilities(false);
+    setCapabilityError(null);
+    setTab("overview");
   };
 
   if (servers.length === 0) {
@@ -259,7 +276,15 @@ export function McpWorkspace({
               </Card.Header>
               <Card.Content className="min-h-0 flex-1 overflow-y-auto p-4">
                 {loadingCapabilities && !capabilities ? (
-                  <LoadingIndicator label={t("main.loading")} />
+                  <LoadingIndicator label={t("tools.mcp.workspace.connecting")} />
+                ) : null}
+                {displayedCapabilityError ? (
+                  <p
+                    role="alert"
+                    className="mb-3 rounded-md border border-destructive/40 p-3 text-sm"
+                  >
+                    {t("tools.mcp.workspace.loadFailed")}: {displayedCapabilityError}
+                  </p>
                 ) : null}
                 {tab === "overview" ? (
                   <OverviewWorkspace
@@ -323,7 +348,7 @@ function OverviewWorkspace({
 }): React.JSX.Element {
   const { t } = useT();
   if (!capabilities)
-    return <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.noCapability")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.notLoaded")}</p>;
   const authLabel =
     auth?.status === "authorized"
       ? t("tools.mcp.workspace.authorized")
@@ -525,7 +550,9 @@ function PromptWorkspace({
   };
   return (
     <div className="flex flex-col gap-4">
-      {prompts.length === 0 ? (
+      {!capabilities ? (
+        <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.notLoaded")}</p>
+      ) : prompts.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.noCapability")}</p>
       ) : null}
       {selected ? (

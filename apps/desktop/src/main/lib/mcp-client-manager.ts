@@ -37,6 +37,9 @@ export type McpConnectionEvent =
 
 type ConnectionListener = (event: McpConnectionEvent) => void;
 
+const MAX_STDIO_STDERR_LENGTH = 4_000;
+const stdioDiagnostics = new WeakMap<StdioClientTransport, { stderr: string }>();
+
 const connectionCache = new Map<string, { updatedAt: number; connection: McpConnection }>();
 const pendingConnections = new Map<string, Promise<McpConnection>>();
 const listeners = new Set<ConnectionListener>();
@@ -138,8 +141,12 @@ export function validateMcpUrl(rawUrl: string): URL {
   return url;
 }
 
-export function redactMcpError(error: unknown, server?: ToolServer): string {
+export function redactMcpError(error: unknown, server?: ToolServer, transport?: Transport): string {
   let message = error instanceof Error ? error.message : String(error);
+  const stderr = getStdioStderr(transport);
+  if (stderr && !message.includes(stderr)) {
+    message += ` (MCP server stderr: ${stderr})`;
+  }
   if (server) {
     for (const value of secretValues(server)) {
       if (value) message = message.split(value).join("[REDACTED]");
@@ -222,7 +229,9 @@ async function connectWithTransport(
       snapshot,
       subscription: null,
     };
+    const sdkOnClose = transport.onclose;
     transport.onclose = () => {
+      sdkOnClose?.();
       const current = connectionCache.get(server.id)?.connection;
       if (current !== connection) return;
       connectionCache.delete(server.id);
@@ -233,14 +242,14 @@ async function connectWithTransport(
   } catch (error) {
     await client.close().catch(() => undefined);
     await transport.close().catch(() => undefined);
-    throw error;
+    throw new Error(redactMcpError(error, server, transport), { cause: error });
   }
 }
 
 function createStdioTransport(server: ToolServer): StdioClientTransport {
   const command = server.command?.trim();
   if (!command) throw new Error("MCP stdio server is missing a command.");
-  return new StdioClientTransport({
+  const transport = new StdioClientTransport({
     command,
     args: safeJsonArray(server.args_json).map(String),
     env: {
@@ -250,6 +259,18 @@ function createStdioTransport(server: ToolServer): StdioClientTransport {
     cwd: server.cwd ?? undefined,
     stderr: "pipe",
   });
+  const diagnostics = { stderr: "" };
+  stdioDiagnostics.set(transport, diagnostics);
+  transport.stderr?.on("data", (chunk: Buffer | string) => {
+    const next = diagnostics.stderr + chunk.toString();
+    diagnostics.stderr = next.slice(-MAX_STDIO_STDERR_LENGTH);
+  });
+  return transport;
+}
+
+function getStdioStderr(transport?: Transport): string {
+  if (!(transport instanceof StdioClientTransport)) return "";
+  return stdioDiagnostics.get(transport)?.stderr.trim() ?? "";
 }
 
 async function createHttpTransport(server: ToolServer): Promise<StreamableHTTPClientTransport> {

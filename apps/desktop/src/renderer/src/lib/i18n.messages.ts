@@ -1478,6 +1478,14 @@ const entries = {
     zh: "该服务器未声明此能力",
     en: "This server does not advertise this capability",
   },
+  "tools.mcp.workspace.notLoaded": {
+    zh: "尚未读取服务器能力，请先点击刷新",
+    en: "Capabilities have not been loaded yet. Refresh to connect.",
+  },
+  "tools.mcp.workspace.loadFailed": {
+    zh: "能力读取失败",
+    en: "Failed to load capabilities",
+  },
   "tools.mcp.workspace.inputTitle": { zh: "MCP 需要你的输入", en: "MCP needs your input" },
   "tools.mcp.workspace.submit": { zh: "确认", en: "Confirm" },
   "tools.mcp.workspace.cancel": { zh: "取消", en: "Cancel" },
@@ -2153,6 +2161,8 @@ const zhOverrides: Dict = {
   "tools.mcp.workspace.getPrompt": "获取提示词",
   "tools.mcp.workspace.copy": "复制",
   "tools.mcp.workspace.noCapability": "该服务器未声明此能力",
+  "tools.mcp.workspace.notLoaded": "尚未读取服务器能力，请先点击刷新",
+  "tools.mcp.workspace.loadFailed": "能力读取失败",
   "tools.mcp.workspace.inputTitle": "MCP 需要你的输入",
   "tools.mcp.workspace.submit": "确认",
   "tools.mcp.workspace.cancel": "取消",

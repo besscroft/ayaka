@@ -4,6 +4,7 @@ import type { CallToolResult } from "@modelcontextprotocol/client";
 import type {
   ChatToolDescriptor,
   McpCapabilitySnapshot,
+  McpCapabilitySummary,
   McpCompletionResult,
   McpPrompt,
   McpPromptResult,
@@ -137,8 +138,9 @@ export async function testMcpServer(serverId: string): Promise<ToolDiscoveryResu
 export async function discoverMcpServer(serverId: string): Promise<ToolDiscoveryResult> {
   const server = getMcpServer(serverId);
   if (!server) throw new Error("MCP server not found: " + serverId);
+  let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
   try {
-    const connection = await getMcpConnection(server, { forceNew: true });
+    connection = await getMcpConnection(server, { forceNew: true });
     const toolsResult = await withMcpTimeout(
       connection.client.listTools(),
       server,
@@ -190,7 +192,7 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
     };
   } catch (error) {
     await closeMcpClient(server.id);
-    const message = redactMcpError(error, server);
+    const message = redactMcpError(error, server, connection?.transport);
     const nextServer =
       (await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message })) ??
       server;
@@ -216,9 +218,15 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
 export async function getMcpCapabilities(serverId: string): Promise<McpCapabilitySnapshot> {
   const server = getMcpServer(serverId);
   if (!server) throw new Error("MCP server not found: " + serverId);
+  let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
   try {
-    const connection = await getMcpConnection(server);
+    connection = await getMcpConnection(server);
     const loaded = await loadMcpCapabilities(connection, server);
+    await updateMcpServerStatusAsync(server.id, {
+      status: server.enabled ? "ready" : "disabled",
+      last_error: null,
+      last_connected_at: connection.snapshot.connectedAt,
+    });
     return {
       serverId,
       protocolEra: connection.snapshot.protocolEra,
@@ -233,7 +241,9 @@ export async function getMcpCapabilities(serverId: string): Promise<McpCapabilit
       connectedAt: connection.snapshot.connectedAt,
     };
   } catch (error) {
-    throw new Error(redactMcpError(error, server), { cause: error });
+    const message = redactMcpError(error, server, connection?.transport);
+    await updateMcpServerStatusAsync(server.id, { status: "error", last_error: message });
+    throw new Error(message, { cause: error });
   }
 }
 
@@ -545,6 +555,7 @@ async function loadMcpCapabilities(
       listResourceTemplates: () => Promise<unknown>;
       listPrompts: () => Promise<unknown>;
     };
+    snapshot: { capabilities: Pick<McpCapabilitySummary, "resources" | "prompts"> };
   },
   server: ToolServer,
 ): Promise<{
@@ -553,21 +564,30 @@ async function loadMcpCapabilities(
   prompts: McpPrompt[];
 }> {
   const [resourcesResult, templatesResult, promptsResult] = await Promise.all([
-    withMcpTimeout(
-      connection.client.listResources(),
-      server,
-      "MCP resource discovery timed out.",
-      () => closeMcpClient(server.id),
-    ).catch(() => ({ resources: [] })),
-    withMcpTimeout(
-      connection.client.listResourceTemplates(),
-      server,
-      "MCP resource template discovery timed out.",
-      () => closeMcpClient(server.id),
-    ).catch(() => ({ resourceTemplates: [] })),
-    withMcpTimeout(connection.client.listPrompts(), server, "MCP prompt discovery timed out.", () =>
-      closeMcpClient(server.id),
-    ).catch(() => ({ prompts: [] })),
+    connection.snapshot.capabilities.resources
+      ? withMcpTimeout(
+          connection.client.listResources(),
+          server,
+          "MCP resource discovery timed out.",
+          () => closeMcpClient(server.id),
+        ).catch(() => ({ resources: [] }))
+      : Promise.resolve({ resources: [] }),
+    connection.snapshot.capabilities.resources
+      ? withMcpTimeout(
+          connection.client.listResourceTemplates(),
+          server,
+          "MCP resource template discovery timed out.",
+          () => closeMcpClient(server.id),
+        ).catch(() => ({ resourceTemplates: [] }))
+      : Promise.resolve({ resourceTemplates: [] }),
+    connection.snapshot.capabilities.prompts
+      ? withMcpTimeout(
+          connection.client.listPrompts(),
+          server,
+          "MCP prompt discovery timed out.",
+          () => closeMcpClient(server.id),
+        ).catch(() => ({ prompts: [] }))
+      : Promise.resolve({ prompts: [] }),
   ]);
   const resources = Array.isArray((resourcesResult as { resources?: unknown[] }).resources)
     ? (resourcesResult as { resources: unknown[] }).resources.map(toMcpResource)

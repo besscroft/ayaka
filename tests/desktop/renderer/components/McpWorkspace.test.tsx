@@ -26,6 +26,7 @@ void describe("MCP workspace", () => {
     assert.match(html, /class="[^\"]*h-full min-h-0 overflow-hidden"/);
     assert.match(html, />Weather MCP</);
     assert.match(html, />概览</);
+    assert.match(html, /尚未读取服务器能力，请先点击刷新/);
     assert.match(html, />工具发现</);
     assert.doesNotMatch(html, />资源</);
     assert.match(html, />提示词</);
