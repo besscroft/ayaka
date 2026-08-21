@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.32]
+
+### 中文
+
+#### 新增
+
+- 新增基于独立 JSON 配置的内置 MCP 预设目录，提供 20 个经过审核的本地与远程 MCP 预设，并支持搜索、分类与安装管理。
+- 新增 MCP 服务能力加载状态与 stderr 诊断，提供本地化且可操作的连接错误提示。
+
+#### 变更
+
+- 移除 mcp.so 商店目录，改用本地内置 MCP 预设系统；预设安装后默认保持禁用，更新预设元数据时保留用户配置、密钥与启用状态。
+- 优化 MCP 工作区布局、环境变量配置及服务切换状态处理，提升服务列表与详情面板的可用性。
+
+#### 修复
+
+- 修复 Windows 中文环境下 stdio MCP 服务 stderr 解码异常及缺少命令时错误信息不清晰的问题。
+- 修复绝区零主题模型与推理选择器无法正常纵向滚动的问题。
+
+### English
+
+#### Added
+
+- Added a standalone JSON-backed built-in MCP preset catalog with 20 reviewed local and remote presets, plus search, categorization, and installation management.
+- Added MCP capability-loading states and stderr diagnostics with localized, actionable connection errors.
+
+#### Changed
+
+- Replaced the mcp.so marketplace catalog with a local built-in MCP preset system; newly installed presets remain disabled until reviewed, and metadata updates preserve user configuration, secrets, and enabled state.
+- Improved MCP workspace layout, environment-variable configuration, and server-switch state handling for clearer server lists and detail panels.
+
+#### Fixed
+
+- Fixed unclear stdio MCP errors caused by stderr decoding in Chinese Windows environments and missing commands.
+- Fixed ZZZ skin model and reasoning selectors not scrolling vertically as expected.
+
 ## [0.1.31]
 
 ### 中文
