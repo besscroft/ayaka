@@ -1448,6 +1448,15 @@ const entries = {
   "main.memory.origin.import": { zh: "导入", en: "Import" },
   "main.memory.origin.system": { zh: "系统", en: "System" },
   "tools.mcp.add": { zh: "添加 MCP", en: "Add MCP" },
+  "tools.mcp.error.commandNotFound": {
+    zh: '找不到 MCP 命令 "{command}"。请安装该命令并确认它已加入 PATH；如果刚安装完成，请重启 Ayaka 以加载新的 PATH。',
+    en: 'MCP command "{command}" was not found. Install it and ensure it is on PATH. If you installed it recently, restart Ayaka so the updated PATH is loaded.',
+  },
+  "tools.mcp.error.connectionClosed": {
+    zh: "MCP 服务器连接已关闭。请检查启动命令和服务端日志。",
+    en: "The MCP server connection was closed. Check the startup command and server logs.",
+  },
+  "tools.mcp.error.page": { zh: "MCP 管理操作失败", en: "MCP management action failed" },
   "tools.mcp.edit": { zh: "编辑 MCP", en: "Edit MCP" },
   "tools.mcp.empty": { zh: "暂无 MCP 服务器", en: "No MCP servers" },
   "tools.mcp.noDescription": { zh: "暂无描述", en: "No description" },
@@ -1486,6 +1495,7 @@ const entries = {
     zh: "能力读取失败",
     en: "Failed to load capabilities",
   },
+  "tools.mcp.workspace.actionFailed": { zh: "操作失败", en: "Action failed" },
   "tools.mcp.workspace.inputTitle": { zh: "MCP 需要你的输入", en: "MCP needs your input" },
   "tools.mcp.workspace.submit": { zh: "确认", en: "Confirm" },
   "tools.mcp.workspace.cancel": { zh: "取消", en: "Cancel" },

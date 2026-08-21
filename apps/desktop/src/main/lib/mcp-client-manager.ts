@@ -8,6 +8,7 @@ import {
   type Transport,
 } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { TextDecoder } from "node:util";
 import type { McpCapabilitySummary, McpProtocolEra, ToolServer } from "../../shared/types";
 import { getToolSecretValue, resolveToolSecretReferences } from "./db";
 import { getMcpExecutionContext } from "./mcp-context";
@@ -37,8 +38,8 @@ export type McpConnectionEvent =
 
 type ConnectionListener = (event: McpConnectionEvent) => void;
 
-const MAX_STDIO_STDERR_LENGTH = 4_000;
-const stdioDiagnostics = new WeakMap<StdioClientTransport, { stderr: string }>();
+const MAX_STDIO_STDERR_BYTES = 4_000;
+const stdioDiagnostics = new WeakMap<StdioClientTransport, { stderr: Uint8Array }>();
 
 const connectionCache = new Map<string, { updatedAt: number; connection: McpConnection }>();
 const pendingConnections = new Map<string, Promise<McpConnection>>();
@@ -142,7 +143,11 @@ export function validateMcpUrl(rawUrl: string): URL {
 }
 
 export function redactMcpError(error: unknown, server?: ToolServer, transport?: Transport): string {
-  let message = error instanceof Error ? error.message : String(error);
+  let message = missingMcpExecutable(error, server)
+    ? `MCP command "${server?.command?.trim()}" was not found. Install it and ensure it is available on PATH. If you installed it recently, restart Ayaka so the desktop app can load the updated PATH.`
+    : error instanceof Error
+      ? error.message
+      : String(error);
   const stderr = getStdioStderr(transport);
   if (stderr && !message.includes(stderr)) {
     message += ` (MCP server stderr: ${stderr})`;
@@ -155,6 +160,16 @@ export function redactMcpError(error: unknown, server?: ToolServer, transport?: 
   return message
     .replace(/(authorization\s*:\s*bearer\s+)[^\s,]+/gi, "$1[REDACTED]")
     .replace(/(api[_-]?key\s*[=:]\s*)[^\s,}]+/gi, "$1[REDACTED]");
+}
+
+function missingMcpExecutable(error: unknown, server?: ToolServer): boolean {
+  if (server?.transport !== "stdio" || !server.command?.trim()) return false;
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === "ENOENT") return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /\bspawn\s+.+\s+ENOENT\b/i.test(message);
 }
 
 async function connectMcpServer(server: ToolServer): Promise<McpConnection> {
@@ -259,18 +274,34 @@ function createStdioTransport(server: ToolServer): StdioClientTransport {
     cwd: server.cwd ?? undefined,
     stderr: "pipe",
   });
-  const diagnostics = { stderr: "" };
+  const diagnostics: { stderr: Uint8Array } = { stderr: new Uint8Array(0) };
   stdioDiagnostics.set(transport, diagnostics);
   transport.stderr?.on("data", (chunk: Buffer | string) => {
-    const next = diagnostics.stderr + chunk.toString();
-    diagnostics.stderr = next.slice(-MAX_STDIO_STDERR_LENGTH);
+    const next = Buffer.concat([diagnostics.stderr, Buffer.from(chunk)]);
+    diagnostics.stderr = trimStdioStderr(next);
   });
   return transport;
 }
 
 function getStdioStderr(transport?: Transport): string {
   if (!(transport instanceof StdioClientTransport)) return "";
-  return stdioDiagnostics.get(transport)?.stderr.trim() ?? "";
+  const stderr = stdioDiagnostics.get(transport)?.stderr;
+  return stderr ? decodeMcpStderr(stderr).trim() : "";
+}
+
+export function decodeMcpStderr(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    // Windows Python tools commonly inherit the active Chinese code page.
+    return new TextDecoder("gb18030").decode(bytes);
+  }
+}
+
+function trimStdioStderr(bytes: Uint8Array): Uint8Array {
+  let start = Math.max(0, bytes.length - MAX_STDIO_STDERR_BYTES);
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start);
 }
 
 async function createHttpTransport(server: ToolServer): Promise<StreamableHTTPClientTransport> {

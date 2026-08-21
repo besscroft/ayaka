@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { isMcpOAuthTransport, type ToolServer } from "@shared/types";
 import { McpWorkspace } from "@renderer/components/McpWorkspace";
+import { getMcpErrorMessage } from "@renderer/lib/mcp-errors";
 
 void describe("MCP workspace", () => {
   void it("renders the server list beside the capability workspace", () => {
@@ -36,6 +37,41 @@ void describe("MCP workspace", () => {
     assert.equal(isMcpOAuthTransport("stdio"), false);
     assert.equal(isMcpOAuthTransport("http"), true);
     assert.equal(isMcpOAuthTransport("sse"), true);
+  });
+
+  void it("renders missing stdio runtime errors inside the workspace", () => {
+    const html = renderToStaticMarkup(
+      <McpWorkspace
+        servers={[
+          {
+            ...server(),
+            transport: "stdio",
+            command: "uvx",
+            status: "error",
+            last_error: 'MCP command "uvx" was not found. Install it and ensure it is on PATH.',
+          },
+        ]}
+        toolsByServer={new Map()}
+        busy={false}
+        discoveringServerIds={new Set()}
+        onRefresh={() => undefined}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+        onToggle={() => undefined}
+      />,
+    );
+
+    assert.match(html, /role="alert"/);
+    assert.match(html, /uvx/);
+    assert.doesNotMatch(html, /spawn uvx ENOENT/);
+    assert.match(getMcpErrorMessage('MCP command "uvx" was not found.', "en"), /PATH/);
+    assert.doesNotMatch(
+      getMcpErrorMessage(
+        "Error invoking remote method 'mcp:capabilities': Error: Connection closed (MCP server stderr: uvx 中文)",
+        "zh-CN",
+      ),
+      /Error invoking remote method/,
+    );
   });
 });
 

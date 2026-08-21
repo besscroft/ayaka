@@ -11,6 +11,7 @@ import type {
 import { isMcpOAuthTransport } from "@shared/types";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
+import { getMcpErrorMessage } from "../lib/mcp-errors";
 import { notify } from "../lib/toast";
 import {
   Button,
@@ -65,6 +66,7 @@ export function McpWorkspace({
   const [auth, setAuth] = useState<McpAuthStatus | null>(null);
   const [loadingCapabilities, setLoadingCapabilities] = useState(false);
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [pendingInput, setPendingInput] = useState<McpInputRequest | null>(null);
   const capabilityRequestId = useRef(0);
 
@@ -73,6 +75,9 @@ export function McpWorkspace({
   const selectedIsDiscovering = selected ? discoveringServerIds.has(selected.id) : false;
   const displayedCapabilityError =
     capabilityError ?? (selected?.status === "error" ? selected.last_error : null);
+  const displayedError = displayedCapabilityError
+    ? getMcpErrorMessage(displayedCapabilityError, locale)
+    : null;
 
   useEffect(() => {
     if (selected?.id !== selectedId) {
@@ -84,6 +89,7 @@ export function McpWorkspace({
       setAuth(null);
       setLoadingCapabilities(false);
       setCapabilityError(null);
+      setWorkspaceError(null);
       setTab("overview");
     }
   }, [selected?.id, selectedId]);
@@ -108,8 +114,7 @@ export function McpWorkspace({
       onRefresh();
     } catch (error) {
       if (requestId === capabilityRequestId.current && selectedId === server.id) {
-        setCapabilityError(error instanceof Error ? error.message : String(error));
-        notify.error(t("tools.toast.failed"), error, locale);
+        setCapabilityError(getMcpErrorMessage(error, locale));
         onRefresh();
       }
     } finally {
@@ -146,6 +151,7 @@ export function McpWorkspace({
     setAuth(null);
     setLoadingCapabilities(false);
     setCapabilityError(null);
+    setWorkspaceError(null);
     setTab("overview");
   };
 
@@ -278,12 +284,20 @@ export function McpWorkspace({
                 {loadingCapabilities && !capabilities ? (
                   <LoadingIndicator label={t("tools.mcp.workspace.connecting")} />
                 ) : null}
-                {displayedCapabilityError ? (
+                {displayedError ? (
                   <p
                     role="alert"
                     className="mb-3 rounded-md border border-destructive/40 p-3 text-sm"
                   >
-                    {t("tools.mcp.workspace.loadFailed")}: {displayedCapabilityError}
+                    {t("tools.mcp.workspace.loadFailed")}: {displayedError}
+                  </p>
+                ) : null}
+                {workspaceError ? (
+                  <p
+                    role="alert"
+                    className="mb-3 rounded-md border border-destructive/40 p-3 text-sm"
+                  >
+                    {t("tools.mcp.workspace.actionFailed")}: {workspaceError}
                   </p>
                 ) : null}
                 {tab === "overview" ? (
@@ -292,6 +306,7 @@ export function McpWorkspace({
                     auth={auth}
                     oauthSupported={isMcpOAuthTransport(selected.transport)}
                     onAuthorize={async () => {
+                      setWorkspaceError(null);
                       try {
                         const result = await api.mcp.authorize(selected.id);
                         notify.success(
@@ -300,15 +315,16 @@ export function McpWorkspace({
                             : t("tools.mcp.workspace.authorizePending"),
                         );
                       } catch (error) {
-                        notify.error(t("tools.toast.failed"), error, locale);
+                        setWorkspaceError(getMcpErrorMessage(error, locale));
                       }
                     }}
                     onLogout={async () => {
+                      setWorkspaceError(null);
                       try {
                         await api.mcp.logout(selected.id);
                         setAuth({ status: "unknown", expiresAt: null });
                       } catch (error) {
-                        notify.error(t("tools.toast.failed"), error, locale);
+                        setWorkspaceError(getMcpErrorMessage(error, locale));
                       }
                     }}
                   />
@@ -432,10 +448,16 @@ function ToolWorkspace({
   onRefresh: () => void;
 }): React.JSX.Element {
   const { t, locale } = useT();
+  const [error, setError] = useState<string | null>(null);
   if (tools.length === 0)
     return <p className="text-sm text-muted-foreground">{t("tools.mcp.noTools")}</p>;
   return (
     <div className="flex flex-col gap-2">
+      {error ? (
+        <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
+          {t("tools.mcp.workspace.actionFailed")}: {error}
+        </p>
+      ) : null}
       {tools.map((item) => (
         <div key={item.id} className="rounded-md border border-border p-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -450,11 +472,12 @@ function ToolWorkspace({
                 size="sm"
                 isSelected={item.enabled !== 0}
                 isDisabled={busy}
-                onChange={(enabled) =>
-                  void updateTool(item.id, { enabled }, onRefresh, (error) =>
-                    notify.error(t("tools.toast.failed"), error, locale),
-                  )
-                }
+                onChange={(enabled) => {
+                  setError(null);
+                  void updateTool(item.id, { enabled }, onRefresh, (reason) =>
+                    setError(getMcpErrorMessage(reason, locale)),
+                  );
+                }}
               >
                 {t("tools.enabled")}
               </Switch>
@@ -462,11 +485,12 @@ function ToolWorkspace({
                 size="sm"
                 isSelected={item.auto_use !== 0}
                 isDisabled={busy}
-                onChange={(auto_use) =>
-                  void updateTool(item.id, { auto_use }, onRefresh, (error) =>
-                    notify.error(t("tools.toast.failed"), error, locale),
-                  )
-                }
+                onChange={(auto_use) => {
+                  setError(null);
+                  void updateTool(item.id, { auto_use }, onRefresh, (reason) =>
+                    setError(getMcpErrorMessage(reason, locale)),
+                  );
+                }}
               >
                 {t("tools.autoUse")}
               </Switch>
@@ -474,11 +498,12 @@ function ToolWorkspace({
                 size="sm"
                 isSelected={item.requires_approval !== 0}
                 isDisabled={busy}
-                onChange={(requires_approval) =>
-                  void updateTool(item.id, { requires_approval }, onRefresh, (error) =>
-                    notify.error(t("tools.toast.failed"), error, locale),
-                  )
-                }
+                onChange={(requires_approval) => {
+                  setError(null);
+                  void updateTool(item.id, { requires_approval }, onRefresh, (reason) =>
+                    setError(getMcpErrorMessage(reason, locale)),
+                  );
+                }}
               >
                 {t("tools.approval")}
               </Switch>
@@ -518,6 +543,7 @@ function PromptWorkspace({
   const [promptName, setPromptName] = useState(prompts[0]?.name ?? "");
   const [args, setArgs] = useState<Record<string, string>>({});
   const [result, setResult] = useState<McpPromptResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const selected = prompts.find((prompt) => prompt.name === promptName) ?? prompts[0] ?? null;
   useEffect(() => {
     if (selected && selected.name !== promptName) {
@@ -528,10 +554,11 @@ function PromptWorkspace({
   }, [promptName, selected]);
   const getPrompt = async (): Promise<void> => {
     if (!selected) return;
+    setError(null);
     try {
       setResult(await api.mcp.getPrompt({ serverId, name: selected.name, arguments: args }));
     } catch (error) {
-      notify.error(t("tools.toast.failed"), error, locale);
+      setError(getMcpErrorMessage(error, locale));
     }
   };
   const copy = async (): Promise<void> => {
@@ -554,6 +581,11 @@ function PromptWorkspace({
         <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.notLoaded")}</p>
       ) : prompts.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("tools.mcp.workspace.noCapability")}</p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
+          {t("tools.mcp.workspace.actionFailed")}: {error}
+        </p>
       ) : null}
       {selected ? (
         <>
@@ -585,16 +617,16 @@ function PromptWorkspace({
                 <Button
                   size="sm"
                   variant="tertiary"
-                  onPress={() =>
+                  onPress={() => {
+                    setError(null);
                     void requestCompletion(
                       serverId,
                       selected,
                       argument.name,
                       args[argument.name] ?? "",
                       t,
-                      locale,
-                    )
-                  }
+                    ).catch((reason) => setError(getMcpErrorMessage(reason, locale)));
+                  }}
                 >
                   {t("tools.mcp.workspace.complete")}
                 </Button>
@@ -647,20 +679,15 @@ async function requestCompletion(
   argumentName: string,
   value: string,
   t: ReturnType<typeof useT>["t"],
-  locale: ReturnType<typeof useT>["locale"],
 ): Promise<void> {
-  try {
-    const result = await api.mcp.complete({
-      serverId,
-      ref: { type: "ref/prompt", name: prompt.name },
-      argument: { name: argumentName, value },
-    });
-    if (result.values[0]) {
-      await navigator.clipboard.writeText(result.values.join("\n"));
-      notify.success(t("tools.mcp.workspace.completionCopied"));
-    }
-  } catch (error) {
-    notify.error(t("tools.toast.failed"), error, locale);
+  const result = await api.mcp.complete({
+    serverId,
+    ref: { type: "ref/prompt", name: prompt.name },
+    argument: { name: argumentName, value },
+  });
+  if (result.values[0]) {
+    await navigator.clipboard.writeText(result.values.join("\n"));
+    notify.success(t("tools.mcp.workspace.completionCopied"));
   }
 }
 

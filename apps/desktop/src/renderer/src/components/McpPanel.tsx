@@ -16,6 +16,7 @@ import {
 } from "./ui";
 import { api, type ToolsSnapshot } from "../lib/api";
 import { useT } from "../lib/i18n";
+import { getMcpErrorMessage } from "../lib/mcp-errors";
 import { notify } from "../lib/toast";
 import { buildMcpInput, formatMcpEnvironment, type McpFormState } from "../lib/tools-form";
 import { cn } from "../lib/utils";
@@ -60,6 +61,7 @@ export function McpPanel({
   const [catalogSnapshot, setCatalogSnapshot] = useState<CatalogSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(() => new Set());
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -75,14 +77,15 @@ export function McpPanel({
     savedSecretKeys: string[];
   } | null>(null);
 
-  const refresh = (): void => {
+  const refresh = (options: { clearError?: boolean } = {}): void => {
+    if (options.clearError !== false) setPageError(null);
     setRefreshing(true);
     void Promise.all([api.tools.snapshot(), api.catalog.snapshot()])
       .then(([nextSnapshot, nextCatalogSnapshot]) => {
         setSnapshot(nextSnapshot);
         setCatalogSnapshot(nextCatalogSnapshot);
       })
-      .catch((error) => notify.error(t("tools.toast.failed"), error, locale))
+      .catch((error) => setPageError(getMcpErrorMessage(error, locale)))
       .finally(() => {
         setLoading(false);
         setRefreshing(false);
@@ -120,14 +123,15 @@ export function McpPanel({
   );
 
   const runAction = async (action: () => Promise<unknown>, success: string): Promise<void> => {
+    setPageError(null);
     setBusy(true);
     try {
       await action();
       notify.success(success);
     } catch (error) {
-      notify.error(t("tools.toast.failed"), error, locale);
+      setPageError(getMcpErrorMessage(error, locale));
     } finally {
-      refresh();
+      refresh({ clearError: false });
       setBusy(false);
     }
   };
@@ -147,13 +151,13 @@ export function McpPanel({
       .discover(serverId)
       .then((discovery) => {
         if (discovery.server.status === "error") {
-          notify.error(t("tools.toast.failed"), discovery.message, locale);
+          setPageError(getMcpErrorMessage(discovery.message, locale));
         }
       })
-      .catch((error) => notify.error(t("tools.toast.failed"), error, locale))
+      .catch((error) => setPageError(getMcpErrorMessage(error, locale)))
       .finally(() => {
         setServerDiscovering(serverId, false);
-        refresh();
+        refresh({ clearError: false });
       });
   };
 
@@ -214,6 +218,14 @@ export function McpPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto select-none">
+        {pageError ? (
+          <p
+            role="alert"
+            className="mb-4 break-words rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+          >
+            {t("tools.mcp.error.page")}: {pageError}
+          </p>
+        ) : null}
         {tab === "presets" ? (
           <McpPresetsPanel
             onInstalled={(installation, item, savedSecretKeys) => {
@@ -409,8 +421,7 @@ function McpReviewModal({
       notify.success(t("catalog.mcp.enabledToast"));
       onEnabled();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-      notify.error(t("catalog.mcp.enableFailed"), reason, locale);
+      setError(getMcpErrorMessage(reason, locale));
     } finally {
       setPending(false);
     }
@@ -452,7 +463,10 @@ function McpReviewModal({
             </div>
           ) : null}
           {error ? (
-            <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+            <p
+              role="alert"
+              className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+            >
               {error}
             </p>
           ) : null}
@@ -636,7 +650,10 @@ function AddMcpModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <div className="grid gap-4">
             {error ? (
-              <p className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+              <p
+                role="alert"
+                className="break-words rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+              >
                 {error}
               </p>
             ) : null}
