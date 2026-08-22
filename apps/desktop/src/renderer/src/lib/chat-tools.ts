@@ -9,6 +9,7 @@ import {
   type ToolsSnapshot,
   type ModelOption,
   type ProviderInfo,
+  resolveMcpToolPolicy,
 } from "@shared/types";
 
 const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
@@ -282,7 +283,8 @@ function createtoolChatToolDescriptors(
     .map((toolRecord) => {
       const serverId = toolRecord.server_id ?? "";
       const server = serverId ? serverById.get(serverId) : undefined;
-      const enabled = !!server && server.enabled !== 0 && toolRecord.enabled !== 0;
+      const policy = server ? resolveMcpToolPolicy(server, toolRecord) : null;
+      const enabled = policy?.available === true;
       const available = supportsToolCalling && enabled;
       return {
         id: `mcp:${serverId}:${toolRecord.name}`,
@@ -291,13 +293,8 @@ function createtoolChatToolDescriptors(
         kind: "host",
         execution: "host",
         category: "mcp",
-        defaultAuto:
-          supportsToolCalling &&
-          enabled &&
-          (server?.auto_use ?? 0) !== 0 &&
-          toolRecord.auto_use !== 0,
-        requiresApproval:
-          (server?.requires_approval ?? 1) !== 0 || toolRecord.requires_approval !== 0,
+        defaultAuto: supportsToolCalling && policy?.defaultAuto === true,
+        requiresApproval: policy?.requiresApproval ?? toolRecord.requires_approval !== 0,
         available,
         unavailableReason: available
           ? undefined

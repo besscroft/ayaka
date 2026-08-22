@@ -1215,6 +1215,31 @@ export interface ToolRecord {
   purge_after_at: number | null;
 }
 
+export interface McpToolPolicy {
+  available: boolean;
+  defaultAuto: boolean;
+  requiresApproval: boolean;
+}
+
+/**
+ * Resolve the effective policy for an MCP tool.
+ *
+ * The server enabled state gates the tool, while automation and approval are
+ * controlled by the tool-level settings so the MCP workspace switches remain
+ * authoritative.
+ */
+export function resolveMcpToolPolicy(
+  server: Pick<ToolServer, "enabled">,
+  tool: Pick<ToolRecord, "enabled" | "auto_use" | "requires_approval">,
+): McpToolPolicy {
+  const available = server.enabled !== 0 && tool.enabled !== 0;
+  return {
+    available,
+    defaultAuto: available && tool.auto_use !== 0,
+    requiresApproval: tool.requires_approval !== 0,
+  };
+}
+
 export interface ToolDiscoveryResult {
   server: ToolServer;
   tools: ToolRecord[];

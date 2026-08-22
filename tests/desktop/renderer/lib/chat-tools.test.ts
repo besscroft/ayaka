@@ -156,7 +156,7 @@ void describe("chat tool UI helpers", () => {
 
     assert.equal(mcp?.available, true);
     assert.equal(mcp?.defaultAuto, true);
-    assert.equal(mcp?.requiresApproval, true);
+    assert.equal(mcp?.requiresApproval, false);
     assert.equal(skill?.available, false);
     assert.equal(skill?.defaultAuto, false);
     assert.equal(skill?.unavailableReason, "chatTools.unavailable.skillInstructionsOnly");
@@ -254,7 +254,7 @@ function toolsnapshot(): ToolsSnapshot {
         kind: "mcp",
         transport: "http",
         enabled: 1,
-        auto_use: 1,
+        auto_use: 0,
         requires_approval: 1,
         status: "ready",
         command: null,
@@ -290,7 +290,7 @@ function toolsnapshot(): ToolsSnapshot {
         tags_json: "[]",
         enabled: 1,
         auto_use: 1,
-        requires_approval: 1,
+        requires_approval: 0,
         discovered_at: now,
         last_run_at: null,
         updated_at: now,

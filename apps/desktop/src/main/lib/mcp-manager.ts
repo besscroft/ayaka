@@ -1,19 +1,20 @@
 import { createHash } from "node:crypto";
 import { generateText, jsonSchema, tool, type ToolSet } from "ai";
 import type { CallToolResult } from "@modelcontextprotocol/client";
-import type {
-  ChatToolDescriptor,
-  McpCapabilitySnapshot,
-  McpCapabilitySummary,
-  McpCompletionResult,
-  McpPrompt,
-  McpPromptResult,
-  McpReadResourceResult,
-  McpResource,
-  McpResourceTemplate,
-  ToolDiscoveryResult,
-  ToolRecord,
-  ToolServer,
+import {
+  resolveMcpToolPolicy,
+  type ChatToolDescriptor,
+  type McpCapabilitySnapshot,
+  type McpCapabilitySummary,
+  type McpCompletionResult,
+  type McpPrompt,
+  type McpPromptResult,
+  type McpReadResourceResult,
+  type McpResource,
+  type McpResourceTemplate,
+  type ToolDiscoveryResult,
+  type ToolRecord,
+  type ToolServer,
 } from "../../shared/types";
 import {
   getMcpServer,
@@ -32,6 +33,7 @@ import {
   onMcpConnectionEvent,
   redactMcpError,
   withMcpTimeout,
+  type McpConnection,
 } from "./mcp-client-manager";
 import { runWithMcpExecutionContext } from "./mcp-context";
 import { getMcpAuthStatus } from "./mcp-auth";
@@ -60,7 +62,7 @@ export function notifyMcpToolsChanged(serverId: string): void {
   }
 }
 
-async function getReadyMcpConnection(server: ToolServer) {
+async function getReadyMcpConnection(server: ToolServer): Promise<McpConnection> {
   await ensureMcpServerStarted(server.id);
   return getMcpConnection(server);
 }
@@ -90,7 +92,7 @@ export function createMcpToolDescriptors(): ChatToolDescriptor[] {
     return listMcpTools().flatMap((mcpTool) => {
       const server = mcpTool.server_id ? serverById.get(mcpTool.server_id) : null;
       if (!server) return [];
-      const available = server.enabled !== 0 && mcpTool.enabled !== 0;
+      const policy = resolveMcpToolPolicy(server, mcpTool);
       return [
         {
           id: mcpToolReference(server.id, mcpTool.name),
@@ -99,10 +101,10 @@ export function createMcpToolDescriptors(): ChatToolDescriptor[] {
           kind: "host",
           execution: "host",
           category: "mcp",
-          defaultAuto: available && server.auto_use !== 0 && mcpTool.auto_use !== 0,
-          requiresApproval: server.requires_approval !== 0 || mcpTool.requires_approval !== 0,
-          available,
-          unavailableReason: available ? undefined : "MCP server or tool is disabled.",
+          defaultAuto: policy.defaultAuto,
+          requiresApproval: policy.requiresApproval,
+          available: policy.available,
+          unavailableReason: policy.available ? undefined : "MCP server or tool is disabled.",
           sourceId: server.id,
           sourceName: server.name,
         } satisfies ChatToolDescriptor,
@@ -146,11 +148,13 @@ export function createMcpToolSet({
     if (!parsed) continue;
     const server = getMcpServer(parsed.serverId);
     const mcpTool = getMcpToolByReference(parsed.serverId, parsed.toolName);
-    if (!server || !mcpTool || server.enabled === 0 || mcpTool.enabled === 0) continue;
+    if (!server || !mcpTool) continue;
+    const policy = resolveMcpToolPolicy(server, mcpTool);
+    if (!policy.available) continue;
     const toolName = mcpToolRuntimeName(server.id, mcpTool.name);
     tools[toolName] = createMcpTool({ reference, server, mcpTool, model, conversationId, agentId });
     activeTools.push(toolName);
-    if (server.requires_approval !== 0 || mcpTool.requires_approval !== 0) {
+    if (policy.requiresApproval) {
       approvalToolNames.push(toolName);
     }
   }

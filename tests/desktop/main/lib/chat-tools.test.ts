@@ -7,6 +7,8 @@ import {
   type MemoryRecord,
   type ModelCapabilities,
   type ModelProviderKind,
+  type ToolRecord,
+  type ToolServer,
 } from "@shared/types";
 
 const require = createRequire(import.meta.url);
@@ -35,6 +37,7 @@ const capabilities: ModelCapabilities = {
 };
 
 let chatTools: typeof import("@desktop-main/lib/chat-tools");
+let mcpManager: typeof import("@desktop-main/lib/mcp-manager");
 const originalFetch = globalThis.fetch;
 
 const dbSaveMemory = mock.fn();
@@ -50,6 +53,12 @@ const dbGetRuntimeSnapshot = mock.fn(() => ({
   syncState: { mode: "off", status: "disabled", encryption_enabled: 0 },
 }));
 const dbListMessages = mock.fn(() => []);
+let mcpServer: ToolServer | null = null;
+let mcpTool: ToolRecord | null = null;
+const dbGetMcpServer = mock.fn(() => mcpServer);
+const dbGetMcpToolByReference = mock.fn(() => mcpTool);
+const dbListMcpServers = mock.fn(() => (mcpServer ? [mcpServer] : []));
+const dbListMcpTools = mock.fn(() => (mcpTool ? [mcpTool] : []));
 
 mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.url).href, {
   namedExports: {
@@ -58,6 +67,10 @@ mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.u
     getMemoryById: dbGetMemoryById,
     getRuntimeSnapshot: dbGetRuntimeSnapshot,
     insertRuntimeEvent: dbInsertRuntimeEvent,
+    getMcpServer: dbGetMcpServer,
+    getMcpToolByReference: dbGetMcpToolByReference,
+    listMcpServers: dbListMcpServers,
+    listMcpTools: dbListMcpTools,
     listMessages: dbListMessages,
     saveMemory: dbSaveMemory,
     upsertAgentRuntimeState: dbUpsertAgentRuntimeState,
@@ -87,6 +100,7 @@ mock.module(
 );
 
 before(async () => {
+  mcpManager = await import("@desktop-main/lib/mcp-manager");
   chatTools = await import("@desktop-main/lib/chat-tools");
 });
 
@@ -100,6 +114,12 @@ afterEach(() => {
   dbUpsertAgentRuntimeState.mock.resetCalls();
   dbGetRuntimeSnapshot.mock.resetCalls();
   dbListMessages.mock.resetCalls();
+  dbGetMcpServer.mock.resetCalls();
+  dbGetMcpToolByReference.mock.resetCalls();
+  dbListMcpServers.mock.resetCalls();
+  dbListMcpTools.mock.resetCalls();
+  mcpServer = null;
+  mcpTool = null;
 });
 
 void describe("chat tool runtime", () => {
@@ -152,6 +172,44 @@ void describe("chat tool runtime", () => {
     });
     assert.deepEqual(multiple.activeTools, ["memory_search", "runtime_snapshot"]);
     assert.equal(multiple.toolChoice, "required");
+  });
+
+  void it("uses MCP tool-level automation and approval settings in the AI SDK ToolSet", () => {
+    mcpServer = {
+      id: "srv-1",
+      name: "Search MCP",
+      enabled: 1,
+      auto_use: 0,
+      requires_approval: 1,
+    } as ToolServer;
+    mcpTool = {
+      id: "tool-1",
+      server_id: "srv-1",
+      name: "search",
+      enabled: 1,
+      auto_use: 1,
+      requires_approval: 0,
+    } as ToolRecord;
+
+    const toolName = mcpManager.mcpToolRuntimeName("srv-1", "search");
+    const descriptor = mcpManager.createMcpToolDescriptors()[0];
+    assert.equal(descriptor?.defaultAuto, true);
+    assert.equal(descriptor?.requiresApproval, false);
+
+    const runtime = mcpManager.createMcpToolSet({
+      references: ["mcp:srv-1:search"],
+      model: modelContext("openai-compatible"),
+    });
+
+    assert.deepEqual(runtime.activeTools, [toolName]);
+    assert.deepEqual(runtime.approvalToolNames, []);
+
+    mcpTool.requires_approval = 1;
+    const approvalRuntime = mcpManager.createMcpToolSet({
+      references: ["mcp:srv-1:search"],
+      model: modelContext("openai-compatible"),
+    });
+    assert.deepEqual(approvalRuntime.approvalToolNames, [toolName]);
   });
 
   void it("uses provider-native web search internal tool names", () => {
