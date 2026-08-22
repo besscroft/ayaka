@@ -113,16 +113,63 @@ export function detectRuntimeTarget(): RuntimeTarget {
   return { platform, architecture, libc: hasMusl ? "musl" : null, glibcVersion: null };
 }
 
-export function managedRuntimeForCommand(
-  command: string,
-): { kind: RuntimeKind; runtime: ManagedRuntime; executablePath: string } | null {
+export function managedRuntimeForCommand(command: string): {
+  kind: RuntimeKind;
+  runtime: ManagedRuntime;
+  executablePath: string;
+  argsPrefix: string[];
+} | null {
   const normalized = commandBasename(command);
   const kind = runtimeKindForCommand(command);
   if (!kind) return null;
   const runtime = selectLatestManagedRuntime(kind);
   if (!runtime) return null;
-  const executablePath = executableForCommand(runtime, normalized);
-  return executablePath ? { kind, runtime, executablePath } : null;
+  const executable = resolveManagedRuntimeCommand(runtime, normalized);
+  return executable ? { kind, runtime, ...executable } : null;
+}
+
+export function resolveManagedRuntimeCommand(
+  runtime: ManagedRuntime,
+  command: string,
+): { executablePath: string; argsPrefix: string[] } | null {
+  if (command === "node" || command === "uv") {
+    return { executablePath: runtime.executablePath, argsPrefix: [] };
+  }
+  // Windows ships npm/npx as .cmd launchers. They require a shell and cannot
+  // be passed directly to child_process.execFile. Invoke their JavaScript CLI
+  // through the managed node.exe instead so MCP keeps the no-shell boundary.
+  if (
+    process.platform === "win32" &&
+    runtime.kind === "node" &&
+    (command === "npm" || command === "npx")
+  ) {
+    const cliPath = join(
+      dirname(runtime.executablePath),
+      "node_modules",
+      "npm",
+      "bin",
+      `${command}-cli.js`,
+    );
+    if (existsSync(cliPath)) {
+      return { executablePath: runtime.executablePath, argsPrefix: [cliPath] };
+    }
+  }
+  const candidates =
+    process.platform === "win32"
+      ? [`${command}.exe`, `${command}.cmd`, command]
+      : [command, `bin/${command}`];
+  for (const candidate of candidates) {
+    const path = join(runtime.rootPath, candidate);
+    if (existsSync(path)) return { executablePath: path, argsPrefix: [] };
+    const sibling = join(dirname(runtime.executablePath), candidate);
+    if (existsSync(sibling)) return { executablePath: sibling, argsPrefix: [] };
+  }
+  // uv distributes `uvx` as an alias of the same executable. A managed
+  // archive therefore commonly contains `uv` but no separate `uvx` file.
+  if (command === "uvx" && runtime.kind === "uv" && existsSync(runtime.executablePath)) {
+    return { executablePath: runtime.executablePath, argsPrefix: [] };
+  }
+  return null;
 }
 
 /** Return the Runtime family only for an explicit executable basename. */
@@ -143,8 +190,9 @@ export function isRuntimeCommandAvailable(command: string): boolean {
   if (!runtimeKindForCommand(command)) return false;
   const managed = managedRuntimeForCommand(command);
   const executable = managed?.executablePath ?? command;
+  const args = [...(managed?.argsPrefix ?? []), "--version"];
   try {
-    execFileSync(executable, ["--version"], {
+    execFileSync(executable, args, {
       timeout: 5_000,
       windowsHide: true,
       encoding: "utf8",
@@ -158,12 +206,17 @@ export function isRuntimeCommandAvailable(command: string): boolean {
 
 export function resolveMcpCommand(command: string): {
   command: string;
+  argsPrefix: string[];
   runtimeId: string | null;
 } {
   const managed = managedRuntimeForCommand(command);
   return managed
-    ? { command: managed.executablePath, runtimeId: managed.runtime.id }
-    : { command, runtimeId: null };
+    ? {
+        command: managed.executablePath,
+        argsPrefix: managed.argsPrefix,
+        runtimeId: managed.runtime.id,
+      }
+    : { command, argsPrefix: [], runtimeId: null };
 }
 
 export async function installManagedRuntime(
@@ -578,26 +631,6 @@ function selectLatestManagedRuntime(
       )
       .sort((left, right) => compareVersions(right.version, left.version))[0] ?? null
   );
-}
-
-function executableForCommand(runtime: ManagedRuntime, command: string): string | null {
-  if (command === "node" || command === "uv") return runtime.executablePath;
-  const candidates =
-    process.platform === "win32"
-      ? [`${command}.exe`, `${command}.cmd`, command]
-      : [command, `bin/${command}`];
-  for (const candidate of candidates) {
-    const path = join(runtime.rootPath, candidate);
-    if (existsSync(path)) return path;
-    const sibling = join(dirname(runtime.executablePath), candidate);
-    if (existsSync(sibling)) return sibling;
-  }
-  // uv distributes `uvx` as an alias of the same executable. A managed
-  // archive therefore commonly contains `uv` but no separate `uvx` file.
-  if (command === "uvx" && runtime.kind === "uv" && existsSync(runtime.executablePath)) {
-    return runtime.executablePath;
-  }
-  return null;
 }
 
 function executablePaths(asset: RuntimeManifestAsset): string[] {

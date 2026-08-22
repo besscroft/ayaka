@@ -271,7 +271,11 @@ function createStdioTransport(server: ToolServer): StdioClientTransport {
   const dependency = getMcpDependencyInstallation(server.id);
   const resolvedArgs =
     parsed.manager === "npx" && dependency?.status === "installed" && dependency.installRoot
-      ? ensureNpxNoInstall(parsed.resolvedArgs, dependency.installRoot)
+      ? ensureNpxNoInstall(
+          parsed.resolvedArgs,
+          dependency.installRoot,
+          parsed.runtimeArgsPrefix.length,
+        )
       : parsed.resolvedArgs;
   const transport = new StdioClientTransport({
     command: parsed.resolvedCommand,
@@ -293,13 +297,20 @@ function createStdioTransport(server: ToolServer): StdioClientTransport {
   return transport;
 }
 
-function ensureNpxNoInstall(args: string[], installRoot: string): string[] {
-  const withPrefix = args.some((arg) => arg === "--prefix")
-    ? args
-    : ["--prefix", installRoot, ...args];
-  return withPrefix.some((arg) => arg === "--no-install")
+function ensureNpxNoInstall(
+  args: string[],
+  installRoot: string,
+  runtimeArgsPrefixLength = 0,
+): string[] {
+  const runtimeArgsPrefix = args.slice(0, runtimeArgsPrefixLength);
+  const npxArgs = args.slice(runtimeArgsPrefixLength);
+  const withPrefix = npxArgs.some((arg) => arg === "--prefix")
+    ? npxArgs
+    : ["--prefix", installRoot, ...npxArgs];
+  const safeArgs = withPrefix.some((arg) => arg === "--no-install")
     ? withPrefix
     : ["--no-install", ...withPrefix];
+  return [...runtimeArgsPrefix, ...safeArgs];
 }
 
 function mcpDependencyEnvironment(serverId: string): Record<string, string> {

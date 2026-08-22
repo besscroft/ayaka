@@ -10,6 +10,7 @@ export interface ParsedMcpCommand {
   originalArgs: string[];
   resolvedCommand: string;
   resolvedArgs: string[];
+  runtimeArgsPrefix: string[];
   packageSpecs: string[];
   canInstall: boolean;
   installStatus: McpDependencyStatus;
@@ -27,16 +28,18 @@ export function parseMcpCommand(command: string | null, args: string[]): ParsedM
   const canSafelyResolve = manager === "none" || packages.length > 0;
   const resolved = canSafelyResolve
     ? resolveMcpCommand(originalCommand)
-    : { command: originalCommand, runtimeId: null };
-  const resolvedArgs = canSafelyResolve
+    : { command: originalCommand, argsPrefix: [], runtimeId: null };
+  const aliasArgs = canSafelyResolve
     ? resolveAliasArgs(manager, resolved.command, originalArgs)
     : originalArgs;
+  const resolvedArgs = canSafelyResolve ? [...resolved.argsPrefix, ...aliasArgs] : originalArgs;
   return {
     manager,
     originalCommand,
     originalArgs,
     resolvedCommand: resolved.command,
     resolvedArgs,
+    runtimeArgsPrefix: resolved.argsPrefix,
     packageSpecs: packages,
     canInstall: manager !== "none" && packages.length > 0,
     installStatus:

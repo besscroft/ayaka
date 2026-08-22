@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import test from "node:test";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -12,10 +12,12 @@ import {
   runtimeKindForCommand,
   resolveRuntimeArchitecture,
   resolveRuntimePlatform,
+  resolveManagedRuntimeCommand,
   buildRuntimeProcessEnv,
   verifyRuntimeBinaries,
   validateRuntimeManifestAsset,
 } from "@desktop-main/lib/runtime-manager";
+import type { ManagedRuntime } from "@shared/types";
 
 test("maps only explicit Runtime command basenames", () => {
   assert.equal(runtimeKindForCommand("node"), "node");
@@ -41,6 +43,36 @@ test("sanitizes Electron and Node-only environment variables for Runtime childre
     PATH: "C:/runtime",
     AYAKA_RUNTIME_TEST: "kept",
   });
+});
+
+test("maps Windows Managed npm and npx through node CLI scripts", () => {
+  if (process.platform !== "win32") return;
+  const root = mkdtempSync(join(tmpdir(), "ayaka-runtime-"));
+  const nodeRoot = join(root, "node-v24.19.0-win-x64");
+  const npmBin = join(nodeRoot, "node_modules", "npm", "bin");
+  const nodePath = join(nodeRoot, "node.exe");
+  mkdirSync(npmBin, { recursive: true });
+  writeFileSync(nodePath, "placeholder");
+  writeFileSync(join(npmBin, "npm-cli.js"), "placeholder");
+  writeFileSync(join(npmBin, "npx-cli.js"), "placeholder");
+  const runtime = {
+    kind: "node",
+    rootPath: root,
+    executablePath: nodePath,
+  } as ManagedRuntime;
+
+  try {
+    assert.deepEqual(resolveManagedRuntimeCommand(runtime, "npx"), {
+      executablePath: nodePath,
+      argsPrefix: [join(npmBin, "npx-cli.js")],
+    });
+    assert.deepEqual(resolveManagedRuntimeCommand(runtime, "npm"), {
+      executablePath: nodePath,
+      argsPrefix: [join(npmBin, "npm-cli.js")],
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("includes the native verification cause in Runtime errors", async () => {

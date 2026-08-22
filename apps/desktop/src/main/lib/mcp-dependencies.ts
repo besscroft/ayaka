@@ -99,6 +99,7 @@ export async function installMcpDependencies(
       await execFile(
         runtime.command,
         [
+          ...runtime.argsPrefix,
           "install",
           ...(options.allowScripts ? [] : ["--ignore-scripts"]),
           "--no-package-lock",
@@ -110,11 +111,15 @@ export async function installMcpDependencies(
         { timeout: INSTALL_TIMEOUT_MS, windowsHide: true, env: dependencyEnv(tempRoot) },
       );
     } else {
-      await execFile(runtime.command, ["tool", "install", ...command.packageSpecs], {
-        timeout: INSTALL_TIMEOUT_MS,
-        windowsHide: true,
-        env: dependencyEnv(tempRoot),
-      });
+      await execFile(
+        runtime.command,
+        [...runtime.argsPrefix, "tool", "install", ...command.packageSpecs],
+        {
+          timeout: INSTALL_TIMEOUT_MS,
+          windowsHide: true,
+          env: dependencyEnv(tempRoot),
+        },
+      );
     }
     if (!isPathWithin(root, installRoot) || !isPathWithin(root, tempRoot)) {
       throw new Error("MCP dependency path is outside App Data.");
