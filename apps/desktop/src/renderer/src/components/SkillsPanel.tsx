@@ -7,7 +7,7 @@ type SkillsTab = "marketplace" | "installed";
 
 export function SkillsPanel(): React.JSX.Element {
   const { t } = useT();
-  const [tab, setTab] = useState<SkillsTab>("marketplace");
+  const [tab, setTab] = useState<SkillsTab>("installed");
   return (
     <div data-slot="skills-panel" className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

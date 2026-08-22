@@ -9,6 +9,7 @@ import {
   InstalledSkillsPanel,
   applyCatalogInstallation,
 } from "@renderer/components/ToolsPanel";
+import { SkillsPanel } from "@renderer/components/SkillsPanel";
 import { filterToolRecords } from "@renderer/lib/tools-filter";
 import {
   buildMcpInput,
@@ -41,6 +42,14 @@ void describe("ToolsPanel data helpers", () => {
     assert.match(html, /aria-busy="true"/);
     assert.match(html, /animate-pulse/);
     assert.equal((html.match(/class="rounded-lg border border-border bg-card/g) ?? []).length, 4);
+  });
+
+  void it("opens the Skills page on the installed tab", () => {
+    const html = renderToStaticMarkup(<SkillsPanel />);
+
+    assert.match(html, /data-slot="skills-panel"/);
+    assert.match(html, /class="rounded-lg border border-border bg-card/);
+    assert.doesNotMatch(html, /data-slot="tools-catalog"/);
   });
 
   void it("updates only the installed catalog item", () => {
