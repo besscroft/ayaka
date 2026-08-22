@@ -335,6 +335,9 @@ export interface AyakaApi {
       handler: (event: { serverId: string; status: McpAuthStatus }) => void,
     ) => () => void;
     onStateChanged: (handler: (state: McpServerRuntimeState) => void) => () => void;
+    onDependencyStateChanged: (
+      handler: (installation: McpDependencyInstallation) => void,
+    ) => () => void;
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,

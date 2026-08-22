@@ -104,3 +104,31 @@ test("records reconnecting state for an unexpected stdio close", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(db.getMcpRuntimeState(serverId)?.state, "reconnecting");
 });
+
+test("projects dependency confirmation and failures into actionable lifecycle states", async () => {
+  await db.updateToolServerAsync(serverId, {
+    transport: "stdio",
+    command: "uvx",
+    args: ["mcp-server-fetch"],
+  });
+
+  const confirmation = await db.upsertMcpDependencyInstallationAsync({
+    serverId,
+    manager: "uvx",
+    packageSpecs: ["mcp-server-fetch"],
+    status: "needs_confirmation",
+    lastError: "uvx installation may execute Python build scripts; confirm before continuing.",
+  });
+  const confirmationState = await lifecycle.syncMcpDependencyState(serverId, confirmation);
+  assert.equal(confirmationState?.state, "needs_confirmation");
+  assert.match(confirmationState?.lastError ?? "", /Python build scripts/);
+
+  const failed = await db.upsertMcpDependencyInstallationAsync({
+    serverId,
+    manager: "uvx",
+    status: "failed",
+    lastError: "uv Runtime is not available. Install it from Ayaka Settings or add it to PATH.",
+  });
+  const failedState = await lifecycle.syncMcpDependencyState(serverId, failed);
+  assert.equal(failedState?.state, "needs_runtime");
+});

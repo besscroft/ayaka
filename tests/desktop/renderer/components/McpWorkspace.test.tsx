@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { isMcpOAuthTransport, type ToolServer } from "@shared/types";
-import { McpWorkspace } from "@renderer/components/McpWorkspace";
+import { getMcpDependencyAction, McpWorkspace } from "@renderer/components/McpWorkspace";
 import { getMcpErrorMessage } from "@renderer/lib/mcp-errors";
 
 void describe("MCP workspace", () => {
@@ -37,6 +37,26 @@ void describe("MCP workspace", () => {
     assert.equal(isMcpOAuthTransport("stdio"), false);
     assert.equal(isMcpOAuthTransport("http"), true);
     assert.equal(isMcpOAuthTransport("sse"), true);
+  });
+
+  void it("shows confirmation after a dependency install requires scripts", () => {
+    assert.equal(
+      getMcpDependencyAction("needs_install", {
+        id: "dependency-1",
+        serverId: "server-weather",
+        manager: "uvx",
+        packageSpecs: ["mcp-server-fetch"],
+        installRoot: null,
+        status: "needs_confirmation",
+        scriptsAllowed: 0,
+        runtimeInstallationId: null,
+        installedAt: null,
+        updatedAt: 0,
+        lastError: "Confirm install scripts.",
+      }),
+      "confirm",
+    );
+    assert.equal(getMcpDependencyAction("needs_install", undefined), "install");
   });
 
   void it("renders missing stdio runtime errors inside the workspace", () => {

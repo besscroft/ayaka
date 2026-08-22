@@ -7,7 +7,6 @@ import {
   getMcpDependencyInstallation,
   getMcpServer,
   getMcpRuntimeState,
-  setToolServerEnabledAsync,
   upsertMcpDependencyInstallationAsync,
 } from "./db";
 import { parseMcpCommand } from "./mcp-command";
@@ -17,11 +16,57 @@ import {
   runtimeKindForCommand,
 } from "./runtime-manager";
 import { isPathWithin, resolveMcpServerRoot } from "./runtime-paths";
+import { startMcpServer, syncMcpDependencyState } from "./mcp-lifecycle-manager";
 
 const execFile = promisify(execFileCallback);
 const INSTALL_TIMEOUT_MS = 10 * 60 * 1_000;
+const activeInstallations = new Map<string, Promise<McpDependencyInstallation>>();
+const dependencyStateListeners = new Set<(installation: McpDependencyInstallation) => void>();
 
-export async function installMcpDependencies(
+export function onMcpDependencyStateChanged(
+  listener: (installation: McpDependencyInstallation) => void,
+): () => void {
+  dependencyStateListeners.add(listener);
+  return () => dependencyStateListeners.delete(listener);
+}
+
+async function persistDependencyInstallation(
+  input: Parameters<typeof upsertMcpDependencyInstallationAsync>[0],
+): Promise<McpDependencyInstallation> {
+  const installation = await upsertMcpDependencyInstallationAsync(input);
+  await syncMcpDependencyState(installation.serverId, installation).catch(() => undefined);
+  for (const listener of dependencyStateListeners) {
+    try {
+      listener(installation);
+    } catch {
+      // UI observers must not affect dependency installation state.
+    }
+  }
+  return installation;
+}
+
+export function installMcpDependencies(
+  serverId: string,
+  options: { allowScripts?: boolean } = {},
+): Promise<McpDependencyInstallation> {
+  const active = activeInstallations.get(serverId);
+  if (active) return active;
+  const task = installMcpDependenciesInternal(serverId, options);
+  const tracked = task.then(
+    (result) => {
+      if (activeInstallations.get(serverId) === tracked) activeInstallations.delete(serverId);
+      return result;
+    },
+    (error: unknown) => {
+      if (activeInstallations.get(serverId) === tracked) activeInstallations.delete(serverId);
+      throw error;
+    },
+  );
+  activeInstallations.set(serverId, tracked);
+  return tracked;
+}
+
+async function installMcpDependenciesInternal(
   serverId: string,
   options: { allowScripts?: boolean } = {},
 ): Promise<McpDependencyInstallation> {
@@ -35,7 +80,7 @@ export async function installMcpDependencies(
     throw new Error("Stop the MCP server before changing its dependencies.");
   }
   if (server.transport !== "stdio") {
-    return upsertMcpDependencyInstallationAsync({
+    return persistDependencyInstallation({
       serverId,
       manager: "none",
       status: "not_applicable",
@@ -43,7 +88,7 @@ export async function installMcpDependencies(
   }
   const command = parseMcpCommand(server.command, parseArray(server.args_json));
   if (!command.canInstall) {
-    return upsertMcpDependencyInstallationAsync({
+    return persistDependencyInstallation({
       serverId,
       manager: command.manager,
       packageSpecs: command.packageSpecs,
@@ -58,7 +103,7 @@ export async function installMcpDependencies(
   // is no portable, package-independent equivalent of npm's --ignore-scripts,
   // so keep the default path review-only and require an explicit confirmation.
   if (command.manager === "uvx" && options.allowScripts !== true) {
-    return upsertMcpDependencyInstallationAsync({
+    return persistDependencyInstallation({
       serverId,
       manager: command.manager,
       packageSpecs: command.packageSpecs,
@@ -69,7 +114,7 @@ export async function installMcpDependencies(
   const runtimeCommand = command.manager === "npx" ? "npm" : "uv";
   const runtimeKind = runtimeKindForCommand(runtimeCommand);
   if (!runtimeKind || !isRuntimeCommandAvailable(runtimeCommand)) {
-    return upsertMcpDependencyInstallationAsync({
+    return persistDependencyInstallation({
       serverId,
       manager: command.manager,
       packageSpecs: command.packageSpecs,
@@ -84,7 +129,12 @@ export async function installMcpDependencies(
   const tempRoot = join(root, `.install-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   const runtime = resolveMcpCommand(runtimeCommand);
   const current = getMcpDependencyInstallation(serverId);
-  await upsertMcpDependencyInstallationAsync({
+  const shouldStartAfterInstall = server.enabled !== 0;
+  const installsInFinalRoot = command.manager === "uvx";
+  let backupRoot: string | null = null;
+  let stagedFinalRoot = false;
+  let filesystemCommitted = false;
+  await persistDependencyInstallation({
     serverId,
     manager: command.manager,
     packageSpecs: command.packageSpecs,
@@ -94,7 +144,24 @@ export async function installMcpDependencies(
     lastError: null,
   });
   try {
-    mkdirSync(tempRoot, { recursive: true });
+    if (installsInFinalRoot) {
+      // uv writes absolute paths into its Windows tool trampolines and the
+      // virtual environment. Installing in a temporary directory and then
+      // renaming it makes those paths stale, so stage uv tools directly at
+      // their final location instead.
+      if (existsSync(installRoot)) {
+        backupRoot = join(
+          root,
+          `.backup-dependencies-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        );
+        renameSync(installRoot, backupRoot);
+      }
+      mkdirSync(installRoot, { recursive: true });
+      stagedFinalRoot = true;
+    } else {
+      mkdirSync(tempRoot, { recursive: true });
+    }
+    const stagedRoot = installsInFinalRoot ? installRoot : tempRoot;
     if (command.manager === "npx") {
       await execFile(
         runtime.command,
@@ -108,7 +175,7 @@ export async function installMcpDependencies(
           tempRoot,
           ...command.packageSpecs,
         ],
-        { timeout: INSTALL_TIMEOUT_MS, windowsHide: true, env: dependencyEnv(tempRoot) },
+        { timeout: INSTALL_TIMEOUT_MS, windowsHide: true, env: dependencyEnv(stagedRoot) },
       );
     } else {
       await execFile(
@@ -117,7 +184,7 @@ export async function installMcpDependencies(
         {
           timeout: INSTALL_TIMEOUT_MS,
           windowsHide: true,
-          env: dependencyEnv(tempRoot),
+          env: dependencyEnv(stagedRoot),
         },
       );
     }
@@ -127,21 +194,23 @@ export async function installMcpDependencies(
     if (current?.installRoot && current.installRoot !== installRoot) {
       throw new Error("MCP dependency installation path changed unexpectedly.");
     }
-    let backupRoot: string | null = null;
-    if (existsSync(installRoot)) {
-      backupRoot = join(
-        root,
-        `.backup-dependencies-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      );
-      renameSync(installRoot, backupRoot);
+    if (!installsInFinalRoot) {
+      if (existsSync(installRoot)) {
+        backupRoot = join(
+          root,
+          `.backup-dependencies-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        );
+        renameSync(installRoot, backupRoot);
+      }
+      try {
+        renameSync(tempRoot, installRoot);
+      } catch (error) {
+        if (backupRoot && !existsSync(installRoot) && existsSync(backupRoot))
+          renameSync(backupRoot, installRoot);
+        throw error;
+      }
     }
-    try {
-      renameSync(tempRoot, installRoot);
-    } catch (error) {
-      if (backupRoot && !existsSync(installRoot) && existsSync(backupRoot))
-        renameSync(backupRoot, installRoot);
-      throw error;
-    }
+    filesystemCommitted = true;
     if (backupRoot) {
       try {
         rmSync(backupRoot, { recursive: true, force: true });
@@ -149,7 +218,7 @@ export async function installMcpDependencies(
         // A stale backup is safer than deleting a verified installation.
       }
     }
-    const installed = await upsertMcpDependencyInstallationAsync({
+    const installed = await persistDependencyInstallation({
       serverId,
       manager: command.manager,
       packageSpecs: command.packageSpecs,
@@ -160,16 +229,28 @@ export async function installMcpDependencies(
       installedAt: Date.now(),
       lastError: null,
     });
-    // A dependency install is preparation only. Keep the server disabled
-    // until the user reviews its command, secrets, and approval policy.
-    await setToolServerEnabledAsync(serverId, false);
+    if (shouldStartAfterInstall) {
+      // Dependency installation is only allowed while the server is stopped.
+      // Starting here gives enabled MCPs the same lazy lifecycle behavior as a
+      // manual start, while disabled MCPs remain disabled for user review.
+      await startMcpServer(serverId).catch(() => undefined);
+    }
     return installed;
   } catch (error) {
-    rmSync(tempRoot, { recursive: true, force: true });
+    if (!filesystemCommitted) {
+      if (installsInFinalRoot) {
+        if (stagedFinalRoot || backupRoot) rmSync(installRoot, { recursive: true, force: true });
+        if (backupRoot && !existsSync(installRoot) && existsSync(backupRoot)) {
+          renameSync(backupRoot, installRoot);
+        }
+      } else {
+        rmSync(tempRoot, { recursive: true, force: true });
+      }
+    }
     const message = error instanceof Error ? error.message.slice(0, 2_000) : String(error);
     const needsConfirmation =
       !options.allowScripts && /script|lifecycle|postinstall|preinstall/i.test(message);
-    return upsertMcpDependencyInstallationAsync({
+    return persistDependencyInstallation({
       serverId,
       manager: command.manager,
       packageSpecs: command.packageSpecs,
@@ -192,7 +273,7 @@ export async function uninstallMcpDependencies(serverId: string): Promise<boolea
       throw new Error("MCP dependency path is outside App Data.");
     rmSync(installation.installRoot, { recursive: true, force: true });
   }
-  await upsertMcpDependencyInstallationAsync({
+  await persistDependencyInstallation({
     serverId,
     manager: installation?.manager ?? "none",
     packageSpecs: installation?.packageSpecs ?? [],

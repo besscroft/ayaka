@@ -1107,6 +1107,18 @@ const entries = {
   "tools.mcp.stop": { zh: "停止", en: "Stop" },
   "tools.mcp.restart": { zh: "重启", en: "Restart" },
   "tools.mcp.installDependencies": { zh: "安装依赖", en: "Install dependencies" },
+  "tools.mcp.dependency.installing": {
+    zh: "正在安装 MCP 依赖...",
+    en: "Installing MCP dependencies...",
+  },
+  "tools.mcp.dependency.installed": {
+    zh: "依赖已安装",
+    en: "Dependencies installed",
+  },
+  "tools.mcp.dependency.retry": {
+    zh: "重试安装",
+    en: "Retry installation",
+  },
   "tools.mcp.confirmDependencyInstall": { zh: "确认安装脚本", en: "Confirm install scripts" },
   "tools.mcp.confirmDependencyTitle": { zh: "确认执行安装脚本？", en: "Allow install scripts?" },
   "tools.mcp.confirmDependencyMessage": {

@@ -38,6 +38,24 @@ import { Field, ReadStat } from "./ToolsPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 type WorkspaceTab = "overview" | "tools" | "prompts";
+export type McpDependencyAction = "install" | "confirm" | "review";
+
+export function getMcpDependencyAction(
+  runtimeState: McpServerRuntimeState["state"] | undefined,
+  dependency: McpDependencyInstallation | null | undefined,
+): McpDependencyAction | null {
+  if (runtimeState === "needs_confirmation" || dependency?.status === "needs_confirmation") {
+    return dependency?.packageSpecs.length ? "confirm" : "review";
+  }
+  if (
+    runtimeState === "needs_install" ||
+    dependency?.status === "not_installed" ||
+    dependency?.status === "failed"
+  ) {
+    return "install";
+  }
+  return null;
+}
 
 export interface McpWorkspaceProps {
   servers: ToolServer[];
@@ -91,6 +109,8 @@ export function McpWorkspace({
     : null;
   const selectedRuntime = selected ? runtimeStates.get(selected.id) : undefined;
   const selectedDependency = selected ? dependencies.get(selected.id) : undefined;
+  const dependencyInstalling = selectedDependency?.status === "installing";
+  const dependencyAction = getMcpDependencyAction(selectedRuntime?.state, selectedDependency);
   const runtimeLabel = (state: McpServerRuntimeState["state"] | undefined): string =>
     t(`tools.mcp.state.${state ?? "stopped"}`);
 
@@ -113,6 +133,14 @@ export function McpWorkspace({
     () =>
       api.mcp.onStateChanged((state) => {
         setRuntimeStates((current) => new Map(current).set(state.serverId, state));
+      }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      api.mcp.onDependencyStateChanged((installation) => {
+        setDependencies((current) => new Map(current).set(installation.serverId, installation));
       }),
     [],
   );
@@ -230,6 +258,7 @@ export function McpWorkspace({
                 const active = server.id === selected?.id;
                 const tools = toolsByServer.get(server.id) ?? [];
                 const discovering = discoveringServerIds.has(server.id);
+                const installing = dependencies.get(server.id)?.status === "installing";
                 return (
                   <button
                     key={server.id}
@@ -244,15 +273,21 @@ export function McpWorkspace({
                     )}
                     onClick={() => selectServer(server)}
                   >
-                    <IconGlobe className="mt-0.5 size-4 shrink-0 text-foreground/45" />
+                    {installing ? (
+                      <IconRotateCcw className="mt-0.5 size-4 shrink-0 animate-spin text-primary" />
+                    ) : (
+                      <IconGlobe className="mt-0.5 size-4 shrink-0 text-foreground/45" />
+                    )}
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{server.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {server.enabled
-                          ? discovering
-                            ? t("tools.mcp.workspace.connecting")
-                            : `${runtimeLabel(runtimeStates.get(server.id)?.state)} · ${tools.length} ${t("tools.field.tools")}`
-                          : t("catalog.disabled")}
+                        {installing
+                          ? t("tools.mcp.dependency.installing")
+                          : server.enabled
+                            ? discovering
+                              ? t("tools.mcp.workspace.connecting")
+                              : `${runtimeLabel(runtimeStates.get(server.id)?.state)} · ${tools.length} ${t("tools.field.tools")}`
+                            : t("catalog.disabled")}
                       </span>
                     </span>
                   </button>
@@ -280,6 +315,16 @@ export function McpWorkspace({
                     <span className="rounded-full bg-muted px-2 py-1 text-xs">
                       {runtimeLabel(selectedRuntime?.state)}
                     </span>
+                    {dependencyInstalling ? (
+                      <span className="flex items-center gap-1 text-xs text-primary" role="status">
+                        <IconRotateCcw className="size-3 animate-spin" />
+                        {t("tools.mcp.dependency.installing")}
+                      </span>
+                    ) : selectedDependency?.status === "installed" ? (
+                      <span className="text-xs text-muted-foreground">
+                        {t("tools.mcp.dependency.installed")}
+                      </span>
+                    ) : null}
                     {selectedIsDiscovering ? (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <IconRotateCcw className="size-3 animate-spin" />
@@ -289,7 +334,7 @@ export function McpWorkspace({
                     <Switch
                       size="sm"
                       isSelected={selected.enabled !== 0}
-                      isDisabled={busy || selectedIsDiscovering}
+                      isDisabled={busy || selectedIsDiscovering || dependencyInstalling}
                       onChange={(value) => onToggle(selected, value)}
                     >
                       {t("tools.enabled")}
@@ -298,7 +343,7 @@ export function McpWorkspace({
                       size="sm"
                       variant="secondary"
                       onPress={() => onEdit(selected)}
-                      isDisabled={busy || selectedIsDiscovering}
+                      isDisabled={busy || selectedIsDiscovering || dependencyInstalling}
                     >
                       <IconEdit className="size-4" />
                       {t("tools.mcp.edit")}
@@ -320,7 +365,7 @@ export function McpWorkspace({
                       size="sm"
                       variant="danger"
                       onPress={() => onDelete(selected)}
-                      isDisabled={busy || selectedIsDiscovering}
+                      isDisabled={busy || selectedIsDiscovering || dependencyInstalling}
                     >
                       {t("common.delete")}
                     </Button>
@@ -328,7 +373,7 @@ export function McpWorkspace({
                       <Button
                         size="sm"
                         variant="secondary"
-                        isDisabled={lifecycleBusy}
+                        isDisabled={lifecycleBusy || dependencyInstalling}
                         onPress={() => void runLifecycle(() => api.mcp.stop(selected.id))}
                       >
                         {t("tools.mcp.stop")}
@@ -337,7 +382,7 @@ export function McpWorkspace({
                       <Button
                         size="sm"
                         variant="primary"
-                        isDisabled={lifecycleBusy || selected.enabled === 0}
+                        isDisabled={lifecycleBusy || dependencyInstalling || selected.enabled === 0}
                         onPress={() => void runLifecycle(() => api.mcp.start(selected.id))}
                       >
                         {t("tools.mcp.start")}
@@ -346,38 +391,41 @@ export function McpWorkspace({
                     <Button
                       size="sm"
                       variant="tertiary"
-                      isDisabled={lifecycleBusy || selected.enabled === 0}
+                      isDisabled={lifecycleBusy || dependencyInstalling || selected.enabled === 0}
                       onPress={() => void runLifecycle(() => api.mcp.restart(selected.id))}
                     >
                       {t("tools.mcp.restart")}
                     </Button>
-                    {selectedRuntime?.state === "needs_install" ? (
+                    {dependencyAction === "install" ? (
                       <Button
                         size="sm"
                         variant="secondary"
-                        isDisabled={lifecycleBusy}
+                        isDisabled={lifecycleBusy || dependencyInstalling}
                         onPress={() => void runLifecycle(() => api.mcp.install(selected.id))}
                       >
-                        {t("tools.mcp.installDependencies")}
+                        <IconRotateCcw
+                          className={cn("size-4", dependencyInstalling && "animate-spin")}
+                        />
+                        {selectedDependency?.status === "failed"
+                          ? t("tools.mcp.dependency.retry")
+                          : t("tools.mcp.installDependencies")}
                       </Button>
                     ) : null}
-                    {selectedRuntime?.state === "needs_confirmation" &&
-                    selectedDependency?.packageSpecs.length ? (
+                    {dependencyAction === "confirm" && !dependencyInstalling ? (
                       <Button
                         size="sm"
                         variant="secondary"
-                        isDisabled={lifecycleBusy}
+                        isDisabled={lifecycleBusy || dependencyInstalling}
                         onPress={() => setConfirmDependencyInstall(true)}
                       >
                         {t("tools.mcp.confirmDependencyInstall")}
                       </Button>
                     ) : null}
-                    {selectedRuntime?.state === "needs_confirmation" &&
-                    !selectedDependency?.packageSpecs.length ? (
+                    {dependencyAction === "review" && !dependencyInstalling ? (
                       <Button
                         size="sm"
                         variant="secondary"
-                        isDisabled={lifecycleBusy}
+                        isDisabled={lifecycleBusy || dependencyInstalling}
                         onPress={() => onEdit(selected)}
                       >
                         {t("tools.mcp.reviewCommand")}

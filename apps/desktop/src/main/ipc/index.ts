@@ -141,6 +141,7 @@ import {
 } from "../lib/mcp-config-manager";
 import {
   installMcpDependencies,
+  onMcpDependencyStateChanged,
   removeMcpDependencyDirectory,
   uninstallMcpDependencies,
 } from "../lib/mcp-dependencies";
@@ -235,6 +236,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   onMcpAuthChanged((serverId, status) => broadcast("mcp:auth-changed", { serverId, status }));
   onMcpInputRequested((request: McpInputRequest) => broadcast("mcp:input-requested", request));
   onMcpLifecycleStateChanged((state) => broadcast("mcp:state-changed", state));
+  onMcpDependencyStateChanged((installation) =>
+    broadcast("mcp:dependency-state-changed", installation),
+  );
   onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
 
   // ---------- Main window controls ----------

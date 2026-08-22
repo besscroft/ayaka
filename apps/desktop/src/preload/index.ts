@@ -311,6 +311,11 @@ const api = {
       ipcRenderer.on("mcp:state-changed", listener);
       return () => ipcRenderer.removeListener("mcp:state-changed", listener);
     },
+    onDependencyStateChanged: (handler: (installation: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("mcp:dependency-state-changed", listener);
+      return () => ipcRenderer.removeListener("mcp:dependency-state-changed", listener);
+    },
     updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("mcp:updateTool", id, patch),
     setSecret: (input: unknown) => ipcRenderer.invoke("mcp:setSecret", input),
     deleteSecret: (id: string) => ipcRenderer.invoke("mcp:deleteSecret", id),

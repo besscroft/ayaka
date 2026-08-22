@@ -1,5 +1,6 @@
 import type {
   McpManagerSnapshot,
+  McpDependencyInstallation,
   McpServerRuntimeState,
   McpLifecycleState,
   ToolServer,
@@ -150,6 +151,65 @@ export async function startMcpServer(serverId: string): Promise<McpServerRuntime
       recordLifecycleEvent(server, "MCP server start failed", "failed", { state, error: message });
       return next;
     }
+  });
+}
+
+/**
+ * Keep the lifecycle badge actionable when dependency installation finishes
+ * without starting a server, for example while waiting for uvx script
+ * confirmation or after a failed install.
+ */
+export async function syncMcpDependencyState(
+  serverId: string,
+  dependency: McpDependencyInstallation,
+): Promise<McpServerRuntimeState | null> {
+  return runExclusive(serverId, async () => {
+    const server = requireMcpServer(serverId);
+    if (server.transport !== "stdio") return getMcpRuntimeState(serverId);
+    const command = parseMcpCommand(server.command, parseArray(server.args_json));
+    if (command.manager === "none") return getMcpRuntimeState(serverId);
+
+    if (dependency.status === "installed") {
+      return setState(serverId, {
+        desiredState: "stopped",
+        state: "stopped",
+        pid: null,
+        nextRetryAt: null,
+        lastError: null,
+      });
+    }
+    if (dependency.status === "needs_confirmation") {
+      return setState(serverId, {
+        desiredState: "stopped",
+        state: "needs_confirmation",
+        pid: null,
+        nextRetryAt: null,
+        lastError: dependency.lastError,
+      });
+    }
+    if (dependency.status === "failed" || dependency.status === "not_installed") {
+      const needsRuntime =
+        dependency.status === "failed" &&
+        /Runtime is not available/i.test(dependency.lastError ?? "");
+      return setState(serverId, {
+        desiredState: "stopped",
+        state: needsRuntime ? "needs_runtime" : "needs_install",
+        pid: null,
+        nextRetryAt: null,
+        lastError:
+          dependency.lastError ?? "Install this MCP server's dependencies before starting it.",
+      });
+    }
+    if (dependency.status === "installing") {
+      return setState(serverId, {
+        desiredState: "stopped",
+        state: "stopped",
+        pid: null,
+        nextRetryAt: null,
+        lastError: null,
+      });
+    }
+    return getMcpRuntimeState(serverId);
   });
 }
 
@@ -328,6 +388,13 @@ function defaultState(serverId: string): McpServerRuntimeState {
 }
 
 function classifyFailure(message: string, server: ToolServer): McpLifecycleState {
+  if (
+    /uv trampoline failed to canonicalize script path|uv trampoline failed to determine executable path/i.test(
+      message,
+    )
+  ) {
+    return "needs_install";
+  }
   if (
     server.transport === "stdio" &&
     runtimeKindForCommand(server.command ?? "") &&

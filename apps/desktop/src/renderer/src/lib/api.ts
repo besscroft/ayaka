@@ -389,6 +389,9 @@ export const api = {
     ): (() => void) => assertApi().mcp.onAuthChanged(handler),
     onStateChanged: (handler: (state: McpServerRuntimeState) => void): (() => void) =>
       assertApi().mcp.onStateChanged(handler),
+    onDependencyStateChanged: (
+      handler: (installation: McpDependencyInstallation) => void,
+    ): (() => void) => assertApi().mcp.onDependencyStateChanged(handler),
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
