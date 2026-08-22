@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.1.33]
+
+### 中文
+
+#### 新增
+
+- 新增 MCP 运行环境管理，支持托管 Node.js 与 uv 运行时的安装、升级和卸载，并提供独立的运行环境设置页面。
+- 新增 MCP 服务器生命周期管理，支持启动、停止、重启、探测及依赖安装，并展示依赖安装进度和状态。
+- 新增 Claude JSON 与 Codex TOML 格式的 MCP 配置导入导出。
+- 新增已启用且依赖就绪的 stdio MCP 服务器自动启动，以及服务器工具列表变化的自动发现与刷新。
+
+#### 变更
+
+- 优化 MCP 工作区与工具选择器布局，改善服务器启动后的工具发现和列表更新体验。
+- 统一 MCP 工具策略解析逻辑，简化工具可用性、自动启用和审批状态的判断。
+- 支持为托管运行时传递前置参数，完善运行时命令与依赖安装流程。
+
+#### 修复
+
+- 修复 Windows 下 npm/npx 调用方式不兼容导致的 MCP 依赖安装问题。
+- 修复技能面板默认打开标签页不符合预期的问题，默认显示“已安装”。
+
+### English
+
+#### Added
+
+- Added MCP runtime management with installation, upgrade, and removal support for managed Node.js and uv runtimes, plus a dedicated runtime settings page.
+- Added MCP server lifecycle management for starting, stopping, restarting, probing, and installing dependencies, with dependency progress and status display.
+- Added MCP configuration import and export in Claude JSON and Codex TOML formats.
+- Added automatic startup for enabled stdio MCP servers with ready dependencies, along with automatic discovery and refresh when server tool lists change.
+
+#### Changed
+
+- Improved MCP workspace and tool-selector layouts, including better tool discovery and list updates after servers start.
+- Unified MCP tool-policy resolution to simplify availability, auto-enable, and approval-state handling.
+- Added support for passing prefix arguments to managed runtimes and improved runtime command and dependency-installation flows.
+
+#### Fixed
+
+- Fixed MCP dependency installation on Windows by using a compatible npm/npx invocation flow.
+- Fixed the Skills panel opening on the wrong default tab; it now opens on Installed.
+
 ## [0.1.32]
 
 ### 中文
