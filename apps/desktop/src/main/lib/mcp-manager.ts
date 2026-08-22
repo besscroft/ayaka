@@ -35,9 +35,15 @@ import {
 } from "./mcp-client-manager";
 import { runWithMcpExecutionContext } from "./mcp-context";
 import { getMcpAuthStatus } from "./mcp-auth";
+import { ensureMcpServerStarted } from "./mcp-lifecycle-manager";
 
 export { closeAllMcpConnections as closeAllMcpClients };
 export { closeMcpClient };
+
+async function getReadyMcpConnection(server: ToolServer) {
+  await ensureMcpServerStarted(server.id);
+  return getMcpConnection(server);
+}
 
 export function mcpToolReference(serverId: string, toolName: string): string {
   return `mcp:${serverId}:${toolName}`;
@@ -140,7 +146,11 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
   if (!server) throw new Error("MCP server not found: " + serverId);
   let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
   try {
-    connection = await getMcpConnection(server, { forceNew: true });
+    // Discovery is an explicit connection request, but it still belongs to
+    // the lifecycle manager. This keeps lazy-start, runtime diagnostics, and
+    // reconnect state identical to a tool invocation or a manual probe.
+    await ensureMcpServerStarted(server.id);
+    connection = await getMcpConnection(server);
     const toolsResult = await withMcpTimeout(
       connection.client.listTools(),
       server,
@@ -220,7 +230,7 @@ export async function getMcpCapabilities(serverId: string): Promise<McpCapabilit
   if (!server) throw new Error("MCP server not found: " + serverId);
   let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
   try {
-    connection = await getMcpConnection(server);
+    connection = await getReadyMcpConnection(server);
     const loaded = await loadMcpCapabilities(connection, server);
     await updateMcpServerStatusAsync(server.id, {
       status: server.enabled ? "ready" : "disabled",
@@ -252,7 +262,7 @@ export async function readMcpResource(
   uri: string,
 ): Promise<McpReadResourceResult> {
   const server = requireMcpServer(serverId);
-  const connection = await getMcpConnection(server);
+  const connection = await getReadyMcpConnection(server);
   const result = await withMcpRequest(
     connection.client.readResource({ uri }),
     server,
@@ -275,7 +285,7 @@ export async function getMcpPrompt(
   args?: Record<string, string>,
 ): Promise<McpPromptResult> {
   const server = requireMcpServer(serverId);
-  const connection = await getMcpConnection(server);
+  const connection = await getReadyMcpConnection(server);
   const result = await withMcpRequest(
     connection.client.getPrompt({ name, arguments: args }),
     server,
@@ -297,7 +307,7 @@ export async function completeMcp(
   argument: { name: string; value: string },
 ): Promise<McpCompletionResult> {
   const server = requireMcpServer(serverId);
-  const connection = await getMcpConnection(server);
+  const connection = await getReadyMcpConnection(server);
   const result = await withMcpRequest(
     connection.client.complete({ ref, argument } as never),
     server,
@@ -313,7 +323,7 @@ export async function completeMcp(
 
 export async function listenMcpCapabilities(serverId: string): Promise<boolean> {
   const server = requireMcpServer(serverId);
-  const connection = await getMcpConnection(server);
+  const connection = await getReadyMcpConnection(server);
   if (connection.snapshot.protocolEra !== "modern") return false;
   await connection.subscription?.close().catch(() => undefined);
   connection.subscription = await withMcpRequest(
@@ -336,7 +346,7 @@ export function onMcpCapabilitiesChanged(
     if (event.type !== "capabilities-changed") return;
     const server = getMcpServer(event.serverId);
     if (!server) return;
-    void getMcpConnection(server)
+    void getReadyMcpConnection(server)
       .then(async (connection) => {
         if (event.snapshot.capabilities.tools) {
           const result = await withMcpTimeout(
@@ -408,7 +418,7 @@ async function executeMcpTool({
       },
       () =>
         withMcpTimeout(
-          getMcpConnection(server).then((connection) =>
+          getReadyMcpConnection(server).then((connection) =>
             connection.client.callTool({
               name: mcpTool.name,
               arguments: normalizeToolInput(input),

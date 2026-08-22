@@ -9,6 +9,7 @@ import "./renderer/components/McpWorkspace.test.tsx";
 import "./renderer/components/MessageInput.test.tsx";
 import "./renderer/components/MessageList.test.ts";
 import "./renderer/components/ReasoningSelector.test.ts";
+import "./renderer/components/RuntimeSettings.test.tsx";
 import "./renderer/components/ToolsPanel.test.tsx";
 import "./renderer/components/ui/button.test.tsx";
 import "./renderer/components/ui/controls.test.tsx";

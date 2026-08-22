@@ -39,6 +39,7 @@ import {
 
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AboutSettings } from "./AboutSettings";
+import { RuntimeSettings } from "./RuntimeSettings";
 import {
   IconClose,
   IconKey,
@@ -122,6 +123,7 @@ export type SettingsTabId =
   | "general"
   | "model"
   | "workspace"
+  | "runtime"
   | "diagnostics"
   | "trash"
   | "about";
@@ -202,6 +204,7 @@ export function SettingsDialog({
     { id: "general", label: t("settings.tab.general"), Icon: IconSliders },
     { id: "model", label: t("settings.tab.model"), Icon: IconCpu },
     { id: "workspace", label: t("settings.tab.workspace"), Icon: IconFolderOpen },
+    { id: "runtime", label: t("settings.tab.runtime"), Icon: IconZap },
     { id: "diagnostics", label: t("settings.tab.diagnostics"), Icon: IconSliders },
     { id: "trash", label: t("settings.tab.trash"), Icon: IconTrash },
     { id: "about", label: t("settings.tab.about"), Icon: IconInfo, pinned: true },
@@ -281,6 +284,7 @@ export function SettingsDialog({
               {tab === "general" && <GeneralSettings />}
               {tab === "model" && <ModelTab settings={settings} update={update} />}
               {tab === "workspace" && <WorkspaceTab />}
+              {tab === "runtime" && <RuntimeSettings />}
               {tab === "diagnostics" && <DiagnosticsTab />}
               {tab === "trash" && <TrashTab />}
               {tab === "about" && <AboutSettings />}

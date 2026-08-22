@@ -167,6 +167,18 @@ const api = {
   },
   runtime: {
     snapshot: () => ipcRenderer.invoke("runtime:snapshot"),
+    managedSnapshot: () => ipcRenderer.invoke("runtime:managedSnapshot"),
+    managedInstall: (kind: "node" | "uv") => ipcRenderer.invoke("runtime:managedInstall", kind),
+    managedUpgrade: (kind: "node" | "uv") => ipcRenderer.invoke("runtime:managedUpgrade", kind),
+    managedUninstall: (runtimeId: string) =>
+      ipcRenderer.invoke("runtime:managedUninstall", runtimeId),
+    managedSetSource: (kind: "node" | "uv", manifestUrl: string) =>
+      ipcRenderer.invoke("runtime:managedSetSource", kind, manifestUrl),
+    onStateChanged: (handler: (snapshot: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("runtime:state-changed", listener);
+      return () => ipcRenderer.removeListener("runtime:state-changed", listener);
+    },
     enqueueInput: async (input: unknown) => {
       const result = (await ipcRenderer.invoke("runtime:enqueueInput", input)) as
         | { ok: true; value: unknown }
@@ -239,6 +251,25 @@ const api = {
     },
   },
   mcp: {
+    snapshot: () => ipcRenderer.invoke("mcp:snapshot"),
+    start: (id: string) => ipcRenderer.invoke("mcp:start", id),
+    stop: (id: string) => ipcRenderer.invoke("mcp:stop", id),
+    restart: (id: string) => ipcRenderer.invoke("mcp:restart", id),
+    probe: (id: string) => ipcRenderer.invoke("mcp:probe", id),
+    install: (id: string, options?: { allowScripts?: boolean }) =>
+      ipcRenderer.invoke("mcp:install", id, options),
+    uninstall: (id: string) => ipcRenderer.invoke("mcp:uninstall", id),
+    config: {
+      previewImport: (input: unknown) => ipcRenderer.invoke("mcp:config:previewImport", input),
+      importFile: (format: "claude-json" | "codex-toml") =>
+        ipcRenderer.invoke("mcp:config:importFile", format),
+      applyImport: (token: string, options?: { confirmConflicts?: boolean }) =>
+        ipcRenderer.invoke("mcp:config:applyImport", token, options),
+      export: (format: "claude-json" | "codex-toml") =>
+        ipcRenderer.invoke("mcp:config:export", format),
+      exportFile: (format: "claude-json" | "codex-toml") =>
+        ipcRenderer.invoke("mcp:config:exportFile", format),
+    },
     create: (input: unknown) => ipcRenderer.invoke("mcp:create", input),
     update: (id: string, input: unknown) => ipcRenderer.invoke("mcp:update", id, input),
     delete: (id: string) => ipcRenderer.invoke("mcp:delete", id),
@@ -274,6 +305,11 @@ const api = {
       const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
       ipcRenderer.on("mcp:auth-changed", listener);
       return () => ipcRenderer.removeListener("mcp:auth-changed", listener);
+    },
+    onStateChanged: (handler: (state: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+      ipcRenderer.on("mcp:state-changed", listener);
+      return () => ipcRenderer.removeListener("mcp:state-changed", listener);
     },
     updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("mcp:updateTool", id, patch),
     setSecret: (input: unknown) => ipcRenderer.invoke("mcp:setSecret", input),

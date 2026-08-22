@@ -24,6 +24,8 @@ import type {
   ArtifactInstallation,
   CatalogItem,
   CatalogSnapshot,
+  McpConfigFormat,
+  McpConfigImportPreview,
   McpTransportKind,
   ToolServer,
 } from "@shared/types";
@@ -76,6 +78,9 @@ export function McpPanel({
     item: CatalogItem;
     savedSecretKeys: string[];
   } | null>(null);
+  const [configFormat, setConfigFormat] = useState<McpConfigFormat>("claude-json");
+  const [importPreview, setImportPreview] = useState<McpConfigImportPreview | null>(null);
+  const [confirmImportConflicts, setConfirmImportConflicts] = useState(false);
 
   const refresh = (options: { clearError?: boolean } = {}): void => {
     if (options.clearError !== false) setPageError(null);
@@ -122,18 +127,50 @@ export function McpPanel({
     [snapshot],
   );
 
-  const runAction = async (action: () => Promise<unknown>, success: string): Promise<void> => {
+  const runAction = async (action: () => Promise<unknown>, success: string): Promise<boolean> => {
     setPageError(null);
     setBusy(true);
     try {
       await action();
       notify.success(success);
+      return true;
     } catch (error) {
       setPageError(getMcpErrorMessage(error, locale));
+      return false;
     } finally {
       refresh({ clearError: false });
       setBusy(false);
     }
+  };
+
+  const importConfig = async (): Promise<void> => {
+    setPageError(null);
+    try {
+      const preview = await api.mcp.config.importFile(configFormat);
+      if (!preview) return;
+      setConfirmImportConflicts(false);
+      setImportPreview(preview);
+    } catch (error) {
+      setPageError(getMcpErrorMessage(error, locale));
+    }
+  };
+
+  const exportConfig = async (): Promise<void> => {
+    await runAction(() => api.mcp.config.exportFile(configFormat), t("tools.mcp.config.exported"));
+  };
+
+  const applyImport = async (): Promise<void> => {
+    if (!importPreview) return;
+    const applied = await runAction(
+      () =>
+        api.mcp.config.applyImport(importPreview.token, {
+          confirmConflicts: confirmImportConflicts,
+        }),
+      t("tools.mcp.config.imported"),
+    );
+    if (!applied) return;
+    setImportPreview(null);
+    refresh({ clearError: false });
   };
 
   const setServerDiscovering = (serverId: string, discovering: boolean): void => {
@@ -198,6 +235,21 @@ export function McpPanel({
             orientation="horizontal"
           />
           <div className="flex items-center gap-2">
+            <SelectField
+              value={configFormat}
+              options={[
+                { value: "claude-json", label: t("tools.mcp.config.claude") },
+                { value: "codex-toml", label: t("tools.mcp.config.codex") },
+              ]}
+              onChange={(value) => setConfigFormat(value as McpConfigFormat)}
+              ariaLabel={t("tools.mcp.config.format")}
+            />
+            <Button variant="secondary" size="sm" onPress={() => void importConfig()}>
+              {t("tools.mcp.config.import")}
+            </Button>
+            <Button variant="secondary" size="sm" onPress={() => void exportConfig()}>
+              {t("tools.mcp.config.export")}
+            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -304,16 +356,16 @@ export function McpPanel({
           setMcpOpen(false);
           setEditTarget(null);
         }}
-        onSave={(input) =>
-          runAction(async () => {
+        onSave={async (input) => {
+          await runAction(async () => {
             const server = editTarget
               ? await api.mcp.update(editTarget.id, input)
               : await api.mcp.create(input);
             setMcpOpen(false);
             setEditTarget(null);
             discoverInBackground(server.id);
-          }, t("tools.toast.saved"))
-        }
+          }, t("tools.toast.saved"));
+        }}
       />
 
       <McpReviewModal
@@ -333,6 +385,15 @@ export function McpPanel({
         }}
       />
 
+      <McpImportPreviewModal
+        preview={importPreview}
+        confirmConflicts={confirmImportConflicts}
+        onConfirmConflicts={setConfirmImportConflicts}
+        onApply={() => void applyImport()}
+        onClose={() => setImportPreview(null)}
+        busy={busy}
+      />
+
       <ConfirmDialog
         open={!!deleteTarget}
         danger
@@ -343,6 +404,110 @@ export function McpPanel({
         onClose={() => setDeleteTarget(null)}
       />
     </div>
+  );
+}
+
+function McpImportPreviewModal({
+  preview,
+  confirmConflicts,
+  onConfirmConflicts,
+  onApply,
+  onClose,
+  busy,
+}: {
+  preview: McpConfigImportPreview | null;
+  confirmConflicts: boolean;
+  onConfirmConflicts: (value: boolean) => void;
+  onApply: () => void;
+  onClose: () => void;
+  busy: boolean;
+}): React.JSX.Element {
+  const { t } = useT();
+  const conflictCount = preview?.servers.filter((server) => server.conflictServerId).length ?? 0;
+  return (
+    <Dialog open={preview !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-h-[90vh] w-[min(760px,calc(100vw-24px))] max-w-none">
+        <DialogHeader>
+          <DialogTitle>{t("tools.mcp.config.previewTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <p className="text-sm text-muted-foreground">
+            {t("tools.mcp.config.previewSummary", {
+              count: String(preview?.servers.length ?? 0),
+              format: preview?.format ?? "",
+            })}
+          </p>
+          {preview?.warnings.length ? (
+            <ul className="mt-3 list-disc rounded-md border border-warning/30 bg-warning/10 px-6 py-3 text-xs text-warning">
+              {preview.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-2">
+            {preview?.servers.map((server) => (
+              <div
+                key={`${server.id}-${server.name}`}
+                className="rounded-md border border-border p-3 text-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{server.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {server.conflictServerId
+                      ? t("tools.mcp.config.conflict")
+                      : t("tools.mcp.config.new")}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {server.transport} · {server.command ?? server.url ?? ""}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("tools.mcp.config.keys", {
+                    env: String(server.envKeys.length),
+                    headers: String(server.headerKeys.length),
+                  })}
+                </p>
+                {server.diffs.length > 0 ? (
+                  <p className="mt-1 text-xs text-warning">
+                    {t("tools.mcp.config.diff")}: {server.diffs.join(", ")}
+                  </p>
+                ) : null}
+                {server.warnings.map((warning) => (
+                  <p key={warning} className="mt-1 text-xs text-warning">
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+          {conflictCount > 0 ? (
+            <label className="mt-4 flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={confirmConflicts}
+                onChange={(event) => onConfirmConflicts(event.currentTarget.checked)}
+              />
+              <span>
+                {t("tools.mcp.config.confirmConflicts", { count: String(conflictCount) })}
+              </span>
+            </label>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant="tertiary" onPress={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            isPending={busy}
+            isDisabled={conflictCount > 0 && !confirmConflicts}
+            onPress={onApply}
+          >
+            {t("tools.mcp.config.apply")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

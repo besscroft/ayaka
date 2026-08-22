@@ -47,3 +47,23 @@ next run only.
 The main process interrupts active sessions before closing. On the next startup, persisted active
 runs become `interrupted` and queued inputs become `discarded`. The content and diagnostics remain
 available for inspection, but no model call or tool side effect is replayed automatically.
+
+## MCP runtime boundary
+
+MCP configuration is persisted in `tool_servers` and normalized by the main process. Stdio servers
+are lazy-started by the MCP lifecycle manager and are always spawned through an external Node or uv
+runtime. Managed runtimes live under Electron user data, take priority over `PATH`, and are versioned
+so upgrades do not interrupt an existing server. HTTP and SSE entries represent local client sessions;
+Ayaka does not start or stop their remote service.
+
+The uv managed runtime is a pair of external `uv`/`uvx` binaries downloaded only after an explicit
+user action. A bundled, SHA-256-pinned manifest covers supported Windows, macOS, and Linux targets;
+Linux targets are separated by glibc or musl. Custom HTTPS manifests are supported as an advanced
+source and fall back to the bundled/official source when unavailable. The installer never executes
+Astral shell/PowerShell installers, uses Electron's executable, changes PATH, or installs Python as
+part of the uv runtime action.
+
+Runtime state, dependency installation state, and runtime preferences are persisted separately from
+the MCP definition. This keeps configuration, executable selection, and process lifecycle independent
+while allowing the existing MCP ToolSet, approval policy, OAuth, and runtime event records to remain
+the single Agent integration path.

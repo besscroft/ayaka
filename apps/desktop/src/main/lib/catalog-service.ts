@@ -48,6 +48,8 @@ import {
 } from "./catalog-adapters";
 import { discoverMcpServer } from "./mcp-manager";
 import { closeMcpClient } from "./mcp-manager";
+import { uninstallMcpDependencies } from "./mcp-dependencies";
+import { stopMcpServer } from "./mcp-lifecycle-manager";
 import {
   MCP_PRESET_SOURCE_ID,
   MCP_PRESET_SOURCE_NAME,
@@ -300,11 +302,14 @@ export async function setArtifactInstallationEnabled(
       await setSkillToolEnabled(row.skill_id, enabled);
     } else {
       if (!row.tool_server_id) throw new Error("Installed MCP server record is missing.");
+      await setToolServerEnabled(row.tool_server_id, enabled);
       if (enabled) {
         const discovery = await discoverMcpServer(row.tool_server_id);
-        if (discovery.server.status === "error") throw new Error(discovery.message);
+        if (discovery.server.status === "error") {
+          await setToolServerEnabled(row.tool_server_id, false);
+          throw new Error(discovery.message);
+        }
       }
-      await setToolServerEnabled(row.tool_server_id, enabled);
     }
   } catch (error) {
     await updateArtifactInstallation(id, {
@@ -329,7 +334,11 @@ export async function setArtifactInstallationEnabled(
 export async function uninstallArtifact(id: string): Promise<boolean> {
   const row = requireInstallation(id);
   if (row.skill_id) await deleteSkillTool(row.skill_id);
-  if (row.tool_server_id) await permanentlyDeleteToolServer(row.tool_server_id);
+  if (row.tool_server_id) {
+    await stopMcpServer(row.tool_server_id).catch(() => undefined);
+    await uninstallMcpDependencies(row.tool_server_id).catch(() => undefined);
+    await permanentlyDeleteToolServer(row.tool_server_id);
+  }
   if (row.install_path && existsSync(row.install_path))
     rmSync(row.install_path, { recursive: true, force: true });
   return deleteArtifactInstallation(id);

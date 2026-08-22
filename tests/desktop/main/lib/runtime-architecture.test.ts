@@ -74,7 +74,37 @@ void describe("runtime architecture", () => {
       "0001_romantic_blob.sql",
       "0002_remove_desktop_pet.sql",
       "0003_remove_mcp_marketplace.sql",
+      "0004_deep_the_spike.sql",
+      "0005_rare_prodigy.sql",
     ]);
+  });
+
+  void it("adds MCP runtime state without deleting existing configuration", () => {
+    const migration = readFileSync(
+      path.join(process.cwd(), "drizzle", "0004_deep_the_spike.sql"),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE `managed_runtimes`/);
+    assert.match(migration, /CREATE TABLE `runtime_preferences`/);
+    assert.match(migration, /CREATE TABLE `mcp_runtime_states`/);
+    assert.match(migration, /CREATE TABLE `mcp_dependency_installations`/);
+    assert.match(migration, /ALTER TABLE `tool_servers` ADD `config_source`/);
+    assert.match(migration, /ALTER TABLE `tool_servers` ADD `config_version`/);
+    assert.match(migration, /UPDATE `tool_servers`/);
+    assert.match(migration, /SET `enabled` = 0, `status` = 'disabled'/);
+    assert.doesNotMatch(migration, /DELETE FROM `tool_servers`/);
+    assert.doesNotMatch(migration, /DELETE FROM `tool_secrets`/);
+  });
+
+  void it("adds uv target identity and verified command metadata without replacing runtimes", () => {
+    const migration = readFileSync(
+      path.join(process.cwd(), "drizzle", "0005_rare_prodigy.sql"),
+      "utf8",
+    );
+    assert.match(migration, /ALTER TABLE `managed_runtimes` ADD `libc`/);
+    assert.match(migration, /ALTER TABLE `managed_runtimes` ADD `verified_commands_json`/);
+    assert.match(migration, /idx_managed_runtimes_identity/);
+    assert.doesNotMatch(migration, /DELETE FROM `managed_runtimes`/);
   });
 
   void it("removes the retired MCP catalog while preserving installed MCP state", () => {

@@ -825,6 +825,33 @@ export interface SandboxArtifact {
 export type ToolStatus = "ready" | "disabled" | "error" | "unknown";
 export type McpTransportKind = "stdio" | "http" | "sse" | "builtin";
 export type McpProtocolEra = "modern" | "legacy";
+export type RuntimeKind = "node" | "uv";
+export type RuntimePlatform = "win32" | "darwin" | "linux";
+export type RuntimeArchitecture = "x64" | "arm64";
+export type McpConfigSource = "manual" | "preset" | "import" | "system";
+export type McpLifecycleDesiredState = "stopped" | "running";
+export type McpLifecycleState =
+  | "stopped"
+  | "starting"
+  | "running"
+  | "stopping"
+  | "reconnecting"
+  | "needs_runtime"
+  | "needs_install"
+  | "needs_confirmation"
+  | "error";
+export type ManagedRuntimeStatus = "available" | "installing" | "failed" | "uninstalled";
+export type RuntimeLibc = "gnu" | "musl" | null;
+export type RuntimeArchiveLayout = "flat" | "top-level-directory";
+export type RuntimeSourceKind = "bundled" | "official" | "custom";
+export type RuntimeExecutableCommand = "node" | "npx" | "npm" | "uv" | "uvx";
+export type McpDependencyStatus =
+  | "not_applicable"
+  | "not_installed"
+  | "installing"
+  | "installed"
+  | "needs_confirmation"
+  | "failed";
 
 export function isMcpOAuthTransport(transport: McpTransportKind): boolean {
   return transport === "http" || transport === "sse";
@@ -957,6 +984,8 @@ export interface ToolServer {
   enabled: number;
   auto_use: number;
   requires_approval: number;
+  config_source?: McpConfigSource;
+  config_version?: number;
   status: ToolStatus;
   command: string | null;
   args_json: string;
@@ -980,6 +1009,8 @@ export interface ToolServerInput {
   enabled?: boolean | number;
   auto_use?: boolean | number;
   requires_approval?: boolean | number;
+  config_source?: McpConfigSource;
+  config_version?: number;
   command?: string | null;
   args?: string[] | string;
   url?: string | null;
@@ -987,6 +1018,176 @@ export interface ToolServerInput {
   env?: Record<string, string> | string;
   cwd?: string | null;
   timeout_seconds?: number | string | null;
+}
+
+export interface McpServerConfig {
+  id?: string;
+  name: string;
+  description?: string;
+  transport: Exclude<McpTransportKind, "builtin">;
+  command?: string | null;
+  args?: string[];
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  url?: string | null;
+  cwd?: string | null;
+  timeoutSeconds?: number;
+  enabled?: boolean;
+  autoUse?: boolean;
+  requiresApproval?: boolean;
+  source?: McpConfigSource;
+}
+
+export interface ManagedRuntime {
+  id: string;
+  kind: RuntimeKind;
+  version: string;
+  platform: RuntimePlatform;
+  architecture: RuntimeArchitecture;
+  libc: RuntimeLibc;
+  rootPath: string;
+  executablePath: string;
+  sourceUrl: string;
+  sha256: string;
+  verifiedCommands: RuntimeExecutableCommand[];
+  channel: "stable";
+  status: ManagedRuntimeStatus;
+  installedAt: number | null;
+  updatedAt: number;
+  lastError: string | null;
+}
+
+export interface RuntimePreference {
+  kind: RuntimeKind;
+  manifestUrl: string;
+  channel: "stable";
+  updatedAt: number;
+}
+
+export interface McpServerRuntimeState {
+  serverId: string;
+  desiredState: McpLifecycleDesiredState;
+  state: McpLifecycleState;
+  pid: number | null;
+  resolvedCommand: string | null;
+  runtimeInstallationId: string | null;
+  startedAt: number | null;
+  lastExitAt: number | null;
+  restartAttempts: number;
+  nextRetryAt: number | null;
+  lastError: string | null;
+  updatedAt: number;
+}
+
+export interface McpDependencyInstallation {
+  id: string;
+  serverId: string;
+  manager: "npx" | "uvx" | "none";
+  packageSpecs: string[];
+  installRoot: string | null;
+  status: McpDependencyStatus;
+  scriptsAllowed: number;
+  runtimeInstallationId: string | null;
+  installedAt: number | null;
+  updatedAt: number;
+  lastError: string | null;
+}
+
+export interface McpServerView {
+  server: ToolServer;
+  runtime: McpServerRuntimeState;
+  dependency: McpDependencyInstallation | null;
+}
+
+export interface McpManagerSnapshot {
+  servers: McpServerView[];
+  managedRuntimes: ManagedRuntime[];
+  runtimePreferences: RuntimePreference[];
+  tools: ToolRecord[];
+}
+
+export type McpConfigFormat = "claude-json" | "codex-toml";
+
+export interface McpConfigImportPreview {
+  token: string;
+  format: McpConfigFormat;
+  expiresAt: number;
+  servers: Array<{
+    id: string;
+    name: string;
+    transport: Exclude<McpTransportKind, "builtin">;
+    command: string | null;
+    url: string | null;
+    envKeys: string[];
+    headerKeys: string[];
+    conflictServerId: string | null;
+    diffs: string[];
+    warnings: string[];
+  }>;
+  warnings: string[];
+}
+
+export interface McpConfigImportResult {
+  created: string[];
+  updated: string[];
+  warnings: string[];
+}
+
+export interface RuntimeManifestAsset {
+  runtime: RuntimeKind;
+  version: string;
+  platform: RuntimePlatform;
+  architecture: RuntimeArchitecture;
+  libc?: RuntimeLibc;
+  minimumGlibc?: string | null;
+  archiveUrl: string;
+  fallbackArchiveUrls?: string[];
+  archiveType: "zip" | "tar.gz";
+  archiveLayout?: RuntimeArchiveLayout;
+  sha256: string;
+  executableRelativePath: string;
+  providedCommands: string[];
+  executables?: Array<{
+    command: RuntimeExecutableCommand;
+    relativePath: string;
+  }>;
+}
+
+export interface ManagedRuntimeManifest {
+  schema: "ayaka-runtime-manifest-v2";
+  runtime: RuntimeKind;
+  channel: "stable";
+  generatedAt: string;
+  releases: Array<{
+    version: string;
+    assets: RuntimeManifestAsset[];
+  }>;
+}
+
+export interface RuntimeTarget {
+  platform: RuntimePlatform;
+  architecture: RuntimeArchitecture;
+  libc: RuntimeLibc;
+  glibcVersion: string | null;
+}
+
+export interface SystemRuntimeInfo {
+  kind: RuntimeKind;
+  command: string;
+  available: boolean;
+  version: string | null;
+  companion?: {
+    command: string;
+    available: boolean;
+    version: string | null;
+  };
+}
+
+export interface ManagedRuntimeSnapshot {
+  runtimes: ManagedRuntime[];
+  preferences: RuntimePreference[];
+  system: SystemRuntimeInfo[];
+  target: RuntimeTarget;
 }
 
 export interface ToolRecord {

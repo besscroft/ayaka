@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { readFile, writeFile } from "node:fs/promises";
 import { getServerInfo, getServerPort } from "../server";
 import {
   listConversations,
@@ -113,7 +114,6 @@ import {
   type MemoryFileKind,
 } from "../lib/agent-memory-files";
 import {
-  closeMcpClient,
   discoverMcpServer,
   testMcpServer,
   getMcpCapabilities,
@@ -134,6 +134,32 @@ import {
   onMcpInputRequested,
   respondMcpInput,
 } from "../lib/mcp-interaction-broker";
+import {
+  applyMcpConfigImport,
+  exportMcpConfig,
+  previewMcpConfigImport,
+} from "../lib/mcp-config-manager";
+import {
+  installMcpDependencies,
+  removeMcpDependencyDirectory,
+  uninstallMcpDependencies,
+} from "../lib/mcp-dependencies";
+import {
+  getMcpManagerSnapshot as getLifecycleMcpSnapshot,
+  probeMcpServer,
+  restartMcpServer,
+  startMcpServer,
+  stopMcpServer,
+  onMcpLifecycleStateChanged,
+} from "../lib/mcp-lifecycle-manager";
+import {
+  getRuntimeSnapshot as getManagedRuntimeSnapshot,
+  installManagedRuntime,
+  uninstallManagedRuntime,
+  upgradeManagedRuntime,
+  setRuntimeManifestSource,
+  onManagedRuntimeStateChanged,
+} from "../lib/runtime-manager";
 import { runToolSkill } from "../lib/skill-runtime";
 import { generateSkillDraft } from "../lib/skill-drafts";
 import {
@@ -208,6 +234,8 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   onMcpAuthChanged((serverId, status) => broadcast("mcp:auth-changed", { serverId, status }));
   onMcpInputRequested((request: McpInputRequest) => broadcast("mcp:input-requested", request));
+  onMcpLifecycleStateChanged((state) => broadcast("mcp:state-changed", state));
+  onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
 
   // ---------- Main window controls ----------
   ipcMain.handle("window:minimize", (event) => {
@@ -531,6 +559,19 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
 
   ipcMain.handle("runtime:events:list", () => listRuntimeEvents());
+  ipcMain.handle("runtime:managedSnapshot", () => getManagedRuntimeSnapshot());
+  ipcMain.handle("runtime:managedInstall", (_e, kind: "node" | "uv") =>
+    installManagedRuntime(kind),
+  );
+  ipcMain.handle("runtime:managedUpgrade", (_e, kind: "node" | "uv") =>
+    upgradeManagedRuntime(kind),
+  );
+  ipcMain.handle("runtime:managedUninstall", (_e, runtimeId: string) =>
+    uninstallManagedRuntime(runtimeId),
+  );
+  ipcMain.handle("runtime:managedSetSource", (_e, kind: "node" | "uv", manifestUrl: string) =>
+    setRuntimeManifestSource(kind, manifestUrl),
+  );
   ipcMain.handle("interactions:list", () => listInteractionProfiles());
   ipcMain.handle("sync:get", () => getSyncState());
 
@@ -550,31 +591,102 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   ipcMain.handle("mcp:create", (_e, input: ToolServerInput) => createToolServer(input));
   ipcMain.handle("mcp:update", async (_e, id: string, input: Partial<ToolServerInput>) => {
+    await stopMcpServer(id).catch(() => undefined);
     const server = await updateToolServer(id, input);
-    await closeMcpClient(id);
     return server;
   });
   ipcMain.handle("mcp:delete", async (_e, id: string) => {
-    await closeMcpClient(id);
+    await stopMcpServer(id).catch(() => undefined);
     await deleteToolServer(id);
     return true;
   });
   ipcMain.handle("mcp:listDeleted", () => listDeletedToolServers("mcp"));
   ipcMain.handle("mcp:restore", (_e, id: string) => restoreToolServer(id));
   ipcMain.handle("mcp:permanentDelete", async (_e, id: string) => {
-    await closeMcpClient(id);
+    await stopMcpServer(id).catch(() => undefined);
+    removeMcpDependencyDirectory(id);
     await permanentlyDeleteToolServer(id);
     return true;
   });
   ipcMain.handle("mcp:permanentDeleteBatch", async (_e, ids: string[]) => {
-    await Promise.all(ids.map((id) => closeMcpClient(id)));
+    await Promise.all(ids.map((id) => stopMcpServer(id).catch(() => undefined)));
+    for (const id of ids) removeMcpDependencyDirectory(id);
     return permanentlyDeleteToolServers(ids);
   });
   ipcMain.handle("mcp:purgeExpired", () => purgeExpiredDeletedToolServers());
   ipcMain.handle("mcp:setEnabled", async (_e, id: string, enabled: boolean) => {
+    if (!enabled) await stopMcpServer(id).catch(() => undefined);
     const server = await setToolServerEnabled(id, enabled);
-    if (!enabled) await closeMcpClient(id);
     return server;
+  });
+  ipcMain.handle("mcp:snapshot", () => getLifecycleMcpSnapshot());
+  ipcMain.handle("mcp:start", (_e, id: string) => startMcpServer(id));
+  ipcMain.handle("mcp:stop", (_e, id: string) => stopMcpServer(id));
+  ipcMain.handle("mcp:restart", (_e, id: string) => restartMcpServer(id));
+  ipcMain.handle("mcp:probe", (_e, id: string) => probeMcpServer(id));
+  ipcMain.handle("mcp:install", (_e, id: string, options?: { allowScripts?: boolean }) =>
+    installMcpDependencies(id, options),
+  );
+  ipcMain.handle("mcp:uninstall", async (_e, id: string) => {
+    await stopMcpServer(id).catch(() => undefined);
+    return uninstallMcpDependencies(id);
+  });
+  ipcMain.handle(
+    "mcp:config:previewImport",
+    (_e, input: { format: "claude-json" | "codex-toml"; text: string }) =>
+      previewMcpConfigImport(input),
+  );
+  ipcMain.handle(
+    "mcp:config:applyImport",
+    (_e, token: string, options?: { confirmConflicts?: boolean }) =>
+      applyMcpConfigImport(token, options),
+  );
+  ipcMain.handle("mcp:config:importFile", async (event, format: "claude-json" | "codex-toml") => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const result = parent
+      ? await dialog.showOpenDialog(parent, {
+          properties: ["openFile"],
+          filters:
+            format === "claude-json"
+              ? [{ name: "JSON", extensions: ["json"] }]
+              : [{ name: "TOML", extensions: ["toml"] }],
+        })
+      : await dialog.showOpenDialog({
+          properties: ["openFile"],
+          filters:
+            format === "claude-json"
+              ? [{ name: "JSON", extensions: ["json"] }]
+              : [{ name: "TOML", extensions: ["toml"] }],
+        });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return previewMcpConfigImport({
+      format,
+      text: await readFile(result.filePaths[0], "utf8"),
+    });
+  });
+  ipcMain.handle("mcp:config:export", (_e, format: "claude-json" | "codex-toml") =>
+    exportMcpConfig(format),
+  );
+  ipcMain.handle("mcp:config:exportFile", async (event, format: "claude-json" | "codex-toml") => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const result = parent
+      ? await dialog.showSaveDialog(parent, {
+          defaultPath: format === "claude-json" ? "mcp.json" : "config.toml",
+          filters:
+            format === "claude-json"
+              ? [{ name: "JSON", extensions: ["json"] }]
+              : [{ name: "TOML", extensions: ["toml"] }],
+        })
+      : await dialog.showSaveDialog({
+          defaultPath: format === "claude-json" ? "mcp.json" : "config.toml",
+          filters:
+            format === "claude-json"
+              ? [{ name: "JSON", extensions: ["json"] }]
+              : [{ name: "TOML", extensions: ["toml"] }],
+        });
+    if (result.canceled || !result.filePath) return "cancelled" as const;
+    await writeFile(result.filePath, exportMcpConfig(format), "utf8");
+    return "saved" as const;
   });
   ipcMain.handle("mcp:test", (_e, id: string) => testMcpServer(id));
   ipcMain.handle("mcp:discover", (_e, id: string) => discoverMcpServer(id));

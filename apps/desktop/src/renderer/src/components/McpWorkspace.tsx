@@ -7,6 +7,8 @@ import type {
   McpPromptResult,
   ToolRecord,
   ToolServer,
+  McpServerRuntimeState,
+  McpDependencyInstallation,
 } from "@shared/types";
 import { isMcpOAuthTransport } from "@shared/types";
 import { api } from "../lib/api";
@@ -33,6 +35,7 @@ import {
 import { IconCheck, IconCopy, IconEdit, IconGlobe, IconRotateCcw } from "./icons";
 import { cn } from "../lib/utils";
 import { Field, ReadStat } from "./ToolsPanel";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 type WorkspaceTab = "overview" | "tools" | "prompts";
 
@@ -67,6 +70,14 @@ export function McpWorkspace({
   const [loadingCapabilities, setLoadingCapabilities] = useState(false);
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [runtimeStates, setRuntimeStates] = useState<Map<string, McpServerRuntimeState>>(
+    () => new Map(),
+  );
+  const [dependencies, setDependencies] = useState<Map<string, McpDependencyInstallation>>(
+    () => new Map(),
+  );
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [confirmDependencyInstall, setConfirmDependencyInstall] = useState(false);
   const [pendingInput, setPendingInput] = useState<McpInputRequest | null>(null);
   const capabilityRequestId = useRef(0);
 
@@ -78,6 +89,46 @@ export function McpWorkspace({
   const displayedError = displayedCapabilityError
     ? getMcpErrorMessage(displayedCapabilityError, locale)
     : null;
+  const selectedRuntime = selected ? runtimeStates.get(selected.id) : undefined;
+  const selectedDependency = selected ? dependencies.get(selected.id) : undefined;
+  const runtimeLabel = (state: McpServerRuntimeState["state"] | undefined): string =>
+    t(`tools.mcp.state.${state ?? "stopped"}`);
+
+  const refreshRuntimeStates = (): void => {
+    void api.mcp.snapshot().then((next) => {
+      setRuntimeStates(new Map(next.servers.map((item) => [item.server.id, item.runtime])));
+      setDependencies(
+        new Map(
+          next.servers.flatMap((item) =>
+            item.dependency ? [[item.server.id, item.dependency] as const] : [],
+          ),
+        ),
+      );
+    });
+  };
+
+  useEffect(refreshRuntimeStates, []);
+
+  useEffect(
+    () =>
+      api.mcp.onStateChanged((state) => {
+        setRuntimeStates((current) => new Map(current).set(state.serverId, state));
+      }),
+    [],
+  );
+
+  const runLifecycle = async (action: () => Promise<unknown>): Promise<void> => {
+    setLifecycleBusy(true);
+    setWorkspaceError(null);
+    try {
+      await action();
+      refreshRuntimeStates();
+    } catch (error) {
+      setWorkspaceError(getMcpErrorMessage(error, locale));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (selected?.id !== selectedId) {
@@ -200,7 +251,7 @@ export function McpWorkspace({
                         {server.enabled
                           ? discovering
                             ? t("tools.mcp.workspace.connecting")
-                            : `${tools.length} ${t("tools.field.tools")}`
+                            : `${runtimeLabel(runtimeStates.get(server.id)?.state)} · ${tools.length} ${t("tools.field.tools")}`
                           : t("catalog.disabled")}
                       </span>
                     </span>
@@ -226,6 +277,9 @@ export function McpWorkspace({
                     </Card.Description>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-muted px-2 py-1 text-xs">
+                      {runtimeLabel(selectedRuntime?.state)}
+                    </span>
                     {selectedIsDiscovering ? (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <IconRotateCcw className="size-3 animate-spin" />
@@ -270,6 +324,65 @@ export function McpWorkspace({
                     >
                       {t("common.delete")}
                     </Button>
+                    {selectedRuntime?.state === "running" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        isDisabled={lifecycleBusy}
+                        onPress={() => void runLifecycle(() => api.mcp.stop(selected.id))}
+                      >
+                        {t("tools.mcp.stop")}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        isDisabled={lifecycleBusy || selected.enabled === 0}
+                        onPress={() => void runLifecycle(() => api.mcp.start(selected.id))}
+                      >
+                        {t("tools.mcp.start")}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      isDisabled={lifecycleBusy || selected.enabled === 0}
+                      onPress={() => void runLifecycle(() => api.mcp.restart(selected.id))}
+                    >
+                      {t("tools.mcp.restart")}
+                    </Button>
+                    {selectedRuntime?.state === "needs_install" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        isDisabled={lifecycleBusy}
+                        onPress={() => void runLifecycle(() => api.mcp.install(selected.id))}
+                      >
+                        {t("tools.mcp.installDependencies")}
+                      </Button>
+                    ) : null}
+                    {selectedRuntime?.state === "needs_confirmation" &&
+                    selectedDependency?.packageSpecs.length ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        isDisabled={lifecycleBusy}
+                        onPress={() => setConfirmDependencyInstall(true)}
+                      >
+                        {t("tools.mcp.confirmDependencyInstall")}
+                      </Button>
+                    ) : null}
+                    {selectedRuntime?.state === "needs_confirmation" &&
+                    !selectedDependency?.packageSpecs.length ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        isDisabled={lifecycleBusy}
+                        onPress={() => onEdit(selected)}
+                      >
+                        {t("tools.mcp.reviewCommand")}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <Tabs value={tab} onValueChange={(value) => setTab(value as WorkspaceTab)}>
@@ -345,6 +458,19 @@ export function McpWorkspace({
         </Card>
       </div>
       <McpInputDialog request={pendingInput} onClose={() => setPendingInput(null)} />
+      <ConfirmDialog
+        open={confirmDependencyInstall}
+        title={t("tools.mcp.confirmDependencyTitle")}
+        message={t("tools.mcp.confirmDependencyMessage")}
+        confirmLabel={t("tools.mcp.confirmDependencyInstall")}
+        onConfirm={() => {
+          setConfirmDependencyInstall(false);
+          if (selected) {
+            void runLifecycle(() => api.mcp.install(selected.id, { allowScripts: true }));
+          }
+        }}
+        onClose={() => setConfirmDependencyInstall(false)}
+      />
     </>
   );
 }

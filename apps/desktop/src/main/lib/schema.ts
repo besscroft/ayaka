@@ -1,4 +1,11 @@
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const conversations = sqliteTable(
   "conversations",
@@ -500,6 +507,10 @@ export const toolServers = sqliteTable(
     enabled: integer("enabled").notNull().default(1),
     auto_use: integer("auto_use").notNull().default(0),
     requires_approval: integer("requires_approval").notNull().default(1),
+    config_source: text("config_source", { enum: ["manual", "preset", "import", "system"] })
+      .notNull()
+      .default("manual"),
+    config_version: integer("config_version").notNull().default(1),
     status: text("status", { enum: ["ready", "disabled", "error", "unknown"] })
       .notNull()
       .default("unknown"),
@@ -523,6 +534,129 @@ export const toolServers = sqliteTable(
     index("idx_tool_servers_status").on(table.status),
     index("idx_tool_servers_deleted_at").on(table.deleted_at),
     index("idx_tool_servers_purge_after_at").on(table.purge_after_at),
+  ],
+);
+
+export const managedRuntimes = sqliteTable(
+  "managed_runtimes",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind", { enum: ["node", "uv"] }).notNull(),
+    version: text("version").notNull(),
+    platform: text("platform", { enum: ["win32", "darwin", "linux"] }).notNull(),
+    architecture: text("architecture", { enum: ["x64", "arm64"] }).notNull(),
+    libc: text("libc", { enum: ["gnu", "musl"] }),
+    root_path: text("root_path").notNull(),
+    executable_path: text("executable_path").notNull(),
+    source_url: text("source_url").notNull(),
+    sha256: text("sha256").notNull(),
+    verified_commands_json: text("verified_commands_json").notNull().default("[]"),
+    channel: text("channel", { enum: ["stable"] })
+      .notNull()
+      .default("stable"),
+    status: text("status", { enum: ["available", "installing", "failed", "uninstalled"] })
+      .notNull()
+      .default("installing"),
+    installed_at: integer("installed_at"),
+    updated_at: integer("updated_at").notNull(),
+    last_error: text("last_error"),
+  },
+  (table) => [
+    uniqueIndex("idx_managed_runtimes_identity").on(
+      table.kind,
+      table.version,
+      table.platform,
+      table.architecture,
+      table.libc,
+    ),
+    index("idx_managed_runtimes_kind_status").on(table.kind, table.status),
+  ],
+);
+
+export const runtimePreferences = sqliteTable("runtime_preferences", {
+  kind: text("kind", { enum: ["node", "uv"] }).primaryKey(),
+  manifest_url: text("manifest_url").notNull(),
+  channel: text("channel", { enum: ["stable"] })
+    .notNull()
+    .default("stable"),
+  updated_at: integer("updated_at").notNull(),
+});
+
+export const mcpRuntimeStates = sqliteTable(
+  "mcp_runtime_states",
+  {
+    server_id: text("server_id")
+      .primaryKey()
+      .references(() => toolServers.id, { onDelete: "cascade" }),
+    desired_state: text("desired_state", { enum: ["stopped", "running"] })
+      .notNull()
+      .default("stopped"),
+    state: text("state", {
+      enum: [
+        "stopped",
+        "starting",
+        "running",
+        "stopping",
+        "reconnecting",
+        "needs_runtime",
+        "needs_install",
+        "needs_confirmation",
+        "error",
+      ],
+    })
+      .notNull()
+      .default("stopped"),
+    pid: integer("pid"),
+    resolved_command: text("resolved_command"),
+    runtime_installation_id: text("runtime_installation_id").references(() => managedRuntimes.id, {
+      onDelete: "set null",
+    }),
+    started_at: integer("started_at"),
+    last_exit_at: integer("last_exit_at"),
+    restart_attempts: integer("restart_attempts").notNull().default(0),
+    next_retry_at: integer("next_retry_at"),
+    last_error: text("last_error"),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_mcp_runtime_states_state").on(table.state),
+    index("idx_mcp_runtime_states_desired").on(table.desired_state),
+  ],
+);
+
+export const mcpDependencyInstallations = sqliteTable(
+  "mcp_dependency_installations",
+  {
+    id: text("id").primaryKey(),
+    server_id: text("server_id")
+      .notNull()
+      .references(() => toolServers.id, { onDelete: "cascade" }),
+    manager: text("manager", { enum: ["npx", "uvx", "none"] }).notNull(),
+    package_specs_json: text("package_specs_json").notNull().default("[]"),
+    install_root: text("install_root"),
+    status: text("status", {
+      enum: [
+        "not_applicable",
+        "not_installed",
+        "installing",
+        "installed",
+        "needs_confirmation",
+        "failed",
+      ],
+    })
+      .notNull()
+      .default("not_installed"),
+    scripts_allowed: integer("scripts_allowed").notNull().default(0),
+    runtime_installation_id: text("runtime_installation_id").references(() => managedRuntimes.id, {
+      onDelete: "set null",
+    }),
+    installed_at: integer("installed_at"),
+    updated_at: integer("updated_at").notNull(),
+    last_error: text("last_error"),
+  },
+  (table) => [
+    uniqueIndex("idx_mcp_dependency_installations_server").on(table.server_id),
+    index("idx_mcp_dependency_installations_status").on(table.status),
   ],
 );
 
@@ -858,6 +992,10 @@ export const schema = {
   runtimeSteps,
   runtimeEvents,
   toolServers,
+  managedRuntimes,
+  runtimePreferences,
+  mcpRuntimeStates,
+  mcpDependencyInstallations,
   tools,
   toolSecrets,
   memories,
@@ -906,6 +1044,14 @@ export type RuntimeEvent = typeof runtimeEvents.$inferSelect;
 export type NewRuntimeEvent = typeof runtimeEvents.$inferInsert;
 export type ToolServer = typeof toolServers.$inferSelect;
 export type NewToolServer = typeof toolServers.$inferInsert;
+export type ManagedRuntime = typeof managedRuntimes.$inferSelect;
+export type NewManagedRuntime = typeof managedRuntimes.$inferInsert;
+export type RuntimePreference = typeof runtimePreferences.$inferSelect;
+export type NewRuntimePreference = typeof runtimePreferences.$inferInsert;
+export type McpRuntimeState = typeof mcpRuntimeStates.$inferSelect;
+export type NewMcpRuntimeState = typeof mcpRuntimeStates.$inferInsert;
+export type McpDependencyInstallation = typeof mcpDependencyInstallations.$inferSelect;
+export type NewMcpDependencyInstallation = typeof mcpDependencyInstallations.$inferInsert;
 export type ToolRecord = typeof tools.$inferSelect;
 export type NewToolRecord = typeof tools.$inferInsert;
 export type ToolSecret = typeof toolSecrets.$inferSelect;

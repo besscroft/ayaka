@@ -14,6 +14,9 @@ import { getToolSecretValue, resolveToolSecretReferences } from "./db";
 import { getMcpExecutionContext } from "./mcp-context";
 import { requestMcpInput } from "./mcp-interaction-broker";
 import { getMcpOAuthProvider } from "./mcp-auth";
+import { getMcpDependencyInstallation } from "./db";
+import { parseMcpCommand } from "./mcp-command";
+import { delimiter, join } from "node:path";
 
 export interface McpConnectionSnapshot {
   protocolEra: McpProtocolEra;
@@ -144,7 +147,7 @@ export function validateMcpUrl(rawUrl: string): URL {
 
 export function redactMcpError(error: unknown, server?: ToolServer, transport?: Transport): string {
   let message = missingMcpExecutable(error, server)
-    ? `MCP command "${server?.command?.trim()}" was not found. Install it and ensure it is available on PATH. If you installed it recently, restart Ayaka so the desktop app can load the updated PATH.`
+    ? `MCP command "${server?.command?.trim()}" was not found. Install the required Runtime from Ayaka Settings or ensure the command is available on PATH, then restart Ayaka.`
     : error instanceof Error
       ? error.message
       : String(error);
@@ -264,11 +267,18 @@ async function connectWithTransport(
 function createStdioTransport(server: ToolServer): StdioClientTransport {
   const command = server.command?.trim();
   if (!command) throw new Error("MCP stdio server is missing a command.");
+  const parsed = parseMcpCommand(command, safeJsonArray(server.args_json).map(String));
+  const dependency = getMcpDependencyInstallation(server.id);
+  const resolvedArgs =
+    parsed.manager === "npx" && dependency?.status === "installed" && dependency.installRoot
+      ? ensureNpxNoInstall(parsed.resolvedArgs, dependency.installRoot)
+      : parsed.resolvedArgs;
   const transport = new StdioClientTransport({
-    command,
-    args: safeJsonArray(server.args_json).map(String),
+    command: parsed.resolvedCommand,
+    args: resolvedArgs,
     env: {
       ...safeProcessEnv(),
+      ...mcpDependencyEnvironment(server.id),
       ...resolveToolSecretReferences("server", server.id, safeJsonRecord(server.env_json)),
     },
     cwd: server.cwd ?? undefined,
@@ -281,6 +291,30 @@ function createStdioTransport(server: ToolServer): StdioClientTransport {
     diagnostics.stderr = trimStdioStderr(next);
   });
   return transport;
+}
+
+function ensureNpxNoInstall(args: string[], installRoot: string): string[] {
+  const withPrefix = args.some((arg) => arg === "--prefix")
+    ? args
+    : ["--prefix", installRoot, ...args];
+  return withPrefix.some((arg) => arg === "--no-install")
+    ? withPrefix
+    : ["--no-install", ...withPrefix];
+}
+
+function mcpDependencyEnvironment(serverId: string): Record<string, string> {
+  const installation = getMcpDependencyInstallation(serverId);
+  if (!installation || installation.status !== "installed" || !installation.installRoot) return {};
+  const bin = join(installation.installRoot, "node_modules", ".bin");
+  const path = process.env.PATH ? `${bin}${delimiter}${process.env.PATH}` : bin;
+  return {
+    PATH: path,
+    NPM_CONFIG_PREFIX: installation.installRoot,
+    npm_config_prefix: installation.installRoot,
+    UV_TOOL_DIR: join(installation.installRoot, "uv-tools"),
+    UV_TOOL_BIN_DIR: join(installation.installRoot, "bin"),
+    UV_CACHE_DIR: join(installation.installRoot, "uv-cache"),
+  };
 }
 
 function getStdioStderr(transport?: Transport): string {
@@ -425,7 +459,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 function safeProcessEnv(): Record<string, string> {
   return Object.fromEntries(
     Object.entries(process.env).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
+      (entry): entry is [string, string] =>
+        typeof entry[1] === "string" &&
+        !entry[0].startsWith("ELECTRON_") &&
+        entry[0] !== "ELECTRON_RUN_AS_NODE" &&
+        entry[0] !== "ELECTRON_NO_ATTACH_CONSOLE",
     ),
   );
 }

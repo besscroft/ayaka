@@ -15,6 +15,7 @@ import { agentLoopSessions } from "./lib/agent-loop-session";
 import { sendUpdateState, updateManager } from "./lib/update-manager";
 import { removeLegacyCompanionData } from "./lib/runtime-paths";
 import { closeAllMcpClients } from "./lib/mcp-manager";
+import { recoverMcpLifecycleStates, shutdownMcpLifecycle } from "./lib/mcp-lifecycle-manager";
 import { cancelAllMcpInputs } from "./lib/mcp-interaction-broker";
 import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
 import { createTray, type TrayController } from "./lib/tray";
@@ -177,6 +178,7 @@ if (!hasSingleInstanceLock) {
     try {
       await ensureDefaultWorkspaceAsset();
       await initDbWriter();
+      await recoverMcpLifecycleStates();
       await migrateProviderApiKeysToModelKeys();
       await ensureBuiltinCatalogSources();
       scheduleMemoryFileConsolidation();
@@ -238,7 +240,7 @@ if (!hasSingleInstanceLock) {
       .interruptAll()
       .then(() => {
         cancelAllMcpInputs();
-        return closeAllMcpClients();
+        return shutdownMcpLifecycle().then(() => closeAllMcpClients());
       })
       .then(() => closeMcpOAuthLoopback())
       .then(async () => {

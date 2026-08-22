@@ -42,6 +42,10 @@ import {
   artifactInstallations,
   catalogItems,
   catalogSources,
+  managedRuntimes,
+  runtimePreferences,
+  mcpRuntimeStates,
+  mcpDependencyInstallations,
   type AgentRunInput as DbAgentRunInput,
   type AgentPolicy as DbAgentPolicy,
   type AgentInstance as DbAgentInstance,
@@ -71,6 +75,10 @@ import {
   type ToolRecord as DbToolRecord,
   type ToolSecret as DbToolSecret,
   type ToolServer as DbToolServer,
+  type ManagedRuntime as DbManagedRuntime,
+  type RuntimePreference as DbRuntimePreference,
+  type McpRuntimeState as DbMcpRuntimeState,
+  type McpDependencyInstallation as DbMcpDependencyInstallation,
 } from "./schema";
 import {
   DEFAULT_AGENT_HANDOFF_CONFIG,
@@ -123,6 +131,17 @@ import {
   type ToolSkill,
   type ToolSkillInput,
   type ToolsSnapshot,
+  type ManagedRuntime,
+  type RuntimePreference,
+  type McpServerRuntimeState,
+  type McpDependencyInstallation,
+  type RuntimeKind,
+  type RuntimeExecutableCommand,
+  type RuntimePlatform,
+  type RuntimeArchitecture,
+  type McpLifecycleDesiredState,
+  type McpLifecycleState,
+  type McpDependencyStatus,
 } from "../../shared/types";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
 import { resolveUserDataDir } from "./runtime-paths";
@@ -2216,6 +2235,276 @@ export function listMcpServers(): ToolServer[] {
   return listToolServers("mcp");
 }
 
+export function listManagedRuntimes(): ManagedRuntime[] {
+  return getDb().select().from(managedRuntimes).all().map(toManagedRuntime);
+}
+
+export function listAvailableManagedRuntimes(): ManagedRuntime[] {
+  return getDb()
+    .select()
+    .from(managedRuntimes)
+    .where(eq(managedRuntimes.status, "available"))
+    .all()
+    .map(toManagedRuntime);
+}
+
+export function listRuntimePreferences(): RuntimePreference[] {
+  return getDb().select().from(runtimePreferences).all().map(toRuntimePreference);
+}
+
+export function getRuntimePreference(kind: RuntimeKind): RuntimePreference | null {
+  const row = getDb()
+    .select()
+    .from(runtimePreferences)
+    .where(eq(runtimePreferences.kind, kind))
+    .get();
+  return row ? toRuntimePreference(row) : null;
+}
+
+export function upsertRuntimePreference(input: {
+  kind: RuntimeKind;
+  manifestUrl: string;
+  channel?: "stable";
+}): RuntimePreference {
+  const row: DbRuntimePreference = {
+    kind: input.kind,
+    manifest_url: input.manifestUrl,
+    channel: input.channel ?? "stable",
+    updated_at: Date.now(),
+  };
+  getDb()
+    .insert(runtimePreferences)
+    .values(row)
+    .onConflictDoUpdate({
+      target: runtimePreferences.kind,
+      set: { manifest_url: row.manifest_url, channel: row.channel, updated_at: row.updated_at },
+    })
+    .run();
+  return toRuntimePreference(row);
+}
+
+export function upsertManagedRuntime(input: {
+  id: string;
+  kind: RuntimeKind;
+  version: string;
+  platform: RuntimePlatform;
+  architecture: RuntimeArchitecture;
+  libc?: ManagedRuntime["libc"];
+  rootPath: string;
+  executablePath: string;
+  sourceUrl: string;
+  sha256: string;
+  verifiedCommands?: RuntimeExecutableCommand[];
+  status?: ManagedRuntime["status"];
+  installedAt?: number | null;
+  lastError?: string | null;
+}): ManagedRuntime {
+  const now = Date.now();
+  const row: DbManagedRuntime = {
+    id: input.id,
+    kind: input.kind,
+    version: input.version,
+    platform: input.platform,
+    architecture: input.architecture,
+    libc: input.libc ?? null,
+    root_path: input.rootPath,
+    executable_path: input.executablePath,
+    source_url: input.sourceUrl,
+    sha256: input.sha256,
+    verified_commands_json: JSON.stringify(input.verifiedCommands ?? []),
+    channel: "stable",
+    status: input.status ?? "available",
+    installed_at: input.installedAt ?? now,
+    updated_at: now,
+    last_error: input.lastError ?? null,
+  };
+  getDb()
+    .insert(managedRuntimes)
+    .values(row)
+    .onConflictDoUpdate({
+      target: managedRuntimes.id,
+      set: {
+        kind: row.kind,
+        version: row.version,
+        platform: row.platform,
+        architecture: row.architecture,
+        libc: row.libc,
+        root_path: row.root_path,
+        executable_path: row.executable_path,
+        source_url: row.source_url,
+        sha256: row.sha256,
+        verified_commands_json: row.verified_commands_json,
+        channel: row.channel,
+        status: row.status,
+        installed_at: row.installed_at,
+        updated_at: row.updated_at,
+        last_error: row.last_error,
+      },
+    })
+    .run();
+  return toManagedRuntime(row);
+}
+
+export function markManagedRuntimeStatus(
+  id: string,
+  patch: Pick<Partial<ManagedRuntime>, "status" | "lastError"> & { last_error?: string | null },
+): ManagedRuntime | null {
+  const existing = getDb().select().from(managedRuntimes).where(eq(managedRuntimes.id, id)).get();
+  if (!existing) return null;
+  const lastError = "lastError" in patch ? patch.lastError : patch.last_error;
+  getDb()
+    .update(managedRuntimes)
+    .set({
+      ...(patch.status ? { status: patch.status } : {}),
+      ...(lastError !== undefined ? { last_error: lastError } : {}),
+      updated_at: Date.now(),
+    })
+    .where(eq(managedRuntimes.id, id))
+    .run();
+  return toManagedRuntime(
+    getDb().select().from(managedRuntimes).where(eq(managedRuntimes.id, id)).get()!,
+  );
+}
+
+export function listMcpRuntimeStates(): McpServerRuntimeState[] {
+  return getDb().select().from(mcpRuntimeStates).all().map(toMcpRuntimeState);
+}
+
+export function getMcpRuntimeState(serverId: string): McpServerRuntimeState | null {
+  const row = getDb()
+    .select()
+    .from(mcpRuntimeStates)
+    .where(eq(mcpRuntimeStates.server_id, serverId))
+    .get();
+  return row ? toMcpRuntimeState(row) : null;
+}
+
+export function upsertMcpRuntimeState(input: {
+  serverId: string;
+  desiredState?: McpLifecycleDesiredState;
+  state?: McpLifecycleState;
+  pid?: number | null;
+  resolvedCommand?: string | null;
+  runtimeInstallationId?: string | null;
+  startedAt?: number | null;
+  lastExitAt?: number | null;
+  restartAttempts?: number;
+  nextRetryAt?: number | null;
+  lastError?: string | null;
+}): McpServerRuntimeState {
+  const existing = getMcpRuntimeState(input.serverId);
+  const row: DbMcpRuntimeState = {
+    server_id: input.serverId,
+    desired_state: input.desiredState ?? existing?.desiredState ?? "stopped",
+    state: input.state ?? existing?.state ?? "stopped",
+    pid: input.pid !== undefined ? input.pid : (existing?.pid ?? null),
+    resolved_command:
+      input.resolvedCommand !== undefined
+        ? input.resolvedCommand
+        : (existing?.resolvedCommand ?? null),
+    runtime_installation_id:
+      input.runtimeInstallationId !== undefined
+        ? input.runtimeInstallationId
+        : (existing?.runtimeInstallationId ?? null),
+    started_at: input.startedAt !== undefined ? input.startedAt : (existing?.startedAt ?? null),
+    last_exit_at:
+      input.lastExitAt !== undefined ? input.lastExitAt : (existing?.lastExitAt ?? null),
+    restart_attempts: input.restartAttempts ?? existing?.restartAttempts ?? 0,
+    next_retry_at:
+      input.nextRetryAt !== undefined ? input.nextRetryAt : (existing?.nextRetryAt ?? null),
+    last_error: input.lastError !== undefined ? input.lastError : (existing?.lastError ?? null),
+    updated_at: Date.now(),
+  };
+  getDb()
+    .insert(mcpRuntimeStates)
+    .values(row)
+    .onConflictDoUpdate({
+      target: mcpRuntimeStates.server_id,
+      set: {
+        desired_state: row.desired_state,
+        state: row.state,
+        pid: row.pid,
+        resolved_command: row.resolved_command,
+        runtime_installation_id: row.runtime_installation_id,
+        started_at: row.started_at,
+        last_exit_at: row.last_exit_at,
+        restart_attempts: row.restart_attempts,
+        next_retry_at: row.next_retry_at,
+        last_error: row.last_error,
+        updated_at: row.updated_at,
+      },
+    })
+    .run();
+  return toMcpRuntimeState(row);
+}
+
+export function listMcpDependencyInstallations(): McpDependencyInstallation[] {
+  return getDb().select().from(mcpDependencyInstallations).all().map(toMcpDependencyInstallation);
+}
+
+export function getMcpDependencyInstallation(serverId: string): McpDependencyInstallation | null {
+  const row = getDb()
+    .select()
+    .from(mcpDependencyInstallations)
+    .where(eq(mcpDependencyInstallations.server_id, serverId))
+    .get();
+  return row ? toMcpDependencyInstallation(row) : null;
+}
+
+export function upsertMcpDependencyInstallation(input: {
+  serverId: string;
+  manager: "npx" | "uvx" | "none";
+  packageSpecs?: string[];
+  installRoot?: string | null;
+  status?: McpDependencyStatus;
+  scriptsAllowed?: boolean | number;
+  runtimeInstallationId?: string | null;
+  installedAt?: number | null;
+  lastError?: string | null;
+}): McpDependencyInstallation {
+  const existing = getMcpDependencyInstallation(input.serverId);
+  const row: DbMcpDependencyInstallation = {
+    id: existing?.id ?? randomUUID(),
+    server_id: input.serverId,
+    manager: input.manager,
+    package_specs_json: JSON.stringify(input.packageSpecs ?? existing?.packageSpecs ?? []),
+    install_root:
+      input.installRoot !== undefined ? input.installRoot : (existing?.installRoot ?? null),
+    status: input.status ?? existing?.status ?? "not_installed",
+    scripts_allowed:
+      input.scriptsAllowed !== undefined
+        ? normalizeBooleanNumber(input.scriptsAllowed)
+        : (existing?.scriptsAllowed ?? 0),
+    runtime_installation_id:
+      input.runtimeInstallationId !== undefined
+        ? input.runtimeInstallationId
+        : (existing?.runtimeInstallationId ?? null),
+    installed_at:
+      input.installedAt !== undefined ? input.installedAt : (existing?.installedAt ?? null),
+    updated_at: Date.now(),
+    last_error: input.lastError !== undefined ? input.lastError : (existing?.lastError ?? null),
+  };
+  getDb()
+    .insert(mcpDependencyInstallations)
+    .values(row)
+    .onConflictDoUpdate({
+      target: mcpDependencyInstallations.server_id,
+      set: {
+        manager: row.manager,
+        package_specs_json: row.package_specs_json,
+        install_root: row.install_root,
+        status: row.status,
+        scripts_allowed: row.scripts_allowed,
+        runtime_installation_id: row.runtime_installation_id,
+        installed_at: row.installed_at,
+        updated_at: row.updated_at,
+        last_error: row.last_error,
+      },
+    })
+    .run();
+  return toMcpDependencyInstallation(row);
+}
+
 export function getToolServer(id: string): ToolServer | null {
   const row = getDb()
     .select()
@@ -2351,7 +2640,6 @@ export function updateToolServerStatus(
         patch.last_connected_at === undefined
           ? existing.last_connected_at
           : patch.last_connected_at,
-      updated_at: Date.now(),
     })
     .where(eq(toolServers.id, id))
     .run();
@@ -2700,6 +2988,49 @@ export async function updateToolServerStatusAsync(
     : updateToolServerStatus(id, patch);
 }
 export const updateMcpServerStatusAsync = updateToolServerStatusAsync;
+
+export async function upsertRuntimePreferenceAsync(input: {
+  kind: RuntimeKind;
+  manifestUrl: string;
+  channel?: "stable";
+}): Promise<RuntimePreference> {
+  return shouldRouteWrites()
+    ? writeDb<RuntimePreference>("upsertRuntimePreference", [input])
+    : upsertRuntimePreference(input);
+}
+
+export async function upsertManagedRuntimeAsync(
+  input: Parameters<typeof upsertManagedRuntime>[0],
+): Promise<ManagedRuntime> {
+  return shouldRouteWrites()
+    ? writeDb<ManagedRuntime>("upsertManagedRuntime", [input])
+    : upsertManagedRuntime(input);
+}
+
+export async function markManagedRuntimeStatusAsync(
+  id: string,
+  patch: Parameters<typeof markManagedRuntimeStatus>[1],
+): Promise<ManagedRuntime | null> {
+  return shouldRouteWrites()
+    ? writeDb<ManagedRuntime | null>("markManagedRuntimeStatus", [id, patch])
+    : markManagedRuntimeStatus(id, patch);
+}
+
+export async function upsertMcpRuntimeStateAsync(
+  input: Parameters<typeof upsertMcpRuntimeState>[0],
+): Promise<McpServerRuntimeState> {
+  return shouldRouteWrites()
+    ? writeDb<McpServerRuntimeState>("upsertMcpRuntimeState", [input])
+    : upsertMcpRuntimeState(input);
+}
+
+export async function upsertMcpDependencyInstallationAsync(
+  input: Parameters<typeof upsertMcpDependencyInstallation>[0],
+): Promise<McpDependencyInstallation> {
+  return shouldRouteWrites()
+    ? writeDb<McpDependencyInstallation>("upsertMcpDependencyInstallation", [input])
+    : upsertMcpDependencyInstallation(input);
+}
 export async function upsertMcpToolDefinitionsAsync(
   serverId: string,
   definitions: Parameters<typeof upsertMcpToolDefinitions>[1],
@@ -3286,6 +3617,87 @@ function toToolServer(row: DbToolServer): ToolServer {
   return row as ToolServer;
 }
 
+function toManagedRuntime(row: DbManagedRuntime): ManagedRuntime {
+  let verifiedCommands: RuntimeExecutableCommand[] = [];
+  try {
+    const value = JSON.parse(row.verified_commands_json) as unknown;
+    if (Array.isArray(value))
+      verifiedCommands = value.filter(
+        (item): item is RuntimeExecutableCommand =>
+          item === "node" || item === "npx" || item === "npm" || item === "uv" || item === "uvx",
+      );
+  } catch {
+    verifiedCommands = [];
+  }
+  return {
+    id: row.id,
+    kind: row.kind,
+    version: row.version,
+    platform: row.platform,
+    architecture: row.architecture,
+    libc: row.libc ?? null,
+    rootPath: row.root_path,
+    executablePath: row.executable_path,
+    sourceUrl: row.source_url,
+    sha256: row.sha256,
+    verifiedCommands,
+    channel: row.channel,
+    status: row.status,
+    installedAt: row.installed_at,
+    updatedAt: row.updated_at,
+    lastError: row.last_error,
+  };
+}
+
+function toRuntimePreference(row: DbRuntimePreference): RuntimePreference {
+  return {
+    kind: row.kind,
+    manifestUrl: row.manifest_url,
+    channel: row.channel,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toMcpRuntimeState(row: DbMcpRuntimeState): McpServerRuntimeState {
+  return {
+    serverId: row.server_id,
+    desiredState: row.desired_state,
+    state: row.state,
+    pid: row.pid,
+    resolvedCommand: row.resolved_command,
+    runtimeInstallationId: row.runtime_installation_id,
+    startedAt: row.started_at,
+    lastExitAt: row.last_exit_at,
+    restartAttempts: row.restart_attempts,
+    nextRetryAt: row.next_retry_at,
+    lastError: row.last_error,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toMcpDependencyInstallation(row: DbMcpDependencyInstallation): McpDependencyInstallation {
+  let packageSpecs: string[] = [];
+  try {
+    const value = JSON.parse(row.package_specs_json) as unknown;
+    packageSpecs = Array.isArray(value) ? value.map(String) : [];
+  } catch {
+    packageSpecs = [];
+  }
+  return {
+    id: row.id,
+    serverId: row.server_id,
+    manager: row.manager,
+    packageSpecs,
+    installRoot: row.install_root,
+    status: row.status,
+    scriptsAllowed: row.scripts_allowed,
+    runtimeInstallationId: row.runtime_installation_id,
+    installedAt: row.installed_at,
+    updatedAt: row.updated_at,
+    lastError: row.last_error,
+  };
+}
+
 function toToolRecord(row: DbToolRecord): ToolRecord {
   return row as ToolRecord;
 }
@@ -3329,6 +3741,11 @@ function normalizeToolServerInput(
     auto_use: normalizeBooleanNumber(input.auto_use ?? existing?.auto_use ?? 0),
     requires_approval: normalizeBooleanNumber(
       input.requires_approval ?? existing?.requires_approval ?? 1,
+    ),
+    config_source: input.config_source ?? existing?.config_source ?? "manual",
+    config_version: Math.max(
+      1,
+      Math.round(Number(input.config_version ?? existing?.config_version ?? 1)),
     ),
     status: input.enabled === false ? "disabled" : (existing?.status ?? "unknown"),
     command: normalizeNullableText(input.command ?? existing?.command ?? null, 500),

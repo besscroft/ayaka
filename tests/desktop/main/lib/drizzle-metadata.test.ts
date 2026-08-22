@@ -24,7 +24,7 @@ void describe("drizzle metadata", () => {
       readFileSync(path.join(process.cwd(), "drizzle", "meta", "_journal.json"), "utf8"),
     ) as { entries: Array<{ idx: number; tag: string }> };
 
-    assert.equal(journal.entries.length, 4);
+    assert.equal(journal.entries.length, 6);
     assert.deepEqual(
       journal.entries.map((entry) => [entry.idx, entry.tag]),
       [
@@ -32,6 +32,8 @@ void describe("drizzle metadata", () => {
         [1, "0001_romantic_blob"],
         [2, "0002_remove_desktop_pet"],
         [3, "0003_remove_mcp_marketplace"],
+        [4, "0004_deep_the_spike"],
+        [5, "0005_rare_prodigy"],
       ],
     );
   });

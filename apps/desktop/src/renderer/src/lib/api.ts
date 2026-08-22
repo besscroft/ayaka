@@ -53,6 +53,13 @@ import type {
   AgentRunInputKind,
   AgentRunInputSource,
   RuntimeSnapshot,
+  ManagedRuntimeSnapshot,
+  McpManagerSnapshot,
+  McpServerRuntimeState,
+  McpDependencyInstallation,
+  McpConfigFormat,
+  McpConfigImportPreview,
+  McpConfigImportResult,
   UpdateState,
   WorkspaceFileRef,
   WorkspaceFileContent,
@@ -193,6 +200,14 @@ export const api = {
   },
   runtime: {
     snapshot: (): Promise<RuntimeSnapshot> => assertApi().runtime.snapshot(),
+    managedSnapshot: (): Promise<ManagedRuntimeSnapshot> => assertApi().runtime.managedSnapshot(),
+    managedInstall: (kind: "node" | "uv") => assertApi().runtime.managedInstall(kind),
+    managedUpgrade: (kind: "node" | "uv") => assertApi().runtime.managedUpgrade(kind),
+    managedUninstall: (runtimeId: string) => assertApi().runtime.managedUninstall(runtimeId),
+    managedSetSource: (kind: "node" | "uv", manifestUrl: string) =>
+      assertApi().runtime.managedSetSource(kind, manifestUrl),
+    onStateChanged: (handler: (snapshot: ManagedRuntimeSnapshot) => void): (() => void) =>
+      assertApi().runtime.onStateChanged(handler),
     enqueueInput: (input: {
       runId: string;
       kind: AgentRunInputKind;
@@ -305,6 +320,31 @@ export const api = {
     },
   },
   mcp: {
+    snapshot: (): Promise<McpManagerSnapshot> => assertApi().mcp.snapshot(),
+    start: (id: string): Promise<McpServerRuntimeState> => assertApi().mcp.start(id),
+    stop: (id: string): Promise<McpServerRuntimeState> => assertApi().mcp.stop(id),
+    restart: (id: string): Promise<McpServerRuntimeState> => assertApi().mcp.restart(id),
+    probe: (id: string): Promise<McpServerRuntimeState> => assertApi().mcp.probe(id),
+    install: (
+      id: string,
+      options?: { allowScripts?: boolean },
+    ): Promise<McpDependencyInstallation> => assertApi().mcp.install(id, options),
+    uninstall: (id: string): Promise<boolean> => assertApi().mcp.uninstall(id),
+    config: {
+      previewImport: (input: {
+        format: McpConfigFormat;
+        text: string;
+      }): Promise<McpConfigImportPreview> => assertApi().mcp.config.previewImport(input),
+      importFile: (format: McpConfigFormat): Promise<McpConfigImportPreview | null> =>
+        assertApi().mcp.config.importFile(format),
+      applyImport: (
+        token: string,
+        options?: { confirmConflicts?: boolean },
+      ): Promise<McpConfigImportResult> => assertApi().mcp.config.applyImport(token, options),
+      export: (format: McpConfigFormat): Promise<string> => assertApi().mcp.config.export(format),
+      exportFile: (format: McpConfigFormat): Promise<"saved" | "cancelled"> =>
+        assertApi().mcp.config.exportFile(format),
+    },
     create: (input: ToolServerInput): Promise<ToolServer> => assertApi().mcp.create(input),
     update: (id: string, input: Partial<ToolServerInput>): Promise<ToolServer> =>
       assertApi().mcp.update(id, input),
@@ -347,6 +387,8 @@ export const api = {
     onAuthChanged: (
       handler: (event: { serverId: string; status: McpAuthStatus }) => void,
     ): (() => void) => assertApi().mcp.onAuthChanged(handler),
+    onStateChanged: (handler: (state: McpServerRuntimeState) => void): (() => void) =>
+      assertApi().mcp.onStateChanged(handler),
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,

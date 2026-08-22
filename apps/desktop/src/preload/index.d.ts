@@ -51,6 +51,13 @@ import type {
   ProviderTestResult,
   SyncState,
   RuntimeSnapshot,
+  ManagedRuntimeSnapshot,
+  McpManagerSnapshot,
+  McpServerRuntimeState,
+  McpDependencyInstallation,
+  McpConfigFormat,
+  McpConfigImportPreview,
+  McpConfigImportResult,
   AgentRunInput,
   AgentRunInputKind,
   AgentRunInputSource,
@@ -161,6 +168,12 @@ export interface AyakaApi {
   };
   runtime: {
     snapshot: () => Promise<RuntimeSnapshot>;
+    managedSnapshot: () => Promise<ManagedRuntimeSnapshot>;
+    managedInstall: (kind: "node" | "uv") => Promise<ManagedRuntimeSnapshot["runtimes"][number]>;
+    managedUpgrade: (kind: "node" | "uv") => Promise<ManagedRuntimeSnapshot["runtimes"][number]>;
+    managedUninstall: (runtimeId: string) => Promise<boolean>;
+    managedSetSource: (kind: "node" | "uv", manifestUrl: string) => Promise<ManagedRuntimeSnapshot>;
+    onStateChanged: (handler: (snapshot: ManagedRuntimeSnapshot) => void) => () => void;
     enqueueInput: (input: {
       runId: string;
       kind: AgentRunInputKind;
@@ -262,6 +275,29 @@ export interface AyakaApi {
     };
   };
   mcp: {
+    snapshot: () => Promise<McpManagerSnapshot>;
+    start: (id: string) => Promise<McpServerRuntimeState>;
+    stop: (id: string) => Promise<McpServerRuntimeState>;
+    restart: (id: string) => Promise<McpServerRuntimeState>;
+    probe: (id: string) => Promise<McpServerRuntimeState>;
+    install: (
+      id: string,
+      options?: { allowScripts?: boolean },
+    ) => Promise<McpDependencyInstallation>;
+    uninstall: (id: string) => Promise<boolean>;
+    config: {
+      previewImport: (input: {
+        format: McpConfigFormat;
+        text: string;
+      }) => Promise<McpConfigImportPreview>;
+      importFile: (format: McpConfigFormat) => Promise<McpConfigImportPreview | null>;
+      applyImport: (
+        token: string,
+        options?: { confirmConflicts?: boolean },
+      ) => Promise<McpConfigImportResult>;
+      export: (format: McpConfigFormat) => Promise<string>;
+      exportFile: (format: McpConfigFormat) => Promise<"saved" | "cancelled">;
+    };
     create: (input: ToolServerInput) => Promise<ToolServer>;
     update: (id: string, input: Partial<ToolServerInput>) => Promise<ToolServer>;
     delete: (id: string) => Promise<boolean>;
@@ -298,6 +334,7 @@ export interface AyakaApi {
     onAuthChanged: (
       handler: (event: { serverId: string; status: McpAuthStatus }) => void,
     ) => () => void;
+    onStateChanged: (handler: (state: McpServerRuntimeState) => void) => () => void;
     updateTool: (
       id: string,
       patch: Partial<Record<"enabled" | "auto_use" | "requires_approval", boolean | number>>,
