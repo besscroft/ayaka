@@ -15,7 +15,11 @@ import { agentLoopSessions } from "./lib/agent-loop-session";
 import { sendUpdateState, updateManager } from "./lib/update-manager";
 import { removeLegacyCompanionData } from "./lib/runtime-paths";
 import { closeAllMcpClients } from "./lib/mcp-manager";
-import { recoverMcpLifecycleStates, shutdownMcpLifecycle } from "./lib/mcp-lifecycle-manager";
+import {
+  recoverMcpLifecycleStates,
+  shutdownMcpLifecycle,
+  startEnabledMcpServers,
+} from "./lib/mcp-lifecycle-manager";
 import { cancelAllMcpInputs } from "./lib/mcp-interaction-broker";
 import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
 import { createTray, type TrayController } from "./lib/tray";
@@ -179,6 +183,9 @@ if (!hasSingleInstanceLock) {
       await ensureDefaultWorkspaceAsset();
       await initDbWriter();
       await recoverMcpLifecycleStates();
+      void startEnabledMcpServers().catch((error) => {
+        console.error("[mcp] failed to auto-start enabled servers:", error);
+      });
       await migrateProviderApiKeysToModelKeys();
       await ensureBuiltinCatalogSources();
       scheduleMemoryFileConsolidation();

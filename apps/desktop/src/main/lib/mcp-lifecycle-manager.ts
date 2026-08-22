@@ -213,6 +213,28 @@ export async function syncMcpDependencyState(
   });
 }
 
+/**
+ * Restore the requested MCP processes after the desktop process starts. Only
+ * dependency-managed stdio servers with an installed dependency set are
+ * eligible; disabled, remote, and incomplete installations remain lazy.
+ */
+export async function startEnabledMcpServers(): Promise<void> {
+  if (shuttingDown) return;
+  const servers = listMcpServers().filter((server) => {
+    if (server.enabled === 0 || server.transport !== "stdio") return false;
+    const command = parseMcpCommand(server.command, parseArray(server.args_json));
+    return (
+      command.manager !== "none" && getMcpDependencyInstallation(server.id)?.status === "installed"
+    );
+  });
+
+  await Promise.allSettled(
+    servers.map(async (server) => {
+      if (!shuttingDown) await startMcpServer(server.id);
+    }),
+  );
+}
+
 export async function ensureMcpServerStarted(serverId: string): Promise<void> {
   const state = getMcpRuntimeState(serverId);
   if (state?.state === "running") return;

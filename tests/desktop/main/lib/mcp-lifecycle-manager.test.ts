@@ -132,3 +132,22 @@ test("projects dependency confirmation and failures into actionable lifecycle st
   const failedState = await lifecycle.syncMcpDependencyState(serverId, failed);
   assert.equal(failedState?.state, "needs_runtime");
 });
+
+test("auto-starts enabled stdio MCPs whose dependencies are installed", async () => {
+  await db.updateToolServerAsync(serverId, {
+    transport: "stdio",
+    command: "npx",
+    args: ["mcp-server-fetch"],
+    enabled: true,
+  });
+  await db.upsertMcpDependencyInstallationAsync({
+    serverId,
+    manager: "npx",
+    packageSpecs: ["mcp-server-fetch"],
+    status: "installed",
+    installRoot: "C:/ayaka-test-dependencies",
+  });
+
+  await lifecycle.startEnabledMcpServers();
+  assert.equal(db.getMcpRuntimeState(serverId)?.state, "running");
+});
