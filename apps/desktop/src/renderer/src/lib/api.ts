@@ -389,6 +389,8 @@ export const api = {
     ): (() => void) => assertApi().mcp.onAuthChanged(handler),
     onStateChanged: (handler: (state: McpServerRuntimeState) => void): (() => void) =>
       assertApi().mcp.onStateChanged(handler),
+    onToolsChanged: (handler: (event: { serverId: string }) => void): (() => void) =>
+      assertApi().mcp.onToolsChanged(handler),
     onDependencyStateChanged: (
       handler: (installation: McpDependencyInstallation) => void,
     ): (() => void) => assertApi().mcp.onDependencyStateChanged(handler),

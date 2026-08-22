@@ -246,13 +246,13 @@ export function McpWorkspace({
     <>
       <div
         data-slot="mcp-workspace"
-        className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
+        className="grid h-full min-h-0 flex-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
       >
-        <Card data-slot="mcp-server-list" className="h-full min-h-0 overflow-hidden">
+        <Card data-slot="mcp-server-list" className="flex h-full min-h-0 flex-col overflow-hidden">
           <Card.Header className="border-b border-border p-3">
             <Card.Title className="text-sm">{t("tools.metric.mcp")}</Card.Title>
           </Card.Header>
-          <Card.Content className="min-h-0 overflow-y-auto p-2">
+          <Card.Content className="min-h-0 flex-1 overflow-y-auto p-2">
             <div className="flex flex-col gap-1">
               {servers.map((server) => {
                 const active = server.id === selected?.id;
@@ -297,7 +297,10 @@ export function McpWorkspace({
           </Card.Content>
         </Card>
 
-        <Card data-slot="mcp-server-detail" className="min-h-0 overflow-hidden">
+        <Card
+          data-slot="mcp-server-detail"
+          className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
           {selected ? (
             <>
               <Card.Header className="border-b border-border p-4">

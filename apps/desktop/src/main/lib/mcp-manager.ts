@@ -35,10 +35,30 @@ import {
 } from "./mcp-client-manager";
 import { runWithMcpExecutionContext } from "./mcp-context";
 import { getMcpAuthStatus } from "./mcp-auth";
-import { ensureMcpServerStarted } from "./mcp-lifecycle-manager";
+import { ensureMcpServerStarted, onMcpServerStarted } from "./mcp-lifecycle-manager";
 
 export { closeAllMcpConnections as closeAllMcpClients };
 export { closeMcpClient };
+
+const discoveryOperations = new Map<string, Promise<ToolDiscoveryResult>>();
+const toolRefreshOperations = new Map<string, Promise<ToolRecord[]>>();
+const toolChangeListeners = new Set<(event: { serverId: string }) => void>();
+
+export function onMcpToolsChanged(listener: (event: { serverId: string }) => void): () => void {
+  toolChangeListeners.add(listener);
+  return () => toolChangeListeners.delete(listener);
+}
+
+export function notifyMcpToolsChanged(serverId: string): void {
+  const event = { serverId };
+  for (const listener of toolChangeListeners) {
+    try {
+      listener(event);
+    } catch {
+      // Renderer observers must not affect MCP discovery or tool persistence.
+    }
+  }
+}
 
 async function getReadyMcpConnection(server: ToolServer) {
   await ensureMcpServerStarted(server.id);
@@ -141,7 +161,21 @@ export async function testMcpServer(serverId: string): Promise<ToolDiscoveryResu
   return discoverMcpServer(serverId);
 }
 
-export async function discoverMcpServer(serverId: string): Promise<ToolDiscoveryResult> {
+/**
+ * Discovery is shared by startup, lifecycle actions, and the MCP workspace.
+ * Coalescing here prevents a post-start hook from racing an explicit refresh.
+ */
+export function discoverMcpServer(serverId: string): Promise<ToolDiscoveryResult> {
+  const active = discoveryOperations.get(serverId);
+  if (active) return active;
+  const tracked = discoverMcpServerInternal(serverId).finally(() => {
+    if (discoveryOperations.get(serverId) === tracked) discoveryOperations.delete(serverId);
+  });
+  discoveryOperations.set(serverId, tracked);
+  return tracked;
+}
+
+async function discoverMcpServerInternal(serverId: string): Promise<ToolDiscoveryResult> {
   const server = getMcpServer(serverId);
   if (!server) throw new Error("MCP server not found: " + serverId);
   let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
@@ -151,20 +185,7 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
     // reconnect state identical to a tool invocation or a manual probe.
     await ensureMcpServerStarted(server.id);
     connection = await getMcpConnection(server);
-    const toolsResult = await withMcpTimeout(
-      connection.client.listTools(),
-      server,
-      "MCP tool discovery timed out.",
-      () => closeMcpClient(server.id),
-    );
-    const definitions = toolsResult.tools.map((definition) => ({
-      name: definition.name,
-      title: getOptionalString(definition, "title"),
-      description: definition.description,
-      inputSchema: definition.inputSchema,
-      outputSchema: getOptionalValue(definition, "outputSchema"),
-    }));
-    const tools = await upsertMcpToolDefinitionsAsync(server.id, definitions);
+    const tools = await refreshMcpToolDefinitions(connection, server);
     const capabilities = await loadMcpCapabilities(connection, server);
     const nextServer =
       (await updateMcpServerStatusAsync(server.id, {
@@ -225,12 +246,52 @@ export async function discoverMcpServer(serverId: string): Promise<ToolDiscovery
   }
 }
 
+function refreshMcpToolDefinitions(
+  connection: Awaited<ReturnType<typeof getMcpConnection>>,
+  server: ToolServer,
+): Promise<ToolRecord[]> {
+  const active = toolRefreshOperations.get(server.id);
+  if (active) return active;
+  const tracked = refreshMcpToolDefinitionsInternal(connection, server).finally(() => {
+    if (toolRefreshOperations.get(server.id) === tracked) toolRefreshOperations.delete(server.id);
+  });
+  toolRefreshOperations.set(server.id, tracked);
+  return tracked;
+}
+
+async function refreshMcpToolDefinitionsInternal(
+  connection: Awaited<ReturnType<typeof getMcpConnection>>,
+  server: ToolServer,
+): Promise<ToolRecord[]> {
+  if (!connection.snapshot.capabilities.tools) return listMcpTools(server.id);
+  const toolsResult = await withMcpTimeout(
+    connection.client.listTools(),
+    server,
+    "MCP tool discovery timed out.",
+    () => closeMcpClient(server.id),
+  );
+  const definitions = toolsResult.tools.map((definition) => ({
+    name: definition.name,
+    title: getOptionalString(definition, "title"),
+    description: definition.description,
+    inputSchema: definition.inputSchema,
+    outputSchema: getOptionalValue(definition, "outputSchema"),
+  }));
+  const tools = await upsertMcpToolDefinitionsAsync(server.id, definitions);
+  notifyMcpToolsChanged(server.id);
+  return tools;
+}
+
 export async function getMcpCapabilities(serverId: string): Promise<McpCapabilitySnapshot> {
   const server = getMcpServer(serverId);
   if (!server) throw new Error("MCP server not found: " + serverId);
   let connection: Awaited<ReturnType<typeof getMcpConnection>> | undefined;
   try {
     connection = await getReadyMcpConnection(server);
+    // Capabilities refresh is also the user-facing discovery action. This
+    // keeps the persisted Agent ToolSet in sync when a server was started
+    // before its tools had ever been discovered.
+    await refreshMcpToolDefinitions(connection, server);
     const loaded = await loadMcpCapabilities(connection, server);
     await updateMcpServerStatusAsync(server.id, {
       status: server.enabled ? "ready" : "disabled",
@@ -256,6 +317,13 @@ export async function getMcpCapabilities(serverId: string): Promise<McpCapabilit
     throw new Error(message, { cause: error });
   }
 }
+
+onMcpServerStarted(async (serverId) => {
+  const result = await discoverMcpServer(serverId);
+  if (result.server.status === "error") {
+    console.warn(`[mcp] post-start discovery failed for ${serverId}: ${result.message}`);
+  }
+});
 
 export async function readMcpResource(
   serverId: string,
@@ -349,22 +417,7 @@ export function onMcpCapabilitiesChanged(
     void getReadyMcpConnection(server)
       .then(async (connection) => {
         if (event.snapshot.capabilities.tools) {
-          const result = await withMcpTimeout(
-            connection.client.listTools(),
-            server,
-            "MCP tool refresh timed out.",
-            () => closeMcpClient(server.id),
-          );
-          await upsertMcpToolDefinitionsAsync(
-            server.id,
-            result.tools.map((definition) => ({
-              name: definition.name,
-              title: getOptionalString(definition, "title"),
-              description: definition.description,
-              inputSchema: definition.inputSchema,
-              outputSchema: getOptionalValue(definition, "outputSchema"),
-            })),
-          );
+          await refreshMcpToolDefinitions(connection, server);
         }
         return loadMcpCapabilities(connection, server);
       })

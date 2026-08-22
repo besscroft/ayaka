@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { mock, afterEach, beforeEach, test } from "node:test";
 import Module from "node:module";
 
@@ -91,6 +91,16 @@ test("coalesces concurrent starts and stops the local HTTP session", async () =>
   assert.equal(active, false);
 });
 
+test("notifies post-start hooks after a server is running", async () => {
+  const started: string[] = [];
+  const off = lifecycle.onMcpServerStarted((id) => {
+    started.push(id);
+  });
+  await lifecycle.startMcpServer(serverId);
+  off();
+  assert.deepEqual(started, [serverId]);
+});
+
 test("records reconnecting state for an unexpected stdio close", async () => {
   await db.updateToolServerAsync(serverId, {
     transport: "stdio",
@@ -136,7 +146,7 @@ test("projects dependency confirmation and failures into actionable lifecycle st
 test("auto-starts enabled stdio MCPs whose dependencies are installed", async () => {
   await db.updateToolServerAsync(serverId, {
     transport: "stdio",
-    command: "npx",
+    command: "npx.cmd",
     args: ["mcp-server-fetch"],
     enabled: true,
   });
@@ -147,7 +157,23 @@ test("auto-starts enabled stdio MCPs whose dependencies are installed", async ()
     status: "installed",
     installRoot: "C:/ayaka-test-dependencies",
   });
+  await db.upsertManagedRuntimeAsync({
+    id: "managed-node-test",
+    kind: "node",
+    version: process.version,
+    platform: "win32",
+    architecture: "x64",
+    rootPath: dirname(process.execPath),
+    executablePath: process.execPath,
+    sourceUrl: "https://nodejs.org",
+    sha256: "a".repeat(64),
+    verifiedCommands: ["node", "npx", "npm"],
+  });
 
-  await lifecycle.startEnabledMcpServers();
+  const started: string[] = [];
+  await lifecycle.startEnabledMcpServers((id) => {
+    started.push(id);
+  });
   assert.equal(db.getMcpRuntimeState(serverId)?.state, "running");
+  assert.deepEqual(started, [serverId]);
 });

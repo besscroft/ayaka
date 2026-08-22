@@ -99,6 +99,24 @@ export function McpPanel({
 
   useEffect(refresh, []);
 
+  useEffect(() => {
+    let alive = true;
+    const offToolsChanged = api.mcp.onToolsChanged(() => {
+      void api.tools
+        .snapshot()
+        .then((nextSnapshot) => {
+          if (alive) setSnapshot(nextSnapshot);
+        })
+        .catch((error) => {
+          if (alive) setPageError(getMcpErrorMessage(error, locale));
+        });
+    });
+    return () => {
+      alive = false;
+      offToolsChanged();
+    };
+  }, [locale]);
+
   const mcpServers = useMemo(
     () => (snapshot?.toolServers ?? []).filter((server) => server.kind === "mcp"),
     [snapshot],

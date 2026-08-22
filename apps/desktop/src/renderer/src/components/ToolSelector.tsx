@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type SVGProps } from "react";
+import { useCallback, useEffect, useMemo, useState, type SVGProps } from "react";
 import {
   Button,
   Chip,
@@ -90,27 +90,22 @@ export function ToolSelector({
   disabled = false,
 }: ToolSelectorProps): React.JSX.Element {
   const { t } = useT();
-  const [tools, settools] = useState<ToolsSnapshot | null>(null);
+  const [tools, setTools] = useState<ToolsSnapshot | null>(null);
+  const [open, setOpen] = useState(false);
   const selection = normalizeChatToolSelection(value);
 
-  useEffect(() => {
-    let alive = true;
+  const refreshToolsSnapshot = useCallback(async (): Promise<void> => {
     try {
-      void api.tools
-        .snapshot()
-        .then((snapshot) => {
-          if (alive) settools(snapshot);
-        })
-        .catch(() => {
-          if (alive) settools(null);
-        });
+      setTools(await api.tools.snapshot());
     } catch {
-      settools(null);
+      setTools(null);
     }
-    return () => {
-      alive = false;
-    };
   }, []);
+
+  useEffect(() => {
+    void refreshToolsSnapshot();
+    return api.mcp.onToolsChanged(() => void refreshToolsSnapshot());
+  }, [refreshToolsSnapshot]);
 
   const descriptors = useMemo(
     () =>
@@ -142,7 +137,13 @@ export function ToolSelector({
   };
 
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) void refreshToolsSnapshot();
+      }}
+    >
       <Tooltip>
         <TooltipTrigger>
           <PopoverTrigger>

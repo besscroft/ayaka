@@ -37,6 +37,7 @@ const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 const operations = new Map<string, Promise<unknown>>();
 const retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const stateListeners = new Set<(state: McpServerRuntimeState) => void>();
+const startedListeners = new Set<(serverId: string) => void | Promise<void>>();
 let shuttingDown = false;
 let connectionEventUnsubscribe: (() => void) | null = null;
 
@@ -45,6 +46,18 @@ export function onMcpLifecycleStateChanged(
 ): () => void {
   stateListeners.add(listener);
   return () => stateListeners.delete(listener);
+}
+
+/**
+ * Register work that must run after a server has established its connection.
+ * The listener runs outside the per-server lifecycle lock so it may safely
+ * call discovery, which itself ensures that the server is running.
+ */
+export function onMcpServerStarted(
+  listener: (serverId: string) => void | Promise<void>,
+): () => void {
+  startedListeners.add(listener);
+  return () => startedListeners.delete(listener);
 }
 
 function handleMcpConnectionEvent(event: McpConnectionEvent): void {
@@ -78,7 +91,8 @@ function subscribeToConnectionEvents(): void {
 subscribeToConnectionEvents();
 
 export async function startMcpServer(serverId: string): Promise<McpServerRuntimeState> {
-  return runExclusive(serverId, async () => {
+  let startedNow = false;
+  const next = await runExclusive(serverId, async () => {
     const server = requireMcpServer(serverId);
     const currentState = getMcpRuntimeState(serverId);
     let parsedCommand: ReturnType<typeof parseMcpCommand> | null = null;
@@ -142,6 +156,7 @@ export async function startMcpServer(serverId: string): Promise<McpServerRuntime
         last_connected_at: next.startedAt,
       });
       recordLifecycleEvent(server, "MCP server started", "succeeded");
+      startedNow = true;
       return next;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -152,6 +167,8 @@ export async function startMcpServer(serverId: string): Promise<McpServerRuntime
       return next;
     }
   });
+  if (startedNow) await notifyMcpServerStarted(serverId);
+  return next;
 }
 
 /**
@@ -218,7 +235,9 @@ export async function syncMcpDependencyState(
  * dependency-managed stdio servers with an installed dependency set are
  * eligible; disabled, remote, and incomplete installations remain lazy.
  */
-export async function startEnabledMcpServers(): Promise<void> {
+export async function startEnabledMcpServers(
+  onStarted?: (serverId: string) => void | Promise<void>,
+): Promise<void> {
   if (shuttingDown) return;
   const servers = listMcpServers().filter((server) => {
     if (server.enabled === 0 || server.transport !== "stdio") return false;
@@ -230,7 +249,21 @@ export async function startEnabledMcpServers(): Promise<void> {
 
   await Promise.allSettled(
     servers.map(async (server) => {
-      if (!shuttingDown) await startMcpServer(server.id);
+      if (shuttingDown) return;
+      const state = await startMcpServer(server.id);
+      if (state.state === "running") await onStarted?.(server.id);
+    }),
+  );
+}
+
+async function notifyMcpServerStarted(serverId: string): Promise<void> {
+  await Promise.allSettled(
+    [...startedListeners].map(async (listener) => {
+      try {
+        await listener(serverId);
+      } catch (error) {
+        console.warn(`[mcp] post-start hook failed for ${serverId}:`, error);
+      }
     }),
   );
 }

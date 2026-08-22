@@ -122,6 +122,8 @@ import {
   completeMcp,
   listenMcpCapabilities,
   onMcpCapabilitiesChanged,
+  onMcpToolsChanged,
+  notifyMcpToolsChanged,
 } from "../lib/mcp-manager";
 import {
   authorizeMcpServer,
@@ -239,7 +241,21 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   onMcpDependencyStateChanged((installation) =>
     broadcast("mcp:dependency-state-changed", installation),
   );
+  onMcpToolsChanged((event) => broadcast("mcp:tools-changed", event));
   onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
+
+  const updateToolAndNotify = async (
+    id: string,
+    patch: {
+      enabled?: boolean | number;
+      auto_use?: boolean | number;
+      requires_approval?: boolean | number;
+    },
+  ) => {
+    const tool = await updateToolRecord(id, patch);
+    if (tool.kind === "mcp" && tool.server_id) notifyMcpToolsChanged(tool.server_id);
+    return tool;
+  };
 
   // ---------- Main window controls ----------
   ipcMain.handle("window:minimize", (event) => {
@@ -591,17 +607,19 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
         auto_use?: boolean | number;
         requires_approval?: boolean | number;
       },
-    ) => updateToolRecord(id, patch),
+    ) => updateToolAndNotify(id, patch),
   );
   ipcMain.handle("mcp:create", (_e, input: ToolServerInput) => createToolServer(input));
   ipcMain.handle("mcp:update", async (_e, id: string, input: Partial<ToolServerInput>) => {
     await stopMcpServer(id).catch(() => undefined);
     const server = await updateToolServer(id, input);
+    notifyMcpToolsChanged(id);
     return server;
   });
   ipcMain.handle("mcp:delete", async (_e, id: string) => {
     await stopMcpServer(id).catch(() => undefined);
     await deleteToolServer(id);
+    notifyMcpToolsChanged(id);
     return true;
   });
   ipcMain.handle("mcp:listDeleted", () => listDeletedToolServers("mcp"));
@@ -621,6 +639,14 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   ipcMain.handle("mcp:setEnabled", async (_e, id: string, enabled: boolean) => {
     if (!enabled) await stopMcpServer(id).catch(() => undefined);
     const server = await setToolServerEnabled(id, enabled);
+    if (!enabled) notifyMcpToolsChanged(id);
+    if (enabled) {
+      // Enabling a server is an explicit user action. Discover immediately so
+      // the Agent ToolSet is populated without requiring an app restart or a
+      // second manual Start action. Runtime/dependency failures are recorded
+      // by discovery and remain visible in the MCP workspace.
+      await discoverMcpServer(id);
+    }
     return server;
   });
   ipcMain.handle("mcp:snapshot", () => getLifecycleMcpSnapshot());
@@ -732,7 +758,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
         auto_use?: boolean | number;
         requires_approval?: boolean | number;
       },
-    ) => updateToolRecord(id, patch),
+    ) => updateToolAndNotify(id, patch),
   );
   ipcMain.handle("mcp:setSecret", (_e, input: ToolSecretInput) =>
     setToolSecret({ ...input, ownerType: "server" }),
