@@ -150,6 +150,9 @@ importers:
       '@ai-sdk/react':
         specifier: 'catalog:'
         version: 4.0.15(react@19.2.7)(zod@4.4.3)
+      '@ayaka/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
       '@base-ui/react':
         specifier: 'catalog:'
         version: 1.6.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -331,6 +334,9 @@ importers:
 
   apps/docs:
     dependencies:
+      '@ayaka/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
       isbot:
         specifier: ^5.1.36
         version: 5.2.1
@@ -383,6 +389,8 @@ importers:
       wrangler:
         specifier: 4.119.0
         version: 4.119.0(@cloudflare/workers-types@5.20260804.1)
+
+  packages/assets: {}
 
   tests/desktop:
     devDependencies:

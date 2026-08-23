@@ -39,6 +39,7 @@
     "@ai-sdk/openai": "catalog:",
     "@ai-sdk/openai-compatible": "catalog:",
     "@ai-sdk/react": "catalog:",
+    "@ayaka/assets": "workspace:*",
     "@base-ui/react": "catalog:",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
