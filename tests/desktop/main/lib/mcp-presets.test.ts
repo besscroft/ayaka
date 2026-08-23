@@ -34,6 +34,11 @@ test("ships the reviewed MCP presets from JSON", () => {
       "slack",
       "github",
       "mcd-mcp-server",
+      "desktop-commander",
+      "antv-mcp-server-chart",
+      "drawio-mcp-server",
+      "notion-mcp-server",
+      "mysql-mcp-server",
     ],
   );
   assert.equal(MCP_PRESETS[0]?.id, "filesystem");
@@ -64,9 +69,15 @@ test("ships the reviewed MCP presets from JSON", () => {
     MCP_PRESETS.find((preset) => preset.id === "mcd-mcp-server")?.url,
     "https://mcp.mcd.cn",
   );
-  const result = searchMcpPresets({ page: 1, pageSize: 24 });
+  const notion = MCP_PRESETS.find((preset) => preset.id === "notion-mcp-server");
+  assert.deepEqual(notion?.env, { NOTION_TOKEN: "$secret:NOTION_TOKEN" });
+  const mysql = MCP_PRESETS.find((preset) => preset.id === "mysql-mcp-server");
+  assert.deepEqual(mysql?.secretKeys, ["MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE"]);
+  assert.deepEqual(mysql?.args, ["--from", "mysql-mcp-server==0.4.4", "mysql_mcp_server"]);
+  assert.equal(MCP_PRESETS.find((preset) => preset.id === "desktop-commander")?.version, "0.2.47");
+  const result = searchMcpPresets({ page: 1, pageSize: 100 });
   assert.equal(result.items.length, MCP_PRESETS.length);
-  assert.equal(result.items.length, 20);
+  assert.equal(result.items.length, 25);
   assert.equal(result.hasMore, false);
 });
 

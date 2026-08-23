@@ -309,5 +309,93 @@
     "warnings": [
       "需要登录麦当劳 MCP 平台获取 MCP Token，并确认下单、优惠券和账户数据权限后再启用。"
     ]
+  },
+  {
+    "id": "desktop-commander",
+    "name": "Desktop Commander",
+    "description": "执行终端操作、文件编辑和本地开发任务。",
+    "version": "0.2.47",
+    "author": "Wonderwhy-er",
+    "category": "系统与文件",
+    "tags": ["Desktop Commander", "终端", "文件"],
+    "docsUrl": "https://lobehub.com/zh/mcp/wonderwhy-er-desktopcommandermcp",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@wonderwhy-er/desktop-commander@0.2.47"],
+    "warnings": [
+      "需要 Node.js 18 或更高版本。该服务器可以执行终端命令和修改本地文件，请在启用前确认命令权限和工作目录。"
+    ]
+  },
+  {
+    "id": "antv-mcp-server-chart",
+    "name": "AntV 图表",
+    "description": "使用 AntV 生成数据可视化图表。",
+    "version": "0.9.10",
+    "author": "AntV",
+    "category": "可视化",
+    "tags": ["AntV", "图表", "数据可视化"],
+    "docsUrl": "https://lobehub.com/zh/mcp/antvis-mcp-server-chart",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@antv/mcp-server-chart@0.9.10"],
+    "warnings": [
+      "可选的 VIS_REQUEST_SERVER、SERVICE_ID 和 DISABLED_TOOLS 环境变量需要按部署方式自行配置。"
+    ]
+  },
+  {
+    "id": "drawio-mcp-server",
+    "name": "Draw.io",
+    "description": "通过 MCP 控制 Draw.io 绘制图表并分析图表结构。",
+    "version": "2.2.0",
+    "author": "lgazo",
+    "category": "可视化",
+    "tags": ["Draw.io", "流程图", "图表"],
+    "docsUrl": "https://lobehub.com/zh/mcp/lgazo-drawio-mcp-server?activeTab=deployment",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "drawio-mcp-server@2.2.0"],
+    "warnings": ["需要安装 Draw.io MCP 浏览器扩展，并确认浏览器通信权限后再启用。"]
+  },
+  {
+    "id": "notion-mcp-server",
+    "name": "Notion",
+    "description": "访问和管理 Notion 页面、数据库及工作区内容。",
+    "version": "2.5.1",
+    "author": "Notion",
+    "category": "沟通协作",
+    "tags": ["Notion", "知识库"],
+    "docsUrl": "https://lobehub.com/zh/mcp/makenotion-notion-mcp-server",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@notionhq/notion-mcp-server@2.5.1"],
+    "env": { "NOTION_TOKEN": "$secret:NOTION_TOKEN" },
+    "secretKeys": ["NOTION_TOKEN"],
+    "warnings": [
+      "需要 Notion Integration Token，并确认该 Integration 已被授权访问目标页面或数据库。"
+    ]
+  },
+  {
+    "id": "mysql-mcp-server",
+    "name": "MySQL",
+    "description": "安全地列出表格、读取数据并执行 MySQL 查询。",
+    "version": "0.4.4",
+    "author": "DesignComputer",
+    "category": "数据库",
+    "tags": ["MySQL", "数据库", "SQL"],
+    "docsUrl": "https://lobehub.com/zh/mcp/designcomputer-mysql_mcp_server",
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["--from", "mysql-mcp-server==0.4.4", "mysql_mcp_server"],
+    "env": {
+      "MYSQL_HOST": "localhost",
+      "MYSQL_PORT": "3306",
+      "MYSQL_USER": "$secret:MYSQL_USER",
+      "MYSQL_PASSWORD": "$secret:MYSQL_PASSWORD",
+      "MYSQL_DATABASE": "$secret:MYSQL_DATABASE"
+    },
+    "secretKeys": ["MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE"],
+    "warnings": [
+      "请确认 MySQL 主机、端口、数据库和账号权限。该服务器可以执行 SQL，建议使用最小权限账号并在启用前审查访问范围。"
+    ]
   }
 ]

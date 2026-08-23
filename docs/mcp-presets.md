@@ -4,7 +4,7 @@ Ayaka 的 MCP 预设由客户端内置 JSON 配置维护，不再从线上 MCP �
 
 ## 添加预设
 
-编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。当前已内置 filesystem、Feishu、DingTalk、Vercel、Supabase、Sequential Thinking、Fetch、Time、Knowledge Graph Memory、SQLite、Playwright、Git、Cloudflare Workers、智谱搜索、Puppeteer、高德地图、天眼查、Slack、GitHub 和麦当劳预设；示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
+编辑 `apps/desktop/src/main/config/mcp-presets.json`，在顶层 JSON 数组中添加一个经过审核的预设对象。当前已内置 filesystem、Feishu、DingTalk、Vercel、Supabase、Sequential Thinking、Fetch、Time、Knowledge Graph Memory、SQLite、Playwright、Git、Cloudflare Workers、智谱搜索、Puppeteer、高德地图、天眼查、Slack、GitHub、麦当劳、Desktop Commander、AntV 图表、Draw.io、Notion 和 MySQL 预设；示例结构如下。JSON 不支持注释；字段名、字符串和数组元素都必须使用双引号。
 
 ```json
 {
