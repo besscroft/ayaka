@@ -420,6 +420,14 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     defaultAuto: 0,
   },
   {
+    id: "workspace_run_command",
+    title: "Run workspace command",
+    description: "Run a structured command in the current conversation workspace.",
+    category: "execution",
+    requiresApproval: 1,
+    defaultAuto: 1,
+  },
+  {
     id: "cron",
     title: "Automation",
     description: "Create and manage scheduled isolated agent turns.",

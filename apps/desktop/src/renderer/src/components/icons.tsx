@@ -55,6 +55,7 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  Terminal,
   Type,
   Wrench,
   X,
@@ -102,6 +103,7 @@ export const IconPalette = fromLucide(Palette);
 export const IconInfo = fromLucide(Info);
 export const IconSliders = fromLucide(SlidersHorizontal);
 export const IconCpu = fromLucide(Cpu);
+export const IconTerminal = fromLucide(Terminal);
 export const IconRotateCcw = fromLucide(RotateCcw);
 export const IconGlobe = fromLucide(Globe);
 export const IconFolderOpen = fromLucide(FolderOpen);

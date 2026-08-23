@@ -174,6 +174,23 @@ void describe("chat tool runtime", () => {
     assert.equal(multiple.toolChoice, "required");
   });
 
+  void it("describes workspace command as automatic, risk-gated Agent execution", () => {
+    const descriptor = chatTools
+      .createChatToolDescriptors(modelContext("openai", "web_search"))
+      .find((item) => item.id === "workspace_run_command");
+    assert.equal(descriptor?.category, "execution");
+    assert.equal(descriptor?.defaultAuto, true);
+    assert.equal(descriptor?.requiresApproval, true);
+    assert.equal(descriptor?.available, true);
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["workspace_run_command"] },
+      model: modelContext("openai", "web_search"),
+    });
+    assert.equal(runtime.toolChoice, "none");
+    assert.equal(runtime.activeTools, undefined);
+  });
+
   void it("uses MCP tool-level automation and approval settings in the AI SDK ToolSet", () => {
     mcpServer = {
       id: "srv-1",
@@ -532,10 +549,13 @@ void describe("chat tool runtime", () => {
     assert.equal(typeof runtime.tools?.memory_delete, "undefined");
   });
 
-  void it("marks every built-in chat tool as approval-free", () => {
+  void it("marks built-in chat tools approval-free except workspace execution", () => {
     const descriptors = chatTools.createChatToolDescriptors(modelContext("openai-compatible"));
     for (const id of CHAT_TOOL_IDS) {
-      assert.equal(descriptors.find((descriptor) => descriptor.id === id)?.requiresApproval, false);
+      assert.equal(
+        descriptors.find((descriptor) => descriptor.id === id)?.requiresApproval,
+        id === "workspace_run_command",
+      );
     }
   });
 

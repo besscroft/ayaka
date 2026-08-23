@@ -26,7 +26,7 @@ void describe("RunToolScheduler", () => {
     const signal = new AbortController().signal;
     const first = await scheduler.acquire("memory_save", signal);
     let secondStarted = false;
-    const secondPromise = scheduler.acquire("sandbox_run_command", signal).then((release) => {
+    const secondPromise = scheduler.acquire("workspace_run_command", signal).then((release) => {
       secondStarted = true;
       return release;
     });

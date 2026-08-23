@@ -28,4 +28,5 @@ import "./main/lib/agent-coordinator.test.ts";
 import "./main/lib/agent-run-policy.test.ts";
 import "./main/lib/cron-store.test.ts";
 import "./main/lib/run-tool-scheduler.test.ts";
+import "./main/lib/workspace-command.test.ts";
 import "./main/server/index.test.ts";

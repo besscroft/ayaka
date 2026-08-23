@@ -54,10 +54,12 @@ import {
   getToolPartName,
   getToolSummary,
   isSilentToolPart,
+  estimateWorkspaceCommandRisk,
+  normalizeWorkspaceCommandInput,
   normalizeToolState,
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
-import { IconBrain, IconCopy } from "./icons";
+import { IconBrain, IconCopy, IconTerminal } from "./icons";
 import { useConversationScroll } from "./ai-elements/use-conversation-scroll";
 
 interface MessageListProps {
@@ -690,6 +692,11 @@ function MessageItem({
             const state = normalizeToolState(part.state);
             const hasExplicitState = part.state !== undefined;
             const approval = part.approval;
+            const toolName = getToolPartName(part);
+            const displayInput =
+              toolName === "workspace_run_command"
+                ? (normalizeWorkspaceCommandInput(part.input) ?? part.input)
+                : part.input;
             const mediaResult = state === "output-available" ? readMediaToolResult(part) : null;
             const generatedResult =
               state === "output-available" && !mediaResult ? (
@@ -707,12 +714,17 @@ function MessageItem({
                     summary={summary ? t(summary.key, summary.params) : undefined}
                   />
                   <ToolContent>
-                    <ToolInput input={part.input} />
+                    <ToolInput input={displayInput} />
                     {approval && state === "approval-requested" && approval.isAutomatic !== true ? (
-                      <ToolApprovalActions
-                        approvalId={approval.id}
-                        onRespond={onToolApprovalResponse}
-                      />
+                      <>
+                        {toolName === "workspace_run_command" ? (
+                          <WorkspaceCommandApproval input={part.input} />
+                        ) : null}
+                        <ToolApprovalActions
+                          approvalId={approval.id}
+                          onRespond={onToolApprovalResponse}
+                        />
+                      </>
                     ) : null}
                     <ToolOutput
                       output={
@@ -856,6 +868,46 @@ function ToolApprovalActions({
           {t("tool.approval.deny")}
         </button>
       </div>
+    </div>
+  );
+}
+
+function WorkspaceCommandApproval({ input }: { input: unknown }): React.JSX.Element {
+  const { t } = useT();
+  const normalized = normalizeWorkspaceCommandInput(input);
+  if (!normalized) return <p className="mb-2 text-xs text-warning">{t("tool.error")}</p>;
+  const risk = estimateWorkspaceCommandRisk(normalized);
+  const riskLabel =
+    risk === "read_only"
+      ? t("tool.generated.risk.read_only")
+      : risk === "write"
+        ? t("tool.generated.risk.write")
+        : risk === "destructive"
+          ? t("tool.generated.risk.destructive")
+          : risk === "install"
+            ? t("tool.generated.risk.install")
+            : risk === "network"
+              ? t("tool.generated.risk.network")
+              : risk === "process"
+                ? t("tool.generated.risk.process")
+                : t("tool.generated.risk.unknown");
+  return (
+    <div className="mb-2 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-warning">
+        <IconTerminal className="size-3.5" />
+        <span>{t("tool.approval.workspaceCommand")}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-foreground/55">
+        <span>{t("tool.approval.workspaceExecutable", { value: normalized.executable })}</span>
+        <span>{t("tool.approval.workspaceCwd", { path: normalized.cwd })}</span>
+        <span>{t("tool.approval.workspaceRisk", { risk: riskLabel })}</span>
+      </div>
+      <code className="mt-1 block max-h-16 overflow-auto whitespace-pre-wrap break-all text-[11px] text-foreground/75">
+        {t("tool.approval.workspaceArgv")}: {JSON.stringify(normalized.args)}
+      </code>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-warning/85">
+        {t("tool.approval.workspaceWarning")}
+      </p>
     </div>
   );
 }

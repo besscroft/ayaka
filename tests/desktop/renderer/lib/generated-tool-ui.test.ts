@@ -8,6 +8,9 @@ import {
   normalizeMemoryResults,
   normalizeSandboxArtifacts,
   normalizeSandboxCommand,
+  normalizeWorkspaceCommand,
+  normalizeWorkspaceCommandInput,
+  estimateWorkspaceCommandRisk,
   normalizeStringList,
   normalizeToolState,
   normalizeWebOpenResult,
@@ -176,6 +179,60 @@ void describe("generated tool UI parsing", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     assert.equal(safeJsonStringify(cyclic), "[unserializable]");
+  });
+
+  void it("normalizes workspace command results and redacts approval inputs", () => {
+    const input = normalizeWorkspaceCommandInput({
+      executable: "curl",
+      args: ["--token", "secret-value", "$(echo nope)"],
+      cwd: "src",
+      env: { API_KEY: "hidden", NO_COLOR: "1" },
+    });
+    assert.deepEqual(input, {
+      executable: "curl",
+      args: ["--token", "[redacted]", "$(echo nope)"],
+      cwd: "src",
+      env: { API_KEY: "[redacted]", NO_COLOR: "[redacted]" },
+    });
+    assert.equal(estimateWorkspaceCommandRisk(input!), "network");
+    assert.deepEqual(
+      normalizeWorkspaceCommand({
+        executable: "rg",
+        args: ["--files"],
+        cwd: ".",
+        outcome: "completed",
+        risk: "read_only",
+        exitCode: 0,
+        timedOut: false,
+        aborted: false,
+        stdout: "src/a.ts",
+        stderr: "",
+        stdoutBytes: 8,
+        stderrBytes: 0,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        durationMs: 12,
+      }),
+      {
+        executable: "rg",
+        args: ["--files"],
+        cwd: ".",
+        outcome: "completed",
+        risk: "read_only",
+        exitCode: 0,
+        signal: undefined,
+        timedOut: false,
+        aborted: false,
+        stdout: "src/a.ts",
+        stderr: "",
+        stdoutBytes: 8,
+        stderrBytes: 0,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        durationMs: 12,
+      },
+    );
+    assert.equal(normalizeWorkspaceCommand({ executable: "rg", outcome: "completed" }), null);
   });
 
   void it("accepts only safe external links", () => {

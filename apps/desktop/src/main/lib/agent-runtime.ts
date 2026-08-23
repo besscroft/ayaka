@@ -45,6 +45,8 @@ import {
   type ChatToolSelectionRequest,
   type MediaGenerationToolInput,
   type ModelCapabilities,
+  type WorkspaceCommandInput,
+  type WorkspaceCommandResult,
 } from "../../shared/types";
 import { appendReactionFeedback, type ResolvedChatModel } from "./chat-agent";
 import {
@@ -102,6 +104,14 @@ import { classifyChatError } from "./chat-errors";
 import { reconcileToolResults, removeIncompleteToolParts } from "./agent-tool-results";
 import { getChatSamplingSettings } from "./chat-model-settings";
 import { persistChatStreamSnapshot } from "./chat-history";
+import {
+  disposeWorkspaceCommandSession,
+  evaluateWorkspaceCommandPolicy,
+  executeWorkspaceCommand,
+  redactWorkspaceCommandInput,
+  redactWorkspaceCommandText,
+  WORKSPACE_COMMAND_TOOL_ID,
+} from "./workspace-command";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -704,7 +714,13 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   // The remaining orchestration tools follow the user's selection as before.
   // When the user turns chat tools off, only the silently-enabled memory tools
   // above remain available to the root agent.
-  if (base.toolChoice !== "none") {
+  const workspaceCommandSelected = isWorkspaceCommandSelected(context);
+  if (workspaceCommandSelected) {
+    assignTool(tools, WORKSPACE_COMMAND_TOOL_ID, createWorkspaceCommandTool(context));
+    activeTools.add(WORKSPACE_COMMAND_TOOL_ID);
+  }
+
+  if (base.toolChoice !== "none" || workspaceCommandSelected) {
     if (context.disableCronTools) {
       delete tools.cron;
       activeTools.delete("cron");
@@ -762,9 +778,164 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
       base.onStepEnd?.(event);
       return undefined;
     },
-    instructions: [base.instructions, createSandboxIsolationNote(context)]
+    instructions: [
+      base.instructions,
+      createSandboxIsolationNote(context),
+      createWorkspaceCommandNote(context, workspaceCommandSelected),
+    ]
       .filter(Boolean)
       .join("\n"),
+  };
+}
+
+function isWorkspaceCommandSelected(context: RuntimeContext): boolean {
+  if (!context.modelContext.capabilities.toolCalling) return false;
+  const selection = normalizeChatToolSelection(context.toolSelection);
+  return (
+    selection.mode === "auto" ||
+    (selection.mode === "manual" && selection.selectedToolIds.includes(WORKSPACE_COMMAND_TOOL_ID))
+  );
+}
+
+function createWorkspaceCommandNote(
+  context: RuntimeContext,
+  selected: boolean,
+): string | undefined {
+  if (!selected || !context.modelContext.capabilities.toolCalling) return undefined;
+  return [
+    "Workspace command execution:",
+    "- Use workspace_run_command only when the user explicitly needs a local command run.",
+    "- Always provide a structured executable and string argv array; never compose a shell command string.",
+    "- cwd is relative to the conversation workspace and persists for this Agent run; env applies only to this call.",
+    "- Known read-only commands may run automatically. Writes, deletion, installation, network, process, and unknown commands require approval.",
+    "- The workspace cwd is not an OS security sandbox. A program can still access external files, use the network, or start other processes.",
+  ].join("\n");
+}
+
+function createWorkspaceCommandTool(context: RuntimeContext): ToolSet[string] {
+  return tool({
+    description:
+      "Run one structured executable with string argv in the current conversation workspace. cwd is relative and persists for this Agent run; env is per-call only. Known read-only commands may run automatically; risky commands require approval. This is controlled local execution, not an OS sandbox.",
+    inputSchema: jsonSchema<WorkspaceCommandInput>({
+      type: "object",
+      properties: {
+        executable: {
+          type: "string",
+          description: "Executable name or path relative to the current workspace cwd.",
+        },
+        args: { type: "array", items: { type: "string" }, description: "Structured argv values." },
+        cwd: { type: "string", description: "Workspace-relative working directory." },
+        env: {
+          type: "object",
+          additionalProperties: { type: "string" },
+          description: "Allowlisted environment overrides for this call only.",
+        },
+        timeoutMs: {
+          type: "number",
+          description: "Timeout in milliseconds from 1,000 to 60,000; default 20,000.",
+        },
+      },
+      required: ["executable"],
+      additionalProperties: false,
+    }),
+    execute: (input) => runWorkspaceCommandStep(context, input),
+  });
+}
+
+async function runWorkspaceCommandStep(
+  context: RuntimeContext,
+  input: WorkspaceCommandInput,
+): Promise<WorkspaceCommandResult> {
+  const decision = evaluateWorkspaceCommandPolicy(input);
+  const auditInput = redactWorkspaceCommandInput(input);
+  const step = await createRuntimeStep({
+    run_id: context.runId,
+    agent_id: DEFAULT_AGENT_ID,
+    tool_id: WORKSPACE_COMMAND_TOOL_ID,
+    kind: "tool",
+    status: "running",
+    title: "Run workspace command",
+    detail: {
+      toolId: WORKSPACE_COMMAND_TOOL_ID,
+      input: auditInput,
+      risk: decision.risk,
+      approval: decision.decision,
+    },
+  });
+  try {
+    const result = await executeWorkspaceCommand({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      signal: context.session.signal,
+      input,
+    });
+    const summary = summarizeWorkspaceCommandResult(result);
+    const status =
+      result.outcome === "cancelled"
+        ? "cancelled"
+        : result.outcome === "failed_to_start" ||
+            result.outcome === "timed_out" ||
+            result.exitCode !== 0
+          ? "failed"
+          : "succeeded";
+    await updateRuntimeStep(step.id, {
+      status,
+      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, input: auditInput, ...summary },
+      finished_at: Date.now(),
+    });
+    insertRuntimeEvent({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      agentId: DEFAULT_AGENT_ID,
+      kind: "tool",
+      title: "Workspace command " + result.outcome,
+      status,
+      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, ...summary },
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const safeMessage = redactWorkspaceCommandText(message);
+    await updateRuntimeStep(step.id, {
+      status: "failed",
+      error: safeMessage,
+      detail: {
+        toolId: WORKSPACE_COMMAND_TOOL_ID,
+        input: auditInput,
+        risk: decision.risk,
+        error: safeMessage,
+      },
+      finished_at: Date.now(),
+    });
+    insertRuntimeEvent({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      agentId: DEFAULT_AGENT_ID,
+      kind: "tool",
+      title: "Workspace command failed",
+      status: "failed",
+      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, risk: decision.risk, error: safeMessage },
+    });
+    throw error;
+  }
+}
+
+function summarizeWorkspaceCommandResult(result: WorkspaceCommandResult): Record<string, unknown> {
+  return {
+    executable: result.executable,
+    args: result.args,
+    cwd: result.cwd,
+    outcome: result.outcome,
+    risk: result.risk,
+    exitCode: result.exitCode,
+    signal: result.signal,
+    timedOut: result.timedOut,
+    aborted: result.aborted,
+    durationMs: result.durationMs,
+    stdoutBytes: result.stdoutBytes,
+    stderrBytes: result.stderrBytes,
+    stdoutTruncated: result.stdoutTruncated,
+    stderrTruncated: result.stderrTruncated,
   };
 }
 
@@ -1415,7 +1586,10 @@ function createGuardrailApproval(
   return async ({ toolCall }) => {
     const toolName = String(toolCall.toolName);
     const input = (toolCall as { input?: unknown }).input;
-    const auditInput = redactMemoryContentForAudit(toolName, input);
+    const auditInput =
+      toolName === WORKSPACE_COMMAND_TOOL_ID
+        ? redactWorkspaceCommandInput(input)
+        : redactMemoryContentForAudit(toolName, input);
     const decision = evaluateToolGuardrail(
       context,
       toolName,
@@ -1426,6 +1600,7 @@ function createGuardrailApproval(
     const step = await createRuntimeStep({
       run_id: context.runId,
       agent_id: DEFAULT_AGENT_ID,
+      tool_id: toolName,
       kind: decision.decision === "require_review" ? "approval" : "tool",
       status:
         decision.decision === "deny"
@@ -1506,6 +1681,33 @@ function evaluateToolGuardrail(
   if (toolName.startsWith("sandbox_") && inputHasPathEscape(input)) {
     return { decision: "deny", risk: "high", reason: "Sandbox path escapes the session root." };
   }
+  if (toolName === WORKSPACE_COMMAND_TOOL_ID) {
+    const commandPolicy = evaluateWorkspaceCommandPolicy(input);
+    if (commandPolicy.decision === "deny") {
+      return { decision: "deny", risk: "high", reason: commandPolicy.reason };
+    }
+    const agentPolicy = readToolPolicy(context.rootAgent.tool_policy_json);
+    const reviewAll =
+      readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
+    const requiresReview =
+      commandPolicy.decision === "require_review" ||
+      reviewAll ||
+      toolApprovalToolNames.has(toolName) ||
+      agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID);
+    if (requiresReview) {
+      return {
+        decision: "require_review",
+        risk: commandPolicy.risk === "read_only" ? "medium" : "high",
+        reason:
+          commandPolicy.decision === "require_review"
+            ? commandPolicy.reason
+            : reviewAll
+              ? "Agent review policy requires approval for every tool call."
+              : "Agent tool policy requires chat approval.",
+      };
+    }
+    return { decision: "allow", risk: "low", reason: commandPolicy.reason };
+  }
   if (isBuiltinToolName(toolName) || builtinToolNames.has(toolName)) {
     return { decision: "allow", risk: "low", reason: "Built-in tool approval is disabled." };
   }
@@ -1554,6 +1756,11 @@ async function finishRun(
   const failed = status === "failed";
   const finalStatus =
     context.approvalRequested && status === "succeeded" ? "waiting_approval" : status;
+  try {
+    await disposeWorkspaceCommandSession(context.runId);
+  } catch (error) {
+    console.warn("[agent-runtime] failed to dispose workspace command session:", error);
+  }
   if (finalStatus === "waiting_approval") {
     await context.session.markWaitingApproval();
     await updateRuntimeRun(context.runId, { final_agent_id: context.finalAgentId });
@@ -1938,7 +2145,7 @@ function readToolPolicy(raw: string): AgentToolPolicy {
       ? value.allowedToolIds.filter(isChatToolReference)
       : [],
     requireApprovalToolIds: Array.isArray(value.requireApprovalToolIds)
-      ? value.requireApprovalToolIds.filter((id) => isChatToolReference(id) && !isChatToolId(id))
+      ? value.requireApprovalToolIds.filter(isChatToolReference)
       : DEFAULT_AGENT_TOOL_POLICY.requireApprovalToolIds,
   }));
 }

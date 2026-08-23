@@ -537,6 +537,45 @@ export type RuntimeStepKind =
   | "diagnostic"
   | "error";
 
+export type WorkspaceCommandRisk =
+  | "read_only"
+  | "write"
+  | "destructive"
+  | "install"
+  | "network"
+  | "process"
+  | "unknown";
+
+export type WorkspaceCommandOutcome = "completed" | "failed_to_start" | "timed_out" | "cancelled";
+
+export interface WorkspaceCommandInput {
+  executable: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+export interface WorkspaceCommandResult {
+  executable: string;
+  args: string[];
+  cwd: string;
+  outcome: WorkspaceCommandOutcome;
+  risk: WorkspaceCommandRisk;
+  exitCode: number | null;
+  signal: string | null;
+  timedOut: boolean;
+  aborted: boolean;
+  stdout: string;
+  stderr: string;
+  stdoutBytes: number;
+  stderrBytes: number;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+  durationMs: number;
+  error?: string;
+}
+
 export interface RuntimeStep {
   id: string;
   run_id: string;
@@ -1455,6 +1494,7 @@ export const CHAT_TOOL_IDS = [
   "sandbox_restore",
   "sandbox_list_artifacts",
   "sandbox_preview_port",
+  "workspace_run_command",
   "cron",
 ] as const;
 
@@ -1497,6 +1537,7 @@ export interface ChatToolDescriptor {
     | "model"
     | "conversation"
     | "sandbox"
+    | "execution"
     | "automation"
     | "mcp"
     | "skill";

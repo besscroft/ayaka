@@ -369,6 +369,16 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     defaultAuto: false,
     requiresApproval: false,
   },
+  workspace_run_command: {
+    id: "workspace_run_command",
+    label: "Run workspace command",
+    description:
+      "Run a structured executable and argument list in the conversation workspace. This is not an OS sandbox.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: true,
+  },
   cron: {
     id: "cron",
     label: "Automation",
@@ -663,7 +673,12 @@ export async function executeChatHostTool({
         case "sandbox_restore":
         case "sandbox_list_artifacts":
         case "sandbox_preview_port":
-          throw new Error(toolId + " is only available through the agent sandbox runtime.");
+        case "workspace_run_command":
+          throw new Error(
+            toolId === "workspace_run_command"
+              ? "workspace_run_command is only available through the root Agent runtime."
+              : toolId + " is only available through the agent sandbox runtime.",
+          );
       }
     },
     audit,

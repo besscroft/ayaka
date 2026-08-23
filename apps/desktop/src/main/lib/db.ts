@@ -1113,6 +1113,35 @@ export async function updateRuntimeRun(
   return row ? toRuntimeRun(row) : null;
 }
 
+export async function patchRuntimeRunMetadata(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<RuntimeRun | null> {
+  if (shouldRouteWrites())
+    return writeDb<RuntimeRun | null>("patchRuntimeRunMetadata", [id, patch]);
+  const existing = getDb().select().from(runtimeRuns).where(eq(runtimeRuns.id, id)).get();
+  if (!existing) return null;
+  let metadata: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(existing.metadata_json) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      metadata = parsed as Record<string, unknown>;
+    }
+  } catch {
+    metadata = {};
+  }
+  getDb()
+    .update(runtimeRuns)
+    .set({
+      metadata_json: JSON.stringify({ ...metadata, ...patch }),
+      updated_at: Date.now(),
+    })
+    .where(eq(runtimeRuns.id, id))
+    .run();
+  const row = getDb().select().from(runtimeRuns).where(eq(runtimeRuns.id, id)).get();
+  return row ? toRuntimeRun(row) : null;
+}
+
 export function listAgentRunInputs(runId?: string, limit = 500): AgentRunInput[] {
   const query = getDb()
     .select()

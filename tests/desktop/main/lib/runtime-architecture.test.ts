@@ -154,7 +154,20 @@ void describe("runtime architecture", () => {
     );
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "runtime_snapshot"));
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "sandbox_run_command"));
-    assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.every((tool) => tool.requiresApproval === 0));
+    assert.ok(
+      DEFAULT_BUILTIN_TOOL_SEEDS.filter((tool) => tool.id !== "workspace_run_command").every(
+        (tool) => tool.requiresApproval === 0,
+      ),
+    );
+    assert.equal(
+      DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "workspace_run_command")
+        ?.requiresApproval,
+      1,
+    );
+    assert.equal(
+      DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "workspace_run_command")?.defaultAuto,
+      1,
+    );
     assert.ok(
       DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "cron" && tool.defaultAuto === 1),
     );

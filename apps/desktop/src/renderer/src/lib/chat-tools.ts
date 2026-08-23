@@ -22,6 +22,7 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "sandbox_read_file",
   "sandbox_snapshot",
   "sandbox_list_artifacts",
+  "workspace_run_command",
   "cron",
 ]);
 
@@ -175,6 +176,14 @@ const TOOL_METADATA: Record<
     kind: "host",
     category: "sandbox",
     requiresApproval: false,
+  },
+  workspace_run_command: {
+    label: "Run workspace command",
+    description:
+      "Run a structured executable and argument list in the conversation workspace. This is not an OS sandbox.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: true,
   },
   cron: {
     label: "Automation",

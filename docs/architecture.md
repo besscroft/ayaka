@@ -18,7 +18,48 @@ same `runId`; cancellation, errors, aborts, and application shutdown are hard st
 unfinished runs `interrupted` and discards queued inputs without replaying side effects.
 
 `RunToolScheduler` allows known read-only tools to execute concurrently and serializes writes to
-memory, the sandbox, settings, and automations. A cancelled run never starts a queued side effect.
+memory, the sandbox, settings, automations, and local workspace command execution. The local
+command tool is deliberately serialized even for read-only commands so its run-scoped cwd and
+process/stdin lifecycle cannot race. A cancelled run never starts a queued side effect.
+
+### Workspace command tool
+
+`workspace_run_command` is a root-Agent-only built-in tool. It is included by the chat tool
+selector's automatic mode and can also be selected manually. Its input is structured JSON rather
+than a shell string:
+
+```json
+{
+  "executable": "rg",
+  "args": ["--files", "src"],
+  "cwd": "subdir",
+  "env": { "NO_COLOR": "1" },
+  "timeoutMs": 20000
+}
+```
+
+The main process invokes `spawn(executable, args, { shell: false, stdio: ["ignore", ...] })`.
+`cwd` must be relative to the conversation workspace and is persisted in the current Agent run's
+metadata for the next call; `env` is allowlisted and applies only to that call. There is no
+persistent `cd`, `export`, pipe, redirection, or interactive stdin protocol. Timeouts are clamped
+to 1-60 seconds, output streams are bounded independently, and timeout/cancel/run-end cleanup
+terminates the complete process tree (`taskkill /T` on Windows, process groups on Unix).
+
+In automatic mode, known read-only invocations may run without approval. Writes, deletion,
+installation, network, process/service, shell interpreters, and unknown commands require a new
+approval for each call.
+Malformed input, absolute/escaping paths, workspace symlink escapes, and missing cwd directories
+are rejected. This risk decision runs before the built-in-tool approval bypass; `review_all` and
+the Agent tool policy can still elevate a read-only command to approval. The approval and result
+UI show the structured argv, relative cwd, risk, exit state, bounded output, and the following
+warning: a workspace cwd is not an OS security boundary. A program can still access external
+files, use the network, or start other processes.
+
+Runtime steps and events retain `tool_id`, risk, approval decision, relative cwd, outcome, exit
+code/signal, duration, byte counts, and truncation flags. They never persist complete command
+output or environment values; command inputs, outputs, and audit summaries are redacted before
+display or persistence. The existing `sandbox_run_command` remains a separate Docker/local
+sandbox protocol and is not changed by this tool.
 
 ## Persistence
 

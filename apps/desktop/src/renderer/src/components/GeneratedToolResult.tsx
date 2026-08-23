@@ -5,6 +5,7 @@ import {
   normalizeMemoryResults,
   normalizeSandboxArtifacts,
   normalizeSandboxCommand,
+  normalizeWorkspaceCommand,
   normalizeWebOpenResult,
   normalizeWebSearchResult,
   readArray,
@@ -58,6 +59,8 @@ export function GeneratedToolResult({ part }: GeneratedToolResultProps): React.J
       return <SandboxWriteResult output={part.output} />;
     case "sandbox_run_command":
       return <SandboxCommandResult output={part.output} />;
+    case "workspace_run_command":
+      return <WorkspaceCommandResult output={part.output} />;
     case "sandbox_snapshot":
     case "sandbox_restore":
       return <SandboxSnapshotResult toolName={toolName} output={part.output} />;
@@ -352,6 +355,68 @@ function SandboxCommandResult({ output }: { output: unknown }): React.JSX.Elemen
         <p className="text-[10px] text-foreground/40">
           {t("tool.generated.duration", { value: f.fixed(result.durationMs / 1000, 1) })}
         </p>
+      ) : null}
+      {result.timedOut ? (
+        <p className="text-[10px] text-danger">{t("tool.generated.timedOut")}</p>
+      ) : null}
+    </ResultStack>
+  );
+}
+
+function WorkspaceCommandResult({ output }: { output: unknown }): React.JSX.Element {
+  const { t, f } = useT();
+  const result = normalizeWorkspaceCommand(output);
+  if (!result) return <FallbackResult output={output} />;
+  const command = [result.executable, ...result.args].join(" ");
+  const outcome = t(`tool.generated.outcome.${result.outcome}`);
+  const risk = t(`tool.generated.risk.${result.risk}`);
+  const exitStatus =
+    result.exitCode !== null
+      ? t("tool.generated.exitCode", { code: result.exitCode })
+      : result.signal
+        ? t("tool.generated.signal", { signal: result.signal })
+        : null;
+  return (
+    <ResultStack>
+      <div className="flex min-w-0 items-center gap-2">
+        <IconWrench className="size-3 shrink-0 text-foreground/50" />
+        <code className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">$ {command}</code>
+        <StatusText value={outcome} />
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-foreground/45">
+        <span>{t("tool.generated.commandRisk", { risk })}</span>
+        <span>{t("tool.generated.commandCwd", { path: result.cwd })}</span>
+        <span>{t("tool.generated.duration", { value: f.fixed(result.durationMs / 1000, 1) })}</span>
+        {exitStatus ? <span>{exitStatus}</span> : null}
+      </div>
+      <p className="rounded-md border border-warning/25 bg-warning/10 px-2 py-1.5 text-[10px] leading-relaxed text-warning">
+        {t("tool.generated.workspaceWarning")}
+      </p>
+      {result.stdout ? (
+        <div>
+          <p className="mb-1 text-[10px] font-medium text-foreground/50">
+            {t("tool.generated.commandStdout")} · {f.bytes(result.stdoutBytes)}
+          </p>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 font-mono text-[11px] leading-relaxed text-foreground/75">
+            {result.stdout}
+          </pre>
+          {result.stdoutTruncated ? (
+            <p className="mt-1 text-[10px] text-foreground/45">{t("tool.generated.truncated")}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {result.stderr ? (
+        <div>
+          <p className="mb-1 text-[10px] font-medium text-danger/75">
+            {t("tool.generated.commandStderr")} · {f.bytes(result.stderrBytes)}
+          </p>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-danger/5 p-2 font-mono text-[11px] leading-relaxed text-danger/80">
+            {result.stderr}
+          </pre>
+          {result.stderrTruncated ? (
+            <p className="mt-1 text-[10px] text-foreground/45">{t("tool.generated.truncated")}</p>
+          ) : null}
+        </div>
       ) : null}
       {result.timedOut ? (
         <p className="text-[10px] text-danger">{t("tool.generated.timedOut")}</p>

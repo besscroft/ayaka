@@ -78,6 +78,33 @@ export interface SandboxCommandResult {
   durationMs?: number;
 }
 
+export interface WorkspaceCommandDisplayInput {
+  executable: string;
+  args: string[];
+  cwd: string;
+  env?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+export interface WorkspaceCommandResult {
+  executable: string;
+  args: string[];
+  cwd: string;
+  outcome: "completed" | "failed_to_start" | "timed_out" | "cancelled";
+  risk: "read_only" | "write" | "destructive" | "install" | "network" | "process" | "unknown";
+  exitCode: number | null;
+  signal?: string | null;
+  timedOut: boolean;
+  aborted: boolean;
+  stdout: string;
+  stderr: string;
+  stdoutBytes: number;
+  stderrBytes: number;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+  durationMs: number;
+}
+
 export function getToolPartName(part: RenderableToolPart): string | null {
   if (part.type === "dynamic-tool") return readString(part.toolName) ?? null;
   if (part.type.startsWith("tool-")) return part.type.slice("tool-".length) || null;
@@ -122,6 +149,7 @@ export function isGeneratedToolName(toolName: string | null): boolean {
       "sandbox_read_file",
       "sandbox_write_file",
       "sandbox_run_command",
+      "workspace_run_command",
       "sandbox_snapshot",
       "sandbox_restore",
       "sandbox_list_artifacts",
@@ -190,6 +218,18 @@ export function getToolSummary(part: RenderableToolPart): ToolSummary | null {
             key: "tool.generated.command",
             params: { status: exitCode === 0 ? "ok" : String(exitCode) },
           };
+    }
+    case "workspace_run_command": {
+      const result = normalizeWorkspaceCommand(output);
+      return result
+        ? {
+            key: "tool.generated.command",
+            params: {
+              status:
+                result.outcome === "completed" && result.exitCode === 0 ? "ok" : result.outcome,
+            },
+          }
+        : null;
     }
     case "sandbox_list_artifacts": {
       const artifacts = readArray(output?.artifacts);
@@ -327,6 +367,150 @@ export function normalizeSandboxCommand(output: unknown): SandboxCommandResult |
     stderr: truncateText(readString(record.stderr) ?? "", 12_000),
     durationMs: readNumber(record.durationMs),
   };
+}
+
+export function normalizeWorkspaceCommand(output: unknown): WorkspaceCommandResult | null {
+  const record = asRecord(output);
+  if (!record) return null;
+  const executable = readString(record.executable);
+  const outcome = readString(record.outcome);
+  const risk = readString(record.risk);
+  if (
+    !executable ||
+    !outcome ||
+    !risk ||
+    !["completed", "failed_to_start", "timed_out", "cancelled"].includes(outcome) ||
+    !["read_only", "write", "destructive", "install", "network", "process", "unknown"].includes(
+      risk,
+    )
+  ) {
+    return null;
+  }
+  return {
+    executable,
+    args: readArray(record.args).map((value) => String(value)),
+    cwd: readString(record.cwd) ?? ".",
+    outcome: outcome as WorkspaceCommandResult["outcome"],
+    risk: risk as WorkspaceCommandResult["risk"],
+    exitCode: readNumber(record.exitCode) ?? null,
+    signal: readString(record.signal),
+    timedOut: readBoolean(record.timedOut) ?? false,
+    aborted: readBoolean(record.aborted) ?? false,
+    stdout: redactWorkspaceCommandText(truncateText(readString(record.stdout) ?? "", 16_000)),
+    stderr: redactWorkspaceCommandText(truncateText(readString(record.stderr) ?? "", 16_000)),
+    stdoutBytes: readNumber(record.stdoutBytes) ?? 0,
+    stderrBytes: readNumber(record.stderrBytes) ?? 0,
+    stdoutTruncated: readBoolean(record.stdoutTruncated) ?? false,
+    stderrTruncated: readBoolean(record.stderrTruncated) ?? false,
+    durationMs: readNumber(record.durationMs) ?? 0,
+  };
+}
+
+export function normalizeWorkspaceCommandInput(
+  input: unknown,
+): WorkspaceCommandDisplayInput | null {
+  const record = asRecord(input);
+  const executable = readString(record?.executable);
+  if (!executable) return null;
+  const rawArgs = readArray(record?.args).map((value) => String(value));
+  const args = rawArgs.map((arg, index) => {
+    const previous = rawArgs[index - 1] ?? "";
+    return redactWorkspaceCommandArgument(arg, previous);
+  });
+  const rawEnv = asRecord(record?.env);
+  return {
+    executable,
+    args,
+    cwd: readString(record?.cwd) ?? ".",
+    ...(rawEnv
+      ? {
+          env: Object.fromEntries(Object.keys(rawEnv).map((key) => [key, "[redacted]"])),
+        }
+      : {}),
+    ...(readNumber(record?.timeoutMs) !== undefined
+      ? { timeoutMs: readNumber(record?.timeoutMs) }
+      : {}),
+  };
+}
+
+function redactWorkspaceCommandArgument(value: string, previous?: string): string {
+  if (previous && isSensitiveArgumentName(previous)) return "[redacted]";
+  const separator = value.indexOf("=");
+  if (separator > 0 && isSensitiveArgumentName(value.slice(0, separator))) {
+    return value.slice(0, separator + 1) + "[redacted]";
+  }
+  return redactWorkspaceCommandText(value);
+}
+
+function isSensitiveArgumentName(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || (!trimmed.startsWith("-") && !trimmed.includes("="))) return false;
+  return /token|secret|password|authorization|api[-_]?key|cookie/i.test(
+    trimmed.split("=", 1)[0] ?? "",
+  );
+}
+
+function redactWorkspaceCommandText(value: string): string {
+  return value
+    .replace(
+      /(["']?(?:api[-_ ]?key|access[-_ ]?token|authorization|password|secret)["']?\s*[:=]\s*["']?)[^,]+/gi,
+      "$1[redacted]",
+    )
+    .replace(/bearer\s+[a-z0-9._-]+/gi, "Bearer [redacted]")
+    .replace(/\b(?:sk|pk|key|token|secret)[-_][a-z0-9_-]{8,}\b/gi, "[redacted]");
+}
+
+export function estimateWorkspaceCommandRisk(
+  input: WorkspaceCommandDisplayInput,
+): WorkspaceCommandResult["risk"] {
+  const executable =
+    input.executable
+      .split(/[\\/]/)
+      .at(-1)
+      ?.replace(/\.(cmd|bat|exe)$/i, "")
+      .toLowerCase() ?? "";
+  const text = [executable, ...input.args].join(" ").toLowerCase();
+  if (
+    [
+      "cat",
+      "dir",
+      "find",
+      "grep",
+      "head",
+      "ls",
+      "pwd",
+      "rg",
+      "tail",
+      "type",
+      "where",
+      "which",
+    ].includes(executable)
+  )
+    return "read_only";
+  if (
+    executable === "git" &&
+    ["branch", "diff", "log", "ls-files", "rev-parse", "show", "status"].some((action) =>
+      input.args.includes(action),
+    )
+  )
+    return "read_only";
+  if (
+    /\b(rm|del|erase|rmdir|format|mkfs|shutdown|reboot|git\s+(reset|clean|checkout))\b/.test(text)
+  )
+    return "destructive";
+  if (
+    /\b(npm|pnpm|yarn|pip|pip3|uv|brew|apt|apt-get|choco|winget|install|uninstall|update|upgrade)\b/.test(
+      text,
+    )
+  )
+    return "install";
+  if (/\b(curl|wget|invoke-webrequest|clone|fetch|pull|push)\b|https?:\/\//.test(text))
+    return "network";
+  if (/\b(start|kill|systemctl|launchctl|service|docker|run|serve|dev|watch|daemon)\b/.test(text))
+    return "process";
+  if (/\b(mkdir|touch|cp|copy|mv|move|ren|rename|tee|git\s+(add|commit))\b/.test(text))
+    return "write";
+  return "unknown";
 }
 
 export function normalizeStringList(output: unknown): string[] {

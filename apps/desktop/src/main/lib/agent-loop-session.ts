@@ -17,6 +17,7 @@ import {
   getRuntimeRun,
   insertRuntimeEvent,
   listRuntimeRuns,
+  patchRuntimeRunMetadata,
   updateRuntimeRun,
 } from "./db";
 
@@ -319,8 +320,9 @@ export class AgentLoopSession {
   }
 
   private async persistControlMetadata(blockedReason?: string): Promise<void> {
-    await updateRuntimeRun(this.runId, {
-      metadata_json: JSON.stringify({ ...this.controlMetadata, blockedReason }),
+    await patchRuntimeRunMetadata(this.runId, {
+      ...this.controlMetadata,
+      blockedReason: blockedReason ?? null,
     });
   }
 
@@ -350,8 +352,11 @@ export class AgentLoopSession {
           ? (detail ?? (status === "blocked" ? "Agent run blocked" : "Agent run failed"))
           : null,
       usage_json: usage === undefined ? undefined : JSON.stringify(usage),
-      metadata_json: JSON.stringify({ ...this.controlMetadata, blockedReason: detail }),
       finished_at: now,
+    });
+    await patchRuntimeRunMetadata(this.runId, {
+      ...this.controlMetadata,
+      blockedReason: detail ?? null,
     });
     if (finishReason === "budget_exhausted" || finishReason === "absolute_limit") {
       insertRuntimeEvent({
