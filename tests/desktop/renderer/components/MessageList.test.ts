@@ -373,7 +373,7 @@ void describe("execution details", () => {
     assert.equal((html.match(/1\.3/g) ?? []).length, 1);
   });
 
-  void it("uses plain text for the active stream and rich content after completion", () => {
+  void it("renders rich content while the response is still streaming", () => {
     const streamingHtml = renderToStaticMarkup(
       createElement(MessageList, {
         messages: assistant([{ type: "text", text: "**streaming**\nnext line" }]),
@@ -390,7 +390,8 @@ void describe("execution details", () => {
     );
 
     assert.match(streamingHtml, /data-streaming="true"/);
-    assert.doesNotMatch(streamingHtml, /data-slot="rich-content"/);
+    assert.match(streamingHtml, /class="rich-content/);
+    assert.match(streamingHtml, /<strong class="font-semibold">streaming<\/strong>/);
     assert.match(completedHtml, /class="rich-content/);
   });
 
