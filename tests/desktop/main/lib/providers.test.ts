@@ -63,20 +63,24 @@ const capabilities = {
 };
 
 void describe("provider helpers", () => {
-  void it("registers the new built-in providers in the approved order", () => {
+  void it("registers the new built-in providers in the approved order", async () => {
     const providers = providerHelpers.listProviders();
     assert.deepEqual(
-      providers.slice(-5).map((provider) => ({
-        id: provider.id,
-        label: provider.label,
-        kind: provider.kind,
-        source: provider.source,
-        baseUrl: provider.baseUrl,
-        helpUrl: provider.helpUrl,
-        models: provider.models,
-        hasApiKey: provider.hasApiKey,
-        hasProviderApiKey: provider.hasProviderApiKey,
-      })),
+      providers
+        .filter((provider) =>
+          ["minimax-cn", "xiaomi", "siliconflow-cn", "zai", "moonshotai-cn"].includes(provider.id),
+        )
+        .map((provider) => ({
+          id: provider.id,
+          label: provider.label,
+          kind: provider.kind,
+          source: provider.source,
+          baseUrl: provider.baseUrl,
+          helpUrl: provider.helpUrl,
+          models: provider.models,
+          hasApiKey: provider.hasApiKey,
+          hasProviderApiKey: provider.hasProviderApiKey,
+        })),
       [
         {
           id: "minimax-cn",
@@ -135,7 +139,211 @@ void describe("provider helpers", () => {
         },
       ],
     );
+    const free = providers.find((provider) => provider.id === "opencode-free");
+    assert.equal(free?.authKind, "none");
+    assert.equal(free?.baseUrl, "https://opencode.ai/zen/v1");
+    assert.equal(free?.helpUrl, undefined);
+    assert.deepEqual(
+      free?.models.map((model) => model.id),
+      [
+        "nemotron-3-ultra-free",
+        "nemotron-3.5-lightning-free",
+        "big-pickle",
+        "hy3-free",
+        "mimo-v2.5-free",
+        "muse-spark-1.2-contributor-free",
+        "x-preview-f-free",
+      ],
+    );
+    assert.equal(free?.hasApiKey, false);
+    assert.equal(free?.hasProviderApiKey, false);
     assert.equal(new Set(providers.map((provider) => provider.id)).size, providers.length);
+    await assert.rejects(
+      providerHelpers.saveProviderApiKey("opencode-free", "should-not-be-stored"),
+      /does not use an API key/,
+    );
+    await assert.rejects(
+      providerHelpers.clearProviderApiKey("opencode-free"),
+      /does not use an API key/,
+    );
+    await assert.rejects(
+      providerHelpers.deleteCustomProvider("opencode-free"),
+      /Built-in providers cannot be modified/,
+    );
+  });
+
+  void it("initializes the anonymous default and syncs OpenCode models without auth", async () => {
+    await providerHelpers.initializeBuiltinProviderCatalog();
+    assert.equal(settings.get(SettingKey.SelectedModel), "opencode-free/nemotron-3-ultra-free");
+    settings.set(SettingKey.SelectedModel, "opencode-free/big-pickle");
+    await providerHelpers.initializeBuiltinProviderCatalog();
+    assert.equal(settings.get(SettingKey.SelectedModel), "opencode-free/big-pickle");
+
+    const previousFetch = globalThis.fetch;
+    const requests: Array<{ url: string; headers: Headers }> = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      requests.push({ url, headers });
+      if (url === "https://models.dev/api.json") {
+        return new Response(
+          JSON.stringify({
+            opencode: {
+              models: {
+                "big-pickle": {
+                  id: "big-pickle",
+                  name: "Big Pickle",
+                  tool_call: true,
+                  modalities: { input: ["text"], output: ["text"] },
+                  limit: { context: 200_000, output: 32_000 },
+                  cost: { input: 0, output: 0 },
+                },
+                "paid-model": {
+                  id: "paid-model",
+                  tool_call: true,
+                  modalities: { input: ["text"], output: ["text"] },
+                  cost: { input: 1, output: 1 },
+                },
+                "deprecated-model": {
+                  id: "deprecated-model",
+                  status: "deprecated",
+                  tool_call: true,
+                  modalities: { input: ["text"], output: ["text"] },
+                  cost: { input: 0, output: 0 },
+                },
+                "no-tools-model": {
+                  id: "no-tools-model",
+                  tool_call: false,
+                  modalities: { input: ["text"], output: ["text"] },
+                  cost: { input: 0, output: 0 },
+                },
+                "image-only-model": {
+                  id: "image-only-model",
+                  tool_call: true,
+                  modalities: { input: ["image"], output: ["text"] },
+                  cost: { input: 0, output: 0 },
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { ETag: '"fixture-v1"' } },
+        );
+      }
+      if (url === "https://opencode.ai/zen/v1/models") {
+        return new Response(
+          JSON.stringify({
+            data: [
+              { id: "big-pickle", object: "model" },
+              { id: "paid-model", object: "model" },
+              { id: "deprecated-model", object: "model" },
+              { id: "no-tools-model", object: "model" },
+              { id: "image-only-model", object: "model" },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith("/chat/completions")) {
+        return new Response("fixture request reached chat completions", { status: 400 });
+      }
+      throw new Error("Unexpected fixture URL: " + url);
+    }) as typeof fetch;
+
+    try {
+      const result = await providerHelpers.syncAvailableModels("opencode-free");
+      assert.equal(result.discovered, 1);
+      assert.deepEqual(
+        result.provider.models.map((model) => model.id),
+        ["big-pickle"],
+      );
+      assert.equal(result.provider.models[0]?.capabilities.textGeneration, true);
+      assert.equal(result.provider.models[0]?.capabilities.toolCalling, true);
+      assert.equal(result.provider.models[0]?.capabilities.vision, false);
+      assert.equal(result.provider.models[0]?.contextWindow, 200_000);
+      assert.equal(result.provider.models[0]?.maxOutputTokens, 32_000);
+      assert.equal(settings.get(SettingKey.SelectedModel), "opencode-free/big-pickle");
+
+      const modelListRequest = requests.find((request) => request.url.endsWith("/models"));
+      assert.equal(modelListRequest?.headers.get("Authorization"), null);
+      const resolved = providerHelpers.resolveModel("opencode-free/big-pickle");
+      await assert.rejects(
+        (
+          resolved.model as unknown as {
+            doGenerate(options: { prompt: unknown[] }): Promise<unknown>;
+          }
+        ).doGenerate({
+          prompt: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+        }),
+      );
+      const chatRequest = requests.find((request) => request.url.endsWith("/chat/completions"));
+      assert.equal(chatRequest?.headers.get("Authorization"), null);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
+  void it("uses the cached models.dev ETag and preserves the snapshot on refresh failure", async () => {
+    await providerHelpers.initializeBuiltinProviderCatalog();
+    const previousFetch = globalThis.fetch;
+    let mode: "first" | "not-modified" | "failed" = "first";
+    const requests: Array<{ url: string; headers: Headers }> = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      requests.push({ url, headers });
+      if (mode === "failed") throw new Error("fixture network down");
+      if (url === "https://models.dev/api.json") {
+        if (mode === "not-modified") return new Response(null, { status: 304 });
+        return new Response(
+          JSON.stringify({
+            opencode: {
+              models: {
+                "big-pickle": {
+                  name: "Big Pickle",
+                  tool_call: true,
+                  modalities: { input: ["text"], output: ["text"] },
+                  cost: { input: 0, output: 0 },
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { ETag: '"fixture-v1"' } },
+        );
+      }
+      return new Response(JSON.stringify({ data: [{ id: "big-pickle" }] }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      await providerHelpers.syncAvailableModels("opencode-free");
+      mode = "not-modified";
+      await providerHelpers.syncAvailableModels("opencode-free");
+      assert.equal(
+        requests
+          .filter((request) => request.url === "https://models.dev/api.json")
+          .at(-1)
+          ?.headers.get("If-None-Match"),
+        '"fixture-v1"',
+      );
+      const before = providerHelpers
+        .listProviders()
+        .find((provider) => provider.id === "opencode-free");
+      await providerHelpers.updateModelEnabled("opencode-free", "big-pickle", false);
+      mode = "failed";
+      await assert.rejects(
+        providerHelpers.syncAvailableModels("opencode-free"),
+        /fixture network down/,
+      );
+      const after = providerHelpers
+        .listProviders()
+        .find((provider) => provider.id === "opencode-free");
+      assert.deepEqual(
+        after?.models.map((model) => model.id),
+        before?.models.map((model) => model.id),
+      );
+      assert.equal(after?.models[0]?.enabled, false);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
   });
 
   void it("lets a legacy custom collision override and update its built-in slot", async () => {

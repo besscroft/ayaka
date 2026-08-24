@@ -74,6 +74,7 @@ import {
   saveProviderApiKey,
   saveModelApiKey,
   syncAvailableModels,
+  subscribeProviderCatalogUpdated,
   testProvider,
   updateModelEnabled,
   upsertCustomModel,
@@ -243,6 +244,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   onMcpToolsChanged((event) => broadcast("mcp:tools-changed", event));
   onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
+  subscribeProviderCatalogUpdated((providerId) =>
+    broadcast("providers:catalog-updated", { providerId }),
+  );
 
   const updateToolAndNotify = async (
     id: string,

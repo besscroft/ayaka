@@ -28,6 +28,13 @@ export function ModelSelector({
   }, []);
 
   useEffect(() => {
+    const unsubscribe = api.providers.onCatalogUpdated(() => {
+      void api.providers.list().then(setProviders);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     if (open) void api.providers.list().then(setProviders);
   }, [open]);
 

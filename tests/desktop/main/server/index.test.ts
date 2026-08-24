@@ -67,7 +67,7 @@ void describe("local chat server", () => {
 
     assert.equal(response.status, 401);
     assert.deepEqual(await response.json(), {
-      error: "The chat session expired. Restart the app and try again.",
+      error: "The anonymous model service or chat session rejected the request. Try again later.",
       code: "unauthorized",
       retryable: false,
     });

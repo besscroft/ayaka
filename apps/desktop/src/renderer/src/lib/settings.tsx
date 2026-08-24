@@ -212,6 +212,18 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
   }, []);
 
   useEffect(() => {
+    const unsubscribe = api.providers.onCatalogUpdated(() => {
+      void api.settings.getAll([SettingKey.SelectedModel]).then((map) => {
+        setSettings((current) => ({
+          ...current,
+          selectedModel: map[SettingKey.SelectedModel] || null,
+        }));
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     applyAppearance(settings);
   }, [settings]);
 

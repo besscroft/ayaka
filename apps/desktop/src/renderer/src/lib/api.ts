@@ -427,6 +427,8 @@ export const api = {
       assertApi().providers.deleteModelApiKey(providerId, modelId),
     deleteCustomModel: (providerId: string, modelId: string): Promise<boolean> =>
       assertApi().providers.deleteCustomModel(providerId, modelId),
+    onCatalogUpdated: (handler: (event: { providerId: string }) => void): (() => void) =>
+      assertApi().providers.onCatalogUpdated(handler),
   },
   server: {
     port: (): Promise<number> => assertApi().server.port(),

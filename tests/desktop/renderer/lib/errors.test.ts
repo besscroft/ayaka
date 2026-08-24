@@ -12,7 +12,7 @@ void describe("chat error helpers", () => {
     const error = new TypeError("Failed to fetch");
     assert.equal(
       getChatErrorMessage(error, "en"),
-      "Unable to connect to the local chat service. Wait a few seconds and try again, or restart the app.",
+      "Unable to connect to OpenCode Zen or the local chat service. Check your network and try again.",
     );
     assert.equal(isChatErrorRetryable(error, "en"), true);
   });
@@ -28,10 +28,24 @@ void describe("chat error helpers", () => {
     const info = getChatErrorInfo(error, "en");
     assert.deepEqual(info, {
       code: "rate_limited",
-      message: "The model provider is rate limiting requests. Wait a moment and try again.",
+      message:
+        "The model service quota or IP limit was reached; free models can be affected too. Try again later.",
       retryable: true,
     });
     assert.equal(info.message.includes("secret"), false);
+  });
+
+  void it("classifies an unavailable model without asking for an API key", () => {
+    const info = getChatErrorInfo(
+      Object.assign(new Error("model not found"), { statusCode: 404 }),
+      "en",
+    );
+    assert.equal(info.code, "model_unavailable");
+    assert.equal(
+      info.message,
+      "The selected model may be unavailable. Refresh the model list or choose another model.",
+    );
+    assert.equal(info.message.toLowerCase().includes("api key"), false);
   });
 
   void it("hides unstructured server details behind a safe chat message", () => {

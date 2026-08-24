@@ -360,6 +360,7 @@ export interface AyakaApi {
     setModelApiKey: (providerId: string, modelId: string, apiKey: string) => Promise<boolean>;
     deleteModelApiKey: (providerId: string, modelId: string) => Promise<boolean>;
     deleteCustomModel: (providerId: string, modelId: string) => Promise<boolean>;
+    onCatalogUpdated: (handler: (event: { providerId: string }) => void) => () => void;
   };
   // 鏈湴 AI 鏈嶅姟
   server: {

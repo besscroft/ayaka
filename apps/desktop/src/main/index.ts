@@ -6,7 +6,11 @@ import { initDbWriter, closeDb } from "./lib/db";
 import { scheduleMemoryFileConsolidation } from "./lib/agent-memory-files";
 import { startMemoryWorker } from "./lib/agent-learning";
 import { startServer, stopServer } from "./server";
-import { migrateProviderApiKeysToModelKeys } from "./lib/providers";
+import {
+  initializeBuiltinProviderCatalog,
+  migrateProviderApiKeysToModelKeys,
+  refreshBuiltinProviderCatalog,
+} from "./lib/providers";
 import { registerAyakaMediaProtocol } from "./lib/media-assets";
 import { registerIpcHandlers } from "./ipc";
 import { startCronScheduler, stopCronScheduler } from "./lib/cron-scheduler";
@@ -189,6 +193,7 @@ if (!hasSingleInstanceLock) {
         console.error("[mcp] failed to auto-start enabled servers:", error);
       });
       await migrateProviderApiKeysToModelKeys();
+      await initializeBuiltinProviderCatalog();
       await ensureBuiltinCatalogSources();
       scheduleMemoryFileConsolidation();
       startMemoryWorker();
@@ -212,6 +217,7 @@ if (!hasSingleInstanceLock) {
     });
 
     createWindow();
+    void refreshBuiltinProviderCatalog().catch(() => undefined);
     if (process.platform === "win32") {
       trayController = createTray(
         dispatchTrayAction,

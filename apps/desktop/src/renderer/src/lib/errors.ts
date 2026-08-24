@@ -24,6 +24,7 @@ const CHAT_CODES = new Set<ChatErrorCode>([
   "invalid_run_id",
   "invalid_mode",
   "missing_model",
+  "model_unavailable",
   "vision_model_unavailable",
   "unauthorized",
   "configuration",
@@ -209,6 +210,8 @@ function messageForChatCode(code: ChatErrorCode, locale: ErrorLocale): string {
   switch (code) {
     case "missing_model":
       return text(locale, "error.chat.missingModel");
+    case "model_unavailable":
+      return text(locale, "error.chat.modelUnavailable");
     case "vision_model_unavailable":
       return text(locale, "error.chat.visionModelUnavailable");
     case "invalid_media_input":
@@ -265,6 +268,8 @@ function classifyUnstructuredChatError(error: unknown, locale: ErrorLocale): Cha
     code = "unauthorized";
   } else if (lower.includes("no available model") || lower.includes("model is required")) {
     code = "missing_model";
+  } else if (status === 404 || lower.includes("model may be unavailable")) {
+    code = "model_unavailable";
   } else if (lower.includes("cannot process image input") || lower.includes("vision model")) {
     code = "vision_model_unavailable";
   } else if (

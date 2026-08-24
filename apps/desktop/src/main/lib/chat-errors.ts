@@ -44,13 +44,18 @@ const SAFE_MESSAGES: Record<ChatErrorCode, string> = {
   invalid_run_id: "The chat run is invalid. Start the message again.",
   invalid_mode: "The chat run mode is invalid. Start the message again.",
   missing_model: "No available model is selected. Choose or configure a model first.",
+  model_unavailable:
+    "The selected model may be unavailable. Refresh the model list or choose another model.",
   vision_model_unavailable:
     "The selected chat model cannot process image input. Choose a vision model in General settings.",
-  unauthorized: "The chat session expired. Restart the app and try again.",
+  unauthorized:
+    "The anonymous model service or chat session rejected the request. Try again later.",
   configuration: "The selected model is not configured correctly. Check its provider settings.",
-  network: "Unable to connect to the local chat service. Wait a few seconds and try again.",
-  rate_limited: "The model provider is rate limiting requests. Wait a moment and try again.",
-  timeout: "The model request timed out. Try again or use a shorter request.",
+  network:
+    "Unable to connect to OpenCode Zen or the local chat service. Check your network and try again.",
+  rate_limited:
+    "The model service limit was reached. For free models, this can be a free quota or IP limit. Wait and try again.",
+  timeout: "The model request timed out while contacting the model service. Try again later.",
   provider: "The model provider could not complete the request. Try again shortly.",
   runtime: "The local agent runtime could not complete the request. Try again.",
   run_conflict: "This conversation is already running another request.",
@@ -93,6 +98,9 @@ export function classifyChatError(
   const lower = diagnostic.toLowerCase();
   if (status === 401 || status === 403 || lower.includes("unauthorized")) {
     return createClassification("unauthorized", phase, diagnostic, 401);
+  }
+  if (status === 404) {
+    return createClassification("model_unavailable", phase, diagnostic, 404);
   }
   if (
     lower.includes("api key") ||

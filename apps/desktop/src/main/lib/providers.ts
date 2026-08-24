@@ -38,9 +38,18 @@ import {
   type ProviderModelSyncResult,
   type ProviderInfo,
   type ProviderTestResult,
+  type ProviderAuthKind,
   isChatReasoningLevel,
   isCustomProviderApiFormat,
 } from "../../shared/types";
+import {
+  OPENCODE_FREE_BASE_URL,
+  OPENCODE_FREE_PROVIDER_ID,
+  ensureOpenCodeFreeCatalog,
+  getOpenCodeFreeModelOptions,
+  refreshOpenCodeFreeCatalog,
+  setOpenCodeFreeModelEnabled,
+} from "./opencode-free-catalog";
 
 type ProviderConfig = Omit<ProviderInfo, "hasApiKey" | "hasProviderApiKey">;
 type ProviderOptions = NonNullable<Parameters<typeof streamText>[0]["providerOptions"]>;
@@ -221,6 +230,15 @@ const BUILTIN_PROVIDERS: ProviderConfig[] = [
     models: [],
     helpUrl: "https://platform.kimi.com/console/api-keys",
   },
+  {
+    id: OPENCODE_FREE_PROVIDER_ID,
+    label: "OpenCode Free",
+    kind: "openai-compatible",
+    source: "builtin",
+    baseUrl: OPENCODE_FREE_BASE_URL,
+    authKind: "none",
+    models: [],
+  },
 ];
 
 function customModel(model: ModelCatalogSettings["models"][number], enabled: boolean): ModelOption {
@@ -252,6 +270,18 @@ function readCatalog(): ModelCatalogSettings {
     console.error("[providers] Failed to parse model catalog:", err);
     return emptyCatalog();
   }
+}
+
+function providerAuthKind(provider: Pick<ProviderInfo, "authKind">): ProviderAuthKind {
+  return provider.authKind === "none" ? "none" : "api-key";
+}
+
+function builtinProviderConfigs(): ProviderConfig[] {
+  return BUILTIN_PROVIDERS.map((provider) =>
+    provider.id === OPENCODE_FREE_PROVIDER_ID
+      ? { ...provider, models: getOpenCodeFreeModelOptions() }
+      : { ...provider },
+  );
 }
 
 async function writeCatalog(catalog: ModelCatalogSettings): Promise<void> {
@@ -567,22 +597,20 @@ function isSelectedModelValid(catalog: ModelCatalogSettings, selectedModel: stri
   const providerId = normalizeProviderId(selectedModel.slice(0, slashIdx));
   const modelId = selectedModel.slice(slashIdx + 1).trim();
   if (!modelId) return false;
-  const model = catalog.models.find(
+  const customModel = catalog.models.find(
     (item) => item.providerId === providerId && item.id === modelId,
   );
-  return !!model && isModelEnabled(catalog, providerId, modelId);
+  if (customModel) return isModelEnabled(catalog, providerId, modelId);
+  const builtinModel = builtinProviderConfigs()
+    .find((provider) => provider.id === providerId)
+    ?.models.find((model) => model.id === modelId);
+  return !!builtinModel && builtinModel.enabled;
 }
 
 async function clearInvalidSelectedModel(catalog = readCatalog()): Promise<void> {
   const selectedModel = getSetting(SettingKey.SelectedModel);
   if (selectedModel && !isSelectedModelValid(catalog, selectedModel)) {
     await setSetting(SettingKey.SelectedModel, "");
-  }
-}
-
-function assertKnownProvider(providerId: string): void {
-  if (!listProviders().some((provider) => provider.id === providerId)) {
-    throw new Error("Unknown provider: " + providerId);
   }
 }
 
@@ -595,6 +623,7 @@ function assertKnownModel(providerId: string, modelId: string): void {
 }
 
 function mergeModels(provider: ProviderConfig, catalog: ModelCatalogSettings): ModelOption[] {
+  if (provider.id === OPENCODE_FREE_PROVIDER_ID) return getOpenCodeFreeModelOptions();
   return catalog.models
     .filter((model) => model.providerId === provider.id)
     .map((model) => customModel(model, isModelEnabled(catalog, provider.id, model.id)));
@@ -643,8 +672,9 @@ export function listProviders(): ProviderInfo[] {
     models: [],
   }));
 
-  return mergeProviderConfigs(BUILTIN_PROVIDERS, customProviders).map((provider) => ({
+  return mergeProviderConfigs(builtinProviderConfigs(), customProviders).map((provider) => ({
     ...provider,
+    authKind: providerAuthKind(provider),
     hasProviderApiKey: providerKeys.has(provider.id),
     hasApiKey:
       providerKeys.has(provider.id) ||
@@ -666,6 +696,7 @@ export function listManagedModels(): ManagedModelInfo[] {
       providerBaseUrl: provider.baseUrl,
       providerApiFormat: provider.apiFormat,
       providerHelpUrl: provider.helpUrl,
+      authKind: providerAuthKind(provider),
       modelId: model.id,
       modelLabel: model.label,
       modelSource: model.source,
@@ -734,6 +765,9 @@ export async function deleteCustomProvider(providerId: string): Promise<void> {
   const id = normalizeProviderId(providerId);
   const catalog = readCatalog();
   const existing = catalog.providers.find((provider) => provider.id === id);
+  if (!existing && BUILTIN_PROVIDERS.some((provider) => provider.id === id)) {
+    throw new Error("Built-in providers cannot be modified");
+  }
   if (!existing) throw new Error("Custom provider not found");
 
   catalog.providers = catalog.providers.filter((provider) => provider.id !== id);
@@ -748,12 +782,22 @@ export async function saveProviderApiKey(providerId: string, apiKey: string): Pr
   const normalizedProviderId = normalizeProviderId(providerId);
   const key = apiKey.trim();
   if (!key) throw new Error("API key is required");
-  assertKnownProvider(normalizedProviderId);
+  const provider = getProviderConfig(normalizedProviderId);
+  if (!provider) throw new Error("Unknown provider: " + normalizedProviderId);
+  if (providerAuthKind(provider) === "none") {
+    throw new Error("This provider does not use an API key");
+  }
   await setApiKey(normalizedProviderId, key);
 }
 
 export async function clearProviderApiKey(providerId: string): Promise<void> {
-  await deleteApiKey(normalizeProviderId(providerId));
+  const normalizedProviderId = normalizeProviderId(providerId);
+  const provider = getProviderConfig(normalizedProviderId);
+  if (!provider) throw new Error("Unknown provider: " + normalizedProviderId);
+  if (providerAuthKind(provider) === "none") {
+    throw new Error("This provider does not use an API key");
+  }
+  await deleteApiKey(normalizedProviderId);
 }
 
 export function resolveProviderApiKeyFallback({
@@ -784,6 +828,80 @@ function getProviderOrLegacyModelApiKey(providerId: string, modelId?: string): s
     legacyModelRefs: listModelApiKeyRefs(),
     getLegacyModelKey: (id) => getModelApiKey(providerId, id),
   });
+}
+
+function resolveProviderCredential(provider: ProviderInfo, modelId?: string): string | undefined {
+  if (providerAuthKind(provider) === "none") return undefined;
+  return getProviderOrLegacyModelApiKey(provider.id, modelId) ?? undefined;
+}
+
+function providerNeedsApiKey(provider: ProviderInfo): boolean {
+  return providerAuthKind(provider) !== "none";
+}
+
+export async function initializeBuiltinProviderCatalog(): Promise<void> {
+  await ensureOpenCodeFreeCatalog();
+  await ensureDefaultSelectedModel();
+}
+
+export async function refreshBuiltinProviderCatalog(): Promise<ProviderModelSyncResult> {
+  try {
+    const result = await refreshOpenCodeFreeCatalog();
+    await ensureDefaultSelectedModel();
+    notifyProviderCatalogUpdated(OPENCODE_FREE_PROVIDER_ID);
+    const provider = getProviderConfig(OPENCODE_FREE_PROVIDER_ID);
+    if (!provider) throw new Error("Failed to save provider");
+    return {
+      provider,
+      discovered: result.discovered,
+      added: result.added,
+      updated: result.updated,
+      updatedCapabilities: result.updatedCapabilities,
+    };
+  } catch (error) {
+    console.warn(
+      "[providers] OpenCode Free catalog refresh failed:",
+      error instanceof Error ? error.message : String(error),
+    );
+    throw error;
+  }
+}
+
+export function subscribeProviderCatalogUpdated(
+  listener: (providerId: string) => void,
+): () => void {
+  providerCatalogListeners.add(listener);
+  return () => providerCatalogListeners.delete(listener);
+}
+
+const providerCatalogListeners = new Set<(providerId: string) => void>();
+
+function notifyProviderCatalogUpdated(providerId: string): void {
+  for (const listener of providerCatalogListeners) listener(providerId);
+}
+
+async function ensureDefaultSelectedModel(): Promise<void> {
+  const selectedModel = getApiSetting(SettingKey.SelectedModel);
+  const providers = listProviders();
+  const selectedIsValid = selectedModel
+    ? providers.some((provider) =>
+        provider.models.some(
+          (model) => model.enabled && providerModelRef(provider.id, model.id) === selectedModel,
+        ),
+      )
+    : false;
+  if (selectedIsValid) return;
+  const defaultModel = providers
+    .find((provider) => provider.id === OPENCODE_FREE_PROVIDER_ID)
+    ?.models.find((model) => model.enabled);
+  await setSetting(
+    SettingKey.SelectedModel,
+    defaultModel ? providerModelRef(OPENCODE_FREE_PROVIDER_ID, defaultModel.id) : "",
+  );
+}
+
+function getApiSetting(key: string): string | null {
+  return getSetting(key);
 }
 
 export interface RemoteModelInfo {
@@ -1215,7 +1333,7 @@ async function fetchJson(url: URL, init: RequestInit): Promise<unknown> {
 
 async function fetchRemoteModels(
   provider: ProviderInfo,
-  apiKey: string,
+  apiKey?: string,
 ): Promise<RemoteModelInfo[]> {
   const customApiFormat = getCustomProviderApiFormat(provider);
   if (customApiFormat) {
@@ -1224,10 +1342,12 @@ async function fetchRemoteModels(
     const headers: Record<string, string> =
       customApiFormat === "anthropic-messages"
         ? {
-            "x-api-key": apiKey,
+            "x-api-key": apiKey ?? "",
             "anthropic-version": "2023-06-01",
           }
-        : { Authorization: "Bearer " + apiKey };
+        : apiKey
+          ? { Authorization: "Bearer " + apiKey }
+          : {};
     const json = await fetchJson(url, { headers });
     return customApiFormat === "anthropic-messages"
       ? parseAnthropicModelListResponse(json)
@@ -1240,7 +1360,7 @@ async function fetchRemoteModels(
       if (!provider.baseUrl) throw new Error(provider.label + " base URL is not configured.");
       const url = new URL(provider.baseUrl.replace(/\/+$/, "") + "/models");
       const json = await fetchJson(url, {
-        headers: { Authorization: "Bearer " + apiKey },
+        headers: apiKey ? { Authorization: "Bearer " + apiKey } : {},
       });
       return parseOpenAIModelListResponse(json);
     }
@@ -1248,7 +1368,7 @@ async function fetchRemoteModels(
       const url = new URL("https://api.anthropic.com/v1/models");
       const json = await fetchJson(url, {
         headers: {
-          "x-api-key": apiKey,
+          "x-api-key": apiKey ?? "",
           "anthropic-version": "2023-06-01",
         },
       });
@@ -1256,7 +1376,7 @@ async function fetchRemoteModels(
     }
     case "google": {
       const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
-      url.searchParams.set("key", apiKey);
+      url.searchParams.set("key", apiKey ?? "");
       const json = await fetchJson(url, {});
       return parseGoogleModelListResponse(json);
     }
@@ -1269,8 +1389,8 @@ export async function testProvider(providerId: string): Promise<ProviderTestResu
   if (!provider) throw new Error("Unknown provider: " + id);
 
   try {
-    const apiKey = getProviderOrLegacyModelApiKey(id);
-    if (!apiKey) throw new Error("API key is required");
+    const apiKey = resolveProviderCredential(provider);
+    if (providerNeedsApiKey(provider) && !apiKey) throw new Error("API key is required");
     const models = await fetchRemoteModels(provider, apiKey);
     return {
       ok: true,
@@ -1293,6 +1413,8 @@ export async function syncAvailableModels(providerId: string): Promise<ProviderM
   const provider = getProviderConfig(id);
   if (!provider) throw new Error("Unknown provider: " + id);
 
+  if (id === OPENCODE_FREE_PROVIDER_ID) return refreshBuiltinProviderCatalog();
+
   const apiKey = getProviderOrLegacyModelApiKey(id);
   if (!apiKey) throw new Error("API key is required");
 
@@ -1312,7 +1434,11 @@ export async function syncAvailableModels(providerId: string): Promise<ProviderM
 
 export async function upsertCustomModel(input: CustomModelInput): Promise<ProviderInfo> {
   const providerId = normalizeProviderId(input.providerId);
-  assertKnownProvider(providerId);
+  const providerConfig = getProviderConfig(providerId);
+  if (!providerConfig) throw new Error("Unknown provider: " + providerId);
+  if (providerConfig.id === OPENCODE_FREE_PROVIDER_ID) {
+    throw new Error("Built-in providers cannot be modified");
+  }
 
   const modelId = input.id.trim();
   if (!modelId) throw new Error("Model id is required");
@@ -1372,9 +1498,9 @@ export async function upsertCustomModel(input: CustomModelInput): Promise<Provid
   setModelState(catalog, providerId, modelId, nextModel.enabled);
   await writeCatalog(catalog);
 
-  const provider = getProviderConfig(providerId);
-  if (!provider) throw new Error("Failed to save model");
-  return provider;
+  const savedProvider = getProviderConfig(providerId);
+  if (!savedProvider) throw new Error("Failed to save model");
+  return savedProvider;
 }
 
 export async function updateModelEnabled(
@@ -1384,6 +1510,12 @@ export async function updateModelEnabled(
 ): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedModelId = modelId.trim();
+  if (normalizedProviderId === OPENCODE_FREE_PROVIDER_ID) {
+    await setOpenCodeFreeModelEnabled(normalizedModelId, enabled);
+    await ensureDefaultSelectedModel();
+    notifyProviderCatalogUpdated(OPENCODE_FREE_PROVIDER_ID);
+    return;
+  }
   assertKnownModel(normalizedProviderId, normalizedModelId);
 
   const catalog = readCatalog();
@@ -1400,17 +1532,26 @@ export async function saveModelApiKey(
   const normalizedModelId = modelId.trim();
   const key = apiKey.trim();
   if (!key) throw new Error("API key is required");
+  const provider = getProviderConfig(normalizedProviderId);
+  if (!provider) throw new Error("Unknown provider: " + normalizedProviderId);
+  if (!providerNeedsApiKey(provider)) throw new Error("This provider does not use an API key");
   assertKnownModel(normalizedProviderId, normalizedModelId);
   await setModelApiKey(normalizedProviderId, normalizedModelId, key);
 }
 
 export async function clearModelApiKey(providerId: string, modelId: string): Promise<void> {
-  await deleteModelApiKey(normalizeProviderId(providerId), modelId.trim());
+  const normalizedProviderId = normalizeProviderId(providerId);
+  const provider = getProviderConfig(normalizedProviderId);
+  if (!provider) throw new Error("Unknown provider: " + normalizedProviderId);
+  if (!providerNeedsApiKey(provider)) throw new Error("This provider does not use an API key");
+  await deleteModelApiKey(normalizedProviderId, modelId.trim());
 }
 
 export async function deleteCustomModel(providerId: string, modelId: string): Promise<void> {
   const normalizedProviderId = normalizeProviderId(providerId);
   const normalizedModelId = modelId.trim();
+  const provider = getProviderConfig(normalizedProviderId);
+  if (provider?.source === "builtin") throw new Error("Built-in providers cannot be modified");
   const catalog = readCatalog();
   const before = catalog.models.length;
   catalog.models = catalog.models.filter(
@@ -1459,8 +1600,8 @@ export function resolveMediaModel(
     throw new Error((model.label ?? model.id) + " does not support " + kind + ".");
   }
 
-  const apiKey = getProviderOrLegacyModelApiKey(providerId, modelId);
-  if (!apiKey) {
+  const apiKey = resolveProviderCredential(config, modelId);
+  if (providerNeedsApiKey(config) && !apiKey) {
     throw new Error(
       config.label + " API key is not configured. Please add it in model management.",
     );
@@ -1510,7 +1651,7 @@ function modelSupportsMediaKind(
 
 function createMediaModel(
   config: ProviderInfo,
-  apiKey: string,
+  apiKey: string | undefined,
   modelId: string,
   kind: MediaGenerationKind,
 ): ImageModel | SpeechModel | TranscriptionModel {
@@ -1519,10 +1660,33 @@ function createMediaModel(
   }
 
   switch (config.kind) {
-    case "openai":
-    case "openai-compatible": {
+    case "openai": {
       if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
-      const provider = createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id });
+      const provider = createOpenAI({
+        apiKey: apiKey ?? "",
+        baseURL: config.baseUrl,
+        name: config.id,
+      });
+      switch (kind) {
+        case "image":
+          return provider.image(modelId);
+        case "speech":
+          return provider.speech(modelId);
+        case "transcription":
+          return provider.transcription(modelId);
+      }
+      break;
+    }
+    case "openai-compatible": {
+      if (providerAuthKind(config) === "none") {
+        throw new Error(config.label + " does not support media generation.");
+      }
+      if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
+      const provider = createOpenAI({
+        apiKey: apiKey ?? "",
+        baseURL: config.baseUrl,
+        name: config.id,
+      });
       switch (kind) {
         case "image":
           return provider.image(modelId);
@@ -1534,7 +1698,7 @@ function createMediaModel(
       break;
     }
     case "google": {
-      const provider = createGoogle({ apiKey });
+      const provider = createGoogle({ apiKey: apiKey ?? "" });
       switch (kind) {
         case "image":
           return provider.image(modelId);
@@ -1563,8 +1727,8 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     throw new Error((model.label ?? model.id) + " does not support text generation.");
   }
 
-  const apiKey = getProviderOrLegacyModelApiKey(providerId, modelId);
-  if (!apiKey) {
+  const apiKey = resolveProviderCredential(config, modelId);
+  if (providerNeedsApiKey(config) && !apiKey) {
     throw new Error(
       config.label + " API key is not configured. Please add it in model management.",
     );
@@ -1596,7 +1760,7 @@ export function resolveModel(modelRef: string): ResolvedModelConfig {
     nativeTools: createNativeChatTools(config, apiKey, modelId, model.providerOptions),
     countInputTokens:
       config.kind === "openai"
-        ? (input) => countOpenAIInputTokens(config.baseUrl, apiKey, modelId, input)
+        ? (input) => countOpenAIInputTokens(config.baseUrl, apiKey ?? "", modelId, input)
         : undefined,
   };
 }
@@ -1634,7 +1798,11 @@ async function countOpenAIInputTokens(
   return body.input_tokens;
 }
 
-function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: string): LanguageModel {
+function createLanguageModel(
+  config: ProviderInfo,
+  apiKey: string | undefined,
+  modelId: string,
+): LanguageModel {
   const customApiFormat = getCustomProviderApiFormat(config);
   if (customApiFormat) {
     if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
@@ -1647,12 +1815,14 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
           includeUsage: true,
         })(modelId);
       case "responses":
-        return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id }).responses(
-          modelId,
-        );
+        return createOpenAI({
+          apiKey: apiKey ?? "",
+          baseURL: config.baseUrl,
+          name: config.id,
+        }).responses(modelId);
       case "anthropic-messages":
         return createAnthropic({
-          apiKey,
+          apiKey: apiKey ?? "",
           baseURL: config.baseUrl,
           name: config.id,
         }).messages(modelId);
@@ -1661,7 +1831,9 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
 
   switch (config.kind) {
     case "openai":
-      return createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id })(modelId);
+      return createOpenAI({ apiKey: apiKey ?? "", baseURL: config.baseUrl, name: config.id })(
+        modelId,
+      );
     case "openai-compatible":
       if (!config.baseUrl) throw new Error(config.label + " base URL is not configured.");
       return createOpenAICompatible({
@@ -1671,9 +1843,9 @@ function createLanguageModel(config: ProviderInfo, apiKey: string, modelId: stri
         includeUsage: true,
       })(modelId);
     case "anthropic":
-      return createAnthropic({ apiKey })(modelId);
+      return createAnthropic({ apiKey: apiKey ?? "" })(modelId);
     case "google":
-      return createGoogle({ apiKey })(modelId);
+      return createGoogle({ apiKey: apiKey ?? "" })(modelId);
   }
 }
 
@@ -1705,13 +1877,17 @@ export function normalizeOpenAICompatibleProviderOptions(
 
 function createNativeChatTools(
   config: ProviderInfo,
-  apiKey: string,
+  apiKey: string | undefined,
   modelId: string,
   providerOptions: JsonObject,
 ): NativeChatTool[] {
   switch (config.kind) {
     case "openai": {
-      const provider = createOpenAI({ apiKey, baseURL: config.baseUrl, name: config.id });
+      const provider = createOpenAI({
+        apiKey: apiKey ?? "",
+        baseURL: config.baseUrl,
+        name: config.id,
+      });
       const tools: NativeChatTool[] = [
         {
           id: "web_search",
@@ -1754,7 +1930,7 @@ function createNativeChatTools(
       return tools;
     }
     case "anthropic": {
-      const provider = createAnthropic({ apiKey });
+      const provider = createAnthropic({ apiKey: apiKey ?? "" });
       return [
         {
           id: "web_search",
@@ -1765,7 +1941,7 @@ function createNativeChatTools(
       ];
     }
     case "google": {
-      const provider = createGoogle({ apiKey });
+      const provider = createGoogle({ apiKey: apiKey ?? "" });
       return [
         {
           id: "web_search",

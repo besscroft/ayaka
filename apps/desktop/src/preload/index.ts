@@ -348,6 +348,12 @@ const api = {
       ipcRenderer.invoke("providers:deleteModelApiKey", providerId, modelId),
     deleteCustomModel: (providerId: string, modelId: string) =>
       ipcRenderer.invoke("providers:deleteCustomModel", providerId, modelId),
+    onCatalogUpdated: (handler: (event: { providerId: string }) => void) => {
+      const listener = (_event: IpcRendererEvent, value: { providerId: string }): void =>
+        handler(value);
+      ipcRenderer.on("providers:catalog-updated", listener);
+      return () => ipcRenderer.removeListener("providers:catalog-updated", listener);
+    },
   },
   server: {
     port: () => ipcRenderer.invoke("server:port"),

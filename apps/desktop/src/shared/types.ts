@@ -1450,6 +1450,7 @@ export type ChatErrorCode =
   | "invalid_run_id"
   | "invalid_mode"
   | "missing_model"
+  | "model_unavailable"
   | "vision_model_unavailable"
   | "unauthorized"
   | "configuration"
@@ -1915,6 +1916,8 @@ export interface SyncState {
 }
 export type ModelProviderKind = "openai" | "openai-compatible" | "anthropic" | "google";
 export type ModelCatalogSource = "builtin" | "custom";
+/** Whether a provider requires a user-managed credential before requests. */
+export type ProviderAuthKind = "api-key" | "none";
 
 export const CUSTOM_PROVIDER_API_FORMATS = [
   "chat-completions",
@@ -2009,6 +2012,8 @@ export interface ProviderInfo {
   baseUrl?: string;
   /** Text API protocol used by custom providers. Built-in providers use fixed adapters. */
   apiFormat?: CustomProviderApiFormat;
+  /** Authentication mode. Missing legacy values are treated as `api-key`. */
+  authKind?: ProviderAuthKind;
   /** Provider-level or legacy model-level API key is available. */
   hasApiKey: boolean;
   /** A provider-level API key is configured. */
@@ -2075,6 +2080,32 @@ export interface ModelCatalogSettings {
   }>;
 }
 
+/** Cached metadata for a built-in provider, kept separate from custom providers. */
+export interface BuiltinModelInfo {
+  id: string;
+  label?: string;
+  enabled: boolean;
+  temperature: number;
+  topP: number;
+  maxOutputTokens: number;
+  contextWindow: number;
+  capabilities: ModelCapabilities;
+  providerOptions: JsonObject;
+  reasoningDefault?: ChatReasoningLevel;
+  reasoningLevels?: ChatReasoningLevel[];
+  capabilitySources?: ModelCapabilitySources;
+  lastSyncedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BuiltinModelCatalogSettings {
+  version: 1;
+  models: BuiltinModelInfo[];
+  modelsDevEtag?: string;
+  updatedAt?: number;
+}
+
 export interface ManagedModelInfo {
   ref: string;
   providerId: string;
@@ -2083,6 +2114,8 @@ export interface ManagedModelInfo {
   providerSource: ModelCatalogSource;
   providerBaseUrl?: string;
   providerApiFormat?: CustomProviderApiFormat;
+  /** Authentication mode inherited from the provider. */
+  authKind?: ProviderAuthKind;
   /** API-key help link for built-in providers. Custom providers do not expose one. */
   providerHelpUrl?: string;
   modelId: string;
@@ -2287,6 +2320,8 @@ export const SettingKey = {
   MediaGeneration: "media_generation",
   /** Custom provider and model catalog JSON. */
   ModelCatalog: "model_catalog",
+  /** Built-in provider model catalog JSON, including its conditional-fetch ETag. */
+  BuiltinModelCatalog: "builtin_model_catalog",
   /** Global limit for child agents running at the same time. */
   MaxConcurrentSubagents: "max_concurrent_subagents",
   // 鈥斺€?鍏跺畠 鈥斺€?

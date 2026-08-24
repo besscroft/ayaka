@@ -747,6 +747,10 @@ const entries = {
     zh: "还没有选择可用模型。请先选择或配置一个模型。",
     en: "No available model is selected. Choose or configure a model first.",
   },
+  "error.chat.modelUnavailable": {
+    zh: "当前模型可能已下线。请刷新模型列表或选择其他模型。",
+    en: "The selected model may be unavailable. Refresh the model list or choose another model.",
+  },
   "error.chat.visionModelUnavailable": {
     zh: "当前模型无法处理图片输入。请在通用设置中选择视觉模型。",
     en: "The selected chat model cannot process image input. Choose a vision model in General settings.",
@@ -756,16 +760,16 @@ const entries = {
     en: "The attached image could not be read. Choose it again and try again.",
   },
   "error.chat.network": {
-    zh: "无法连接到本地聊天服务。请稍等几秒后重试，或重启应用。",
-    en: "Unable to connect to the local chat service. Wait a few seconds and try again, or restart the app.",
+    zh: "无法连接到 OpenCode Zen 或本地聊天服务，请检查网络后重试。",
+    en: "Unable to connect to OpenCode Zen or the local chat service. Check your network and try again.",
   },
   "error.chat.provider": {
     zh: "\u6a21\u578b\u670d\u52a1\u5546\u65e0\u6cd5\u5b8c\u6210\u672c\u6b21\u8bf7\u6c42\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",
     en: "The model provider could not complete the request. Try again shortly.",
   },
   "error.chat.rateLimited": {
-    zh: "\u6a21\u578b\u670d\u52a1\u5546\u6682\u65f6\u9650\u5236\u4e86\u8bf7\u6c42\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",
-    en: "The model provider is rate limiting requests. Wait a moment and try again.",
+    zh: "模型服务额度或 IP 限流已触发（免费模型也可能受此影响），请稍后重试。",
+    en: "The model service quota or IP limit was reached; free models can be affected too. Try again later.",
   },
   "error.chat.runtime": {
     zh: "\u672c\u5730\u667a\u80fd\u4f53\u8fd0\u884c\u65f6\u65e0\u6cd5\u5b8c\u6210\u8bf7\u6c42\u3002\u8bf7\u91cd\u8bd5\u3002",
@@ -776,12 +780,12 @@ const entries = {
     en: "The local chat service failed to process the request.",
   },
   "error.chat.unauthorized": {
-    zh: "聊天会话已过期，请重启应用后重试。",
-    en: "The chat session expired. Restart the app and try again.",
+    zh: "匿名模型服务暂时拒绝了请求，请稍后重试。",
+    en: "The anonymous model service temporarily rejected the request. Try again later.",
   },
   "error.chat.timeout": {
-    zh: "\u6a21\u578b\u8bf7\u6c42\u8d85\u65f6\u3002\u8bf7\u91cd\u8bd5\u6216\u7f29\u77ed\u8bf7\u6c42\u5185\u5bb9\u3002",
-    en: "The model request timed out. Try again or use a shorter request.",
+    zh: "连接模型服务超时，请稍后重试。",
+    en: "The model service request timed out. Try again later.",
   },
   "error.chat.unknown": {
     zh: "请求失败，请稍后重试。",
@@ -931,6 +935,7 @@ const entries = {
   "model.provider.apiKeyReady": { zh: "API 密钥已就绪", en: "API key ready" },
   "model.provider.baseUrl": { zh: "基础 URL", en: "Base URL" },
   "model.provider.builtin": { zh: "内置", en: "Built-in" },
+  "model.provider.anonymousReady": { zh: "无需 API Key / 已就绪", en: "No API key needed / Ready" },
   "model.provider.builtinEndpoint": { zh: "内置端点", en: "Built-in endpoint" },
   "model.provider.custom": { zh: "自定义", en: "Custom" },
   "model.provider.delete": { zh: "删除提供商", en: "Delete provider" },

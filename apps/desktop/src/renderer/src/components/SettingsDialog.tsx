@@ -1919,6 +1919,11 @@ function ProviderModelWorkbench({
     refreshCatalog();
   }, [refreshCatalog]);
 
+  useEffect(() => {
+    const unsubscribe = api.providers.onCatalogUpdated(() => refreshCatalog());
+    return unsubscribe;
+  }, [refreshCatalog]);
+
   const enabledModelRefs = useMemo(
     () =>
       new Set(
@@ -1982,6 +1987,7 @@ function ProviderModelWorkbench({
   );
 
   const canEditProvider = selectedProvider?.source === "custom";
+  const selectedProviderIsAnonymous = selectedProvider?.authKind === "none";
   const selectedModels = selectedProvider?.models ?? [];
   const enabledCount = selectedModels.filter((model) => model.enabled).length;
   const canSaveProvider =
@@ -2275,7 +2281,9 @@ function ProviderModelWorkbench({
                       <span
                         className={[
                           "size-2 shrink-0 rounded-full",
-                          provider.hasApiKey ? "bg-success" : "bg-warning",
+                          provider.authKind === "none" || provider.hasApiKey
+                            ? "bg-success"
+                            : "bg-warning",
                         ].join(" ")}
                       />
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -2326,14 +2334,16 @@ function ProviderModelWorkbench({
                     <span
                       className={[
                         "rounded-full px-2 py-0.5 text-[11px]",
-                        selectedProvider.hasApiKey
+                        selectedProviderIsAnonymous || selectedProvider.hasApiKey
                           ? "bg-success/10 text-success"
                           : "bg-warning/10 text-warning",
                       ].join(" ")}
                     >
-                      {selectedProvider.hasApiKey
-                        ? t("apikey.configured")
-                        : t("apikey.notConfigured")}
+                      {selectedProviderIsAnonymous
+                        ? t("model.provider.anonymousReady")
+                        : selectedProvider.hasApiKey
+                          ? t("apikey.configured")
+                          : t("apikey.notConfigured")}
                     </span>
                   </div>
                   <p className="mt-1 break-all text-xs text-foreground/45">{selectedProvider.id}</p>
@@ -2382,7 +2392,7 @@ function ProviderModelWorkbench({
                         <IconTrash className="size-3.5" />
                       </Button>
                     </>
-                  ) : (
+                  ) : selectedProviderIsAnonymous ? null : (
                     providerApiKey.trim() && (
                       <Button variant="secondary" size="sm" onPress={handleSaveProviderApiKey}>
                         {t("common.save")}
@@ -2448,35 +2458,37 @@ function ProviderModelWorkbench({
                     />
                   </label>
                 )}
-                <TextField className="md:col-span-2">
-                  <Label>{t("model.apiKey")}</Label>
-                  <Input
-                    type="password"
-                    className="select-text"
-                    value={providerApiKey}
-                    placeholder={
-                      selectedProvider.hasProviderApiKey
-                        ? t("apikey.placeholder.replace")
-                        : t("apikey.placeholder.set", { label: selectedProvider.label })
-                    }
-                    onChange={(event) =>
-                      setProviderApiKey((event.target as HTMLInputElement).value)
-                    }
-                  />
-                  <Description className="mt-1 flex flex-wrap items-center gap-3">
-                    <span>{t("model.provider.keyHelp")}</span>
-                    {selectedProvider.helpUrl && (
-                      <a
-                        href={selectedProvider.helpUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {t("apikey.getKey")}
-                      </a>
-                    )}
-                  </Description>
-                </TextField>
+                {!selectedProviderIsAnonymous && (
+                  <TextField className="md:col-span-2">
+                    <Label>{t("model.apiKey")}</Label>
+                    <Input
+                      type="password"
+                      className="select-text"
+                      value={providerApiKey}
+                      placeholder={
+                        selectedProvider.hasProviderApiKey
+                          ? t("apikey.placeholder.replace")
+                          : t("apikey.placeholder.set", { label: selectedProvider.label })
+                      }
+                      onChange={(event) =>
+                        setProviderApiKey((event.target as HTMLInputElement).value)
+                      }
+                    />
+                    <Description className="mt-1 flex flex-wrap items-center gap-3">
+                      <span>{t("model.provider.keyHelp")}</span>
+                      {selectedProvider.helpUrl && (
+                        <a
+                          href={selectedProvider.helpUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {t("apikey.getKey")}
+                        </a>
+                      )}
+                    </Description>
+                  </TextField>
+                )}
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
@@ -2500,16 +2512,18 @@ function ProviderModelWorkbench({
                       <IconRefresh className="mr-1 size-3.5" />
                       {t("model.models.fetch")}
                     </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onPress={() =>
-                        setModelEditorState({ mode: "add", providerId: selectedProvider.id })
-                      }
-                    >
-                      <IconPlus className="mr-1 size-3.5" />
-                      {t("model.models.addManual")}
-                    </Button>
+                    {selectedProvider.source === "custom" && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onPress={() =>
+                          setModelEditorState({ mode: "add", providerId: selectedProvider.id })
+                        }
+                      >
+                        <IconPlus className="mr-1 size-3.5" />
+                        {t("model.models.addManual")}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -2576,39 +2590,43 @@ function ProviderModelWorkbench({
                                 {t("model.enabled")}
                               </Switch.Content>
                             </Switch>
-                            <Tooltip>
-                              <TooltipTrigger>
+                            {selectedProvider.source === "custom" && (
+                              <>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Button
+                                      type="button"
+                                      isIconOnly
+                                      size="sm"
+                                      variant="secondary"
+                                      onPress={() =>
+                                        setModelEditorState({
+                                          mode: "edit",
+                                          providerId: selectedProvider.id,
+                                          model,
+                                        })
+                                      }
+                                      aria-label={t("model.options.title")}
+                                    >
+                                      <IconSliders className="size-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{t("model.options.title")}</TooltipContent>
+                                </Tooltip>
                                 <Button
                                   type="button"
                                   isIconOnly
+                                  variant="tertiary"
                                   size="sm"
-                                  variant="secondary"
                                   onPress={() =>
-                                    setModelEditorState({
-                                      mode: "edit",
-                                      providerId: selectedProvider.id,
-                                      model,
-                                    })
+                                    setModelToDelete({ provider: selectedProvider, model })
                                   }
-                                  aria-label={t("model.options.title")}
+                                  aria-label={t("common.delete")}
                                 >
-                                  <IconSliders className="size-4" />
+                                  <IconTrash className="size-3.5" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>{t("model.options.title")}</TooltipContent>
-                            </Tooltip>
-                            <Button
-                              type="button"
-                              isIconOnly
-                              variant="tertiary"
-                              size="sm"
-                              onPress={() =>
-                                setModelToDelete({ provider: selectedProvider, model })
-                              }
-                              aria-label={t("common.delete")}
-                            >
-                              <IconTrash className="size-3.5" />
-                            </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
