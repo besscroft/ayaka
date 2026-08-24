@@ -200,7 +200,7 @@ function AppContent(): React.JSX.Element {
           aria-hidden={activeView !== "chat"}
         >
           {activeId && serverInfo !== null ? (
-            <ChatView conversationId={activeId} serverInfo={serverInfo} />
+            <ChatView key={activeId} conversationId={activeId} serverInfo={serverInfo} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-foreground/40">
               {t("chat.initializing")}
