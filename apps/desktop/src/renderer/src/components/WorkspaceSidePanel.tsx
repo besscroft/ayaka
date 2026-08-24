@@ -174,7 +174,12 @@ export function WorkspaceSidePanel({
 
       <div className="flex h-full min-w-0 flex-col">
         <header className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
-          <div className="min-w-0 flex-1" role="tablist" aria-label={t("workspacePanel.tabs")}>
+          <div
+            data-slot="tabs-list"
+            className="inline-flex w-fit shrink-0 items-center gap-1 p-[3px]"
+            role="tablist"
+            aria-label={t("workspacePanel.tabs")}
+          >
             <TabButton
               id={tabIds.runtime}
               panelId={panelIds.runtime}
@@ -301,6 +306,8 @@ function TabButton({
 }): React.JSX.Element {
   return (
     <button
+      data-slot="tabs-trigger"
+      data-active={active ? "" : undefined}
       type="button"
       id={id}
       role="tab"

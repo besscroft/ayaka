@@ -24,6 +24,10 @@ void describe("workspace side panel", () => {
     );
 
     assert.match(html, /data-slot="workspace-side-panel"/);
+    assert.match(html, /data-slot="tabs-list"/);
+    assert.match(html, /data-slot="tabs-list"[^>]*class="inline-flex w-fit shrink-0/);
+    assert.equal((html.match(/data-slot="tabs-trigger"/g) ?? []).length, 2);
+    assert.match(html, /data-slot="tabs-trigger"[^>]*data-active/);
     assert.match(html, /role="tablist"/);
     assert.match(html, /role="tab"/g);
     assert.match(html, /运行状态|Runtime/);
