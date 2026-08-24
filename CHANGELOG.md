@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.1.35]
+
+### 中文
+
+#### 新增
+
+- 新增 OpenCode Free 内置免费模型目录，支持公开模型服务、模型目录自动更新及模型启用状态管理。
+- 新增沙箱产物发布与预览能力，支持静态应用和 HTML 产物的发布、授权、预览及工作区侧边面板管理。
+- 新增工作区命令工具的审批配置，支持在工具设置中持久化审批策略并处理等待审批任务的取消与恢复。
+
+#### 变更
+
+- 优化消息操作栏布局，助手消息默认显示操作条并整合执行耗时，用户消息继续保持悬停时显示。
+- 优化工作区侧边面板的布局和拖拽调整大小交互，完善指针取消与捕获释放处理。
+- 优化提供商状态、模型列表同步及聊天错误提示，补充模型不可用、免费额度或 IP 限制等场景的可操作提示。
+
+#### 修复
+
+- 修复工作区侧边面板生成应用内容区域布局不正确的问题。
+- 修复拖拽调整工作区侧边面板大小时指针取消与捕获释放处理不完整的问题。
+
+### English
+
+#### Added
+
+- Added a built-in OpenCode Free model catalog with public free models, automatic catalog refresh, and model enablement controls.
+- Added sandbox artifact publishing and preview support for static apps and HTML artifacts, including authorization and workspace side-panel management.
+- Added approval configuration for the workspace command tool, with persisted policies and cancellation/recovery handling for runs waiting for approval.
+
+#### Changed
+
+- Improved message-action layout by keeping assistant actions visible and placing execution time on the same row, while user actions remain hover-only.
+- Improved workspace side-panel layout and resize interactions, including pointer-cancellation and pointer-capture cleanup.
+- Improved provider status, model-list synchronization, and chat error messages with actionable guidance for unavailable models and free-quota or IP limits.
+
+#### Fixed
+
+- Fixed the generated-app content area using an incorrect layout inside the workspace side panel.
+- Fixed incomplete pointer-cancellation and pointer-capture cleanup while resizing the workspace side panel.
+
 ## [0.1.34]
 
 ### 中文
