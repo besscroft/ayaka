@@ -3,7 +3,7 @@
  *
  * 负责：
  *  - 渲染消息气泡、reasoning（思维链）、tool、source、附件
- *  - 提供每条消息的 hover 动作条：复制 / 编辑 / 重新发送 / 删除
+ *  - 提供每条消息的操作条：复制 / 编辑 / 重新发送 / 删除
  *  - 编辑态：把消息气泡替换为 EditableMessage
  *  - 错误展示与重试
  *
@@ -479,7 +479,7 @@ export interface MessageItemProps {
 /**
  * 单条消息容器
  *  - 渲染 Message（外壳）+ MessageContent（气泡）+ MessageActions（操作条）
- *  - 操作条放在气泡下方，hover 时浮现
+ *  - 操作条与 assistant 消息的耗时统计放在气泡下方同一行
  *  - 编辑态：整个替换为 EditableMessage
  */
 function MessageItem({
@@ -514,8 +514,9 @@ function MessageItem({
   const executionTime = formatExecutionTime(metadata.execution?.durationMs, f);
   const isUser = message.role === "user";
   const isMediaError = message.role === "assistant" && isMediaGenerationError(message);
-  // 是否允许 hover 动作（仅在非流式中）
+  // 消息操作仅在非流式中可用，完成后始终显示
   const actionsEnabled = !messageStreaming;
+  const showExecutionTime = message.role === "assistant" && !messageStreaming && executionTime;
 
   /* ---------- 复制 ---------- */
   const handleCopy = async (): Promise<void> => {
@@ -748,28 +749,33 @@ function MessageItem({
         })}
       </MessageContent>
 
-      {/* 操作条：放在气泡下方，hover 时浮现（仅气泡外的小行） */}
-      {actionsEnabled && fullText && (
-        <MessageActions
-          placement={isUser ? "left" : "right"}
-          onCopy={handleCopy}
-          onEdit={isUser && onEdit ? startEdit : undefined}
-          onResend={
-            isUser && onResend
-              ? handleResend
-              : isMediaError && onRetry
-                ? handleMediaRetry
-                : undefined
-          }
-          onDelete={onDelete ? handleDelete : undefined}
-        />
-      )}
+      {/* 操作条与耗时统计：放在气泡下方同一行，assistant 常显、user hover 显示 */}
+      {(actionsEnabled && fullText) || showExecutionTime ? (
+        <div className="mt-1 flex items-center gap-2">
+          {actionsEnabled && fullText ? (
+            <MessageActions
+              placement={isUser ? "left" : "right"}
+              alwaysVisible={!isUser}
+              onCopy={handleCopy}
+              onEdit={isUser && onEdit ? startEdit : undefined}
+              onResend={
+                isUser && onResend
+                  ? handleResend
+                  : isMediaError && onRetry
+                    ? handleMediaRetry
+                    : undefined
+              }
+              onDelete={onDelete ? handleDelete : undefined}
+            />
+          ) : null}
 
-      {message.role === "assistant" && !messageStreaming && executionTime && (
-        <span className="mt-0.5 text-[10.5px] leading-none text-foreground/40">
-          {t("msg.executionTime", { duration: executionTime })}
-        </span>
-      )}
+          {showExecutionTime ? (
+            <span className="text-[10.5px] leading-none text-foreground/40">
+              {t("msg.executionTime", { duration: executionTime })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {message.role === "assistant" &&
       !messageStreaming &&
       metadata.execution?.agentPath &&

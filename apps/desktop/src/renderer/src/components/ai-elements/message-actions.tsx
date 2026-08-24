@@ -2,7 +2,7 @@
  * AI Elements - MessageActions 组件
  *
  * 设计目标：
- *  - 在消息上 hover 时浮现一行操作按钮
+ *  - 提供一行消息操作按钮，支持常显或 hover 时显示
  *  - 操作：复制、编辑、重新发送、删除
  *  - 视觉：紧凑圆角按钮 + 颜色微差（危险操作用危险色）
  *  - 通过回调把控制权交还给上层（MessageList / ChatView）
@@ -34,6 +34,8 @@ interface MessageActionsProps extends HTMLMotionProps<"div"> {
   children?: ReactNode;
   /** placement 提示：决定对齐方式。right 表示按钮靠右（assistant 消息），left 表示按钮靠左（user 消息） */
   placement?: "left" | "right";
+  /** 是否始终显示操作条；未开启时仅在消息 hover/focus 时显示 */
+  alwaysVisible?: boolean;
 }
 
 interface ActionButtonProps {
@@ -45,7 +47,7 @@ interface ActionButtonProps {
 
 /**
  * 操作条
- *  - 默认通过 group-hover/msg 触发；不强制 hover 实现，也可始终显示
+ *  - alwaysVisible=true 时始终显示，否则通过 group-hover/msg 触发
  *  - placement=right 时按钮左对齐（紧跟 assistant 气泡左缘下方）
  *  - placement=left 时按钮右对齐（紧跟 user 气泡右缘下方）
  */
@@ -55,6 +57,7 @@ export function MessageActions({
   onResend,
   onDelete,
   placement = "right",
+  alwaysVisible = false,
   className,
   children,
   ...rest
@@ -68,8 +71,9 @@ export function MessageActions({
       animate={{ y: 0 }}
       transition={{ duration: 0.14 }}
       className={cn(
-        "mt-1 flex items-center gap-0.5",
-        "opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100",
+        "flex items-center gap-0.5",
+        !alwaysVisible &&
+          "opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100",
         placement === "right" ? "justify-start" : "justify-end",
         className,
       )}
