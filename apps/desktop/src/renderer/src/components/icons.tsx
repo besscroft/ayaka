@@ -13,6 +13,7 @@ import {
   CircleCheck,
   CircleDashed,
   CircleX,
+  Code2,
   Clock,
   CornerDownLeft,
   Cpu,
@@ -91,6 +92,7 @@ export const IconDots = fromLucide(MoreHorizontal);
 export const IconWrench = fromLucide(Wrench);
 export const IconCircleCheck = fromLucide(CircleCheck);
 export const IconCircleX = fromLucide(CircleX);
+export const IconCode = fromLucide(Code2);
 export const IconCircleDashed = fromLucide(CircleDashed);
 export const IconBrain = fromLucide(Brain);
 export const IconMessage = fromLucide(MessageSquare);

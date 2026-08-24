@@ -420,6 +420,23 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
     defaultAuto: 0,
   },
   {
+    id: "sandbox_publish_artifact",
+    title: "Publish sandbox artifact",
+    description:
+      "Publish an HTML file or static directory for preview; call after writing generated UI files.",
+    category: "sandbox",
+    requiresApproval: 0,
+    defaultAuto: 1,
+  },
+  {
+    id: "sandbox_start_preview",
+    title: "Start sandbox preview",
+    description: "Start a long-running local preview process for server-backed generated apps.",
+    category: "sandbox",
+    requiresApproval: 1,
+    defaultAuto: 1,
+  },
+  {
     id: "workspace_run_command",
     title: "Run workspace command",
     description: "Run a structured command in the current conversation workspace.",

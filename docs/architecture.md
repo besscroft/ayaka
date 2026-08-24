@@ -108,3 +108,36 @@ Runtime state, dependency installation state, and runtime preferences are persis
 the MCP definition. This keeps configuration, executable selection, and process lifecycle independent
 while allowing the existing MCP ToolSet, approval policy, OAuth, and runtime event records to remain
 the single Agent integration path.
+
+## Generated HTML and application previews
+
+Sandbox files remain the Agent's source of truth. `sandbox_publish_artifact` scans a sandbox-relative
+HTML file or directory containing `index.html`, stores only metadata (relative path, entry point,
+size, hash, MIME type, and status) in `sandbox_artifacts`, and leaves HTML/CSS/JS/assets on the
+sandbox filesystem. A publish of the same path updates that metadata in place; snapshots remain the
+only history mechanism. Reads reject absolute paths, traversal, symlink escape, and `.snapshots`.
+Single-file HTML is executable only up to 256 KiB. Static applications are capped at 20 MiB, 1,000
+files, and 2 MiB per resource.
+
+The renderer never receives a sandbox root or a host path. HTML is loaded through a sandboxed
+`iframe` with `allow-scripts` only and a restrictive CSP that disables network access. Static
+resources use the privileged `ayaka-artifact://<artifactId>/<relative-path>` protocol; the main
+process resolves the artifact ID, re-validates the sandbox path, restricts MIME types and size, and
+returns a CSP-protected response. Artifact authorization is an in-memory capability keyed by the
+artifact ID and is rechecked for source reads and protocol resources.
+
+Long-running Vite/React or static-server processes are separate from `sandbox_run_command` and are
+managed by `sandbox-preview-manager.ts`. `sandbox_start_preview` accepts only structured
+`executable + args`, validates the sandbox-relative cwd and loopback port, requires process/network
+approval, waits for an HTTP health response, and keeps a memory-only handle. Local previews render
+in an isolated Electron `WebContentsView` with no Ayaka preload, Node integration disabled,
+context isolation enabled, a temporary partition, and request/navigation allowlisting for only the
+current `127.0.0.1:<port>` origin plus its HMR WebSocket. Docker previews use a named long-lived
+container and an explicit loopback port mapping; they never silently fall back to a local process.
+
+The ChatView places generated applications in a right-side resizable pane. Renderer bounds are sent
+to main so the localhost `WebContentsView` follows the divider. Artifact and preview state changes
+are broadcast as `sandbox:artifact-updated` and `sandbox:preview-updated`. Closing the pane, changing
+conversation, or quitting Electron stops and removes active preview processes/containers; an Agent
+turn finishing does not stop a preview. Stop, refresh, close, and revoke operations do not require
+approval, while a new long-running preview does.

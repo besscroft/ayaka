@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { AnimatePresence } from "motion/react";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { McpInputDialog } from "./McpWorkspace";
@@ -31,7 +30,8 @@ import {
   persistConversationTitleWithRetry,
 } from "../lib/conversation-title";
 import { getChatErrorInfo, getChatErrorMessage } from "../lib/errors";
-import { AgentStatusWidget } from "./AgentStatusWidget";
+import { AgentStatusTrigger } from "./AgentStatusWidget";
+import { openWorkspaceSidePanel, WorkspaceSidePanel } from "./WorkspaceSidePanel";
 import {
   appendOrReplaceMessage,
   buildUserMessage,
@@ -149,7 +149,6 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatErrorRetryable, setChatErrorRetryable] = useState(false);
   const [isStopped, setIsStopped] = useState(false);
-  const [runtimePanelOpen, setRuntimePanelOpen] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [toolsSnapshot, setToolsSnapshot] = useState<ToolsSnapshot | null>(null);
@@ -529,6 +528,18 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       followupRequestRef.current = null;
     };
   }, [conversationId, hydrationRetry, locale, persistenceQueue, session]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.sandboxArtifacts.list(conversationId).then((items) => {
+      if (!cancelled && items.some((item) => item.kind === "html" || item.kind === "static")) {
+        openWorkspaceSidePanel("generated-app");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
 
   const chat = useChat({ chat: session.chat, experimental_throttle: 50 });
   chatRef.current = chat;
@@ -1248,9 +1259,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }
 
   const isEmpty = renderedMessages.length === 0 && !isLoading;
-  const renderAgentStatusWidget = (open: boolean) => (
-    <AgentStatusWidget
-      key={open ? "expanded" : "collapsed"}
+  const renderAgentStatusWidget = () => (
+    <AgentStatusTrigger
       conversationId={conversationId}
       snapshot={runtimeSnapshot}
       profiles={agentProfiles}
@@ -1261,8 +1271,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       tools={toolsSnapshot}
       chatStatus={statusKind}
       isChatActive={isChatLoading}
-      open={open}
-      onOpenChange={setRuntimePanelOpen}
+      onOpenChange={() => openWorkspaceSidePanel("runtime")}
       onStop={handleStop}
     />
   );
@@ -1273,11 +1282,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         <ChatHeader
           status={statusKind}
           workspace={getConversationWorkspaceForHeader(workspace, conversationId)}
-          agentStatus={
-            <AnimatePresence initial={false}>
-              {runtimePanelOpen ? null : renderAgentStatusWidget(false)}
-            </AnimatePresence>
-          }
+          agentStatus={renderAgentStatusWidget()}
         />
 
         <div className="relative flex min-h-0 flex-1">
@@ -1333,9 +1338,19 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         </div>
       </div>
 
-      <AnimatePresence initial={false}>
-        {runtimePanelOpen ? renderAgentStatusWidget(true) : null}
-      </AnimatePresence>
+      <WorkspaceSidePanel
+        conversationId={conversationId}
+        snapshot={runtimeSnapshot}
+        profiles={agentProfiles}
+        providers={providers}
+        selectedModel={selectedModel}
+        reasoningLevel={reasoningLevel}
+        toolSelection={toolSelection}
+        tools={toolsSnapshot}
+        chatStatus={statusKind}
+        isChatActive={isChatLoading}
+        onStop={handleStop}
+      />
       <McpInputDialog request={mcpInputRequest} onClose={() => setMcpInputRequest(null)} />
     </div>
   );

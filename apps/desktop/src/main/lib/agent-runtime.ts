@@ -89,6 +89,9 @@ import {
   writeSandboxFile,
   type SandboxContext,
 } from "./sandbox-agents";
+import { publishSandboxArtifact } from "./sandbox-artifact-manager";
+import { authorizeSandboxArtifact, isSandboxArtifactAuthorized } from "./sandbox-artifact-manager";
+import { startSandboxPreview } from "./sandbox-preview-manager";
 import { getSandboxSessionOrThrow } from "./sandbox-runtime";
 import { resolveAgentStepDisposition, ROOT_AGENT_STOP_WHEN } from "./agent-run-policy";
 import { agentLoopSessions, type AgentLoopMode, type AgentLoopSession } from "./agent-loop-session";
@@ -1502,6 +1505,85 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
       }),
     );
   }
+  if (enabled.has("sandbox_publish_artifact")) {
+    assignTool(
+      tools,
+      "sandbox_publish_artifact",
+      tool({
+        description:
+          "Publish a sandbox HTML file or static directory as a previewable artifact. Paths are sandbox-relative. Always call this after writing HTML or a static app; chat Markdown alone does not create an interactive preview.",
+        inputSchema: jsonSchema<{ path: string; kind?: "html" | "static"; entryPath?: string }>({
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            kind: { type: "string", enum: ["html", "static"] },
+            entryPath: { type: "string" },
+          },
+          required: ["path"],
+          additionalProperties: false,
+        }),
+        execute: (input) =>
+          runSandboxStep(context, "Publish sandbox artifact", async (sandbox) => {
+            const artifact = await publishSandboxArtifact(sandbox.session, input);
+            return {
+              artifactId: artifact.id,
+              path: artifact.path,
+              entryPath: artifact.entry_path,
+              kind: artifact.kind,
+              sizeBytes: artifact.size_bytes,
+              sha256: artifact.sha256,
+              status: artifact.status,
+              requiresAuthorization: !isSandboxArtifactAuthorized(artifact.id),
+            };
+          }),
+      }),
+    );
+  }
+  if (enabled.has("sandbox_start_preview")) {
+    assignTool(
+      tools,
+      "sandbox_start_preview",
+      tool({
+        description:
+          "Start a long-running localhost preview process using structured executable and args. Use this only for Vite, React, or another server-backed app; standalone HTML does not need it. The artifact must be authorized first.",
+        inputSchema: jsonSchema<{
+          artifactId: string;
+          executable: string;
+          args?: string[];
+          cwd?: string;
+          port?: number;
+          env?: Record<string, string>;
+        }>({
+          type: "object",
+          properties: {
+            artifactId: { type: "string" },
+            executable: { type: "string" },
+            args: { type: "array", items: { type: "string" } },
+            cwd: { type: "string" },
+            port: { type: "number" },
+            env: { type: "object", additionalProperties: { type: "string" } },
+          },
+          required: ["artifactId", "executable"],
+          additionalProperties: false,
+        }),
+        execute: (input) =>
+          runSandboxStep(context, "Start sandbox preview", async (sandbox) => {
+            const artifact = authorizeSandboxArtifact(
+              context.conversationId ?? "",
+              input.artifactId,
+            );
+            const preview = await startSandboxPreview(sandbox.session, input);
+            return {
+              previewId: preview.id,
+              artifactId: artifact.id,
+              port: preview.port,
+              url: preview.url,
+              status: preview.status,
+            };
+          }),
+      }),
+    );
+  }
   return tools;
 }
 
@@ -1589,7 +1671,9 @@ function createGuardrailApproval(
     const auditInput =
       toolName === WORKSPACE_COMMAND_TOOL_ID
         ? redactWorkspaceCommandInput(input)
-        : redactMemoryContentForAudit(toolName, input);
+        : toolName === "sandbox_start_preview"
+          ? redactSandboxPreviewInput(input)
+          : redactMemoryContentForAudit(toolName, input);
     const decision = evaluateToolGuardrail(
       context,
       toolName,
@@ -1664,6 +1748,23 @@ function redactMemoryContentForAudit(toolName: string, input: unknown): unknown 
   };
 }
 
+function redactSandboxPreviewInput(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const value = input as Record<string, unknown>;
+  const env = value.env;
+  return {
+    artifactId: typeof value.artifactId === "string" ? value.artifactId : undefined,
+    executable: typeof value.executable === "string" ? value.executable : undefined,
+    args: Array.isArray(value.args) ? { redacted: true, count: value.args.length } : undefined,
+    cwd: typeof value.cwd === "string" ? value.cwd : undefined,
+    port: typeof value.port === "number" ? value.port : undefined,
+    env:
+      env && typeof env === "object" && !Array.isArray(env)
+        ? { redacted: true, keys: Object.keys(env).slice(0, 32) }
+        : undefined,
+  };
+}
+
 function evaluateToolGuardrail(
   context: RuntimeContext,
   toolName: string,
@@ -1680,6 +1781,17 @@ function evaluateToolGuardrail(
   }
   if (toolName.startsWith("sandbox_") && inputHasPathEscape(input)) {
     return { decision: "deny", risk: "high", reason: "Sandbox path escapes the session root." };
+  }
+  if (toolName === "sandbox_start_preview") {
+    if (inputHasPathEscape(input)) {
+      return { decision: "deny", risk: "high", reason: "Preview path escapes the sandbox root." };
+    }
+    return {
+      decision: "require_review",
+      risk: "high",
+      reason:
+        "Starting a localhost preview launches a long-running process and opens a local network port.",
+    };
   }
   if (toolName === WORKSPACE_COMMAND_TOOL_ID) {
     const commandPolicy = evaluateWorkspaceCommandPolicy(input);
@@ -2057,6 +2169,13 @@ function createSandboxIsolationNote(context: RuntimeContext): string | undefined
       ? "- Docker was unavailable or not selected; commands are restricted to a local sandbox directory."
       : "- Docker was detected; this session records docker-capable isolation.",
     "- All file paths must be relative to the sandbox root.",
+    "Generated HTML and small-app previews:",
+    "- Do not place generated HTML only in the chat response and expect it to render as an app.",
+    "- After writing a standalone .html file, call sandbox_publish_artifact with kind html.",
+    "- After writing a multi-file static app, call sandbox_publish_artifact for its directory with entryPath index.html.",
+    "- For Vite or React apps, publish the project first, then use sandbox_start_preview with structured executable and args after authorization.",
+    "- Use sandbox_start_preview only for long-running localhost services; standalone HTML does not need a server.",
+    "- If the sandbox artifact tools are unavailable, state that the app cannot be published for preview; never pretend that a preview exists.",
   ].join("\n");
 }
 
@@ -2135,7 +2254,14 @@ function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy
   }
   if (selection.mode === "off") return [];
   if (selection.mode === "manual") return selection.selectedToolIds.filter(isSandboxToolId);
-  return ["sandbox_list_files", "sandbox_read_file", "sandbox_snapshot", "sandbox_list_artifacts"];
+  return [
+    "sandbox_list_files",
+    "sandbox_read_file",
+    "sandbox_snapshot",
+    "sandbox_list_artifacts",
+    "sandbox_publish_artifact",
+    "sandbox_start_preview",
+  ];
 }
 
 function readToolPolicy(raw: string): AgentToolPolicy {

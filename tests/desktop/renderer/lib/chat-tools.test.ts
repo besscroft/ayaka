@@ -61,6 +61,8 @@ void describe("chat tool UI helpers", () => {
       "sandbox_read_file",
       "sandbox_snapshot",
       "sandbox_list_artifacts",
+      "sandbox_publish_artifact",
+      "sandbox_start_preview",
       "workspace_run_command",
       "cron",
     ]);

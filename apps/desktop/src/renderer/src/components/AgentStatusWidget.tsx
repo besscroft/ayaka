@@ -52,7 +52,7 @@ type RuntimeSnapshotSubset = Pick<
   | "conversationAgentStates"
 >;
 
-interface AgentStatusWidgetProps {
+export interface AgentStatusWidgetProps {
   conversationId: string;
   snapshot: RuntimeSnapshotSubset | null;
   profiles: AgentProfile[];
@@ -66,6 +66,7 @@ interface AgentStatusWidgetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStop: () => void;
+  embedded?: boolean;
 }
 
 const ACTIVE_RUN_STATUSES = new Set(["queued", "running", "waiting_approval", "waiting_handoff"]);
@@ -138,6 +139,7 @@ export function AgentStatusWidget({
   open,
   onOpenChange,
   onStop,
+  embedded = false,
 }: AgentStatusWidgetProps): React.JSX.Element {
   const { t } = useT();
   const reduceMotion = useReducedMotion();
@@ -281,6 +283,116 @@ export function AgentStatusWidget({
                 )
               : t("agentStatus.ready");
 
+  const panelContent = (
+    <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
+        <AgentAvatar
+          profile={activeProfile}
+          fallback={t("agentStatus.rootAgent")}
+          className="size-8 rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground"
+        />
+        <div className="min-w-0 flex-1 select-none">
+          <p className="truncate text-sm font-medium text-foreground/90">
+            {activeProfile?.name || t("agentStatus.rootAgent")}
+          </p>
+          <p className="truncate text-[11px] text-foreground/50">
+            {activeProfile?.role || t("agentStatus.roleFallback")} ·{" "}
+            {formatModel(effectiveModel, t)}
+          </p>
+        </div>
+        {!embedded ? (
+          <button
+            type="button"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            onClick={() => onOpenChange(false)}
+            aria-label={t("agentStatus.close")}
+            title={t("agentStatus.close")}
+          >
+            <IconPanelRightClose className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {run && (active || waiting || failed || blocked) ? (
+          <AttentionBar
+            status={status}
+            title={title}
+            error={blockedReason ?? run.error}
+            elapsed={elapsed}
+          />
+        ) : null}
+
+        {run ? (
+          <>
+            <section className="border-b border-border py-3" aria-labelledby="agent-status-agents">
+              <div className="flex items-center justify-between gap-2 select-none">
+                <SectionLabel id="agent-status-agents" label={t("agentStatus.agents")} />
+                <span className="text-[10px] tabular-nums text-foreground/40">
+                  {instances.length + 1}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-col gap-0.5 select-none">
+                <AgentTree
+                  node={tree.root}
+                  expandedPaths={expandedPaths}
+                  onToggle={(path) => setExpandedPaths((current) => togglePath(current, path))}
+                  t={t}
+                />
+              </div>
+            </section>
+
+            <section
+              className="border-b border-border py-3 select-none"
+              aria-labelledby="agent-status-activity"
+            >
+              <SectionLabel id="agent-status-activity" label={t("agentStatus.activity")} />
+              {activityItems.length === 0 ? (
+                <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
+              ) : (
+                <div className="mt-2 flex flex-col gap-1">
+                  {activityItems.map((item) => (
+                    <ActivityRow key={item.id} item={item} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="border-b border-border py-3" aria-labelledby="agent-status-metrics">
+              <SectionLabel id="agent-status-metrics" label={t("agentStatus.metrics")} />
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
+                <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
+                <Metric label={t("agentStatus.metric.pendingInputs")} value={queuedInputs.length} />
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <ConfigurationSection
+          profile={activeProfile}
+          effectiveModel={effectiveModel}
+          reasoning={runtimeReasoning}
+          instructions={getAgentInstructions(activeProfile)}
+          expectedOutput={getAgentExpectedOutput(activeProfile)}
+          toolGroups={toolGroups}
+          toolsUnavailable={tools === null}
+          t={t}
+        />
+      </div>
+
+      {active && run ? (
+        <div className="shrink-0 border-t border-border px-3 py-3 select-none">
+          <Button size="sm" variant="tertiary" className="w-full" onPress={onStop}>
+            {t("input.stop")}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (embedded) return panelContent;
+
   return (
     <motion.aside
       initial={open ? { width: 0, opacity: 0 } : false}
@@ -300,118 +412,7 @@ export function AgentStatusWidget({
       aria-label={t("agentStatus.panel")}
     >
       {open ? (
-        <div className="flex h-full min-w-[320px] max-w-[calc(100vw-2.5rem)] flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
-            <AgentAvatar
-              profile={activeProfile}
-              fallback={t("agentStatus.rootAgent")}
-              className="size-8 rounded-lg bg-accent/15 text-sm font-semibold text-accent-foreground"
-            />
-            <div className="min-w-0 flex-1 select-none">
-              <p className="truncate text-sm font-medium text-foreground/90">
-                {activeProfile?.name || t("agentStatus.rootAgent")}
-              </p>
-              <p className="truncate text-[11px] text-foreground/50">
-                {activeProfile?.role || t("agentStatus.roleFallback")} ·{" "}
-                {formatModel(effectiveModel, t)}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              onClick={() => onOpenChange(false)}
-              aria-label={t("agentStatus.close")}
-              title={t("agentStatus.close")}
-            >
-              <IconPanelRightClose className="size-4" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            {run && (active || waiting || failed || blocked) ? (
-              <AttentionBar
-                status={status}
-                title={title}
-                error={blockedReason ?? run.error}
-                elapsed={elapsed}
-              />
-            ) : null}
-
-            {run ? (
-              <>
-                <section
-                  className="border-b border-border py-3"
-                  aria-labelledby="agent-status-agents"
-                >
-                  <div className="flex items-center justify-between gap-2 select-none">
-                    <SectionLabel id="agent-status-agents" label={t("agentStatus.agents")} />
-                    <span className="text-[10px] tabular-nums text-foreground/40">
-                      {instances.length + 1}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-col gap-0.5 select-none">
-                    <AgentTree
-                      node={tree.root}
-                      expandedPaths={expandedPaths}
-                      onToggle={(path) => setExpandedPaths((current) => togglePath(current, path))}
-                      t={t}
-                    />
-                  </div>
-                </section>
-
-                <section
-                  className="border-b border-border py-3 select-none"
-                  aria-labelledby="agent-status-activity"
-                >
-                  <SectionLabel id="agent-status-activity" label={t("agentStatus.activity")} />
-                  {activityItems.length === 0 ? (
-                    <p className="mt-2 text-xs text-foreground/45">{t("agentStatus.noActivity")}</p>
-                  ) : (
-                    <div className="mt-2 flex flex-col gap-1">
-                      {activityItems.map((item) => (
-                        <ActivityRow key={item.id} item={item} />
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section
-                  className="border-b border-border py-3"
-                  aria-labelledby="agent-status-metrics"
-                >
-                  <SectionLabel id="agent-status-metrics" label={t("agentStatus.metrics")} />
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
-                    <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
-                    <Metric
-                      label={t("agentStatus.metric.pendingInputs")}
-                      value={queuedInputs.length}
-                    />
-                  </div>
-                </section>
-              </>
-            ) : null}
-
-            <ConfigurationSection
-              profile={activeProfile}
-              effectiveModel={effectiveModel}
-              reasoning={runtimeReasoning}
-              instructions={getAgentInstructions(activeProfile)}
-              expectedOutput={getAgentExpectedOutput(activeProfile)}
-              toolGroups={toolGroups}
-              toolsUnavailable={tools === null}
-              t={t}
-            />
-          </div>
-
-          {active && run ? (
-            <div className="shrink-0 border-t border-border px-3 py-3 select-none">
-              <Button size="sm" variant="tertiary" className="w-full" onPress={onStop}>
-                {t("input.stop")}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        panelContent
       ) : (
         <div
           className="flex h-full items-center gap-1 px-1"
@@ -449,6 +450,21 @@ export function AgentStatusWidget({
       )}
     </motion.aside>
   );
+}
+
+export type AgentStatusContentProps = Omit<
+  AgentStatusWidgetProps,
+  "open" | "onOpenChange" | "embedded"
+>;
+
+export function AgentStatusContent(props: AgentStatusContentProps): React.JSX.Element {
+  return <AgentStatusWidget {...props} open onOpenChange={() => undefined} embedded />;
+}
+
+export function AgentStatusTrigger(
+  props: AgentStatusContentProps & { onOpenChange: () => void },
+): React.JSX.Element {
+  return <AgentStatusWidget {...props} open={false} onOpenChange={() => props.onOpenChange()} />;
 }
 
 function ConfigurationSection({

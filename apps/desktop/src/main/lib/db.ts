@@ -142,6 +142,7 @@ import {
   type McpLifecycleDesiredState,
   type McpLifecycleState,
   type McpDependencyStatus,
+  type SandboxSessionView,
 } from "../../shared/types";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
 import { resolveUserDataDir } from "./runtime-paths";
@@ -1541,7 +1542,7 @@ export function runtimeSnapshot(): Pick<
     runtimeSteps: listRuntimeSteps(),
     agentRuntimeStates: listagentRuntimeStates(),
     conversationAgentStates: listConversationAgentStates(),
-    sandboxSessions: listSandboxSessions(),
+    sandboxSessions: listSandboxSessions().map(toSandboxSessionView),
     sandboxSnapshots: listSandboxSnapshots(),
     sandboxArtifacts: listSandboxArtifacts(),
     runtimeEvents: listRuntimeEvents(),
@@ -3216,6 +3217,11 @@ export function getSyncState(): SyncState {
   return ensureSyncProfile();
 }
 
+function toSandboxSessionView(session: SandboxSession): SandboxSessionView {
+  const { root_path: _rootPath, ...view } = session;
+  return view;
+}
+
 export function getRuntimeSnapshot(): RuntimeSnapshot {
   return {
     agents: listAgents(),
@@ -3223,7 +3229,7 @@ export function getRuntimeSnapshot(): RuntimeSnapshot {
     runtimeSteps: listRuntimeSteps(),
     agentRuntimeStates: listagentRuntimeStates(),
     conversationAgentStates: listConversationAgentStates(),
-    sandboxSessions: listSandboxSessions(),
+    sandboxSessions: listSandboxSessions().map(toSandboxSessionView),
     sandboxSnapshots: listSandboxSnapshots(),
     sandboxArtifacts: listSandboxArtifacts(),
     memories: listMemories(),
@@ -3278,6 +3284,23 @@ export function listSandboxSessions(limit = 50): SandboxSession[] {
   return getDb()
     .select()
     .from(sandboxSessions)
+    .orderBy(desc(sandboxSessions.updated_at))
+    .limit(limit)
+    .all();
+}
+
+export function getSandboxSession(id: string): SandboxSession | null {
+  return getDb().select().from(sandboxSessions).where(eq(sandboxSessions.id, id)).get() ?? null;
+}
+
+export function listSandboxSessionsForConversation(
+  conversationId: string,
+  limit = 50,
+): SandboxSession[] {
+  return getDb()
+    .select()
+    .from(sandboxSessions)
+    .where(eq(sandboxSessions.conversation_id, conversationId))
     .orderBy(desc(sandboxSessions.updated_at))
     .limit(limit)
     .all();
@@ -3354,6 +3377,57 @@ export function listSandboxArtifacts(limit = 100): SandboxArtifact[] {
     .all();
 }
 
+export function getSandboxArtifact(id: string): SandboxArtifact | null {
+  return getDb().select().from(sandboxArtifacts).where(eq(sandboxArtifacts.id, id)).get() ?? null;
+}
+
+export function listSandboxArtifactsForSession(sessionId: string, limit = 100): SandboxArtifact[] {
+  return getDb()
+    .select()
+    .from(sandboxArtifacts)
+    .where(eq(sandboxArtifacts.session_id, sessionId))
+    .orderBy(desc(sandboxArtifacts.updated_at))
+    .limit(limit)
+    .all();
+}
+
+export function updateSandboxArtifact(
+  id: string,
+  patch: Partial<
+    Pick<
+      SandboxArtifact,
+      | "kind"
+      | "path"
+      | "url"
+      | "size_bytes"
+      | "entry_path"
+      | "mime_type"
+      | "sha256"
+      | "status"
+      | "updated_at"
+    >
+  >,
+): SandboxArtifact {
+  const now = patch.updated_at ?? Date.now();
+  getDb()
+    .update(sandboxArtifacts)
+    .set({ ...patch, updated_at: now })
+    .where(eq(sandboxArtifacts.id, id))
+    .run();
+  const row = getSandboxArtifact(id);
+  if (!row) throw new Error("Sandbox artifact not found.");
+  return row;
+}
+
+export async function updateSandboxArtifactAsync(
+  id: string,
+  patch: Parameters<typeof updateSandboxArtifact>[1],
+): Promise<SandboxArtifact> {
+  return shouldRouteWrites()
+    ? writeDb<SandboxArtifact>("updateSandboxArtifact", [id, patch])
+    : updateSandboxArtifact(id, patch);
+}
+
 export function insertSandboxArtifact(
   input: Omit<NewSandboxArtifact, "id" | "created_at"> & { id?: string; created_at?: number },
 ): SandboxArtifact {
@@ -3364,7 +3438,12 @@ export function insertSandboxArtifact(
     path: input.path,
     url: input.url ?? null,
     size_bytes: input.size_bytes ?? null,
+    entry_path: input.entry_path ?? null,
+    mime_type: input.mime_type ?? null,
+    sha256: input.sha256 ?? null,
+    status: input.status ?? "ready",
     created_at: input.created_at ?? Date.now(),
+    updated_at: input.updated_at ?? input.created_at ?? Date.now(),
   };
   getDb().insert(sandboxArtifacts).values(row).run();
   return row as SandboxArtifact;

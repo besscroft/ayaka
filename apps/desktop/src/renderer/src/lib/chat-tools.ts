@@ -22,6 +22,8 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "sandbox_read_file",
   "sandbox_snapshot",
   "sandbox_list_artifacts",
+  "sandbox_publish_artifact",
+  "sandbox_start_preview",
   "workspace_run_command",
   "cron",
 ]);
@@ -176,6 +178,22 @@ const TOOL_METADATA: Record<
     kind: "host",
     category: "sandbox",
     requiresApproval: false,
+  },
+  sandbox_publish_artifact: {
+    label: "Publish sandbox artifact",
+    description:
+      "Publish generated HTML or a static app after writing its files so the workspace panel can render it.",
+    kind: "host",
+    category: "sandbox",
+    requiresApproval: false,
+  },
+  sandbox_start_preview: {
+    label: "Start sandbox preview",
+    description:
+      "Start an approval-gated local preview process for Vite, React, or another server-backed app.",
+    kind: "host",
+    category: "sandbox",
+    requiresApproval: true,
   },
   workspace_run_command: {
     label: "Run workspace command",

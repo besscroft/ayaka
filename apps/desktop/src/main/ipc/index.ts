@@ -46,6 +46,7 @@ import {
   updateToolServerAsync as updateToolServer,
   deleteToolServerAsync as deleteToolServer,
   listDeletedToolServers,
+  getSandboxSession,
   restoreToolServerAsync as restoreToolServer,
   permanentlyDeleteToolServerAsync as permanentlyDeleteToolServer,
   permanentlyDeleteToolServersAsync as permanentlyDeleteToolServers,
@@ -205,6 +206,23 @@ import {
 import { updateManager } from "../lib/update-manager";
 import { readChangelog } from "../lib/changelog";
 import {
+  authorizeSandboxArtifact,
+  getSandboxArtifactResourceUrl,
+  listSandboxArtifactsForConversation,
+  readSandboxArtifactHtml,
+  revokeSandboxArtifactAuthorization,
+} from "../lib/sandbox-artifact-manager";
+import {
+  closeSandboxPreview,
+  listSandboxPreviewsForConversation,
+  restartSandboxPreview,
+  setSandboxPreviewBounds,
+  setSandboxPreviewVisible,
+  stopSandboxPreview,
+  onSandboxPreviewUpdated,
+} from "../lib/sandbox-preview-manager";
+import { onSandboxArtifactUpdated } from "../lib/sandbox-artifact-manager";
+import {
   exportCurrentErrorLog,
   recordErrorLog,
   type ErrorLogSaveDialog,
@@ -244,6 +262,16 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   onMcpToolsChanged((event) => broadcast("mcp:tools-changed", event));
   onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
+  onSandboxArtifactUpdated((artifact) => {
+    const session = getSandboxSession(artifact.session_id);
+    if (session?.conversation_id) {
+      broadcast("sandbox:artifact-updated", {
+        ...artifact,
+        conversationId: session.conversation_id,
+      });
+    }
+  });
+  onSandboxPreviewUpdated((preview) => broadcast("sandbox:preview-updated", preview));
   subscribeProviderCatalogUpdated((providerId) =>
     broadcast("providers:catalog-updated", { providerId }),
   );
@@ -377,6 +405,90 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   ipcMain.handle("workspace:rollback", (_e, conversationId: string) =>
     rollbackConversationWorkspacePreparation(conversationId),
+  );
+
+  // ---------- 生成式 artifact / preview ----------
+  ipcMain.handle("sandbox:artifacts:list", (_event, conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId)
+      throw new Error("conversationId is required.");
+    return listSandboxArtifactsForConversation(conversationId);
+  });
+  ipcMain.handle(
+    "sandbox:artifacts:read",
+    (_event, input: { conversationId: string; artifactId: string }) => {
+      if (
+        !input ||
+        typeof input.conversationId !== "string" ||
+        typeof input.artifactId !== "string"
+      ) {
+        throw new Error("conversationId and artifactId are required.");
+      }
+      return readSandboxArtifactHtml(input.conversationId, input.artifactId);
+    },
+  );
+  ipcMain.handle(
+    "sandbox:artifacts:resourceUrl",
+    (_event, input: { conversationId: string; artifactId: string }) => {
+      if (
+        !input ||
+        typeof input.conversationId !== "string" ||
+        typeof input.artifactId !== "string"
+      ) {
+        throw new Error("conversationId and artifactId are required.");
+      }
+      return getSandboxArtifactResourceUrl(input.conversationId, input.artifactId);
+    },
+  );
+  ipcMain.handle(
+    "sandbox:artifacts:authorize",
+    (_event, input: { conversationId: string; artifactId: string }) =>
+      authorizeSandboxArtifact(input.conversationId, input.artifactId),
+  );
+  ipcMain.handle(
+    "sandbox:artifacts:revoke",
+    (_event, input: { conversationId: string; artifactId: string }) =>
+      revokeSandboxArtifactAuthorization(input.conversationId, input.artifactId),
+  );
+  ipcMain.handle("sandbox:previews:list", (_event, conversationId: string) =>
+    listSandboxPreviewsForConversation(conversationId),
+  );
+  ipcMain.handle(
+    "sandbox:previews:stop",
+    (_event, input: { conversationId: string; previewId: string }) =>
+      stopSandboxPreview(input.previewId, input.conversationId),
+  );
+  ipcMain.handle(
+    "sandbox:previews:restart",
+    (_event, input: { conversationId: string; previewId: string }) =>
+      restartSandboxPreview(input.previewId, input.conversationId),
+  );
+  ipcMain.handle(
+    "sandbox:previews:close",
+    (_event, input: { conversationId: string; previewId: string }) =>
+      closeSandboxPreview(input.previewId, input.conversationId),
+  );
+  ipcMain.handle(
+    "sandbox:previews:setBounds",
+    (
+      event,
+      input: {
+        conversationId: string;
+        previewId: string;
+        bounds: { x: number; y: number; width: number; height: number };
+      },
+    ) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error("Preview window is unavailable.");
+      setSandboxPreviewBounds(input.previewId, input.conversationId, window, input.bounds);
+    },
+  );
+  ipcMain.handle(
+    "sandbox:previews:setVisible",
+    (event, input: { conversationId: string; previewId: string; visible: boolean }) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error("Preview window is unavailable.");
+      setSandboxPreviewVisible(input.previewId, input.conversationId, window, input.visible);
+    },
   );
 
   // ---------- 娑堟伅 ----------

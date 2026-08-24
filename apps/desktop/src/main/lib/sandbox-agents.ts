@@ -413,6 +413,10 @@ export async function registerSandboxPreviewPort(
 ): Promise<SandboxArtifact> {
   const port = Math.floor(input.port);
   if (!Number.isFinite(port) || port < 1 || port > 65_535) throw new Error("Invalid port.");
+  const { isSandboxPreviewPortManaged } = await import("./sandbox-preview-manager");
+  if (!isSandboxPreviewPortManaged(session.id, port)) {
+    throw new Error("Preview ports must be created by sandbox_start_preview.");
+  }
   return insertSandboxArtifact({
     session_id: session.id,
     kind: "preview",

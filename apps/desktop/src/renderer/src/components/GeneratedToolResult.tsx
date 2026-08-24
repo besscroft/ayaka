@@ -13,7 +13,6 @@ import {
   readNumber,
   readString,
   safeJsonStringify,
-  sanitizeToolUrl,
   truncateText,
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
@@ -25,6 +24,7 @@ import {
   IconDatabase,
   IconGlobe,
   IconLink,
+  IconEye,
   IconSearch,
   IconWrench,
 } from "./icons";
@@ -68,6 +68,9 @@ export function GeneratedToolResult({ part }: GeneratedToolResultProps): React.J
       return <SandboxArtifactsResult output={part.output} />;
     case "sandbox_preview_port":
       return <SandboxPreviewResult output={part.output} />;
+    case "sandbox_publish_artifact":
+    case "sandbox_start_preview":
+      return <SandboxArtifactPublishedResult output={part.output} />;
     case "current_time":
       return <CurrentTimeResult output={part.output} />;
     case "runtime_snapshot":
@@ -464,19 +467,32 @@ function SandboxArtifactsResult({ output }: { output: unknown }): React.JSX.Elem
     <ResultStack>
       {artifacts.map((artifact) => (
         <div key={artifact.id ?? artifact.path} className="flex min-w-0 items-center gap-2">
+          <IconBookOpen className="size-3 shrink-0 text-foreground/50" />
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/70">
             {artifact.path}
           </span>
+          {artifact.kind ? <StatusText value={artifact.kind} /> : null}
+          {artifact.status ? <StatusText value={artifact.status} /> : null}
           {artifact.sizeBytes !== undefined ? (
             <span className="shrink-0 text-[10px] text-foreground/40">
               {f.bytes(artifact.sizeBytes)}
             </span>
           ) : null}
-          {artifact.url ? (
-            <SafeLink href={artifact.url} compact>
-              <IconLink className="size-3" />
-              <span>{t("tool.generated.open")}</span>
-            </SafeLink>
+          {artifact.id ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("ayaka:open-generated-app", {
+                    detail: { artifactId: artifact.id },
+                  }),
+                )
+              }
+            >
+              <IconEye className="size-3" />
+              <span>{t("tool.generated.openPreview")}</span>
+            </button>
           ) : null}
         </div>
       ))}
@@ -487,17 +503,65 @@ function SandboxArtifactsResult({ output }: { output: unknown }): React.JSX.Elem
 function SandboxPreviewResult({ output }: { output: unknown }): React.JSX.Element {
   const { t } = useT();
   const record = asRecord(output);
-  const url = sanitizeToolUrl(readString(record?.url));
+  const artifactId = readString(record?.artifactId) ?? readString(record?.artifact_id);
+  const status = readString(record?.status);
   return (
     <ResultStack>
-      {url ? (
-        <SafeLink href={url}>
-          <IconLink className="size-3" />
-          <span className="truncate">{readString(record?.path) ?? url}</span>
-        </SafeLink>
+      {artifactId ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-primary hover:underline"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent("ayaka:open-generated-app", { detail: { artifactId } }),
+            )
+          }
+        >
+          <IconEye className="size-3" />
+          <span>{t("tool.generated.openPreview")}</span>
+        </button>
       ) : (
         <ResultLabel icon={<IconGlobe />} text={t("tool.generated.previewRegistered")} />
       )}
+      {status ? <StatusText value={status} /> : null}
+    </ResultStack>
+  );
+}
+
+function SandboxArtifactPublishedResult({ output }: { output: unknown }): React.JSX.Element {
+  const { t, f } = useT();
+  const record = asRecord(output);
+  const artifactId = readString(record?.artifactId) ?? readString(record?.artifact_id);
+  const path = readString(record?.path);
+  const kind = readString(record?.kind);
+  const status = readString(record?.status);
+  const size = readNumber(record?.sizeBytes) ?? readNumber(record?.size_bytes);
+  return (
+    <ResultStack>
+      <div className="flex min-w-0 items-center gap-2">
+        <IconBookOpen className="size-3 shrink-0 text-foreground/50" />
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/70">
+          {path ?? t("tool.generated.artifact")}
+        </span>
+        {kind ? <StatusText value={kind} /> : null}
+        {status ? <StatusText value={status} /> : null}
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-foreground/40">
+        {size !== undefined ? <span>{f.bytes(size)}</span> : null}
+        {artifactId ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("ayaka:open-generated-app", { detail: { artifactId } }),
+              )
+            }
+          >
+            <IconEye className="size-3" /> {t("tool.generated.openPreview")}
+          </button>
+        ) : null}
+      </div>
     </ResultStack>
   );
 }

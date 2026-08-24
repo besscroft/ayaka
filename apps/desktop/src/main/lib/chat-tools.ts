@@ -369,6 +369,26 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     defaultAuto: false,
     requiresApproval: false,
   },
+  sandbox_publish_artifact: {
+    id: "sandbox_publish_artifact",
+    label: "Publish sandbox artifact",
+    description:
+      "Publish generated HTML or a static app after writing its files so the workspace panel can render it.",
+    kind: "host",
+    category: "sandbox",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  sandbox_start_preview: {
+    id: "sandbox_start_preview",
+    label: "Start sandbox preview",
+    description:
+      "Start an approval-gated local preview process for Vite, React, or another server-backed app.",
+    kind: "host",
+    category: "sandbox",
+    defaultAuto: true,
+    requiresApproval: true,
+  },
   workspace_run_command: {
     id: "workspace_run_command",
     label: "Run workspace command",
@@ -673,6 +693,8 @@ export async function executeChatHostTool({
         case "sandbox_restore":
         case "sandbox_list_artifacts":
         case "sandbox_preview_port":
+        case "sandbox_publish_artifact":
+        case "sandbox_start_preview":
         case "workspace_run_command":
           throw new Error(
             toolId === "workspace_run_command"
@@ -680,6 +702,7 @@ export async function executeChatHostTool({
               : toolId + " is only available through the agent sandbox runtime.",
           );
       }
+      throw new Error("Unsupported chat tool: " + toolId);
     },
     audit,
   );

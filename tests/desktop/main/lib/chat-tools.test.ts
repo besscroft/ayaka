@@ -549,12 +549,12 @@ void describe("chat tool runtime", () => {
     assert.equal(typeof runtime.tools?.memory_delete, "undefined");
   });
 
-  void it("marks built-in chat tools approval-free except workspace execution", () => {
+  void it("marks built-in chat tools approval-free except execution tools", () => {
     const descriptors = chatTools.createChatToolDescriptors(modelContext("openai-compatible"));
     for (const id of CHAT_TOOL_IDS) {
       assert.equal(
         descriptors.find((descriptor) => descriptor.id === id)?.requiresApproval,
-        id === "workspace_run_command",
+        id === "workspace_run_command" || id === "sandbox_start_preview",
       );
     }
   });

@@ -12,6 +12,8 @@ import {
   refreshBuiltinProviderCatalog,
 } from "./lib/providers";
 import { registerAyakaMediaProtocol } from "./lib/media-assets";
+import { readSandboxArtifactResource } from "./lib/sandbox-artifact-manager";
+import { closeAllSandboxPreviews } from "./lib/sandbox-preview-manager";
 import { registerIpcHandlers } from "./ipc";
 import { startCronScheduler, stopCronScheduler } from "./lib/cron-scheduler";
 import { ensureBuiltinCatalogSources } from "./lib/catalog-service";
@@ -43,6 +45,15 @@ const WINDOWS_APP_ID = "com.zzzvoid.ai";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "ayaka-media",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+    },
+  },
+  {
+    scheme: "ayaka-artifact",
     privileges: {
       standard: true,
       secure: true,
@@ -203,6 +214,32 @@ if (!hasSingleInstanceLock) {
     }
 
     registerAyakaMediaProtocol();
+    protocol.handle("ayaka-artifact", async (request) => {
+      try {
+        const url = new URL(request.url);
+        const artifactId = decodeURIComponent(url.hostname);
+        const relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+        const resource = await readSandboxArtifactResource(artifactId, relativePath);
+        return new Response(resource.body as unknown as BodyInit, {
+          headers: {
+            "Content-Type": resource.mimeType,
+            "Content-Security-Policy":
+              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+              "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; " +
+              "base-uri 'none'; form-action 'none'",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      } catch (error) {
+        return new Response(
+          error instanceof Error ? error.message : "Artifact resource unavailable",
+          {
+            status: 404,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          },
+        );
+      }
+    });
 
     try {
       const port = await startServer();
@@ -259,6 +296,7 @@ if (!hasSingleInstanceLock) {
       })
       .then(() => closeMcpOAuthLoopback())
       .then(async () => {
+        await closeAllSandboxPreviews();
         stopServer();
         await closeDb();
         await flushErrorLogs();

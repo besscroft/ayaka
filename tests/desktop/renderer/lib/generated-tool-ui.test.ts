@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   getToolPartName,
   getToolSummary,
+  getGeneratedAppPreviewMode,
   isSilentToolPart,
   isGeneratedToolName,
   normalizeMemoryResults,
@@ -15,6 +16,7 @@ import {
   normalizeToolState,
   normalizeWebOpenResult,
   normalizeWebSearchResult,
+  protectGeneratedHtml,
   safeJsonStringify,
   sanitizeToolUrl,
   truncateText,
@@ -34,6 +36,30 @@ void describe("generated tool UI parsing", () => {
     assert.equal(isSilentToolPart({ type: "tool-web_search" }), false);
     assert.equal(isGeneratedToolName("web_open"), true);
     assert.equal(isGeneratedToolName("mcp_custom_tool"), false);
+  });
+
+  void it("selects the isolated preview mode and protects single-file HTML", () => {
+    assert.equal(getGeneratedAppPreviewMode({ kind: "html", authorized: false }), "authorization");
+    assert.equal(getGeneratedAppPreviewMode({ kind: "html", authorized: true }), "html");
+    assert.equal(getGeneratedAppPreviewMode({ kind: "static", authorized: true }), "static");
+    assert.equal(
+      getGeneratedAppPreviewMode({ kind: "static", authorized: true, previewStatus: "running" }),
+      "localhost",
+    );
+    assert.equal(
+      getGeneratedAppPreviewMode({ kind: "html", authorized: true, sizeBytes: 256 * 1024 + 1 }),
+      "source",
+    );
+    assert.equal(
+      getGeneratedAppPreviewMode({ kind: "html", authorized: true, sourceMode: true }),
+      "source",
+    );
+
+    const protectedHtml = protectGeneratedHtml("<h1>safe</h1>");
+    assert.match(protectedHtml, /Content-Security-Policy/);
+    assert.match(protectedHtml, /connect-src 'none'/);
+    assert.match(protectedHtml, /frame-src 'none'/);
+    assert.doesNotMatch(protectedHtml, /allow-same-origin/);
   });
 
   void it("normalizes valid and invalid tool states", () => {
@@ -147,13 +173,29 @@ void describe("generated tool UI parsing", () => {
     assert.deepEqual(
       normalizeSandboxArtifacts({
         artifacts: [
-          { id: "a1", path: "report.txt", url: "https://example.com/report.txt", size_bytes: 12 },
+          {
+            id: "a1",
+            path: "report.txt",
+            url: "https://example.com/report.txt",
+            size_bytes: 12,
+            kind: "html",
+            status: "ready",
+          },
           { path: "unsafe", url: "javascript:alert(1)" },
+          { path: "C:\\private\\secret.html", id: "absolute" },
+          { path: "../outside.html", id: "traversal" },
           { url: "https://example.com/missing-path" },
         ],
       }),
       [
-        { id: "a1", path: "report.txt", url: "https://example.com/report.txt", sizeBytes: 12 },
+        {
+          id: "a1",
+          kind: "html",
+          path: "report.txt",
+          url: "https://example.com/report.txt",
+          sizeBytes: 12,
+          status: "ready",
+        },
         { path: "unsafe" },
       ],
     );

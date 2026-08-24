@@ -765,7 +765,7 @@ function clampTimeout(value: unknown): number {
   return Math.floor(value);
 }
 
-async function terminateProcessTree(child: ChildProcess): Promise<void> {
+export async function terminateProcessTree(child: ChildProcess): Promise<void> {
   const pid = child.pid;
   if (!pid) {
     child.kill("SIGTERM");

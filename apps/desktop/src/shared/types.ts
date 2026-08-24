@@ -843,6 +843,9 @@ export interface SandboxSession {
   updated_at: number;
 }
 
+/** Renderer-safe sandbox session projection. It intentionally omits root_path. */
+export type SandboxSessionView = Omit<SandboxSession, "root_path">;
+
 export interface SandboxSnapshot {
   id: string;
   session_id: string;
@@ -854,11 +857,50 @@ export interface SandboxSnapshot {
 export interface SandboxArtifact {
   id: string;
   session_id: string;
-  kind: "file" | "directory" | "preview";
+  kind: SandboxArtifactKind;
   path: string;
   url: string | null;
   size_bytes: number | null;
+  entry_path: string | null;
+  mime_type: string | null;
+  sha256: string | null;
+  status: SandboxArtifactStatus;
   created_at: number;
+  updated_at: number;
+  /** Only populated by the main-process public artifact projection. */
+  authorized?: boolean;
+}
+
+/** Main-process event projection; conversationId is never persisted in artifact metadata. */
+export interface SandboxArtifactUpdate extends SandboxArtifact {
+  conversationId: string;
+}
+
+export type SandboxArtifactKind = "file" | "directory" | "html" | "static" | "preview";
+export type SandboxArtifactStatus = "candidate" | "ready" | "running" | "stopped" | "failed";
+
+export type SandboxPreviewStatus = "starting" | "running" | "stopped" | "failed";
+
+export interface SandboxPreview {
+  id: string;
+  artifact_id: string;
+  conversation_id: string;
+  port: number;
+  url: string;
+  status: SandboxPreviewStatus;
+  error: string | null;
+  updated_at: number;
+}
+
+export interface SandboxArtifactReadResult {
+  artifactId: string;
+  kind: "html";
+  path: string;
+  mimeType: "text/html";
+  sizeBytes: number;
+  sha256: string;
+  text: string;
+  truncated: boolean;
 }
 
 export type ToolStatus = "ready" | "disabled" | "error" | "unknown";
@@ -1495,6 +1537,8 @@ export const CHAT_TOOL_IDS = [
   "sandbox_restore",
   "sandbox_list_artifacts",
   "sandbox_preview_port",
+  "sandbox_publish_artifact",
+  "sandbox_start_preview",
   "workspace_run_command",
   "cron",
 ] as const;
@@ -2452,7 +2496,7 @@ export interface RuntimeSnapshot {
   runtimeSteps: RuntimeStep[];
   agentRuntimeStates: AgentRuntimeState[];
   conversationAgentStates: ConversationAgentState[];
-  sandboxSessions: SandboxSession[];
+  sandboxSessions: SandboxSessionView[];
   sandboxSnapshots: SandboxSnapshot[];
   sandboxArtifacts: SandboxArtifact[];
   memories: MemoryRecord[];

@@ -70,6 +70,10 @@ import type {
   WorkspaceMediaSaveInput,
   WorkspaceMediaSaveResult,
   WorkspaceOrphan,
+  SandboxArtifact,
+  SandboxArtifactUpdate,
+  SandboxArtifactReadResult,
+  SandboxPreview,
 } from "../shared/types";
 import type { UIMessage } from "ai";
 
@@ -131,6 +135,34 @@ export interface AyakaApi {
     saveMediaAs: (input: WorkspaceMediaSaveInput) => Promise<WorkspaceMediaSaveResult>;
     revealFile: (input: { conversationId: string; path: string }) => Promise<boolean>;
     rollback: (conversationId: string) => Promise<void>;
+  };
+  sandboxArtifacts: {
+    list: (conversationId: string) => Promise<SandboxArtifact[]>;
+    read: (input: {
+      conversationId: string;
+      artifactId: string;
+    }) => Promise<SandboxArtifactReadResult>;
+    resourceUrl: (input: { conversationId: string; artifactId: string }) => Promise<string>;
+    authorize: (input: { conversationId: string; artifactId: string }) => Promise<SandboxArtifact>;
+    revoke: (input: { conversationId: string; artifactId: string }) => Promise<SandboxArtifact>;
+    onUpdated: (handler: (artifact: SandboxArtifactUpdate) => void) => () => void;
+  };
+  sandboxPreviews: {
+    list: (conversationId: string) => Promise<SandboxPreview[]>;
+    stop: (input: { conversationId: string; previewId: string }) => Promise<SandboxPreview>;
+    restart: (input: { conversationId: string; previewId: string }) => Promise<SandboxPreview>;
+    close: (input: { conversationId: string; previewId: string }) => Promise<boolean>;
+    setBounds: (input: {
+      conversationId: string;
+      previewId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }) => Promise<void>;
+    setVisible: (input: {
+      conversationId: string;
+      previewId: string;
+      visible: boolean;
+    }) => Promise<void>;
+    onUpdated: (handler: (preview: SandboxPreview) => void) => () => void;
   };
   cron: {
     list: () => Promise<CronJob[]>;

@@ -962,11 +962,20 @@ export const sandboxArtifacts = sqliteTable(
     session_id: text("session_id")
       .notNull()
       .references(() => sandboxSessions.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["file", "directory", "preview"] }).notNull(),
+    kind: text("kind", { enum: ["file", "directory", "html", "static", "preview"] }).notNull(),
     path: text("path").notNull(),
     url: text("url"),
     size_bytes: integer("size_bytes"),
+    entry_path: text("entry_path"),
+    mime_type: text("mime_type"),
+    sha256: text("sha256"),
+    status: text("status", {
+      enum: ["candidate", "ready", "running", "stopped", "failed"],
+    })
+      .notNull()
+      .default("ready"),
     created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull().default(0),
   },
   (table) => [
     index("idx_sandbox_artifacts_session").on(table.session_id),

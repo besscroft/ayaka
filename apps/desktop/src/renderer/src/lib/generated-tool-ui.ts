@@ -64,6 +64,50 @@ export interface SandboxArtifactResult {
   path: string;
   url?: string;
   sizeBytes?: number;
+  status?: string;
+  authorized?: boolean;
+}
+
+export type GeneratedAppPreviewMode =
+  | "none"
+  | "authorization"
+  | "source"
+  | "html"
+  | "static"
+  | "localhost";
+
+export function getGeneratedAppPreviewMode(input: {
+  kind?: string;
+  authorized?: boolean;
+  sourceMode?: boolean;
+  previewStatus?: string;
+  sizeBytes?: number;
+  maxHtmlBytes?: number;
+}): GeneratedAppPreviewMode {
+  if (input.kind !== "html" && input.kind !== "static") return "none";
+  if (!input.authorized) return "authorization";
+  if (
+    input.sourceMode ||
+    (input.kind === "html" &&
+      input.sizeBytes !== undefined &&
+      input.sizeBytes > (input.maxHtmlBytes ?? 256 * 1024))
+  ) {
+    return "source";
+  }
+  if (input.previewStatus === "running") return "localhost";
+  return input.kind === "html" ? "html" : "static";
+}
+
+export function protectGeneratedHtml(text: string): string {
+  const csp =
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ` +
+    `script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; ` +
+    `font-src data:; media-src data: blob:; connect-src 'none'; object-src 'none'; ` +
+    `frame-src 'none'; base-uri 'none'; form-action 'none';">`;
+  if (/<head\b[^>]*>/i.test(text)) {
+    return text.replace(/<head\b[^>]*>/i, (value) => `${value}${csp}`);
+  }
+  return `<!doctype html><html><head>${csp}</head><body>${text}</body></html>`;
 }
 
 export interface SandboxCommandResult {
@@ -154,6 +198,8 @@ export function isGeneratedToolName(toolName: string | null): boolean {
       "sandbox_restore",
       "sandbox_list_artifacts",
       "sandbox_preview_port",
+      "sandbox_publish_artifact",
+      "sandbox_start_preview",
       "file_search",
       "code_interpreter",
       "tool_search",
@@ -239,6 +285,8 @@ export function getToolSummary(part: RenderableToolPart): ToolSummary | null {
     case "sandbox_restore":
       return { key: "tool.generated.snapshot" };
     case "sandbox_preview_port":
+    case "sandbox_publish_artifact":
+    case "sandbox_start_preview":
       return { key: "tool.generated.preview" };
     case "current_time": {
       const localDateTime = readString(output?.localDateTime);
@@ -335,20 +383,35 @@ export function normalizeSandboxArtifacts(output: unknown): SandboxArtifactResul
     .map((value) => {
       const item = asRecord(value);
       const path = readString(item?.path);
-      if (!path) return null;
+      if (!path || !isSafeSandboxRelativePath(path)) return null;
       const id = readString(item?.id);
       const kind = readString(item?.kind);
       const url = sanitizeToolUrl(readString(item?.url));
       const sizeBytes = readNumber(item?.size_bytes) ?? readNumber(item?.sizeBytes);
+      const status = readString(item?.status);
+      const authorized = readBoolean(item?.authorized);
       return {
         ...(id ? { id } : {}),
         ...(kind ? { kind } : {}),
         path,
         ...(url ? { url } : {}),
         ...(sizeBytes !== undefined ? { sizeBytes } : {}),
+        ...(status ? { status } : {}),
+        ...(authorized !== undefined ? { authorized } : {}),
       };
     })
     .filter((value): value is SandboxArtifactResult => value !== null);
+}
+
+function isSafeSandboxRelativePath(value: string): boolean {
+  const normalized = value.replace(/\\/g, "/");
+  return (
+    normalized.length > 0 &&
+    !normalized.startsWith("/") &&
+    !/^[a-zA-Z]:/.test(normalized) &&
+    !normalized.split("/").includes("..") &&
+    !normalized.split("/").includes(".snapshots")
+  );
 }
 
 export function normalizeSandboxCommand(output: unknown): SandboxCommandResult | null {

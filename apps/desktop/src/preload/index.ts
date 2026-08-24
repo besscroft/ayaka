@@ -6,6 +6,8 @@ import type {
   ErrorLogInput,
   TrayAction,
   TrayMenuLabels,
+  SandboxArtifactUpdate,
+  SandboxPreview,
 } from "../shared/types";
 
 /**
@@ -132,6 +134,45 @@ const api = {
     saveMediaAs: (input: unknown) => ipcRenderer.invoke("workspace:saveMediaAs", input),
     revealFile: (input: unknown) => ipcRenderer.invoke("workspace:revealFile", input),
     rollback: (conversationId: string) => ipcRenderer.invoke("workspace:rollback", conversationId),
+  },
+  sandboxArtifacts: {
+    list: (conversationId: string) => ipcRenderer.invoke("sandbox:artifacts:list", conversationId),
+    read: (input: { conversationId: string; artifactId: string }) =>
+      ipcRenderer.invoke("sandbox:artifacts:read", input),
+    resourceUrl: (input: { conversationId: string; artifactId: string }) =>
+      ipcRenderer.invoke("sandbox:artifacts:resourceUrl", input),
+    authorize: (input: { conversationId: string; artifactId: string }) =>
+      ipcRenderer.invoke("sandbox:artifacts:authorize", input),
+    revoke: (input: { conversationId: string; artifactId: string }) =>
+      ipcRenderer.invoke("sandbox:artifacts:revoke", input),
+    onUpdated: (handler: (artifact: SandboxArtifactUpdate) => void) => {
+      const listener = (_event: IpcRendererEvent, artifact: SandboxArtifactUpdate): void =>
+        handler(artifact);
+      ipcRenderer.on("sandbox:artifact-updated", listener);
+      return () => ipcRenderer.removeListener("sandbox:artifact-updated", listener);
+    },
+  },
+  sandboxPreviews: {
+    list: (conversationId: string) => ipcRenderer.invoke("sandbox:previews:list", conversationId),
+    stop: (input: { conversationId: string; previewId: string }) =>
+      ipcRenderer.invoke("sandbox:previews:stop", input),
+    restart: (input: { conversationId: string; previewId: string }) =>
+      ipcRenderer.invoke("sandbox:previews:restart", input),
+    close: (input: { conversationId: string; previewId: string }) =>
+      ipcRenderer.invoke("sandbox:previews:close", input),
+    setBounds: (input: {
+      conversationId: string;
+      previewId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }) => ipcRenderer.invoke("sandbox:previews:setBounds", input),
+    setVisible: (input: { conversationId: string; previewId: string; visible: boolean }) =>
+      ipcRenderer.invoke("sandbox:previews:setVisible", input),
+    onUpdated: (handler: (preview: SandboxPreview) => void) => {
+      const listener = (_event: IpcRendererEvent, preview: SandboxPreview): void =>
+        handler(preview);
+      ipcRenderer.on("sandbox:preview-updated", listener);
+      return () => ipcRenderer.removeListener("sandbox:preview-updated", listener);
+    },
   },
   cron: {
     list: () => ipcRenderer.invoke("cron:list"),

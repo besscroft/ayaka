@@ -76,6 +76,7 @@ void describe("runtime architecture", () => {
       "0003_remove_mcp_marketplace.sql",
       "0004_deep_the_spike.sql",
       "0005_rare_prodigy.sql",
+      "0006_lazy_hitman.sql",
     ]);
   });
 
@@ -105,6 +106,18 @@ void describe("runtime architecture", () => {
     assert.match(migration, /ALTER TABLE `managed_runtimes` ADD `verified_commands_json`/);
     assert.match(migration, /idx_managed_runtimes_identity/);
     assert.doesNotMatch(migration, /DELETE FROM `managed_runtimes`/);
+  });
+
+  void it("adds bounded generated artifact metadata", () => {
+    const migration = readFileSync(
+      path.join(process.cwd(), "drizzle", "0006_lazy_hitman.sql"),
+      "utf8",
+    );
+    assert.match(migration, /ALTER TABLE `sandbox_artifacts` ADD `entry_path`/);
+    assert.match(migration, /ALTER TABLE `sandbox_artifacts` ADD `mime_type`/);
+    assert.match(migration, /ALTER TABLE `sandbox_artifacts` ADD `sha256`/);
+    assert.match(migration, /ALTER TABLE `sandbox_artifacts` ADD `status`/);
+    assert.match(migration, /ALTER TABLE `sandbox_artifacts` ADD `updated_at`/);
   });
 
   void it("removes the retired MCP catalog while preserving installed MCP state", () => {
@@ -155,12 +168,17 @@ void describe("runtime architecture", () => {
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "runtime_snapshot"));
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "sandbox_run_command"));
     assert.ok(
-      DEFAULT_BUILTIN_TOOL_SEEDS.filter((tool) => tool.id !== "workspace_run_command").every(
-        (tool) => tool.requiresApproval === 0,
-      ),
+      DEFAULT_BUILTIN_TOOL_SEEDS.filter(
+        (tool) => !["workspace_run_command", "sandbox_start_preview"].includes(tool.id),
+      ).every((tool) => tool.requiresApproval === 0),
     );
     assert.equal(
       DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "workspace_run_command")
+        ?.requiresApproval,
+      1,
+    );
+    assert.equal(
+      DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "sandbox_start_preview")
         ?.requiresApproval,
       1,
     );

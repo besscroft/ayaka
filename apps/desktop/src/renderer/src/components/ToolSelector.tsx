@@ -36,6 +36,7 @@ import {
 import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
 import {
+  IconBookOpen,
   IconCheck,
   IconCheckSquare,
   IconClock,
@@ -80,6 +81,8 @@ const ICONS: Record<ChatToolId, (props: SVGProps<SVGSVGElement>) => React.JSX.El
   sandbox_restore: IconDatabase,
   sandbox_list_artifacts: IconList,
   sandbox_preview_port: IconGlobe,
+  sandbox_publish_artifact: IconBookOpen,
+  sandbox_start_preview: IconGlobe,
   workspace_run_command: IconTerminal,
   cron: IconClock,
 };

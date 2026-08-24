@@ -69,6 +69,10 @@ import type {
   WorkspaceOrphan,
   TrayAction,
   TrayMenuLabels,
+  SandboxArtifact,
+  SandboxArtifactReadResult,
+  SandboxArtifactUpdate,
+  SandboxPreview,
 } from "@shared/types";
 import type { UIMessage } from "ai";
 
@@ -159,6 +163,44 @@ export const api = {
       assertApi().workspace.revealFile(input),
     rollback: (conversationId: string): Promise<void> =>
       assertApi().workspace.rollback(conversationId),
+  },
+  sandboxArtifacts: {
+    list: (conversationId: string): Promise<SandboxArtifact[]> =>
+      assertApi().sandboxArtifacts.list(conversationId),
+    read: (input: {
+      conversationId: string;
+      artifactId: string;
+    }): Promise<SandboxArtifactReadResult> => assertApi().sandboxArtifacts.read(input),
+    resourceUrl: (input: { conversationId: string; artifactId: string }): Promise<string> =>
+      assertApi().sandboxArtifacts.resourceUrl(input),
+    authorize: (input: { conversationId: string; artifactId: string }): Promise<SandboxArtifact> =>
+      assertApi().sandboxArtifacts.authorize(input),
+    revoke: (input: { conversationId: string; artifactId: string }): Promise<SandboxArtifact> =>
+      assertApi().sandboxArtifacts.revoke(input),
+    onUpdated: (handler: (artifact: SandboxArtifactUpdate) => void): (() => void) =>
+      assertApi().sandboxArtifacts.onUpdated(handler),
+  },
+  sandboxPreviews: {
+    list: (conversationId: string): Promise<SandboxPreview[]> =>
+      assertApi().sandboxPreviews.list(conversationId),
+    stop: (input: { conversationId: string; previewId: string }): Promise<SandboxPreview> =>
+      assertApi().sandboxPreviews.stop(input),
+    restart: (input: { conversationId: string; previewId: string }): Promise<SandboxPreview> =>
+      assertApi().sandboxPreviews.restart(input),
+    close: (input: { conversationId: string; previewId: string }): Promise<boolean> =>
+      assertApi().sandboxPreviews.close(input),
+    setBounds: (input: {
+      conversationId: string;
+      previewId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }): Promise<void> => assertApi().sandboxPreviews.setBounds(input),
+    setVisible: (input: {
+      conversationId: string;
+      previewId: string;
+      visible: boolean;
+    }): Promise<void> => assertApi().sandboxPreviews.setVisible(input),
+    onUpdated: (handler: (preview: SandboxPreview) => void): (() => void) =>
+      assertApi().sandboxPreviews.onUpdated(handler),
   },
   cron: {
     list: (): Promise<CronJob[]> => assertApi().cron.list(),
