@@ -49,6 +49,7 @@ mock.module(
 
 const db = await import("@desktop-main/lib/db");
 const lifecycle = await import("@desktop-main/lib/mcp-lifecycle-manager");
+const dependencies = await import("@desktop-main/lib/mcp-dependencies");
 
 let root = "";
 let serverId = "";
@@ -141,6 +142,29 @@ test("projects dependency confirmation and failures into actionable lifecycle st
   });
   const failedState = await lifecycle.syncMcpDependencyState(serverId, failed);
   assert.equal(failedState?.state, "needs_runtime");
+});
+
+test("recovers interrupted dependency installations after a process restart", async () => {
+  await db.updateToolServerAsync(serverId, {
+    transport: "stdio",
+    command: "uvx",
+    args: ["mcp-server-fetch"],
+  });
+  await db.upsertMcpDependencyInstallationAsync({
+    serverId,
+    manager: "uvx",
+    packageSpecs: ["mcp-server-fetch"],
+    status: "installing",
+    installRoot: "C:/ayaka-test-dependencies",
+  });
+
+  await lifecycle.recoverMcpLifecycleStates();
+  await dependencies.recoverMcpDependencyInstallations();
+
+  const recovered = db.getMcpDependencyInstallation(serverId);
+  assert.equal(recovered?.status, "failed");
+  assert.match(recovered?.lastError ?? "", /interrupted before completion/);
+  assert.equal(db.getMcpRuntimeState(serverId)?.state, "needs_install");
 });
 
 test("auto-starts enabled stdio MCPs whose dependencies are installed", async () => {

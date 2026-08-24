@@ -142,7 +142,13 @@
     "docsUrl": "https://www.modelscope.cn/mcp/servers/@modelcontextprotocol/sqlite",
     "transport": "stdio",
     "command": "uvx",
-    "args": ["mcp-server-sqlite==2025.4.25", "--db-path", "/path/to/database.db"],
+    "args": [
+      "--with",
+      "mcp<2",
+      "mcp-server-sqlite==2025.4.25",
+      "--db-path",
+      "/path/to/database.db"
+    ],
     "warnings": ["请将 /path/to/database.db 替换为实际数据库路径，并确认数据库读写权限后再启用。"]
   },
   {

@@ -7,6 +7,7 @@ import {
   getMcpDependencyInstallation,
   getMcpServer,
   getMcpRuntimeState,
+  listMcpDependencyInstallations,
   upsertMcpDependencyInstallationAsync,
 } from "./db";
 import { parseMcpCommand } from "./mcp-command";
@@ -20,6 +21,8 @@ import { startMcpServer, syncMcpDependencyState } from "./mcp-lifecycle-manager"
 
 const execFile = promisify(execFileCallback);
 const INSTALL_TIMEOUT_MS = 10 * 60 * 1_000;
+const INTERRUPTED_INSTALLATION_ERROR =
+  "MCP dependency installation was interrupted before completion. Retry installing the dependencies.";
 const activeInstallations = new Map<string, Promise<McpDependencyInstallation>>();
 const dependencyStateListeners = new Set<(installation: McpDependencyInstallation) => void>();
 
@@ -64,6 +67,31 @@ export function installMcpDependencies(
   );
   activeInstallations.set(serverId, tracked);
   return tracked;
+}
+
+/**
+ * Recover durable installation rows left behind when the desktop process
+ * exits before the package-manager child finishes. The in-memory task map is
+ * intentionally checked so this remains safe if recovery is invoked while a
+ * live installation is still running.
+ */
+export async function recoverMcpDependencyInstallations(): Promise<void> {
+  for (const installation of listMcpDependencyInstallations()) {
+    if (installation.status !== "installing" || activeInstallations.has(installation.serverId)) {
+      continue;
+    }
+    await persistDependencyInstallation({
+      serverId: installation.serverId,
+      manager: installation.manager,
+      packageSpecs: installation.packageSpecs,
+      installRoot: installation.installRoot,
+      status: "failed",
+      scriptsAllowed: installation.scriptsAllowed,
+      runtimeInstallationId: installation.runtimeInstallationId,
+      installedAt: null,
+      lastError: INTERRUPTED_INSTALLATION_ERROR,
+    });
+  }
 }
 
 async function installMcpDependenciesInternal(
@@ -180,7 +208,7 @@ async function installMcpDependenciesInternal(
     } else {
       await execFile(
         runtime.command,
-        [...runtime.argsPrefix, "tool", "install", ...command.packageSpecs],
+        [...runtime.argsPrefix, "tool", "install", ...command.installArgs],
         {
           timeout: INSTALL_TIMEOUT_MS,
           windowsHide: true,

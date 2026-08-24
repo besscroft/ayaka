@@ -15,6 +15,7 @@ import { agentLoopSessions } from "./lib/agent-loop-session";
 import { sendUpdateState, updateManager } from "./lib/update-manager";
 import { removeLegacyCompanionData } from "./lib/runtime-paths";
 import { closeAllMcpClients } from "./lib/mcp-manager";
+import { recoverMcpDependencyInstallations } from "./lib/mcp-dependencies";
 import {
   recoverMcpLifecycleStates,
   shutdownMcpLifecycle,
@@ -183,6 +184,7 @@ if (!hasSingleInstanceLock) {
       await ensureDefaultWorkspaceAsset();
       await initDbWriter();
       await recoverMcpLifecycleStates();
+      await recoverMcpDependencyInstallations();
       void startEnabledMcpServers().catch((error) => {
         console.error("[mcp] failed to auto-start enabled servers:", error);
       });

@@ -61,6 +61,13 @@ test("ships the reviewed MCP presets from JSON", () => {
   const zhipu = MCP_PRESETS.find((preset) => preset.id === "zhipu-web-search");
   assert.deepEqual(zhipu?.headers, { Authorization: "$secret:API_KEY" });
   assert.equal(MCP_PRESETS.find((preset) => preset.id === "amap-maps")?.transport, "stdio");
+  assert.deepEqual(MCP_PRESETS.find((preset) => preset.id === "sqlite")?.args, [
+    "--with",
+    "mcp<2",
+    "mcp-server-sqlite==2025.4.25",
+    "--db-path",
+    "/path/to/database.db",
+  ]);
   assert.equal(
     MCP_PRESETS.find((preset) => preset.id === "tyc-mcp")?.url,
     "https://mcp.tianyancha.com/v1",
