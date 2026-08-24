@@ -85,6 +85,22 @@ type WorkspaceCommandPolicyDecision =
   | { decision: "require_review"; risk: Exclude<WorkspaceCommandRisk, "read_only">; reason: string }
   | { decision: "deny"; risk: WorkspaceCommandRisk; reason: string };
 
+export function shouldRequireWorkspaceCommandApproval(options: {
+  approvalEnabled: boolean;
+  commandDecision: "allow" | "require_review";
+  reviewAll: boolean;
+  toolApprovalRequested: boolean;
+  agentPolicyRequiresApproval: boolean;
+}): boolean {
+  if (!options.approvalEnabled) return false;
+  return (
+    options.commandDecision === "require_review" ||
+    options.reviewAll ||
+    options.toolApprovalRequested ||
+    options.agentPolicyRequiresApproval
+  );
+}
+
 interface NormalizedWorkspaceCommandInput {
   executable: string;
   args: string[];

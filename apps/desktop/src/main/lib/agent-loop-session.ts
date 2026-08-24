@@ -14,11 +14,17 @@ import {
   createRuntimeRun,
   discardAgentRunInputs,
   enqueueAgentRunInput,
+  getConversationAgentState,
   getRuntimeRun,
   insertRuntimeEvent,
+  listRuntimeSteps,
   listRuntimeRuns,
+  listagentRuntimeStates,
   patchRuntimeRunMetadata,
+  updateRuntimeStep,
   updateRuntimeRun,
+  upsertAgentRuntimeState,
+  upsertConversationAgentState,
 } from "./db";
 
 const ACTIVE_STATUSES = new Set<RuntimeRun["status"]>([
@@ -354,6 +360,14 @@ export class AgentLoopSession {
       usage_json: usage === undefined ? undefined : JSON.stringify(usage),
       finished_at: now,
     });
+    if (status === "cancelled" || status === "interrupted") {
+      await clearCancelledRuntimeState(
+        this.runId,
+        this.conversationId,
+        detail ?? finishReason,
+        now,
+      );
+    }
     await patchRuntimeRunMetadata(this.runId, {
       ...this.controlMetadata,
       blockedReason: detail ?? null,
@@ -373,6 +387,48 @@ export class AgentLoopSession {
     }
     this.onClosed(this.runId);
   }
+}
+
+async function clearCancelledRuntimeState(
+  runId: string,
+  conversationId: string | undefined,
+  reason: string,
+  finishedAt: number,
+): Promise<void> {
+  const unfinishedSteps = listRuntimeSteps(10_000).filter(
+    (step) =>
+      step.run_id === runId &&
+      ["queued", "running", "waiting_approval", "waiting_handoff"].includes(step.status),
+  );
+  await Promise.all(
+    unfinishedSteps.map((step) =>
+      updateRuntimeStep(step.id, {
+        status: "cancelled",
+        finished_at: finishedAt,
+        error: reason,
+      }),
+    ),
+  );
+
+  for (const state of listagentRuntimeStates()) {
+    if (state.current_run_id !== runId) continue;
+    upsertAgentRuntimeState({
+      agent_id: state.agent_id,
+      status: "idle",
+      current_run_id: null,
+    });
+  }
+
+  if (!conversationId) return;
+  const conversationState = getConversationAgentState(conversationId);
+  if (conversationState?.current_run_id !== runId) return;
+  upsertConversationAgentState({
+    conversation_id: conversationId,
+    current_run_id: null,
+    current_step_id: null,
+    status: "idle",
+    summary: "Agent run cancelled",
+  });
 }
 
 function parseControlMetadata(raw: string | undefined): AgentLoopControlMetadata & {

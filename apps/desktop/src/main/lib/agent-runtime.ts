@@ -67,6 +67,7 @@ import { ContextEngine } from "./context-engine";
 import {
   createContextCheckpoint,
   getConversationAgentState,
+  getToolRecord,
   getSetting,
   upsertAgentRuntimeState,
   upsertConversationAgentState,
@@ -113,6 +114,7 @@ import {
   executeWorkspaceCommand,
   redactWorkspaceCommandInput,
   redactWorkspaceCommandText,
+  shouldRequireWorkspaceCommandApproval,
   WORKSPACE_COMMAND_TOOL_ID,
 } from "./workspace-command";
 
@@ -810,7 +812,7 @@ function createWorkspaceCommandNote(
     "- Use workspace_run_command only when the user explicitly needs a local command run.",
     "- Always provide a structured executable and string argv array; never compose a shell command string.",
     "- cwd is relative to the conversation workspace and persists for this Agent run; env applies only to this call.",
-    "- Known read-only commands may run automatically. Writes, deletion, installation, network, process, and unknown commands require approval.",
+    "- Approval for this tool is configurable in the Tools settings. When enabled, writes, deletion, installation, network, process, and unknown commands require approval.",
     "- The workspace cwd is not an OS security sandbox. A program can still access external files, use the network, or start other processes.",
   ].join("\n");
 }
@@ -818,7 +820,7 @@ function createWorkspaceCommandNote(
 function createWorkspaceCommandTool(context: RuntimeContext): ToolSet[string] {
   return tool({
     description:
-      "Run one structured executable with string argv in the current conversation workspace. cwd is relative and persists for this Agent run; env is per-call only. Known read-only commands may run automatically; risky commands require approval. This is controlled local execution, not an OS sandbox.",
+      "Run one structured executable with string argv in the current conversation workspace. cwd is relative and persists for this Agent run; env is per-call only. Approval is controlled by the workspace command tool setting. This is controlled local execution, not an OS sandbox.",
     inputSchema: jsonSchema<WorkspaceCommandInput>({
       type: "object",
       properties: {
@@ -1801,11 +1803,15 @@ function evaluateToolGuardrail(
     const agentPolicy = readToolPolicy(context.rootAgent.tool_policy_json);
     const reviewAll =
       readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
-    const requiresReview =
-      commandPolicy.decision === "require_review" ||
-      reviewAll ||
-      toolApprovalToolNames.has(toolName) ||
-      agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID);
+    const approvalEnabled = getToolRecord(WORKSPACE_COMMAND_TOOL_ID)?.requires_approval !== 0;
+    const requiresReview = shouldRequireWorkspaceCommandApproval({
+      approvalEnabled,
+      commandDecision: commandPolicy.decision,
+      reviewAll,
+      toolApprovalRequested: toolApprovalToolNames.has(toolName),
+      agentPolicyRequiresApproval:
+        agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID),
+    });
     if (requiresReview) {
       return {
         decision: "require_review",
@@ -1868,6 +1874,7 @@ async function finishRun(
   const failed = status === "failed";
   const finalStatus =
     context.approvalRequested && status === "succeeded" ? "waiting_approval" : status;
+  const approvalPending = finalStatus === "waiting_approval";
   try {
     await disposeWorkspaceCommandSession(context.runId);
   } catch (error) {
@@ -1907,14 +1914,14 @@ async function finishRun(
       agent.id === context.finalAgentId && context.finalAgentId !== DEFAULT_AGENT_ID;
     upsertAgentRuntimeState({
       agent_id: agent.id,
-      status: context.approvalRequested
+      status: approvalPending
         ? "reviewing"
         : status === "blocked"
           ? "blocked"
           : isFinalHandoffAgent
             ? "idle"
             : "idle",
-      current_run_id: context.approvalRequested ? context.runId : null,
+      current_run_id: approvalPending ? context.runId : null,
       last_error: extra.error ?? null,
     });
   }
@@ -1922,16 +1929,16 @@ async function finishRun(
     upsertConversationAgentState({
       conversation_id: context.conversationId,
       active_agent_id: context.finalAgentId,
-      current_run_id: context.approvalRequested ? context.runId : null,
+      current_run_id: approvalPending ? context.runId : null,
       current_step_id: null,
-      status: context.approvalRequested
+      status: approvalPending
         ? "reviewing"
         : status === "blocked"
           ? "blocked"
           : failed
             ? "failed"
             : "idle",
-      summary: context.approvalRequested
+      summary: approvalPending
         ? "Waiting for user approval"
         : failed
           ? extra.error

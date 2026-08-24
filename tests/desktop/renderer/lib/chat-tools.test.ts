@@ -178,6 +178,31 @@ void describe("chat tool UI helpers", () => {
     );
   });
 
+  void it("uses the persisted approval setting for the workspace command", () => {
+    const tools = toolsnapshot();
+    const base = tools.toolRecords[0]!;
+    tools.toolRecords.push({
+      ...base,
+      id: "workspace_run_command",
+      server_id: null,
+      name: "workspace_run_command",
+      title: "Run workspace command",
+      description: "Run a workspace command.",
+      kind: "builtin",
+      category: "execution",
+      reference: "workspace_run_command",
+      requires_approval: 0,
+    });
+
+    const descriptor = createClientChatToolDescriptors({
+      selectedModel: "custom/local-model",
+      providers: [provider("custom", "openai-compatible")],
+      tools,
+    }).find((item) => item.id === "workspace_run_command");
+
+    assert.equal(descriptor?.requiresApproval, false);
+  });
+
   void it("keeps silent memory tools out of the user-facing selector", () => {
     const providers = [provider("openai", "openai")];
     const visible = filterUserVisibleChatToolDescriptors(

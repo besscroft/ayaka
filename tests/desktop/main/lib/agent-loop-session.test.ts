@@ -85,6 +85,88 @@ void describe("AgentLoopSessionManager", () => {
     assert.equal(db.listAgentRunInputs(runId)[0]?.status, "discarded");
   });
 
+  void it("clears approval state and cancels unfinished steps when a run is stopped", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    await manager.start(baseOptions(runId));
+    db.upsertAgentRuntimeState({
+      agent_id: DEFAULT_AGENT_ID,
+      status: "reviewing",
+      current_run_id: runId,
+    });
+    db.upsertConversationAgentState({
+      conversation_id: conversationId,
+      active_agent_id: DEFAULT_AGENT_ID,
+      current_run_id: runId,
+      current_step_id: "approval-step",
+      status: "reviewing",
+      summary: "Waiting for user approval",
+    });
+    await db.createRuntimeStep({
+      id: "approval-step",
+      run_id: runId,
+      agent_id: DEFAULT_AGENT_ID,
+      kind: "approval",
+      status: "queued",
+      title: "Approval requested: workspace_run_command",
+    });
+
+    assert.equal(await manager.cancel(runId), true);
+
+    const agentState = db
+      .listagentRuntimeStates()
+      .find((state) => state.agent_id === DEFAULT_AGENT_ID);
+    const conversationState = db.getConversationAgentState(conversationId);
+    const approvalStep = db.listRuntimeSteps().find((step) => step.id === "approval-step");
+    assert.equal(agentState?.status, "idle");
+    assert.equal(agentState?.current_run_id, null);
+    assert.equal(conversationState?.status, "idle");
+    assert.equal(conversationState?.current_run_id, null);
+    assert.equal(conversationState?.current_step_id, null);
+    assert.equal(approvalStep?.status, "cancelled");
+    assert.notEqual(approvalStep?.finished_at, null);
+  });
+
+  void it("interrupts queued approval steps when recovering stale runs", async () => {
+    const runId = randomUUID();
+    await db.createRuntimeRun({
+      id: runId,
+      conversation_id: conversationId,
+      root_agent_id: DEFAULT_AGENT_ID,
+      status: "waiting_approval",
+    });
+    await db.createRuntimeStep({
+      id: "stale-approval-step",
+      run_id: runId,
+      agent_id: DEFAULT_AGENT_ID,
+      kind: "approval",
+      status: "queued",
+      title: "Approval requested: workspace_run_command",
+    });
+    await db.createRuntimeStep({
+      id: "stale-completed-step",
+      run_id: runId,
+      agent_id: DEFAULT_AGENT_ID,
+      kind: "model",
+      status: "succeeded",
+      title: "Model step",
+      finished_at: Date.now(),
+    });
+
+    await db.closeDb();
+    db.initDb();
+
+    const recoveredRun = db.getRuntimeRun(runId);
+    const approvalStep = db.listRuntimeSteps().find((step) => step.id === "stale-approval-step");
+    const completedStep = db.listRuntimeSteps().find((step) => step.id === "stale-completed-step");
+    assert.equal(recoveredRun?.status, "interrupted");
+    assert.equal(recoveredRun?.finish_reason, "interrupted");
+    assert.equal(approvalStep?.status, "interrupted");
+    assert.equal(approvalStep?.error, "application_interrupted");
+    assert.notEqual(approvalStep?.finished_at, null);
+    assert.equal(completedStep?.status, "succeeded");
+  });
+
   void it("persists absolute limits and rejects resume after the hard cap", async () => {
     const manager = new sessionModule.AgentLoopSessionManager();
     const runId = randomUUID();

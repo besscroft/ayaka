@@ -280,6 +280,15 @@ function openAndMigrateDb(dbPath: string, options: DbInitOptions): DbInstance {
 function cancelStaleRuntimeRuns(): void {
   const now = Date.now();
   getDb().transaction((tx) => {
+    const staleRunIds = tx
+      .select({ id: runtimeRuns.id })
+      .from(runtimeRuns)
+      .where(
+        inArray(runtimeRuns.status, ["queued", "running", "waiting_approval", "waiting_handoff"]),
+      )
+      .all()
+      .map((run) => run.id);
+
     tx.update(runtimeRuns)
       .set({
         status: "interrupted",
@@ -291,6 +300,26 @@ function cancelStaleRuntimeRuns(): void {
         inArray(runtimeRuns.status, ["queued", "running", "waiting_approval", "waiting_handoff"]),
       )
       .run();
+    if (staleRunIds.length > 0) {
+      tx.update(runtimeSteps)
+        .set({
+          status: "interrupted",
+          finished_at: now,
+          error: "application_interrupted",
+        })
+        .where(
+          and(
+            inArray(runtimeSteps.run_id, staleRunIds),
+            inArray(runtimeSteps.status, [
+              "queued",
+              "running",
+              "waiting_approval",
+              "waiting_handoff",
+            ]),
+          ),
+        )
+        .run();
+    }
     tx.update(agentRunInputs)
       .set({
         status: "discarded",
@@ -2691,6 +2720,11 @@ export function listToolRecords(kind?: "builtin" | "mcp" | "skill" | "sandbox"):
     .map(toToolRecord);
 }
 
+export function getToolRecord(id: string): ToolRecord | null {
+  const row = getDb().select().from(tools).where(eq(tools.id, id)).get();
+  return row ? toToolRecord(row) : null;
+}
+
 export function listMcpTools(serverId?: string): ToolRecord[] {
   if (serverId && !getToolServer(serverId)) return [];
   const rows = serverId
@@ -3499,16 +3533,7 @@ function seedDefaults(): void {
 function seedBuiltinTools(now: number): void {
   for (const seed of DEFAULT_BUILTIN_TOOL_SEEDS) {
     const existing = getDb().select().from(tools).where(eq(tools.id, seed.id)).get();
-    if (existing) {
-      if (existing.requires_approval !== seed.requiresApproval) {
-        getDb()
-          .update(tools)
-          .set({ requires_approval: seed.requiresApproval, updated_at: now })
-          .where(eq(tools.id, seed.id))
-          .run();
-      }
-      continue;
-    }
+    if (existing) continue;
     getDb()
       .insert(tools)
       .values({

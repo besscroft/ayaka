@@ -20,6 +20,7 @@ import type { NativeChatTool } from "./providers";
 import {
   getAgent,
   getMemoryById,
+  getToolRecord,
   getRuntimeSnapshot,
   insertRuntimeEvent,
   listMessages,
@@ -424,6 +425,7 @@ export class ChatToolSelectionError extends Error {
 export function createChatToolDescriptors(model: ChatToolModelContext): ChatToolDescriptor[] {
   const supportsTools = model.capabilities.toolCalling;
   const webSearchExecution = getWebSearchExecution(model);
+  const workspaceCommandRecord = getToolRecord("workspace_run_command");
 
   const builtInDescriptors = CHAT_TOOL_IDS.map((id) => {
     const base = TOOL_DEFINITIONS[id];
@@ -446,6 +448,11 @@ export function createChatToolDescriptors(model: ChatToolModelContext): ChatTool
               ? "This provider has not registered the hosted tool for the selected model."
               : "Tool calling is unavailable for the selected model.";
 
+    const requiresApproval =
+      id === "workspace_run_command" && workspaceCommandRecord
+        ? workspaceCommandRecord.requires_approval !== 0
+        : base.requiresApproval;
+
     return {
       ...base,
       ...((id === "web_search" && webSearchExecution) || (isNativeOnly && nativeTool)
@@ -460,6 +467,7 @@ export function createChatToolDescriptors(model: ChatToolModelContext): ChatTool
                 : base.description,
           }
         : {}),
+      requiresApproval,
       available,
       unavailableReason,
     };

@@ -52,6 +52,7 @@ const dbGetRuntimeSnapshot = mock.fn(() => ({
   runtimeEvents: [],
   syncState: { mode: "off", status: "disabled", encryption_enabled: 0 },
 }));
+const dbGetToolRecord = mock.fn<(id: string) => ToolRecord | null>(() => null);
 const dbListMessages = mock.fn(() => []);
 let mcpServer: ToolServer | null = null;
 let mcpTool: ToolRecord | null = null;
@@ -66,6 +67,7 @@ mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.u
     getAgent: dbGetAgent,
     getMemoryById: dbGetMemoryById,
     getRuntimeSnapshot: dbGetRuntimeSnapshot,
+    getToolRecord: dbGetToolRecord,
     insertRuntimeEvent: dbInsertRuntimeEvent,
     getMcpServer: dbGetMcpServer,
     getMcpToolByReference: dbGetMcpToolByReference,
@@ -113,6 +115,8 @@ afterEach(() => {
   dbInsertRuntimeEvent.mock.resetCalls();
   dbUpsertAgentRuntimeState.mock.resetCalls();
   dbGetRuntimeSnapshot.mock.resetCalls();
+  dbGetToolRecord.mock.resetCalls();
+  dbGetToolRecord.mock.mockImplementation(() => null);
   dbListMessages.mock.resetCalls();
   dbGetMcpServer.mock.resetCalls();
   dbGetMcpToolByReference.mock.resetCalls();
@@ -189,6 +193,18 @@ void describe("chat tool runtime", () => {
     });
     assert.equal(runtime.toolChoice, "none");
     assert.equal(runtime.activeTools, undefined);
+  });
+
+  void it("reflects the persisted workspace command approval setting", () => {
+    dbGetToolRecord.mock.mockImplementation((id) =>
+      id === "workspace_run_command" ? ({ requires_approval: 0 } as ToolRecord) : null,
+    );
+
+    const descriptor = chatTools
+      .createChatToolDescriptors(modelContext("openai-compatible"))
+      .find((item) => item.id === "workspace_run_command");
+
+    assert.equal(descriptor?.requiresApproval, false);
   });
 
   void it("uses MCP tool-level automation and approval settings in the AI SDK ToolSet", () => {

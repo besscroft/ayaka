@@ -97,6 +97,17 @@ void describe("agent lifecycle persistence", () => {
     );
   });
 
+  void it("persists the workspace command approval setting across database reinitialization", async () => {
+    assert.equal(db.getToolRecord("workspace_run_command")?.requires_approval, 1);
+
+    db.updateToolRecord("workspace_run_command", { requires_approval: false });
+    assert.equal(db.getToolRecord("workspace_run_command")?.requires_approval, 0);
+
+    await db.closeDb();
+    db.initDb();
+    assert.equal(db.getToolRecord("workspace_run_command")?.requires_approval, 0);
+  });
+
   void it("classifies only active runtime work as busy", () => {
     const busyStatuses = [
       "queued",

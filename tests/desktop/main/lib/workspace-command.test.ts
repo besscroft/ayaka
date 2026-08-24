@@ -112,6 +112,29 @@ void describe("workspace command policy", () => {
     );
   });
 
+  void it("allows the explicit tool setting to disable every approval source", () => {
+    assert.equal(
+      command.shouldRequireWorkspaceCommandApproval({
+        approvalEnabled: false,
+        commandDecision: "require_review",
+        reviewAll: true,
+        toolApprovalRequested: true,
+        agentPolicyRequiresApproval: true,
+      }),
+      false,
+    );
+    assert.equal(
+      command.shouldRequireWorkspaceCommandApproval({
+        approvalEnabled: true,
+        commandDecision: "require_review",
+        reviewAll: false,
+        toolApprovalRequested: false,
+        agentPolicyRequiresApproval: false,
+      }),
+      true,
+    );
+  });
+
   void it("redacts sensitive argv values and environment values", () => {
     assert.deepEqual(
       command.redactWorkspaceCommandInput({

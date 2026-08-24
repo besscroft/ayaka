@@ -10,7 +10,9 @@ export interface ToolRecordFilters {
 }
 
 export function isToolRecordApprovalEligible(tool: ToolRecord): boolean {
-  return tool.kind !== "builtin" && tool.kind !== "sandbox";
+  return (
+    tool.id === "workspace_run_command" || (tool.kind !== "builtin" && tool.kind !== "sandbox")
+  );
 }
 
 export function filterToolRecords(

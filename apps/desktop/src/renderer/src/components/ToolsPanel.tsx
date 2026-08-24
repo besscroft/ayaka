@@ -86,6 +86,7 @@ export function ToolsPanel(): React.JSX.Element {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<ToolKindFilter>("all");
   const [status, setStatus] = useState<ToolStatusFilter>("all");
+  const [approvalToolId, setApprovalToolId] = useState<string | null>(null);
 
   const refresh = (): void => {
     setRefreshing(true);
@@ -100,6 +101,19 @@ export function ToolsPanel(): React.JSX.Element {
   };
 
   useEffect(refresh, []);
+
+  const updateApproval = async (tool: ToolRecord, requiresApproval: boolean): Promise<void> => {
+    setApprovalToolId(tool.id);
+    try {
+      await api.tools.updateTool(tool.id, { requires_approval: requiresApproval });
+      notify.success(t("tools.toast.saved"));
+    } catch (error) {
+      notify.error(t("tools.toast.failed"), error, locale);
+    } finally {
+      refresh();
+      setApprovalToolId(null);
+    }
+  };
 
   const rows = useMemo(
     () =>
@@ -171,7 +185,13 @@ export function ToolsPanel(): React.JSX.Element {
           </div>
         ) : null}
 
-        {snapshot ? <RegistrySection rows={rows} /> : null}
+        {snapshot ? (
+          <RegistrySection
+            rows={rows}
+            approvalToolId={approvalToolId}
+            onApprovalChange={updateApproval}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -340,7 +360,15 @@ function InstalledSkillsListSkeleton(): React.JSX.Element {
   );
 }
 
-function RegistrySection({ rows }: { rows: ToolRecord[] }): React.JSX.Element {
+function RegistrySection({
+  rows,
+  approvalToolId,
+  onApprovalChange,
+}: {
+  rows: ToolRecord[];
+  approvalToolId: string | null;
+  onApprovalChange: (tool: ToolRecord, requiresApproval: boolean) => void;
+}): React.JSX.Element {
   const { t } = useT();
   return (
     <>
@@ -382,6 +410,16 @@ function RegistrySection({ rows }: { rows: ToolRecord[] }): React.JSX.Element {
                 </p>
               </div>
               <div className="flex flex-wrap items-start gap-2 md:justify-end">
+                {tool.id === "workspace_run_command" ? (
+                  <Switch
+                    size="sm"
+                    isSelected={tool.requires_approval !== 0}
+                    isDisabled={approvalToolId === tool.id}
+                    onChange={(requiresApproval) => onApprovalChange(tool, requiresApproval)}
+                  >
+                    {t("tools.approval")}
+                  </Switch>
+                ) : null}
                 {tool.auto_use ? <Chip size="sm">{t("tools.autoUse")}</Chip> : null}
                 {isToolRecordApprovalEligible(tool) && tool.requires_approval ? (
                   <Chip size="sm">{t("tools.approval")}</Chip>

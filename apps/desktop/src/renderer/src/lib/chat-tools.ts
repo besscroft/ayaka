@@ -242,6 +242,11 @@ export function createClientChatToolDescriptors({
 }): ChatToolDescriptor[] {
   const selected = findSelectedChatModel(selectedModel, providers);
   const supportsToolCalling = selected?.model.capabilities.toolCalling === true;
+  const builtinToolRecords = new Map(
+    (tools?.toolRecords ?? [])
+      .filter((toolRecord) => toolRecord.kind === "builtin")
+      .map((toolRecord) => [toolRecord.id, toolRecord]),
+  );
 
   const builtIn = CHAT_TOOL_IDS.map((id) => {
     const meta = TOOL_METADATA[id];
@@ -263,6 +268,9 @@ export function createClientChatToolDescriptors({
           }
         : {}),
       defaultAuto: DEFAULT_AUTO_TOOL_IDS.has(id),
+      requiresApproval: builtinToolRecords.get(id)
+        ? builtinToolRecords.get(id)!.requires_approval !== 0
+        : meta.requiresApproval,
       available,
       unavailableReason: available
         ? undefined

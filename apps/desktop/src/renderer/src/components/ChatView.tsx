@@ -1035,16 +1035,20 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   const handleStop = (): void => {
     const runId = runIdRef.current;
-    void Promise.all([
+    void Promise.allSettled([
       chat.stop(),
       runId ? api.runtime.cancelRun(runId) : Promise.resolve(false),
-    ]).finally(() => {
-      runIdRef.current = null;
-      runModeRef.current = "start";
-      session.isStopped = true;
-      setIsStopped(true);
-      persistInBackground(latestMessagesRef.current, "stopped response");
-    });
+    ])
+      .then(() => api.agents.runtimeSnapshot())
+      .then((snapshot) => setRuntimeSnapshot(snapshot))
+      .catch((error) => console.error("[chat] failed to refresh stopped runtime:", error))
+      .finally(() => {
+        runIdRef.current = null;
+        runModeRef.current = "start";
+        session.isStopped = true;
+        setIsStopped(true);
+        persistInBackground(latestMessagesRef.current, "stopped response");
+      });
   };
 
   const handleRetry = (): void => {

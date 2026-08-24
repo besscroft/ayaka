@@ -79,6 +79,7 @@ void describe("ToolsPanel data helpers", () => {
   void it("filters tools by kind, approval state, enabled state, and search query", () => {
     const records = [
       toolRecord("builtin-time", "builtin", "current_time", "system", 1, 0),
+      toolRecord("workspace_run_command", "builtin", "workspace_run_command", "execution", 1, 1),
       toolRecord("mcp-search", "mcp", "search", "web", 1, 1),
       toolRecord("skill-research", "skill", "research", "general", 0, 1),
       toolRecord("sandbox-command", "sandbox", "sandbox_run_command", "sandbox", 1, 1),
@@ -90,11 +91,11 @@ void describe("ToolsPanel data helpers", () => {
     );
     assert.deepEqual(
       filterToolRecords(records, { status: "enabled" }).map((tool) => tool.id),
-      ["builtin-time", "mcp-search", "sandbox-command"],
+      ["builtin-time", "workspace_run_command", "mcp-search", "sandbox-command"],
     );
     assert.deepEqual(
       filterToolRecords(records, { status: "approval" }).map((tool) => tool.id),
-      ["mcp-search", "skill-research"],
+      ["workspace_run_command", "mcp-search", "skill-research"],
     );
 
     assert.deepEqual(
@@ -106,7 +107,7 @@ void describe("ToolsPanel data helpers", () => {
     );
     assert.deepEqual(
       filterToolRecords(records, { query: "command" }).map((tool) => tool.id),
-      ["sandbox-command"],
+      ["workspace_run_command", "sandbox-command"],
     );
   });
 
