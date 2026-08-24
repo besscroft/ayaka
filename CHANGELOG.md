@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.34]
+
+### 中文
+
+#### 新增
+
+- 新增 Desktop Commander、AntV 图表、Draw.io、Notion 和 MySQL 共 5 个内置 MCP 预设。
+- 新增结构化工作区命令执行工具，支持按可执行文件与参数运行命令，并根据风险等级自动执行或请求审批。
+- 新增共享静态资源包，支持桌面端与文档站复用 Ayaka 资源。
+
+#### 变更
+
+- 优化 MCP 依赖安装与运行参数处理，支持 SQLite MCP 的版本兼容约束，并支持桌面端重启后恢复未完成的依赖安装。
+- 优化流式消息渲染，统一使用富文本内容组件展示增量输出。
+
+#### 修复
+
+- 修复切换对话时聊天视图未正确重新渲染的问题。
+
+### English
+
+#### Added
+
+- Added five built-in MCP presets: Desktop Commander, AntV Chart, Draw.io, Notion, and MySQL.
+- Added a structured workspace command tool that runs executables with argument arrays and automatically allows or requests approval based on command risk.
+- Added a shared static-assets package for reusing Ayaka assets across the desktop and documentation apps.
+
+#### Changed
+
+- Improved MCP dependency installation and runtime-argument handling with SQLite MCP version compatibility constraints and recovery for interrupted installations after restart.
+- Improved streaming message rendering by consistently using the rich-content renderer for incremental output.
+
+#### Fixed
+
+- Fixed the chat view not re-rendering correctly when switching conversations.
+
 ## [0.1.33]
 
 ### 中文
