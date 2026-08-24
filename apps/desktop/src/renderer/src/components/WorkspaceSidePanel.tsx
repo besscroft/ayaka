@@ -54,7 +54,8 @@ export function WorkspaceSidePanel({
     failedPreviews: 0,
   });
   const [width, setWidth] = useState(() => WIDTH_BY_CONVERSATION.get(conversationId) ?? 460);
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
   const tabIds = {
     runtime: `${conversationId}-workspace-runtime-tab`,
     generatedApp: `${conversationId}-workspace-generated-app-tab`,
@@ -97,15 +98,21 @@ export function WorkspaceSidePanel({
       WIDTH_BY_CONVERSATION.set(conversationId, nextWidth);
     };
     const stop = (): void => {
+      const drag = dragRef.current;
+      if (drag && resizeHandleRef.current?.hasPointerCapture(drag.pointerId)) {
+        resizeHandleRef.current.releasePointerCapture(drag.pointerId);
+      }
       dragRef.current = null;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
     window.addEventListener("pointermove", handle);
     window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
     return () => {
       window.removeEventListener("pointermove", handle);
       window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
     };
   }, [conversationId]);
 
@@ -148,12 +155,18 @@ export function WorkspaceSidePanel({
       aria-label={t("workspacePanel.title")}
     >
       <div
+        ref={resizeHandleRef}
         role="separator"
         aria-orientation="vertical"
         aria-label={t("workspacePanel.resize")}
         className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize"
         onPointerDown={(event) => {
-          dragRef.current = { startX: event.clientX, startWidth: width };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          dragRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startWidth: width,
+          };
           document.body.style.cursor = "col-resize";
           document.body.style.userSelect = "none";
         }}
