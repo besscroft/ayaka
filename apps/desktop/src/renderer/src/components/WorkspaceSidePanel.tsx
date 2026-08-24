@@ -247,7 +247,7 @@ export function WorkspaceSidePanel({
             aria-labelledby={tabIds.generatedApp}
             aria-hidden={activeTab !== "generated-app"}
             hidden={activeTab !== "generated-app"}
-            className="h-full min-h-0"
+            className="flex h-full min-h-0 flex-col"
           >
             <GeneratedAppPane
               conversationId={conversationId}

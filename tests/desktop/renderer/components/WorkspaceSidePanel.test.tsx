@@ -33,6 +33,10 @@ void describe("workspace side panel", () => {
     assert.match(html, /aria-controls="conversation-1-workspace-generated-app-panel"/);
     assert.match(html, /aria-labelledby="conversation-1-workspace-runtime-tab"/);
     assert.match(html, /aria-labelledby="conversation-1-workspace-generated-app-tab"/);
+    assert.match(
+      html,
+      /id="conversation-1-workspace-generated-app-panel"[^>]*class="flex h-full min-h-0 flex-col"/,
+    );
     assert.match(html, /hidden=""/);
   });
 });
