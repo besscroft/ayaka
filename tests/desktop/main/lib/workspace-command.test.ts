@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it } from "node:test";
-import { chmod, copyFile, mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import Module, { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -189,6 +189,20 @@ void describe("workspace command execution", () => {
     );
     assert.notEqual(envResult.stdout, "workspace-only");
     assert.equal(persistedCwds.at(-1), "subdir");
+  });
+
+  void it("allows large arguments for file-writing commands", async () => {
+    const contents = "x".repeat(8 * 1024);
+    const result = await execute(
+      nodeCommand(
+        "require('node:fs').writeFileSync(process.argv[1], process.argv[2])",
+        "large-write.txt",
+        contents,
+      ),
+    );
+
+    assert.equal(result.outcome, "completed");
+    assert.equal(await readFile(path.join(root, "large-write.txt"), "utf8"), contents);
   });
 
   void it("runs workspace-relative executables and rejects executable symlink escapes", async (t) => {

@@ -14,7 +14,6 @@ export const MAX_WORKSPACE_COMMAND_TIMEOUT_MS = 60_000;
 export const MAX_WORKSPACE_COMMAND_OUTPUT_BYTES = 64 * 1024;
 
 const MAX_ARGS = 64;
-const MAX_ARGUMENT_LENGTH = 4_096;
 const MAX_ENV_ENTRIES = 32;
 const MAX_ENV_VALUE_LENGTH = 4_096;
 const MAX_EXECUTABLE_LENGTH = 256;
@@ -535,8 +534,8 @@ function normalizeWorkspaceCommandInput(input: unknown): NormalizedWorkspaceComm
     throw new Error("Workspace command args must be a string array with at most 64 items.");
   }
   const normalizedArgs = args.map((arg) => {
-    if (arg.length > MAX_ARGUMENT_LENGTH || arg.includes("\0")) {
-      throw new Error("Workspace command arguments must be shorter than 4096 characters.");
+    if (arg.includes("\0")) {
+      throw new Error("Workspace command arguments must not contain NUL characters.");
     }
     return arg;
   });
