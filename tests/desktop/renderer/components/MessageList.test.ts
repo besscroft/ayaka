@@ -505,11 +505,11 @@ void describe("media tool output", () => {
 });
 
 void describe("generated tool disclosure", () => {
-  void it("collapses tool cards in every state by default", () => {
+  void it("opens approval requests while collapsing completed tool cards", () => {
     assert.equal(getToolDefaultOpen(normalizeToolState("output-available")), false);
     assert.equal(getToolDefaultOpen(normalizeToolState("approval-responded")), false);
     assert.equal(getToolDefaultOpen(normalizeToolState("input-available")), false);
-    assert.equal(getToolDefaultOpen(normalizeToolState("approval-requested")), false);
+    assert.equal(getToolDefaultOpen(normalizeToolState("approval-requested")), true);
     assert.equal(getToolDefaultOpen(normalizeToolState("output-error")), false);
     assert.equal(getToolDefaultOpen(normalizeToolState("output-denied")), false);
   });

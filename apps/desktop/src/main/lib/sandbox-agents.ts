@@ -12,7 +12,6 @@ import {
   upsertSandboxSessionAsync as upsertSandboxSession,
 } from "./db";
 import { getConversationWorkspace } from "./db";
-import { seedDefaultWorkspaceAsset } from "./default-workspace-assets";
 import type { SandboxArtifact, SandboxSession, SandboxSnapshot } from "../../shared/types";
 
 const DATA_DIRNAME = "data";
@@ -68,7 +67,6 @@ export async function getOrCreateSandboxSession(input: {
     : path.join(resolveSandboxBaseDir(), sessionId);
   await mkdir(rootPath, { recursive: true });
   await mkdir(path.join(rootPath, SNAPSHOT_DIRNAME), { recursive: true });
-  await seedDefaultWorkspaceAsset(rootPath);
   const now = Date.now();
   const session = await upsertSandboxSession({
     id: sessionId,

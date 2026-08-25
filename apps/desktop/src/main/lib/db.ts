@@ -283,9 +283,7 @@ function cancelStaleRuntimeRuns(): void {
     const staleRunIds = tx
       .select({ id: runtimeRuns.id })
       .from(runtimeRuns)
-      .where(
-        inArray(runtimeRuns.status, ["queued", "running", "waiting_approval", "waiting_handoff"]),
-      )
+      .where(inArray(runtimeRuns.status, ["queued", "running", "waiting_handoff"]))
       .all()
       .map((run) => run.id);
 
@@ -296,9 +294,7 @@ function cancelStaleRuntimeRuns(): void {
         finished_at: now,
         updated_at: now,
       })
-      .where(
-        inArray(runtimeRuns.status, ["queued", "running", "waiting_approval", "waiting_handoff"]),
-      )
+      .where(inArray(runtimeRuns.status, ["queued", "running", "waiting_handoff"]))
       .run();
     if (staleRunIds.length > 0) {
       tx.update(runtimeSteps)

@@ -110,6 +110,13 @@ void describe("workspace command policy", () => {
       }).risk,
       "unknown",
     );
+    assert.equal(
+      command.evaluateWorkspaceCommandPolicy({
+        executable: "Get-Content",
+        args: ["AGENTS.md"],
+      }).risk,
+      "unknown",
+    );
   });
 
   void it("allows the explicit tool setting to disable every approval source", () => {

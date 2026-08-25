@@ -825,6 +825,7 @@ function createWorkspaceCommandNote(
     "- Use workspace_run_command only when the user explicitly needs a local command run.",
     "- Always provide a structured executable and string argv array; never compose a shell command string.",
     "- cwd is relative to the conversation workspace and persists for this Agent run; env applies only to this call.",
+    "- On Windows, prefer the real rg executable for reading and searching files (for example, rg --files or rg -n). Do not invoke PowerShell or cmd just to read a file.",
     "- Approval for this tool is configurable in the Tools settings. When enabled, writes, deletion, installation, network, process, and unknown commands require approval.",
     "- The workspace cwd is not an OS security sandbox. A program can still access external files, use the network, or start other processes.",
   ].join("\n");

@@ -502,10 +502,10 @@ export class AgentLoopSessionManager {
           `Agent run '${options.runId}' was not found.`,
         );
       }
-      if (existing.status !== "blocked") {
+      if (existing.status !== "blocked" && existing.status !== "waiting_approval") {
         throw new AgentLoopSessionError(
           "run_not_active",
-          `Agent run '${options.runId}' cannot be resumed after its process ended.`,
+          `Agent run '${options.runId}' cannot be resumed from status '${existing.status}'.`,
         );
       }
       const resumed = new AgentLoopSession(

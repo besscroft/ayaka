@@ -117,6 +117,13 @@ void describe("agent tool-result reconciliation", () => {
             state: "output-error",
             errorText: "failed",
           } as UIMessage["parts"][number],
+          {
+            type: "tool-workspace_run_command",
+            toolCallId: "call-4",
+            state: "approval-responded",
+            input: { executable: "rg", args: ["--files"] },
+            approval: { id: "approval-1", approved: true },
+          } as UIMessage["parts"][number],
         ],
       },
     ];
@@ -138,6 +145,13 @@ void describe("agent tool-result reconciliation", () => {
         toolCallId: "call-3",
         state: "output-error",
         errorText: "failed",
+      },
+      {
+        type: "tool-workspace_run_command",
+        toolCallId: "call-4",
+        state: "approval-responded",
+        input: { executable: "rg", args: ["--files"] },
+        approval: { id: "approval-1", approved: true },
       },
     ]);
   });

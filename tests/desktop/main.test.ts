@@ -1,7 +1,6 @@
 import "./main/lib/catalog-adapters.test.ts";
 import "./main/lib/catalog-service.test.ts";
 import "./main/lib/changelog.test.ts";
-import "./main/lib/default-workspace-assets.test.ts";
 import "./main/lib/chat-errors.test.ts";
 import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";

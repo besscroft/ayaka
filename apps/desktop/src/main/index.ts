@@ -31,7 +31,6 @@ import { cancelAllMcpInputs } from "./lib/mcp-interaction-broker";
 import { closeMcpOAuthLoopback } from "./lib/mcp-auth";
 import { createTray, type TrayController } from "./lib/tray";
 import { getDefaultTrayMenuLabels } from "./lib/tray-menu";
-import { ensureDefaultWorkspaceAsset } from "./lib/default-workspace-assets";
 import {
   flushErrorLogs,
   initializeErrorLogger,
@@ -196,7 +195,6 @@ if (!hasSingleInstanceLock) {
     });
 
     try {
-      await ensureDefaultWorkspaceAsset();
       await initDbWriter();
       await recoverMcpLifecycleStates();
       await recoverMcpDependencyInstallations();

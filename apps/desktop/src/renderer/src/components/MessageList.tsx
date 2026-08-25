@@ -706,7 +706,10 @@ function MessageItem({
             const summary = getToolSummary(part);
             return (
               <Fragment key={key}>
-                <Tool active={hasExplicitState && isActiveToolState(state)} defaultOpen={false}>
+                <Tool
+                  active={hasExplicitState && isActiveToolState(state)}
+                  defaultOpen={getToolDefaultOpen(state)}
+                >
                   <ToolHeader
                     type={part.type}
                     toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
@@ -1010,8 +1013,7 @@ function isActiveToolState(state: ReturnType<typeof normalizeToolState>): boolea
 }
 
 export function getToolDefaultOpen(state: ReturnType<typeof normalizeToolState>): boolean {
-  void state;
-  return false;
+  return state === "approval-requested";
 }
 
 function renderToolOutput(output: unknown, unserializableLabel: string): ReactNode {

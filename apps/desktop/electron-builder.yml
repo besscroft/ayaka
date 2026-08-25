@@ -13,8 +13,6 @@ asarUnpack:
   - resources/**
   - "**/*.node"
 extraResources:
-  - from: ../../ayaka.png
-    to: default/ayaka.png
   - from: drizzle
     to: drizzle
     filter: ["**/*"]

@@ -220,7 +220,7 @@ export function evaluateWorkspaceCommandPolicy(input: unknown): WorkspaceCommand
     };
   }
   if (
-    matchesAny(text, /\b(mkdir|md|touch|cp|copy|mv|move|ren|rename|tee|git\s+(add|commit))\b/) ||
+    matchesAny(text, /\b(mkdir|touch|cp|copy|mv|move|ren|rename|tee|git\s+(add|commit))\b/) ||
     matchesAny(text, /\b(write|output|target|destination)\b/)
   ) {
     return {
