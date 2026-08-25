@@ -546,16 +546,10 @@ const entries = {
     zh: "Agent 生成 HTML 或小应用后会显示在这里。",
     en: "Generated HTML and apps appear here.",
   },
-  "generatedApp.authorize": { zh: "授权预览", en: "Authorize preview" },
-  "generatedApp.authorizationRequired": {
-    zh: "此生成物尚未获授权执行。",
-    en: "This artifact is not authorized to execute yet.",
-  },
   "generatedApp.preview": { zh: "预览", en: "Preview" },
   "generatedApp.source": { zh: "源码", en: "Source" },
   "generatedApp.stop": { zh: "停止", en: "Stop" },
   "generatedApp.restart": { zh: "重启", en: "Restart" },
-  "generatedApp.revoke": { zh: "撤销授权", en: "Revoke" },
   "generatedApp.sourceLoading": { zh: "正在读取源码…", en: "Loading source…" },
   "generatedApp.tooLarge": {
     zh: "文件超过 256 KB，已回退为源码，不会执行。",

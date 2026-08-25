@@ -39,21 +39,14 @@ void describe("generated tool UI parsing", () => {
   });
 
   void it("selects the isolated preview mode and protects single-file HTML", () => {
-    assert.equal(getGeneratedAppPreviewMode({ kind: "html", authorized: false }), "authorization");
-    assert.equal(getGeneratedAppPreviewMode({ kind: "html", authorized: true }), "html");
-    assert.equal(getGeneratedAppPreviewMode({ kind: "static", authorized: true }), "static");
+    assert.equal(getGeneratedAppPreviewMode({ kind: "html" }), "html");
+    assert.equal(getGeneratedAppPreviewMode({ kind: "static" }), "static");
     assert.equal(
-      getGeneratedAppPreviewMode({ kind: "static", authorized: true, previewStatus: "running" }),
+      getGeneratedAppPreviewMode({ kind: "static", previewStatus: "running" }),
       "localhost",
     );
-    assert.equal(
-      getGeneratedAppPreviewMode({ kind: "html", authorized: true, sizeBytes: 256 * 1024 + 1 }),
-      "source",
-    );
-    assert.equal(
-      getGeneratedAppPreviewMode({ kind: "html", authorized: true, sourceMode: true }),
-      "source",
-    );
+    assert.equal(getGeneratedAppPreviewMode({ kind: "html", sizeBytes: 256 * 1024 + 1 }), "source");
+    assert.equal(getGeneratedAppPreviewMode({ kind: "html", sourceMode: true }), "source");
 
     const protectedHtml = protectGeneratedHtml("<h1>safe</h1>");
     assert.match(protectedHtml, /Content-Security-Policy/);

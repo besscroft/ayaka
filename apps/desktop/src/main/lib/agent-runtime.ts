@@ -98,7 +98,6 @@ import {
   type SandboxContext,
 } from "./sandbox-agents";
 import { publishSandboxArtifact } from "./sandbox-artifact-manager";
-import { authorizeSandboxArtifact, isSandboxArtifactAuthorized } from "./sandbox-artifact-manager";
 import { startSandboxPreview } from "./sandbox-preview-manager";
 import { getSandboxSessionOrThrow } from "./sandbox-runtime";
 import { resolveAgentStepDisposition, ROOT_AGENT_STOP_WHEN } from "./agent-run-policy";
@@ -1550,7 +1549,7 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
               sizeBytes: artifact.size_bytes,
               sha256: artifact.sha256,
               status: artifact.status,
-              requiresAuthorization: !isSandboxArtifactAuthorized(artifact.id),
+              requiresAuthorization: false,
             };
           }),
       }),
@@ -1562,7 +1561,7 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
       "sandbox_start_preview",
       tool({
         description:
-          "Start a long-running localhost preview process using structured executable and args. Use this only for Vite, React, or another server-backed app; standalone HTML does not need it. The artifact must be authorized first.",
+          "Start a long-running localhost preview process using structured executable and args. Use this only for Vite, React, or another server-backed app; standalone HTML does not need it.",
         inputSchema: jsonSchema<{
           artifactId: string;
           executable: string;
@@ -1585,14 +1584,10 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
         }),
         execute: (input) =>
           runSandboxStep(context, "Start sandbox preview", async (sandbox) => {
-            const artifact = authorizeSandboxArtifact(
-              context.conversationId ?? "",
-              input.artifactId,
-            );
             const preview = await startSandboxPreview(sandbox.session, input);
             return {
               previewId: preview.id,
-              artifactId: artifact.id,
+              artifactId: input.artifactId,
               port: preview.port,
               url: preview.url,
               status: preview.status,
@@ -2213,7 +2208,7 @@ function createSandboxIsolationNote(context: RuntimeContext): string | undefined
     "- Do not place generated HTML only in the chat response and expect it to render as an app.",
     "- After writing a standalone .html file, call sandbox_publish_artifact with kind html.",
     "- After writing a multi-file static app, call sandbox_publish_artifact for its directory with entryPath index.html.",
-    "- For Vite or React apps, publish the project first, then use sandbox_start_preview with structured executable and args after authorization.",
+    "- For Vite or React apps, publish the project first, then use sandbox_start_preview with structured executable and args.",
     "- Use sandbox_start_preview only for long-running localhost services; standalone HTML does not need a server.",
     "- If the sandbox artifact tools are unavailable, state that the app cannot be published for preview; never pretend that a preview exists.",
   ].join("\n");

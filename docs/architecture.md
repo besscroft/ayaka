@@ -123,8 +123,9 @@ The renderer never receives a sandbox root or a host path. HTML is loaded throug
 `iframe` with `allow-scripts` only and a restrictive CSP that disables network access. Static
 resources use the privileged `ayaka-artifact://<artifactId>/<relative-path>` protocol; the main
 process resolves the artifact ID, re-validates the sandbox path, restricts MIME types and size, and
-returns a CSP-protected response. Artifact authorization is an in-memory capability keyed by the
-artifact ID and is rechecked for source reads and protocol resources.
+returns a CSP-protected response. Published HTML and static artifacts are immediately available for
+preview; source reads and protocol resources still re-check conversation ownership, sandbox paths,
+MIME types, and size limits in the main process.
 
 Long-running Vite/React or static-server processes are separate from `sandbox_run_command` and are
 managed by `sandbox-preview-manager.ts`. `sandbox_start_preview` accepts only structured

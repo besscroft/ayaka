@@ -4,16 +4,7 @@ import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { getGeneratedAppPreviewMode, protectGeneratedHtml } from "../lib/generated-tool-ui";
 import { Button } from "./ui";
-import {
-  IconBookOpen,
-  IconClose,
-  IconCode,
-  IconEye,
-  IconFolderOpen,
-  IconGlobe,
-  IconRefresh,
-  IconMaximize,
-} from "./icons";
+import { IconCode, IconEye, IconGlobe, IconRefresh, IconMaximize } from "./icons";
 
 interface GeneratedAppPaneProps {
   conversationId: string;
@@ -25,7 +16,6 @@ interface GeneratedAppPaneProps {
 
 export interface GeneratedAppSummary {
   artifactCount: number;
-  pendingAuthorization: number;
   runningPreviews: number;
   failedPreviews: number;
 }
@@ -39,7 +29,7 @@ export function GeneratedAppPane({
   onRequestOpen,
   onSummaryChange,
 }: GeneratedAppPaneProps): React.JSX.Element {
-  const { t, f } = useT();
+  const { t } = useT();
   const [artifacts, setArtifacts] = useState<SandboxArtifact[]>([]);
   const [previews, setPreviews] = useState<SandboxPreview[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,7 +48,6 @@ export function GeneratedAppPane({
     (selected?.kind === "html" && (selected.size_bytes ?? 0) > MAX_HTML_EXECUTABLE_BYTES) || false;
   const previewMode = getGeneratedAppPreviewMode({
     kind: selected?.kind,
-    authorized: selected?.authorized,
     sourceMode,
     previewStatus: selectedPreview?.status,
     sizeBytes: selected?.size_bytes ?? undefined,
@@ -140,7 +129,6 @@ export function GeneratedAppPane({
   useEffect(() => {
     onSummaryChange?.({
       artifactCount: artifacts.length,
-      pendingAuthorization: artifacts.filter((artifact) => !artifact.authorized).length,
       runningPreviews: previews.filter((preview) => preview.status === "running").length,
       failedPreviews: previews.filter((preview) => preview.status === "failed").length,
     });
@@ -165,7 +153,7 @@ export function GeneratedAppPane({
     setSourceError(null);
     setResourceUrl(null);
     setSourceMode(false);
-    if (!selected || !selected.authorized) return;
+    if (!selected) return;
     if (selected.kind === "html") {
       void api.sandboxArtifacts
         .read({ conversationId, artifactId: selected.id })
@@ -231,44 +219,6 @@ export function GeneratedAppPane({
     };
   }, [conversationId, selectedPreview, visible]);
 
-  const authorize = async (): Promise<void> => {
-    if (!selected) return;
-    try {
-      const next = await api.sandboxArtifacts.authorize({
-        conversationId,
-        artifactId: selected.id,
-      });
-      setArtifacts((current) => current.map((item) => (item.id === next.id ? next : item)));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-    }
-  };
-
-  const revoke = async (): Promise<void> => {
-    if (!selected) return;
-    if (selectedPreview) {
-      await api.sandboxPreviews
-        .close({ conversationId, previewId: selectedPreview.id })
-        .catch(() => undefined);
-    }
-    await api.sandboxArtifacts
-      .revoke({ conversationId, artifactId: selected.id })
-      .catch(() => undefined);
-    setSource(null);
-    setResourceUrl(null);
-    setSourceMode(false);
-    await load();
-  };
-
-  const closePreview = async (): Promise<void> => {
-    const items = await api.sandboxPreviews.list(conversationId).catch(() => []);
-    await Promise.all(
-      items.map((item) =>
-        api.sandboxPreviews.close({ conversationId, previewId: item.id }).catch(() => false),
-      ),
-    );
-  };
-
   const refresh = (): void => {
     setRefreshNonce((value) => value + 1);
     void load();
@@ -280,44 +230,50 @@ export function GeneratedAppPane({
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
       aria-label={t("generatedApp.title")}
     >
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <IconEye className="size-3.5 text-primary" />
-        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold">{t("generatedApp.title")}</h2>
+      <header className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+        {artifacts.length > 1 ? (
+          <GeneratedArtifactTabs
+            artifacts={artifacts}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
+          />
+        ) : null}
+        {selected ? (
+          <>
+            <Button
+              size="icon"
+              variant={sourceMode ? "secondary" : "primary"}
+              className="shrink-0"
+              aria-label={t("generatedApp.preview")}
+              title={t("generatedApp.preview")}
+              onPress={() => setSourceMode(false)}
+            >
+              <IconEye className="size-3.5" />
+            </Button>
+            {selected.kind === "html" ? (
+              <Button
+                size="icon"
+                variant={sourceMode ? "primary" : "secondary"}
+                className="shrink-0"
+                aria-label={t("generatedApp.source")}
+                title={t("generatedApp.source")}
+                onPress={() => setSourceMode(true)}
+              >
+                <IconCode className="size-3.5" />
+              </Button>
+            ) : null}
+          </>
+        ) : null}
         <Button
           variant="ghost"
           size="icon"
+          className="shrink-0"
           aria-label={t("generatedApp.refresh")}
           onPress={refresh}
         >
           <IconRefresh className="size-3.5" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("generatedApp.close")}
-          onPress={() => void closePreview()}
-        >
-          <IconClose className="size-3.5" />
-        </Button>
       </header>
-      {artifacts.length > 1 ? (
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 py-1.5">
-          {artifacts.map((artifact) => (
-            <button
-              key={artifact.id}
-              type="button"
-              className={`max-w-44 truncate rounded px-2 py-1 text-[10px] ${
-                artifact.id === selected?.id
-                  ? "bg-primary/15 text-primary"
-                  : "text-foreground/55 hover:bg-muted"
-              }`}
-              onClick={() => setSelectedId(artifact.id)}
-            >
-              {artifact.path}
-            </button>
-          ))}
-        </div>
-      ) : null}
       <div className="flex min-h-0 flex-1 flex-col">
         {loading ? (
           <p className="p-4 text-xs text-foreground/50">{t("generatedApp.loading")}</p>
@@ -330,82 +286,38 @@ export function GeneratedAppPane({
         {!loading && !error && !selected ? <EmptyPane /> : null}
         {selected ? (
           <>
-            <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-              {selected.kind === "static" ? (
-                <IconFolderOpen className="size-3.5" />
-              ) : (
-                <IconBookOpen className="size-3.5" />
-              )}
-              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-foreground/65">
-                {selected.path}
-              </span>
-              <span className="shrink-0 text-[10px] text-foreground/40">
-                {f.bytes(selected.size_bytes ?? 0)}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
-              {!selected.authorized ? (
-                <Button size="sm" variant="primary" onPress={() => void authorize()}>
-                  {t("generatedApp.authorize")}
-                </Button>
-              ) : (
-                <>
+            {selectedPreview ? (
+              <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
+                {selectedPreview.status === "running" ? (
                   <Button
                     size="sm"
-                    variant={sourceMode ? "secondary" : "primary"}
-                    onPress={() => setSourceMode(false)}
+                    variant="ghost"
+                    onPress={() =>
+                      void api.sandboxPreviews.stop({
+                        conversationId,
+                        previewId: selectedPreview.id,
+                      })
+                    }
                   >
-                    <IconEye className="size-3" /> {t("generatedApp.preview")}
+                    <IconMaximize className="size-3" /> {t("generatedApp.stop")}
                   </Button>
-                  {selected.kind === "html" ? (
-                    <Button
-                      size="sm"
-                      variant={sourceMode ? "primary" : "secondary"}
-                      onPress={() => setSourceMode(true)}
-                    >
-                      <IconCode className="size-3" /> {t("generatedApp.source")}
-                    </Button>
-                  ) : null}
-                  {selectedPreview ? (
-                    selectedPreview.status === "running" ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onPress={() =>
-                          void api.sandboxPreviews.stop({
-                            conversationId,
-                            previewId: selectedPreview.id,
-                          })
-                        }
-                      >
-                        <IconMaximize className="size-3" /> {t("generatedApp.stop")}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onPress={() =>
-                          void api.sandboxPreviews.restart({
-                            conversationId,
-                            previewId: selectedPreview.id,
-                          })
-                        }
-                      >
-                        <IconRefresh className="size-3" /> {t("generatedApp.restart")}
-                      </Button>
-                    )
-                  ) : null}
-                  <Button size="sm" variant="ghost" onPress={() => void revoke()}>
-                    {t("generatedApp.revoke")}
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() =>
+                      void api.sandboxPreviews.restart({
+                        conversationId,
+                        previewId: selectedPreview.id,
+                      })
+                    }
+                  >
+                    <IconRefresh className="size-3" /> {t("generatedApp.restart")}
                   </Button>
-                </>
-              )}
-            </div>
-            {previewMode === "authorization" ? (
-              <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-foreground/55">
-                {t("generatedApp.authorizationRequired")}
+                )}
               </div>
-            ) : previewMode === "source" ? (
+            ) : null}
+            {previewMode === "source" ? (
               <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-foreground/75">
                 {sourceError ?? source ?? t("generatedApp.sourceLoading")}
               </pre>
@@ -455,6 +367,37 @@ export function GeneratedAppPane({
             ) : null}
           </>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function GeneratedArtifactTabs({
+  artifacts,
+  selectedId,
+  onSelect,
+}: {
+  artifacts: SandboxArtifact[];
+  selectedId: string | null;
+  onSelect: (artifactId: string) => void;
+}): React.JSX.Element {
+  return (
+    <div data-slot="generated-artifact-tabs-scroll" className="min-w-0 flex-1 overflow-x-auto">
+      <div className="flex w-max min-w-full gap-1">
+        {artifacts.map((artifact) => (
+          <button
+            key={artifact.id}
+            type="button"
+            className={`max-w-44 shrink-0 truncate rounded px-2 py-1 text-[10px] ${
+              artifact.id === selectedId
+                ? "bg-primary/15 text-primary"
+                : "text-foreground/55 hover:bg-muted"
+            }`}
+            onClick={() => onSelect(artifact.id)}
+          >
+            {artifact.path}
+          </button>
+        ))}
       </div>
     </div>
   );

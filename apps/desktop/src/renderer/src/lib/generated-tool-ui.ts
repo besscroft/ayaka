@@ -68,24 +68,16 @@ export interface SandboxArtifactResult {
   authorized?: boolean;
 }
 
-export type GeneratedAppPreviewMode =
-  | "none"
-  | "authorization"
-  | "source"
-  | "html"
-  | "static"
-  | "localhost";
+export type GeneratedAppPreviewMode = "none" | "source" | "html" | "static" | "localhost";
 
 export function getGeneratedAppPreviewMode(input: {
   kind?: string;
-  authorized?: boolean;
   sourceMode?: boolean;
   previewStatus?: string;
   sizeBytes?: number;
   maxHtmlBytes?: number;
 }): GeneratedAppPreviewMode {
   if (input.kind !== "html" && input.kind !== "static") return "none";
-  if (!input.authorized) return "authorization";
   if (
     input.sourceMode ||
     (input.kind === "html" &&

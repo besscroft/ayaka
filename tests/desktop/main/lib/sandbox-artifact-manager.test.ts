@@ -61,7 +61,8 @@ void describe("sandbox artifact manager", () => {
     assert.equal(staticSite.kind, "static");
     assert.equal(staticSite.path, "site");
     assert.equal(staticSite.entry_path, "index.html");
-    assert.equal(staticSite.authorized, false);
+    assert.equal(html.authorized, true);
+    assert.equal(staticSite.authorized, true);
     assert.doesNotMatch(JSON.stringify(html), /[A-Za-z]:\\/);
   });
 
@@ -92,16 +93,11 @@ void describe("sandbox artifact manager", () => {
     assert.throws(() => artifacts.normalizeRelativePath("C:/escape.js"), /relative/);
   });
 
-  void it("requires authorization before HTML reads", async () => {
+  void it("allows HTML reads without authorization", async () => {
     const session = await makeSession("authorize");
     await mkdir(session.root_path, { recursive: true });
     await writeFile(path.join(session.root_path, "index.html"), "<p>safe</p>");
     const artifact = await artifacts.publishSandboxArtifact(session, { path: "index.html" });
-    await assert.rejects(
-      () => artifacts.readSandboxArtifactHtml(session.conversation_id!, artifact.id),
-      /authorization/,
-    );
-    artifacts.authorizeSandboxArtifact(session.conversation_id!, artifact.id);
     const source = await artifacts.readSandboxArtifactHtml(session.conversation_id!, artifact.id);
     assert.equal(source.text, "<p>safe</p>");
   });
@@ -123,11 +119,6 @@ void describe("sandbox artifact manager", () => {
     assert.notEqual(updated.sha256, first.sha256);
     assert.equal(updated.status, "ready");
 
-    assert.throws(
-      () => artifacts.getSandboxArtifactResourceUrl(session.conversation_id!, updated.id),
-      /authorization/,
-    );
-    artifacts.authorizeSandboxArtifact(session.conversation_id!, updated.id);
     assert.equal(
       artifacts.getSandboxArtifactResourceUrl(session.conversation_id!, updated.id),
       `ayaka-artifact://${updated.id}/index.html`,

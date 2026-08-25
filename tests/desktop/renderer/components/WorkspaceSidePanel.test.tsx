@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { SandboxArtifact } from "@shared/types";
 import { DEFAULT_CHAT_TOOL_SELECTION } from "@shared/types";
+import { GeneratedArtifactTabs } from "@renderer/components/GeneratedAppPane";
 import {
   getWorkspaceSidePanelAnimation,
   getWorkspaceSidePanelTransition,
@@ -63,4 +65,39 @@ void describe("workspace side panel", () => {
     assert.match(html, /inert=""/);
     assert.match(html, /will-change-\[width\]/);
   });
+
+  void it("keeps generated artifact tabs horizontally scrollable", () => {
+    const artifacts = ["report.html", "chart.html", "summary.html"].map((path, index) =>
+      makeArtifact(`artifact-${index}`, path),
+    );
+    const html = renderToStaticMarkup(
+      createElement(GeneratedArtifactTabs, {
+        artifacts,
+        selectedId: artifacts[0].id,
+        onSelect: () => undefined,
+      }),
+    );
+
+    assert.match(html, /data-slot="generated-artifact-tabs-scroll"/);
+    assert.match(html, /class="min-w-0 flex-1 overflow-x-auto"/);
+    for (const artifact of artifacts) assert.match(html, new RegExp(artifact.path));
+  });
 });
+
+function makeArtifact(id: string, path: string): SandboxArtifact {
+  return {
+    id,
+    session_id: "session-1",
+    kind: "html",
+    path,
+    url: null,
+    size_bytes: 1,
+    entry_path: null,
+    mime_type: "text/html",
+    sha256: null,
+    status: "ready",
+    created_at: 0,
+    updated_at: 0,
+    authorized: false,
+  };
+}

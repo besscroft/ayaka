@@ -50,6 +50,8 @@ export function onSandboxArtifactUpdated(
 }
 
 export function isSandboxArtifactAuthorized(id: string): boolean {
+  const artifact = getSandboxArtifact(id);
+  if (artifact?.kind === "html" || artifact?.kind === "static") return true;
   return authorizedArtifactIds.has(id);
 }
 
@@ -132,9 +134,6 @@ export async function readSandboxArtifactHtml(
 ): Promise<SandboxArtifactReadResult> {
   const artifact = getOwnedArtifact(conversationId, artifactId);
   if (artifact.kind !== "html") throw new Error("Only HTML artifacts can be read as source.");
-  if (!isSandboxArtifactAuthorized(artifact.id)) {
-    throw new Error("Sandbox artifact requires authorization.");
-  }
   const session = getSandboxSession(artifact.session_id);
   if (!session) throw new Error("Sandbox session not found.");
   const filePath = resolveSandboxPath(session.root_path, artifact.path);
@@ -165,9 +164,6 @@ export async function readSandboxArtifactHtml(
 export function getSandboxArtifactResourceUrl(conversationId: string, artifactId: string): string {
   const artifact = getOwnedArtifact(conversationId, artifactId);
   if (artifact.kind !== "static") throw new Error("Only static artifacts have resource URLs.");
-  if (!isSandboxArtifactAuthorized(artifact.id)) {
-    throw new Error("Sandbox artifact requires authorization.");
-  }
   if (!artifact.entry_path) throw new Error("Static artifact entry is missing.");
   const entryPath = normalizeRelativePath(artifact.entry_path);
   const encodedPath = entryPath.split("/").map(encodeURIComponent).join("/");
@@ -180,8 +176,6 @@ export async function readSandboxArtifactResource(
 ): Promise<{ body: Buffer; mimeType: string; sizeBytes: number }> {
   const artifact = getSandboxArtifact(artifactId);
   if (!artifact || artifact.kind !== "static") throw new Error("Static artifact not found.");
-  if (!isSandboxArtifactAuthorized(artifact.id))
-    throw new Error("Sandbox artifact requires authorization.");
   const session = getSandboxSession(artifact.session_id);
   if (!session) throw new Error("Sandbox session not found.");
   const normalized = normalizeRelativePath(relativePath);
@@ -340,7 +334,7 @@ async function scanDirectory(root: string): Promise<{
 }
 
 function projectArtifact(artifact: SandboxArtifact): SandboxArtifact {
-  return { ...artifact, authorized: authorizedArtifactIds.has(artifact.id) };
+  return { ...artifact, authorized: isSandboxArtifactAuthorized(artifact.id) };
 }
 
 function emitArtifact(artifact: SandboxArtifact): void {

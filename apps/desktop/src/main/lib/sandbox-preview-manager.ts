@@ -7,7 +7,6 @@ import { BrowserWindow, WebContentsView } from "electron";
 import {
   createSandboxPreviewArtifact,
   getOwnedArtifact,
-  isSandboxArtifactAuthorized,
   MAX_HTML_EXECUTABLE_BYTES,
   setSandboxArtifactStatus,
 } from "./sandbox-artifact-manager";
@@ -91,8 +90,8 @@ export async function startSandboxPreview(
   if (artifact.kind === "html" && (artifact.size_bytes ?? 0) > MAX_HTML_EXECUTABLE_BYTES) {
     throw new Error("HTML artifacts over 256 KB can only be shown as source.");
   }
-  if (!isSandboxArtifactAuthorized(artifact.id)) {
-    throw new Error("Sandbox artifact preview requires authorization first.");
+  if (artifact.kind !== "html" && artifact.kind !== "static") {
+    throw new Error("Only published HTML or static artifacts can be previewed.");
   }
   const launch = await normalizeLaunch(session, input);
   const previewId = randomUUID();

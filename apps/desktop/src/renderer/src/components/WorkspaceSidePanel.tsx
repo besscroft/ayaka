@@ -70,7 +70,6 @@ export function WorkspaceSidePanel({
   const [requestedArtifactId, setRequestedArtifactId] = useState<string | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedAppSummary>({
     artifactCount: 0,
-    pendingAuthorization: 0,
     runningPreviews: 0,
     failedPreviews: 0,
   });
@@ -163,9 +162,7 @@ export function WorkspaceSidePanel({
     "blocked",
   ].includes(runtimeStatus);
   const generatedAttention =
-    generatedSummary.pendingAuthorization > 0 ||
-    generatedSummary.runningPreviews > 0 ||
-    generatedSummary.failedPreviews > 0;
+    generatedSummary.runningPreviews > 0 || generatedSummary.failedPreviews > 0;
 
   return (
     <motion.aside
@@ -230,13 +227,7 @@ export function WorkspaceSidePanel({
               icon={<IconEye className="size-3.5" />}
               label={t("workspacePanel.generatedApp")}
               badge={
-                generatedAttention
-                  ? String(
-                      generatedSummary.pendingAuthorization ||
-                        generatedSummary.runningPreviews ||
-                        "!",
-                    )
-                  : undefined
+                generatedAttention ? String(generatedSummary.runningPreviews || "!") : undefined
               }
               onClick={() => setActiveTab("generated-app")}
               onKeyDown={(event) => {
