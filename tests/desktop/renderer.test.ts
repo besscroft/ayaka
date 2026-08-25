@@ -24,6 +24,7 @@ import "./renderer/lib/chat-persistence.test.ts";
 import "./renderer/lib/chat-reconciliation.test.ts";
 import "./renderer/lib/chat-retry.test.ts";
 import "./renderer/lib/chat-session-registry.test.ts";
+import "./renderer/lib/chat-permissions.test.ts";
 import "./renderer/lib/chat-tools.test.ts";
 import "./renderer/lib/chat-token-cache.test.ts";
 import "./renderer/lib/custom-provider-api-format.test.ts";

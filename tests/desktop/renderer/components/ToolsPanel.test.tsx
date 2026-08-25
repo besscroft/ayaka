@@ -7,6 +7,7 @@ import type { ArtifactInstallation, CatalogItem, ToolRecord } from "@shared/type
 import {
   CatalogDiscover,
   InstalledSkillsPanel,
+  ToolsPanel,
   applyCatalogInstallation,
 } from "@renderer/components/ToolsPanel";
 import { SkillsPanel } from "@renderer/components/SkillsPanel";
@@ -26,6 +27,14 @@ void describe("ToolsPanel data helpers", () => {
 
     assert.match(html, /aria-busy="true"/);
     assert.doesNotMatch(html, /mcp\.so/);
+  });
+
+  void it("renders the global session permission default control", () => {
+    const html = renderToStaticMarkup(<ToolsPanel />);
+
+    assert.match(html, /会话权限默认值/);
+    assert.match(html, /全局默认权限/);
+    assert.match(html, /仅审批风险操作/);
   });
 
   void it("renders the marketplace skeleton while the first catalog request is pending", () => {

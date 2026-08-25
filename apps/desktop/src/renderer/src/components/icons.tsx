@@ -24,6 +24,7 @@ import {
   GitFork,
   Globe,
   FolderOpen,
+  Hand,
   History,
   Image,
   Info,
@@ -50,6 +51,7 @@ import {
   Search,
   Send,
   Settings,
+  ShieldAlert,
   Square,
   SlidersHorizontal,
   Smile,
@@ -62,6 +64,7 @@ import {
   X,
   Zap,
   Eye,
+  Unlock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -106,6 +109,9 @@ export const IconInfo = fromLucide(Info);
 export const IconSliders = fromLucide(SlidersHorizontal);
 export const IconCpu = fromLucide(Cpu);
 export const IconTerminal = fromLucide(Terminal);
+export const IconHand = fromLucide(Hand);
+export const IconShieldAlert = fromLucide(ShieldAlert);
+export const IconUnlock = fromLucide(Unlock);
 export const IconRotateCcw = fromLucide(RotateCcw);
 export const IconGlobe = fromLucide(Globe);
 export const IconFolderOpen = fromLucide(FolderOpen);

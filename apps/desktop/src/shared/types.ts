@@ -1568,6 +1568,110 @@ export interface ChatToolsSetting {
   byConversation: Record<string, ChatToolSelectionRequest>;
 }
 
+export type ChatPermissionMode = "ask" | "approve_risky" | "full_access";
+
+export interface ChatPermissionsSetting {
+  version: 1;
+  defaultMode: ChatPermissionMode;
+  byConversation: Record<string, ChatPermissionMode>;
+}
+
+export interface ChatPermissionResolution {
+  mode: ChatPermissionMode;
+  source: "default" | "conversation";
+}
+
+export const DEFAULT_CHAT_PERMISSION_MODE: ChatPermissionMode = "approve_risky";
+
+export function isChatPermissionMode(value: unknown): value is ChatPermissionMode {
+  return value === "ask" || value === "approve_risky" || value === "full_access";
+}
+
+export function normalizeChatPermissionMode(
+  raw: unknown,
+  fallback: ChatPermissionMode = DEFAULT_CHAT_PERMISSION_MODE,
+): ChatPermissionMode {
+  return isChatPermissionMode(raw) ? raw : fallback;
+}
+
+export function parseChatPermissionsSetting(
+  raw: string | null | undefined,
+): ChatPermissionsSetting {
+  if (!raw) {
+    return { version: 1, defaultMode: DEFAULT_CHAT_PERMISSION_MODE, byConversation: {} };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<ChatPermissionsSetting>;
+    const byConversation: Record<string, ChatPermissionMode> = {};
+    if (
+      parsed.version === 1 &&
+      parsed.byConversation &&
+      typeof parsed.byConversation === "object" &&
+      !Array.isArray(parsed.byConversation)
+    ) {
+      for (const [conversationId, mode] of Object.entries(parsed.byConversation)) {
+        if (conversationId && isChatPermissionMode(mode)) byConversation[conversationId] = mode;
+      }
+    }
+    return {
+      version: 1,
+      defaultMode: normalizeChatPermissionMode(parsed.defaultMode),
+      byConversation,
+    };
+  } catch {
+    return { version: 1, defaultMode: DEFAULT_CHAT_PERMISSION_MODE, byConversation: {} };
+  }
+}
+
+export function getChatPermissionForConversation(
+  rawSetting: string | null | undefined,
+  conversationId: string,
+): ChatPermissionResolution {
+  const setting = parseChatPermissionsSetting(rawSetting);
+  const override = setting.byConversation[conversationId];
+  return override
+    ? { mode: override, source: "conversation" }
+    : { mode: setting.defaultMode, source: "default" };
+}
+
+export function withChatPermissionForConversation(
+  rawSetting: string | null | undefined,
+  conversationId: string,
+  mode: ChatPermissionMode,
+): ChatPermissionsSetting {
+  const setting = parseChatPermissionsSetting(rawSetting);
+  return {
+    version: 1,
+    defaultMode: setting.defaultMode,
+    byConversation: {
+      ...setting.byConversation,
+      [conversationId]: normalizeChatPermissionMode(mode),
+    },
+  };
+}
+
+export function clearChatPermissionForConversation(
+  rawSetting: string | null | undefined,
+  conversationId: string,
+): ChatPermissionsSetting {
+  const setting = parseChatPermissionsSetting(rawSetting);
+  const byConversation = { ...setting.byConversation };
+  delete byConversation[conversationId];
+  return { version: 1, defaultMode: setting.defaultMode, byConversation };
+}
+
+export function withChatPermissionDefault(
+  rawSetting: string | null | undefined,
+  mode: ChatPermissionMode,
+): ChatPermissionsSetting {
+  const setting = parseChatPermissionsSetting(rawSetting);
+  return {
+    version: 1,
+    defaultMode: normalizeChatPermissionMode(mode),
+    byConversation: setting.byConversation,
+  };
+}
+
 export interface ChatToolDescriptor {
   id: ChatToolReference;
   label: string;
@@ -2360,6 +2464,8 @@ export const SettingKey = {
   ChatReasoningLevel: "chat_reasoning_level",
   /** Per-conversation chat tool mode and manual selections. */
   ChatTools: "chat_tools",
+  /** Global and per-conversation chat permission modes. */
+  ChatPermissions: "chat_permissions",
   /** Chat media generation defaults. */
   MediaGeneration: "media_generation",
   /** Custom provider and model catalog JSON. */

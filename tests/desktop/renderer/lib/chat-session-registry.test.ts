@@ -66,4 +66,13 @@ void describe("chat session registry", () => {
     assert.equal(registry.get("a"), undefined);
     assert.ok(registry.get("b"));
   });
+
+  void it("keeps the conversation permission mode in the next request config", () => {
+    const registry = new ChatSessionRegistry();
+    const session = registry.getOrCreate({ conversationId: "a", transport: transport() });
+
+    registry.updateRequestConfig("a", { permissionMode: "full_access" });
+
+    assert.equal(session.requestConfig.permissionMode, "full_access");
+  });
 });

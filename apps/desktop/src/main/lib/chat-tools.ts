@@ -11,6 +11,7 @@ import {
   type ChatToolDescriptor,
   type ChatToolId,
   type ChatToolSelectionRequest,
+  type ChatPermissionMode,
   type MemoryKind,
   type MemoryScope,
   type ModelCapabilities,
@@ -46,6 +47,7 @@ import {
 import { getCronScheduler } from "./cron-scheduler";
 import type { CronJobInput } from "../../shared/types";
 import { readWebPage } from "./web-page-reader";
+import { isChatPermissionSensitiveTool } from "./chat-permission-policy";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 
@@ -64,6 +66,7 @@ export interface BuildChatToolRuntimeOptions {
   model: ChatToolModelContext;
   conversationId?: string;
   agentId?: string | null;
+  permissionMode?: ChatPermissionMode;
 }
 
 export interface ChatToolRuntimeConfig {
@@ -493,6 +496,7 @@ export function buildChatToolRuntime({
   model,
   conversationId,
   agentId,
+  permissionMode = "approve_risky",
 }: BuildChatToolRuntimeOptions): ChatToolRuntimeConfig {
   const selection = normalizeChatToolSelection(rawSelection);
   const descriptors = createChatToolDescriptors(model);
@@ -584,6 +588,14 @@ export function buildChatToolRuntime({
     approvalToolNames.push(...runtime.approvalToolNames);
   }
 
+  if (permissionMode === "ask") {
+    for (const toolName of activeTools) {
+      if (isChatPermissionSensitiveTool(toolName) && !approvalToolNames.includes(toolName)) {
+        approvalToolNames.push(toolName);
+      }
+    }
+  }
+
   if (model.providerKind === "openai" && activeTools.includes("tool_search")) {
     for (const [toolName, value] of Object.entries(toolSet)) {
       if (toolName === "tool_search") continue;
@@ -602,7 +614,10 @@ export function buildChatToolRuntime({
     builtinToolNames,
     approvalToolNames,
     toolChoice,
-    toolApproval: createToolApproval(conversationId, agentId, model, approvalToolNames),
+    toolApproval:
+      permissionMode === "full_access"
+        ? undefined
+        : createToolApproval(conversationId, agentId, model, approvalToolNames),
     stopWhen: isStepCount(5),
     onStepEnd: createStepAuditor({
       model,

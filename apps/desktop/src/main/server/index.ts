@@ -6,9 +6,11 @@ import { generateText, type UIMessage } from "ai";
 import {
   CHAT_RUN_ID_HEADER,
   CHAT_SESSION_HEADER,
+  isChatPermissionMode,
   type ChatErrorResponse,
   isChatReasoningLevel,
   type ChatReasoningLevel,
+  type ChatPermissionMode,
   type ChatToolSelectionRequest,
   type LocalServerInfo,
   type MediaGenerationErrorResponse,
@@ -61,6 +63,15 @@ function parseChatReasoningLevel(raw: unknown): {
 } {
   if (raw === undefined) return { ok: true };
   if (!isChatReasoningLevel(raw)) return { ok: false };
+  return { ok: true, value: raw };
+}
+
+function parseChatPermissionMode(raw: unknown): {
+  ok: boolean;
+  value?: ChatPermissionMode;
+} {
+  if (raw === undefined) return { ok: true };
+  if (!isChatPermissionMode(raw)) return { ok: false };
   return { ok: true, value: raw };
 }
 
@@ -146,6 +157,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       conversationId?: string;
       reasoning?: unknown;
       toolSelection?: ChatToolSelectionRequest;
+      permissionMode?: unknown;
       cronRun?: boolean;
       runId?: string;
       mode?: "start" | "resume";
@@ -173,6 +185,10 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     }
     const parsedReasoning = parseChatReasoningLevel(body.reasoning);
     if (!parsedReasoning.ok) {
+      return c.json(chatErrorResponse("invalid_request"), 400);
+    }
+    const parsedPermissionMode = parseChatPermissionMode(body.permissionMode);
+    if (!parsedPermissionMode.ok) {
       return c.json(chatErrorResponse("invalid_request"), 400);
     }
 
@@ -207,6 +223,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         preferredAgentId: body.agentId,
         reasoning: reasoning.value,
         toolSelection: body.toolSelection,
+        permissionMode: parsedPermissionMode.value,
         disableCronTools: body.cronRun === true,
         origin: body.cronRun === true ? "automation" : "chat",
         buildAgentSystemPrompt: async (agentId, conversationId) =>

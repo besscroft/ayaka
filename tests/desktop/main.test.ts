@@ -5,6 +5,7 @@ import "./main/lib/default-workspace-assets.test.ts";
 import "./main/lib/chat-errors.test.ts";
 import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";
+import "./main/lib/chat-permission-policy.test.ts";
 import "./main/lib/drizzle-metadata.test.ts";
 import "./main/lib/error-logger.test.ts";
 import "./main/lib/mcp-presets.test.ts";

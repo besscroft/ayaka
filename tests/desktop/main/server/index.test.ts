@@ -175,6 +175,26 @@ void describe("local chat server", () => {
     assert.equal(body.retryable, false);
   });
 
+  void it("rejects unsupported chat permission modes", async () => {
+    const app = createApp({ sessionToken: token });
+
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({
+        messages: validMessages,
+        model: "mock/chat",
+        permissionMode: "always_allow",
+      }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, "invalid_request");
+  });
+
   void it("validates agent run identity and mode", async () => {
     const app = createApp({ sessionToken: token });
     const headers = {
@@ -204,7 +224,7 @@ void describe("local chat server", () => {
   });
 
   void it("preserves every supported top-level reasoning value including none", async () => {
-    const captured: Array<RunAgentChatOptions["reasoning"]> = [];
+    const captured: RunAgentChatOptions[] = [];
     const model = new MockLanguageModelV4({});
     const app = createApp({
       sessionToken: token,
@@ -216,7 +236,7 @@ void describe("local chat server", () => {
       }),
       buildAgentSystemPrompt: async () => "test",
       runAgentChat: async (options) => {
-        captured.push(options.reasoning);
+        captured.push(options);
         return agentRuntimeResponse("runtime-stream");
       },
     });
@@ -233,7 +253,14 @@ void describe("local chat server", () => {
       assert.equal(response.status, 200);
     }
 
-    assert.deepEqual(captured, [...CHAT_REASONING_LEVELS]);
+    assert.deepEqual(
+      captured.map((options) => options.reasoning),
+      [...CHAT_REASONING_LEVELS],
+    );
+    assert.equal(
+      captured.every((options) => options.permissionMode === undefined),
+      true,
+    );
   });
 
   void it("routes chat responses through the provider-neutral agent runtime", async () => {
@@ -265,6 +292,7 @@ void describe("local chat server", () => {
         model: "mock/chat",
         conversationId: "c-stream",
         reasoning: "high",
+        permissionMode: "full_access",
         runId: "018f8896-bef7-7051-8c30-1f862a28d31a",
         mode: "resume",
       }),
@@ -282,6 +310,7 @@ void describe("local chat server", () => {
     assert.equal(captured.value?.modelRef, "mock/chat");
     assert.equal(captured.value?.conversationId, "c-stream");
     assert.equal(captured.value?.reasoning, "high");
+    assert.equal(captured.value?.permissionMode, "full_access");
     assert.equal(captured.value?.runId, "018f8896-bef7-7051-8c30-1f862a28d31a");
     assert.equal(captured.value?.mode, "resume");
     assert.deepEqual(captured.value?.resolved.providerOptions, providerOptions);

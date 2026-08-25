@@ -243,6 +243,13 @@ void describe("chat tool runtime", () => {
       model: modelContext("openai-compatible"),
     });
     assert.deepEqual(approvalRuntime.approvalToolNames, [toolName]);
+
+    const fullAccessRuntime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["mcp:srv-1:search"] },
+      model: modelContext("openai-compatible"),
+      permissionMode: "full_access",
+    });
+    assert.equal(fullAccessRuntime.toolApproval, undefined);
   });
 
   void it("uses provider-native web search internal tool names", () => {
@@ -267,6 +274,22 @@ void describe("chat tool runtime", () => {
     assert.deepEqual(google.activeTools, ["google_search"]);
     assert.deepEqual(google.toolChoice, { type: "tool", toolName: "google_search" });
     assert.deepEqual(google.builtinToolNames, ["google_search"]);
+  });
+
+  void it("applies ask and full-access permission modes independently of tool selection", () => {
+    const ask = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["web_search"] },
+      model: modelContext("openai", "web_search"),
+      permissionMode: "ask",
+    });
+    assert.ok(ask.approvalToolNames?.includes("web_search"));
+
+    const fullAccess = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["web_search"] },
+      model: modelContext("openai", "web_search"),
+      permissionMode: "full_access",
+    });
+    assert.equal(fullAccess.toolApproval, undefined);
   });
 
   void it("reads a user-provided public page through the host tool", async () => {

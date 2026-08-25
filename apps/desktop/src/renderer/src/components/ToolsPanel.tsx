@@ -36,6 +36,14 @@ import {
   type ToolKindFilter,
   type ToolStatusFilter,
 } from "../lib/tools-filter";
+import {
+  DEFAULT_CHAT_PERMISSION_MODE,
+  SettingKey,
+  isChatPermissionMode,
+  parseChatPermissionsSetting,
+  withChatPermissionDefault,
+  type ChatPermissionMode,
+} from "@shared/types";
 import { cn } from "../lib/utils";
 import { isChatToolId } from "@shared/types";
 import type {
@@ -62,6 +70,7 @@ import {
   IconTrash,
 } from "./icons";
 import { RichContent } from "./ai-elements/rich-content";
+import { CHAT_PERMISSION_MODE_OPTIONS } from "./ChatPermissionSelector";
 
 export function applyCatalogInstallation(
   items: CatalogItem[],
@@ -87,6 +96,10 @@ export function ToolsPanel(): React.JSX.Element {
   const [kind, setKind] = useState<ToolKindFilter>("all");
   const [status, setStatus] = useState<ToolStatusFilter>("all");
   const [approvalToolId, setApprovalToolId] = useState<string | null>(null);
+  const [permissionDefault, setPermissionDefault] = useState<ChatPermissionMode>(
+    DEFAULT_CHAT_PERMISSION_MODE,
+  );
+  const [permissionDefaultSaving, setPermissionDefaultSaving] = useState(false);
 
   const refresh = (): void => {
     setRefreshing(true);
@@ -101,6 +114,42 @@ export function ToolsPanel(): React.JSX.Element {
   };
 
   useEffect(refresh, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.settings
+      .get(SettingKey.ChatPermissions)
+      .then((raw) => {
+        if (!cancelled) setPermissionDefault(parseChatPermissionsSetting(raw).defaultMode);
+      })
+      .catch((error) => {
+        if (!cancelled) notify.error(t("tools.toast.failed"), error, locale);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, t]);
+
+  const updatePermissionDefault = (value: string): void => {
+    if (!isChatPermissionMode(value) || permissionDefaultSaving) return;
+    const previous = permissionDefault;
+    setPermissionDefault(value);
+    setPermissionDefaultSaving(true);
+    void api.settings
+      .get(SettingKey.ChatPermissions)
+      .then((raw) =>
+        api.settings.set(
+          SettingKey.ChatPermissions,
+          JSON.stringify(withChatPermissionDefault(raw, value)),
+        ),
+      )
+      .then(() => notify.success(t("tools.toast.saved")))
+      .catch((error) => {
+        setPermissionDefault(previous);
+        notify.error(t("tools.toast.failed"), error, locale);
+      })
+      .finally(() => setPermissionDefaultSaving(false));
+  };
 
   const updateApproval = async (tool: ToolRecord, requiresApproval: boolean): Promise<void> => {
     setApprovalToolId(tool.id);
@@ -140,6 +189,33 @@ export function ToolsPanel(): React.JSX.Element {
             <IconRotateCcw className={cn("size-4", refreshing && "animate-spin")} />
             {t("main.refresh")}
           </Button>
+        </div>
+      </div>
+
+      <div
+        className="grid shrink-0 gap-3 rounded-lg border border-border bg-card px-4 py-3 md:grid-cols-[minmax(0,1fr)_220px] md:items-center"
+        aria-busy={permissionDefaultSaving}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{t("tools.permissions.title")}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {t("tools.permissions.description")}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            {t("tools.permissions.defaultLabel")}
+          </p>
+          <SelectField
+            value={permissionDefault}
+            options={CHAT_PERMISSION_MODE_OPTIONS.map(({ mode, labelKey }) => ({
+              value: mode,
+              label: t(labelKey),
+            }))}
+            onChange={updatePermissionDefault}
+            ariaLabel={t("tools.permissions.defaultLabel")}
+            className={permissionDefaultSaving ? "pointer-events-none opacity-60" : undefined}
+          />
         </div>
       </div>
 

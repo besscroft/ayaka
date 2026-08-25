@@ -28,6 +28,8 @@ import {
   MEDIA_GENERATION_TOOL_NAME,
   SettingKey,
   isChatToolReference,
+  normalizeChatPermissionMode,
+  parseChatPermissionsSetting,
   normalizeMaxConcurrentSubagents,
   normalizeChatToolSelection,
   type AgentHandoffConfig,
@@ -39,6 +41,7 @@ import {
   type AgentRuntimeStatus,
   type AgentToolPolicy,
   type ChatMessageMetadata,
+  type ChatPermissionMode,
   type ChatErrorCode,
   type ChatReasoningLevel,
   type ChatToolId,
@@ -59,6 +62,10 @@ import {
 } from "./chat-tools";
 import { addRootMemoryTools, ROOT_MEMORY_TOOL_NAMES } from "./root-memory-tools";
 import { commandLooksDangerous, inputHasPathEscape } from "./approval-policy";
+import {
+  bypassesChatPermissionApproval,
+  requiresChatPermissionApproval,
+} from "./chat-permission-policy";
 import { isBuiltinToolName, rootToolRequiresApproval } from "./root-tool-approval";
 import { loadAgentGraph } from "./agent-graph";
 import type { AgentGraph } from "./agent-graph";
@@ -131,6 +138,7 @@ export interface RunAgentChatOptions {
   preferredAgentId?: string | null;
   reasoning?: StreamTextOptions["reasoning"];
   toolSelection?: ChatToolSelectionRequest;
+  permissionMode?: ChatPermissionMode;
   buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
   resolveModel?: (modelRef: string) => ResolvedChatModel;
   abortSignal?: AbortSignal;
@@ -160,6 +168,7 @@ interface RuntimeContext {
   preferredAgentId?: string | null;
   reasoning?: StreamTextOptions["reasoning"];
   toolSelection?: ChatToolSelectionRequest;
+  permissionMode: ChatPermissionMode;
   buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
   resolveModel: (modelRef: string) => ResolvedChatModel;
   finalAgentId: string;
@@ -233,6 +242,10 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
   const rootResolved =
     rootModelRef === options.modelRef ? options.resolved : resolveModel(rootModelRef);
   const rootRuntimeConfig = readRuntimeConfig(rootAgent.runtime_config_json);
+  const permissionMode = normalizeChatPermissionMode(
+    options.permissionMode,
+    parseChatPermissionsSetting(getSetting(SettingKey.ChatPermissions)).defaultMode,
+  );
   const maxConcurrentSubagents = normalizeMaxConcurrentSubagents(
     getSetting(SettingKey.MaxConcurrentSubagents),
     rootRuntimeConfig.maxConcurrentSubagents,
@@ -351,6 +364,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       options.toolSelection,
       readToolPolicy(rootAgent.tool_policy_json),
     ),
+    permissionMode,
     buildAgentSystemPrompt: options.buildAgentSystemPrompt,
     resolveModel,
     finalAgentId: DEFAULT_AGENT_ID,
@@ -682,6 +696,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     model: context.modelContext,
     conversationId: context.conversationId,
     agentId: DEFAULT_AGENT_ID,
+    permissionMode: context.permissionMode,
   });
 
   if (!context.modelContext.capabilities.toolCalling) {
@@ -1314,6 +1329,7 @@ function buildSafeChildToolRuntime(
     model,
     conversationId: context.conversationId,
     agentId: child.id,
+    permissionMode: context.permissionMode,
   });
   const tools: ToolSet = { ...base.tools };
   const activeTools = new Set(base.activeTools ?? []);
@@ -1788,6 +1804,9 @@ function evaluateToolGuardrail(
     if (inputHasPathEscape(input)) {
       return { decision: "deny", risk: "high", reason: "Preview path escapes the sandbox root." };
     }
+    if (bypassesChatPermissionApproval(context.permissionMode)) {
+      return { decision: "allow", risk: "low", reason: "Full access bypasses soft approval." };
+    }
     return {
       decision: "require_review",
       risk: "high",
@@ -1804,14 +1823,17 @@ function evaluateToolGuardrail(
     const reviewAll =
       readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
     const approvalEnabled = getToolRecord(WORKSPACE_COMMAND_TOOL_ID)?.requires_approval !== 0;
-    const requiresReview = shouldRequireWorkspaceCommandApproval({
-      approvalEnabled,
-      commandDecision: commandPolicy.decision,
-      reviewAll,
-      toolApprovalRequested: toolApprovalToolNames.has(toolName),
-      agentPolicyRequiresApproval:
-        agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID),
-    });
+    const requiresReview =
+      !bypassesChatPermissionApproval(context.permissionMode) &&
+      (requiresChatPermissionApproval(context.permissionMode, toolName) ||
+        shouldRequireWorkspaceCommandApproval({
+          approvalEnabled,
+          commandDecision: commandPolicy.decision,
+          reviewAll,
+          toolApprovalRequested: toolApprovalToolNames.has(toolName),
+          agentPolicyRequiresApproval:
+            agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID),
+        }));
     if (requiresReview) {
       return {
         decision: "require_review",
@@ -1826,10 +1848,21 @@ function evaluateToolGuardrail(
     }
     return { decision: "allow", risk: "low", reason: commandPolicy.reason };
   }
+  if (requiresChatPermissionApproval(context.permissionMode, toolName)) {
+    return {
+      decision: "require_review",
+      risk: "high",
+      reason: "The current conversation permission requires approval for sensitive operations.",
+    };
+  }
   if (isBuiltinToolName(toolName) || builtinToolNames.has(toolName)) {
     return { decision: "allow", risk: "low", reason: "Built-in tool approval is disabled." };
   }
-  if (toolName === "sandbox_run_command" && commandLooksDangerous(input)) {
+  if (
+    toolName === "sandbox_run_command" &&
+    commandLooksDangerous(input) &&
+    !bypassesChatPermissionApproval(context.permissionMode)
+  ) {
     return {
       decision: "require_review",
       risk: "high",
@@ -1841,6 +1874,7 @@ function evaluateToolGuardrail(
   const reviewAll =
     readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
   if (
+    !bypassesChatPermissionApproval(context.permissionMode) &&
     rootToolRequiresApproval({
       toolName,
       toolInput: input,

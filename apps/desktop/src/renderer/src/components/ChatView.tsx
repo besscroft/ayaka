@@ -74,12 +74,17 @@ import {
 } from "./ai-elements";
 import {
   CHAT_SESSION_HEADER,
+  DEFAULT_CHAT_PERMISSION_MODE,
   DEFAULT_CHAT_TOOL_SELECTION,
   DEFAULT_SETTINGS,
   SettingKey,
+  getChatPermissionForConversation,
   getChatToolSelectionForConversation,
   isChatReasoningLevel,
+  clearChatPermissionForConversation,
+  withChatPermissionForConversation,
   withChatToolSelectionForConversation,
+  type ChatPermissionMode,
   type ChatReasoningLevel,
   type ChatToolSelectionRequest,
   type AgentProfile,
@@ -169,6 +174,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [toolSelection, setToolSelection] = useState<ChatToolSelectionRequest>(
     DEFAULT_CHAT_TOOL_SELECTION,
   );
+  const [permissionMode, setPermissionMode] = useState<ChatPermissionMode>(
+    DEFAULT_CHAT_PERMISSION_MODE,
+  );
+  const [permissionSource, setPermissionSource] = useState<"default" | "conversation">("default");
   const [mcpInputRequest, setMcpInputRequest] = useState<McpInputRequest | null>(null);
   /** 鏄惁宸蹭负鏈璇濈敓鎴愯繃鏍囬锛堥槻姝㈤噸澶嶇敓鎴愶級 */
   const titleStateRef = useRef<Map<string, AutoTitleStatus>>(new Map());
@@ -419,6 +428,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   }, [conversationId, toolSelection]);
 
   useEffect(() => {
+    chatSessionRegistry.updateRequestConfig(conversationId, { permissionMode });
+  }, [conversationId, permissionMode]);
+
+  useEffect(() => {
     const offInput = api.mcp.onInputRequested((request) => {
       if (request.conversationId === conversationId) setMcpInputRequest(request);
     });
@@ -443,6 +456,8 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
     followupRequestRef.current = null;
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
+    setPermissionMode(DEFAULT_CHAT_PERMISSION_MODE);
+    setPermissionSource("default");
     if (!alreadyHydrated) {
       runIdRef.current = null;
       runModeRef.current = "start";
@@ -520,8 +535,15 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         hydrationStateRef.current = "error";
       });
 
-    void api.settings.get(SettingKey.ChatTools).then((raw) => {
-      setToolSelection(getChatToolSelectionForConversation(raw, conversationId));
+    void Promise.all([
+      api.settings.get(SettingKey.ChatTools),
+      api.settings.get(SettingKey.ChatPermissions),
+    ]).then(([toolSetting, permissionSetting]) => {
+      if (cancelled) return;
+      setToolSelection(getChatToolSelectionForConversation(toolSetting, conversationId));
+      const permission = getChatPermissionForConversation(permissionSetting, conversationId);
+      setPermissionMode(permission.mode);
+      setPermissionSource(permission.source);
     });
     return () => {
       cancelled = true;
@@ -1123,6 +1145,35 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       .catch((err) => console.error("[chat] failed to persist tool selection:", err));
   };
 
+  const handlePermissionChange = (next: ChatPermissionMode): void => {
+    setPermissionMode(next);
+    setPermissionSource("conversation");
+    chatSessionRegistry.updateRequestConfig(conversationId, { permissionMode: next });
+    void api.settings
+      .get(SettingKey.ChatPermissions)
+      .then((raw) =>
+        api.settings.set(
+          SettingKey.ChatPermissions,
+          JSON.stringify(withChatPermissionForConversation(raw, conversationId, next)),
+        ),
+      )
+      .catch((err) => console.error("[chat] failed to persist permission mode:", err));
+  };
+
+  const handlePermissionReset = (): void => {
+    void api.settings
+      .get(SettingKey.ChatPermissions)
+      .then((raw) => {
+        const nextSetting = clearChatPermissionForConversation(raw, conversationId);
+        const next = getChatPermissionForConversation(JSON.stringify(nextSetting), conversationId);
+        setPermissionMode(next.mode);
+        setPermissionSource(next.source);
+        chatSessionRegistry.updateRequestConfig(conversationId, { permissionMode: next.mode });
+        return api.settings.set(SettingKey.ChatPermissions, JSON.stringify(nextSetting));
+      })
+      .catch((err) => console.error("[chat] failed to reset permission mode:", err));
+  };
+
   /* ---------- 消息操作：编辑 ---------- */
   const handleEditMessage = async (messageId: string, newText: string): Promise<void> => {
     const idx = renderedMessages.findIndex((m) => m.id === messageId);
@@ -1335,6 +1386,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
               onReasoningLevelChange={setReasoningLevel}
               toolSelection={toolSelection}
               onToolSelectionChange={handleToolSelectionChange}
+              permissionMode={permissionMode}
+              permissionInherited={permissionSource === "default"}
+              onPermissionChange={handlePermissionChange}
+              onPermissionReset={handlePermissionReset}
               providers={providers}
               contextMetrics={contextMetrics}
             />

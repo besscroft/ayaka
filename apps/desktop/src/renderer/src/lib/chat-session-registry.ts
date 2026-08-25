@@ -6,8 +6,18 @@ import {
   type ChatTransport,
   type UIMessage,
 } from "ai";
-import type { ChatReasoningLevel, ChatToolSelectionRequest, LocalServerInfo } from "@shared/types";
-import { CHAT_SESSION_HEADER, DEFAULT_AGENT_ID, DEFAULT_CHAT_TOOL_SELECTION } from "@shared/types";
+import type {
+  ChatPermissionMode,
+  ChatReasoningLevel,
+  ChatToolSelectionRequest,
+  LocalServerInfo,
+} from "@shared/types";
+import {
+  CHAT_SESSION_HEADER,
+  DEFAULT_AGENT_ID,
+  DEFAULT_CHAT_PERMISSION_MODE,
+  DEFAULT_CHAT_TOOL_SELECTION,
+} from "@shared/types";
 import { readChatRunIdHeader } from "./chat-retry";
 
 export type ChatSessionFinishEvent = Parameters<ChatOnFinishCallback<UIMessage>>[0];
@@ -20,6 +30,7 @@ export interface ChatSessionRequestConfig {
   model: string | null;
   reasoning: ChatReasoningLevel;
   toolSelection: ChatToolSelectionRequest;
+  permissionMode: ChatPermissionMode;
 }
 
 export interface ChatSessionEntry {
@@ -91,6 +102,7 @@ export class ChatSessionRegistry {
       model: null,
       reasoning: "provider-default",
       toolSelection: { ...DEFAULT_CHAT_TOOL_SELECTION, selectedToolIds: [] },
+      permissionMode: DEFAULT_CHAT_PERMISSION_MODE,
     };
 
     const entry = {
@@ -197,6 +209,8 @@ export class ChatSessionRegistry {
         selectedToolIds: [...update.toolSelection.selectedToolIds],
       };
     }
+    if (update.permissionMode !== undefined)
+      entry.requestConfig.permissionMode = update.permissionMode;
     entry.lastUsedAt = Date.now();
     return entry;
   }
@@ -244,6 +258,7 @@ export class ChatSessionRegistry {
         conversationId: entry.conversationId,
         reasoning: entry.requestConfig.reasoning,
         toolSelection: entry.requestConfig.toolSelection,
+        permissionMode: entry.requestConfig.permissionMode,
         runId: entry.runIdRef.current ?? undefined,
         mode: entry.runModeRef.current,
       }),

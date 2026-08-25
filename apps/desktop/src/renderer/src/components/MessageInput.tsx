@@ -9,11 +9,17 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import type { ChatReasoningLevel, ChatToolSelectionRequest, ProviderInfo } from "@shared/types";
+import type {
+  ChatPermissionMode,
+  ChatReasoningLevel,
+  ChatToolSelectionRequest,
+  ProviderInfo,
+} from "@shared/types";
 import { inferAttachmentMediaType } from "@shared/media-type";
 import { ModelSelector } from "./ModelSelector";
 import { ReasoningSelector } from "./ReasoningSelector";
 import { ToolSelector } from "./ToolSelector";
+import { ChatPermissionSelector } from "./ChatPermissionSelector";
 import {
   AttachmentChip,
   ContextPopover,
@@ -42,9 +48,13 @@ interface MessageInputProps {
   selectedModel: string | null;
   reasoningLevel: ChatReasoningLevel;
   toolSelection: ChatToolSelectionRequest;
+  permissionMode: ChatPermissionMode;
+  permissionInherited: boolean;
   onModelChange: (modelRef: string | null) => void;
   onReasoningLevelChange: (level: ChatReasoningLevel) => void;
   onToolSelectionChange: (selection: ChatToolSelectionRequest) => void;
+  onPermissionChange: (mode: ChatPermissionMode) => void;
+  onPermissionReset: () => void;
   providers: ProviderInfo[];
   maxFileSize?: number;
   accept?: string;
@@ -64,9 +74,13 @@ export function MessageInput({
   selectedModel,
   reasoningLevel,
   toolSelection,
+  permissionMode,
+  permissionInherited,
   onModelChange,
   onReasoningLevelChange,
   onToolSelectionChange,
+  onPermissionChange,
+  onPermissionReset,
   providers,
   maxFileSize = DEFAULT_MAX_SIZE,
   accept = DEFAULT_ACCEPT,
@@ -296,6 +310,14 @@ export function MessageInput({
                     selectedModel={selectedModel}
                     providers={providers}
                     disabled={isRunActive}
+                  />
+                  <ChatPermissionSelector
+                    value={permissionMode}
+                    inherited={permissionInherited}
+                    onChange={onPermissionChange}
+                    onReset={onPermissionReset}
+                    disabled={isRunActive}
+                    compact
                   />
                   <ModelSelector
                     value={selectedModel}
