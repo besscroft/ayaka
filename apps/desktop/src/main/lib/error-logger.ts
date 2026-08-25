@@ -292,7 +292,7 @@ function normalizeError(value: unknown): ErrorLogError | undefined {
       ...(stack ? { stack: redactText(stack) } : {}),
     };
   }
-  return { name: "Error", message: redactText(String(value)) };
+  return { name: "Error", message: redactText(formatValue(value)) };
 }
 
 function safeValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
@@ -345,7 +345,12 @@ function formatValue(value: unknown): string {
       return "[object]";
     }
   }
-  return String(value);
+  if (typeof value === "symbol") return value.toString();
+  if (typeof value === "function") return value.name || "[function]";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "bigint") return value.toString();
+  return "[unserializable]";
 }
 
 function redactText(value: string): string {

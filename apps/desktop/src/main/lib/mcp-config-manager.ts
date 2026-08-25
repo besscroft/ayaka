@@ -189,7 +189,7 @@ function parseCodexToml(text: string): { configs: McpServerConfig[]; warnings: s
       warnings.push(`Ignored unsupported TOML line: ${rawLine.trim()}.`);
       continue;
     }
-    current[assignment[1]] = parseTomlValue(assignment[2], warnings);
+    current[assignment[1]] = parseTomlValue(assignment[2]);
   }
   if (sections.size === 0)
     throw new Error("Codex TOML configuration has no [mcp_servers.<name>] entries.");
@@ -380,18 +380,17 @@ function exportCodexToml(servers: ToolServer[]): string {
   );
 }
 
-function parseTomlValue(raw: string, warnings: string[]): unknown {
+function parseTomlValue(raw: string): unknown {
   const value = raw.trim();
   if (value.startsWith("[") && value.endsWith("]"))
     return splitComma(value.slice(1, -1))
-      .map((item) => parseTomlValue(item, warnings))
+      .map((item) => parseTomlValue(item))
       .filter((item) => item !== "");
   if (value.startsWith("{") && value.endsWith("}")) {
     const result: Record<string, string> = {};
     for (const pair of splitComma(value.slice(1, -1))) {
       const match = pair.match(/^\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z_][A-Za-z0-9_-]*))\s*=\s*(.+)$/);
-      if (match)
-        result[match[1] ?? match[2] ?? match[3]!] = String(parseTomlValue(match[4], warnings));
+      if (match) result[match[1] ?? match[2] ?? match[3]!] = String(parseTomlValue(match[4]));
     }
     return result;
   }

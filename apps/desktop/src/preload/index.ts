@@ -38,12 +38,31 @@ function serializeRendererError(value: unknown): ErrorLogError | undefined {
   }
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
-    const message = typeof record.message === "string" ? record.message : String(value);
+    const message =
+      typeof record.message === "string" ? record.message : formatRendererErrorValue(value);
     const name = typeof record.name === "string" ? record.name : "Error";
     const stack = typeof record.stack === "string" ? record.stack : undefined;
     return { name, message, ...(stack ? { stack } : {}) };
   }
-  return { name: "Error", message: String(value) };
+  return { name: "Error", message: formatRendererErrorValue(value) };
+}
+
+function formatRendererErrorValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null) return "null";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value) ?? "[object]";
+    } catch {
+      return "[object]";
+    }
+  }
+  if (typeof value === "symbol") return value.toString();
+  if (typeof value === "function") return value.name || "[function]";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "bigint") return value.toString();
+  return "[unserializable]";
 }
 
 function installRendererErrorCapture(): void {

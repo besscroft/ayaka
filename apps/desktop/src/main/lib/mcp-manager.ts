@@ -681,9 +681,10 @@ function requireMcpServer(serverId: string): ToolServer {
 
 function toMcpResource(value: unknown): McpResource {
   const record = asRecord(value);
+  const uri = getOptionalString(record, "uri") ?? "";
   return {
-    uri: String(record.uri ?? ""),
-    name: String(record.name ?? record.uri ?? "Resource"),
+    uri,
+    name: getOptionalString(record, "name") ?? (uri || "Resource"),
     title: getOptionalString(record, "title"),
     description: getOptionalString(record, "description"),
     mimeType: getOptionalString(record, "mimeType"),
@@ -693,9 +694,10 @@ function toMcpResource(value: unknown): McpResource {
 
 function toMcpResourceTemplate(value: unknown): McpResourceTemplate {
   const record = asRecord(value);
+  const uriTemplate = getOptionalString(record, "uriTemplate") ?? "";
   return {
-    uriTemplate: String(record.uriTemplate ?? ""),
-    name: String(record.name ?? record.uriTemplate ?? "Resource template"),
+    uriTemplate,
+    name: getOptionalString(record, "name") ?? (uriTemplate || "Resource template"),
     title: getOptionalString(record, "title"),
     description: getOptionalString(record, "description"),
     mimeType: getOptionalString(record, "mimeType"),
@@ -708,7 +710,7 @@ function toMcpPrompt(value: unknown): McpPrompt {
     ? record.arguments.map((argument) => {
         const item = asRecord(argument);
         return {
-          name: String(item.name ?? ""),
+          name: getOptionalString(item, "name") ?? "",
           title: getOptionalString(item, "title"),
           description: getOptionalString(item, "description"),
           required: item.required === true,
@@ -716,7 +718,7 @@ function toMcpPrompt(value: unknown): McpPrompt {
       })
     : undefined;
   return {
-    name: String(record.name ?? ""),
+    name: getOptionalString(record, "name") ?? "",
     title: getOptionalString(record, "title"),
     description: getOptionalString(record, "description"),
     arguments: args,

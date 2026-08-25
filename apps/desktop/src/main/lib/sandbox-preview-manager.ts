@@ -430,7 +430,8 @@ function normalizeExecutable(value: string): string {
   const executable = value.trim();
   if (
     executable.length > MAX_ARG_LENGTH ||
-    /[\0\r\n|;&><]/.test(executable) ||
+    executable.includes(String.fromCharCode(0)) ||
+    /[\r\n|;&><]/.test(executable) ||
     /\s/.test(executable) ||
     path.isAbsolute(executable) ||
     /^[a-zA-Z]:[\\/]/.test(executable) ||

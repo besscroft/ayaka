@@ -72,9 +72,7 @@ function PlatformCard({
 export function SiteDownload({ releaseData }: { releaseData: ReleasePageData }) {
   const resolvedReleaseData = useReleaseData(releaseData);
   const summary =
-    resolvedReleaseData.status === "available"
-      ? releaseSummary(resolvedReleaseData.release)
-      : null;
+    resolvedReleaseData.status === "available" ? releaseSummary(resolvedReleaseData.release) : null;
 
   return (
     <main className="min-h-screen overflow-clip bg-paper text-carbon">

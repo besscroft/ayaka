@@ -73,8 +73,11 @@ export function formatMcpEnvironment(raw: string): string {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "";
     const entries = Object.entries(parsed as Record<string, unknown>);
-    if (entries.some(([, value]) => typeof value !== "string")) return "";
-    return entries.map(([key, value]) => `${key}=${value}`).join("\n");
+    const stringEntries = entries.filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    );
+    if (stringEntries.length !== entries.length) return "";
+    return stringEntries.map(([key, value]) => `${key}=${value}`).join("\n");
   } catch {
     return "";
   }

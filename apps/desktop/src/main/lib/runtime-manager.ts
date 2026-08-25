@@ -847,7 +847,8 @@ function normalizeUvAsset(record: Record<string, unknown>): RuntimeManifestAsset
   const target = detectRuntimeTarget();
   const libc = selectUvLibcForOfficialAsset(target);
   if (platform === "linux" && !libc) throw new Error("Linux libc could not be detected for uv.");
-  const version = String(record.tag_name ?? record.name ?? "").replace(/^v/, "");
+  const versionValue = record.tag_name ?? record.name;
+  const version = (typeof versionValue === "string" ? versionValue : "").replace(/^v/, "");
   const assets = Array.isArray(record.assets) ? record.assets : [];
   const suffix = uvAssetSuffix(platform, architecture, libc);
   const asset = assets.find((item) => {
@@ -1128,7 +1129,10 @@ function compareVersions(left: string, right: string): number {
 }
 
 function decodeAscii(bytes: Uint8Array): string {
-  return new TextDecoder().decode(bytes).replace(/\0+$/, "").trim();
+  const nullCharacter = String.fromCharCode(0);
+  let decoded = new TextDecoder().decode(bytes);
+  while (decoded.endsWith(nullCharacter)) decoded = decoded.slice(0, -1);
+  return decoded.trim();
 }
 
 function asRecord(value: unknown): Record<string, any> {

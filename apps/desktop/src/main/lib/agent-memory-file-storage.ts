@@ -47,11 +47,14 @@ export function removeAgentSoulFiles(agentId: string): void {
     }
   }
 
+  let invalidationError: unknown = null;
   try {
     invalidateSoulCache?.(agentId);
-  } finally {
-    if (firstError) throw firstError;
+  } catch (error) {
+    invalidationError = error;
   }
+  if (firstError) throw firstError;
+  if (invalidationError) throw invalidationError;
 }
 
 function safePathPart(value: string): string {

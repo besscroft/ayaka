@@ -256,9 +256,7 @@ export function SiteHeader({ homePath = "" }: { homePath?: string }) {
   );
 }
 
-function HeroWorkspacePreview({ releaseData }: { releaseData: ReleasePageData }) {
-  const summary = releaseData.status === "available" ? releaseSummary(releaseData.release) : null;
-
+function HeroWorkspacePreview() {
   return (
     <div
       className="relative mx-auto w-full max-w-[680px] rotate-[1deg] lg:rotate-[-1deg]"
@@ -287,7 +285,7 @@ function HeroWorkspacePreview({ releaseData }: { releaseData: ReleasePageData })
 
       <div className="absolute -bottom-5 -left-5 border border-signal/60 bg-carbon px-3 py-2 font-mono text-[0.55rem] uppercase tracking-[0.14em] text-signal shadow-xl shadow-black/20">
         <span className="mr-2 inline-block size-1.5 rounded-full bg-signal align-middle" />
-        真实工作台 / {summary?.version ?? "等待发布"}
+        内测版本即将上线
       </div>
     </div>
   );
@@ -305,7 +303,7 @@ function DownloadAction({
   if (releaseData.status !== "available") {
     return (
       <BracketLink href="/download" tone={tone}>
-        查看下载状态
+        获取 Ayaka
       </BracketLink>
     );
   }
@@ -346,21 +344,21 @@ function Hero({ releaseData }: { releaseData: ReleasePageData }) {
 
       <div className="mx-auto grid min-h-[calc(100svh-3rem)] max-w-[1440px] grid-rows-[auto_1fr_auto] gap-12 px-5 md:px-10">
         <div className="flex items-center justify-between border-b border-paper/15 pb-4 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-paper/55">
-          <span>Ayaka · 本地优先智能体工作台</span>
-          <span className="hidden sm:inline">现场记录 / 001</span>
+          <span>Ayaka · 有情感连续性的关系</span>
+          <span className="hidden sm:inline">数字生命体 / 001</span>
         </div>
 
         <div className="grid items-center gap-16 py-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
           <div className="max-w-xl">
             <p className="mb-7 flex items-center gap-3 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-signal">
               <span className="size-2 rounded-full border border-signal bg-signal/40" />
-              本地优先 / 智能体工作台
+              私人、主动、能延续关系 / 陪伴型 AI 智能
             </p>
             <h1 className="max-w-[11ch] text-[clamp(3.8rem,8vw,7.5rem)] font-semibold leading-[0.9] tracking-[-0.08em]">
               Ayaka
             </h1>
             <p className="mt-8 max-w-[40ch] text-base leading-8 text-paper/65 sm:text-lg">
-              从一句话开始，把对话、智能体、记忆和工具连接成一条可追踪的运行链路。
+              是对「数字生命体」路线的产品化实验
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-6">
               <DownloadAction releaseData={releaseData}>下载 Ayaka</DownloadAction>
@@ -376,17 +374,13 @@ function Hero({ releaseData }: { releaseData: ReleasePageData }) {
             </div>
           </div>
 
-          <HeroWorkspacePreview releaseData={releaseData} />
+          <HeroWorkspacePreview />
         </div>
 
         <div className="flex flex-wrap justify-between gap-x-6 gap-y-2 border-t border-paper/15 pt-5 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-paper/45">
           <span>对话 → 智能体 → 记忆 → 工具</span>
           <span className="sm:text-center">默认可追踪</span>
-          <span className="sm:text-right">
-            {releaseData.status === "available"
-              ? "Windows x64 已可用"
-              : "Windows x64 等待发布"}
-          </span>
+          <span className="sm:text-right">Windows x64 已可用</span>
         </div>
       </div>
     </section>
@@ -407,7 +401,8 @@ function CapabilitiesSection() {
             </h2>
           </div>
           <p className="max-w-md text-base leading-8 text-graphite">
-            对话不是终点。Ayaka 让每个能力入口都服务于同一件事：让任务继续向前。
+            在连接成本上升、精神陪伴需求抬升的背景下，Ayaka
+            构建的不是「更全的知识库」，而是「私人、主动、能延续关系」的数字存在。
           </p>
         </div>
 
@@ -573,8 +568,7 @@ function WorkspaceSection() {
             </h2>
           </div>
           <p className="max-w-lg text-base leading-8 text-graphite">
-            对话是入口，智能体负责行动，记忆保留上下文，工具
-            连接外部世界。它们共享一条运行记录。
+            对话是入口，智能体负责行动，记忆保留上下文，工具 连接外部世界。它们共享一条运行记录。
           </p>
         </div>
 
@@ -697,9 +691,8 @@ function DownloadBanner({ releaseData }: { releaseData: ReleasePageData }) {
             一个任务。
           </h2>
           <p className="mt-6 max-w-xl text-base leading-8 text-graphite">
-            {releaseData.status === "available"
-              ? "Windows x64 当前可用。macOS 和 Linux 版本正在规划中。"
-              : "Windows x64 当前暂时没有可下载的发布包。macOS 和 Linux 版本正在规划中。"}
+            不是一次性问答工具，也不是百科型客服，而是在本地、私密、可长期运行的前提下，验证 AI
+            能否形成 有情感连续性的陪伴关系。
           </p>
           {summary && (
             <p className="mt-5 font-mono text-[0.62rem] uppercase tracking-[0.14em] text-graphite">
@@ -738,7 +731,7 @@ export function SiteFooter({ homePath = "" }: { homePath?: string }) {
             <span className="text-sm font-semibold tracking-[0.2em]">AYAKA</span>
           </div>
           <p className="mt-5 max-w-sm text-sm leading-7 text-paper/55">
-            本地优先的 AI 桌面工作台。让任务有入口，也让过程有记录。
+            对「数字生命体」路线的产品化实验
           </p>
         </div>
         <nav className="flex flex-col gap-3 text-sm tracking-tight text-paper/55">

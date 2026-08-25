@@ -21,12 +21,16 @@ describe("website release client", () => {
     const originalFetch = globalThis.fetch;
     let requestUrl = "";
     globalThis.fetch = async (input) => {
-      requestUrl = String(input);
+      requestUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return new Response(JSON.stringify(RELEASE), { status: 200 });
     };
 
     try {
-      await expect(fetchLatestRelease()).resolves.toEqual({ status: "available", release: RELEASE });
+      await expect(fetchLatestRelease()).resolves.toEqual({
+        status: "available",
+        release: RELEASE,
+      });
       expect(requestUrl).toBe(LATEST_RELEASE_API);
     } finally {
       globalThis.fetch = originalFetch;
@@ -57,7 +61,8 @@ describe("website release client", () => {
     const originalFetch = globalThis.fetch;
     let requestUrl = "";
     globalThis.fetch = async (input) => {
-      requestUrl = String(input);
+      requestUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return new Response(JSON.stringify(RELEASE), { status: 200 });
     };
 
@@ -65,7 +70,7 @@ describe("website release client", () => {
       await expect(
         fetchLatestReleaseForRequest(new Request("http://localhost:5173/")),
       ).resolves.toEqual({ status: "available", release: RELEASE });
-      expect(requestUrl).toBe(`https://ai.zzzvoid.com${LATEST_RELEASE_API}`);
+      expect(requestUrl).toBe(`http://localhost:5173${LATEST_RELEASE_API}`);
     } finally {
       globalThis.fetch = originalFetch;
     }
