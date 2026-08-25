@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.1.36]
+
+### 中文
+
+#### 新增
+
+- 新增会话权限管理，支持“每次询问”“仅审批风险操作”和“完全访问”三种模式，并提供全局默认权限与单会话覆盖设置。
+- 新增附件 MIME 类型自动推断，在原始类型缺失或为通用二进制类型时，根据文件扩展名补全图片、音频、视频和文本附件类型。
+- 新增富文本内容渲染与推理内容智能滚动，改善 Markdown 展示及流式输出体验。
+- 新增运行时诊断详情查看能力，并添加 MemOS 记忆操作系统 MCP 预设。
+- 新增代理头像选择器、内置动态头像资源及运行状态展示。
+
+#### 变更
+
+- 优化工具审批与会话恢复逻辑，完善审批响应状态、风险匹配及大参数处理，并支持完全访问模式跳过软审批。
+- 优化工作区侧边面板动画、过渡效果和可访问性行为。
+- 优化黑色与 ZZZ 深色皮肤的头像样式及图片预览交互。
+- 统一运行时日志时间处理为北京时间，并改善诊断信息展示。
+
+#### 修复
+
+- 修复 ZZZ 主题图片预览框关闭按钮定位不正确的问题。
+
+### English
+
+#### Added
+
+- Added session permission management with Ask, Approve risky actions, and Full access modes, plus global defaults and per-session overrides.
+- Added automatic attachment MIME-type inference, filling in image, audio, video, and text types from file extensions when the declared type is missing or generic.
+- Added rich-content rendering and smart scrolling for reasoning output, improving Markdown display and streaming behavior.
+- Added runtime diagnostic detail views and a MemOS Memory Operating System MCP preset.
+- Added an agent avatar picker, built-in animated avatar assets, and agent runtime-status indicators.
+
+#### Changed
+
+- Improved tool approval and session-recovery flows with approval-response states, refined risk matching, large-argument support, and soft-approval bypass in Full access mode.
+- Improved workspace side-panel animations, transitions, and accessibility behavior.
+- Improved avatar styling and image-preview interactions for the Black and ZZZ dark skins.
+- Standardized runtime log timestamps on Beijing time and improved diagnostic presentation.
+
+#### Fixed
+
+- Fixed the image-preview close button being positioned incorrectly in the ZZZ skin.
+
 ## [0.1.35]
 
 ### 中文
