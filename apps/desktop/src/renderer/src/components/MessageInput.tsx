@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { ChatReasoningLevel, ChatToolSelectionRequest, ProviderInfo } from "@shared/types";
+import { inferAttachmentMediaType } from "@shared/media-type";
 import { ModelSelector } from "./ModelSelector";
 import { ReasoningSelector } from "./ReasoningSelector";
 import { ToolSelector } from "./ToolSelector";
@@ -147,7 +148,7 @@ export function MessageInput({
           id: crypto.randomUUID(),
           file,
           name: file.name,
-          mediaType: file.type || "application/octet-stream",
+          mediaType: inferAttachmentMediaType(file.name, file.type),
           size: file.size,
         });
       }

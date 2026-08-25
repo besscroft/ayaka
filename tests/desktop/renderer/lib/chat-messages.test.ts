@@ -83,6 +83,18 @@ void describe("chat message helpers", () => {
     ]);
   });
 
+  void it("infers Markdown MIME types when an attachment has a generic binary type", () => {
+    const files = toFileUIParts([
+      {
+        mediaType: "application/octet-stream",
+        filename: "notes.md",
+        data: "data:application/octet-stream;base64,IyA=",
+      },
+    ]);
+
+    assert.equal(files[0]?.mediaType, "text/markdown");
+  });
+
   void it("hydrates full UIMessage JSON and falls back to legacy plain text rows", () => {
     const saved: UIMessage = {
       id: "m1",

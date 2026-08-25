@@ -13,7 +13,10 @@ electronModule.filename = electronPath;
 electronModule.paths = [];
 electronModule.loaded = true;
 electronModule.exports = {
-  app: { isPackaged: false, getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd() },
+  app: {
+    isPackaged: false,
+    getPath: () => process.env.AYAKA_USER_DATA_DIR ?? process.cwd(),
+  },
   dialog: {
     showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
     showSaveDialog: async () => saveDialogResult,
@@ -30,7 +33,9 @@ require.cache[electronPath] = electronModule;
 let db: typeof import("@desktop-main/lib/db");
 let workspace: typeof import("@desktop-main/lib/conversation-workspace");
 let root = "";
-let saveDialogResult: { canceled: boolean; filePath?: string } = { canceled: true };
+let saveDialogResult: { canceled: boolean; filePath?: string } = {
+  canceled: true,
+};
 let revealedPath = "";
 
 before(async () => {
@@ -96,8 +101,21 @@ void describe("conversation workspaces", () => {
   void it("stages attachments, disambiguates names, and rejects bad data", async () => {
     const id = "attachments-conversation";
     const refs = await workspace.saveWorkspaceAttachments(id, [
-      { filename: "report.txt", mediaType: "text/plain", dataUrl: "data:text/plain;base64,QQ==" },
-      { filename: "report.txt", mediaType: "text/plain", dataUrl: "data:text/plain;base64,Qg==" },
+      {
+        filename: "report.txt",
+        mediaType: "text/plain",
+        dataUrl: "data:text/plain;base64,QQ==",
+      },
+      {
+        filename: "report.txt",
+        mediaType: "text/plain",
+        dataUrl: "data:text/plain;base64,Qg==",
+      },
+      {
+        filename: "notes.md",
+        mediaType: "application/octet-stream",
+        dataUrl: "data:application/octet-stream;base64,IyA=",
+      },
       {
         filename: "bad/name?.txt",
         mediaType: "text/plain",
@@ -106,8 +124,9 @@ void describe("conversation workspaces", () => {
     ]);
     assert.deepEqual(
       refs.map((ref) => ref.filename),
-      ["report.txt", "report-1.txt", "name_.txt"],
+      ["report.txt", "report-1.txt", "notes.md", "name_.txt"],
     );
+    assert.equal(refs.find((ref) => ref.filename === "notes.md")?.mediaType, "text/markdown");
     const rootPath = db.getConversationWorkspace(id)!.root_path;
     assert.equal(
       (await readFile(path.join(rootPath, "attachments", "report-1.txt"))).toString(),
@@ -146,7 +165,10 @@ void describe("conversation workspaces", () => {
       mediaType: "image/png",
       data: new Uint8Array([7, 8, 9]),
     });
-    saveDialogResult = { canceled: false, filePath: path.join(root, "saved-image.png") };
+    saveDialogResult = {
+      canceled: false,
+      filePath: path.join(root, "saved-image.png"),
+    };
 
     const saved = await workspace.saveWorkspaceMediaAs({
       filename: "generated.png",
@@ -173,7 +195,9 @@ void describe("conversation workspaces", () => {
 
   void it("finds and removes only valid orphan directories", async () => {
     const parent = path.join(root, "parent");
-    await mkdir(path.join(parent, "2026-08-12-conv-orphan"), { recursive: true });
+    await mkdir(path.join(parent, "2026-08-12-conv-orphan"), {
+      recursive: true,
+    });
     await writeFile(path.join(parent, "2026-08-12-conv-orphan", "keep.txt"), "keep");
     const orphans = await workspace.listWorkspaceOrphans();
     assert.equal(orphans.length, 1);
@@ -190,12 +214,23 @@ void describe("conversation workspaces", () => {
       mediaType: "image/png",
       data: new Uint8Array([0, 1, 2]),
     });
+    await workspace.saveWorkspaceAttachment(id, {
+      filename: "notes.md",
+      mediaType: "application/octet-stream",
+      data: new Uint8Array([35, 32]),
+    });
 
     const workspaceMessages = await workspace.normalizeChatMediaInputs(id, [
       {
         id: "m1",
         role: "user",
-        parts: [{ type: "file", mediaType: "image/png", url: "workspace://attachments/pixel.png" }],
+        parts: [
+          {
+            type: "file",
+            mediaType: "image/png",
+            url: "workspace://attachments/pixel.png",
+          },
+        ],
       },
     ]);
     assert.equal(
@@ -203,13 +238,69 @@ void describe("conversation workspaces", () => {
       "data:image/png;base64,AAEC",
     );
 
+    const markdownMessages = await workspace.normalizeChatMediaInputs(id, [
+      {
+        id: "m-markdown",
+        role: "user",
+        parts: [
+          {
+            type: "file",
+            mediaType: "application/octet-stream",
+            filename: "notes.md",
+            url: "workspace://attachments/notes.md",
+          },
+        ],
+      },
+    ]);
+    assert.equal(
+      markdownMessages[0]?.parts[0]?.type === "file" && markdownMessages[0].parts[0].mediaType,
+      "text/markdown",
+    );
+    assert.equal(
+      markdownMessages[0]?.parts[0]?.type === "file" && markdownMessages[0].parts[0].url,
+      "data:text/markdown;base64,IyA=",
+    );
+
+    const inlineMarkdownMessages = await workspace.normalizeChatMediaInputs(undefined, [
+      {
+        id: "m-inline-markdown",
+        role: "user",
+        parts: [
+          {
+            type: "file",
+            mediaType: "application/octet-stream",
+            filename: "inline.md",
+            url: "data:application/octet-stream;base64,IyA=",
+          },
+        ],
+      },
+    ]);
+    assert.equal(
+      inlineMarkdownMessages[0]?.parts[0]?.type === "file" &&
+        inlineMarkdownMessages[0].parts[0].mediaType,
+      "text/markdown",
+    );
+    assert.equal(
+      inlineMarkdownMessages[0]?.parts[0]?.type === "file" &&
+        inlineMarkdownMessages[0].parts[0].url,
+      "data:text/markdown;base64,IyA=",
+    );
+
     const supported = await workspace.normalizeChatMediaInputs(undefined, [
       {
         id: "m2",
         role: "user",
         parts: [
-          { type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" },
-          { type: "file", mediaType: "image/png", url: "https://example.com/image.png" },
+          {
+            type: "file",
+            mediaType: "image/png",
+            url: "data:image/png;base64,AA==",
+          },
+          {
+            type: "file",
+            mediaType: "image/png",
+            url: "https://example.com/image.png",
+          },
         ],
       },
     ]);
@@ -233,7 +324,11 @@ void describe("conversation workspaces", () => {
     ]) {
       await assert.rejects(
         workspace.normalizeChatMediaInputs(undefined, [
-          { id: "m3", role: "user", parts: [{ type: "file", mediaType: "image/png", url }] },
+          {
+            id: "m3",
+            role: "user",
+            parts: [{ type: "file", mediaType: "image/png", url }],
+          },
         ]),
         (error: unknown) => {
           assert.equal((error as { code?: string }).code, "invalid_media_input");

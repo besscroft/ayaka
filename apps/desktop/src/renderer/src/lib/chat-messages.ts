@@ -1,5 +1,6 @@
 import type { FileUIPart, UIMessage } from "ai";
 import type { ChatMessageMetadata, ChatReactionMetadata, MessageRow } from "@shared/types";
+import { inferAttachmentMediaType } from "@shared/media-type";
 
 const FOLLOWUP_SUGGESTION_LIMIT = 4;
 const FOLLOWUP_SUGGESTION_MAX_LENGTH = 60;
@@ -16,7 +17,7 @@ export function toFileUIParts(files: FilePartInput[]): FileUIPart[] {
   return files
     .map((file, index) => ({
       type: "file" as const,
-      mediaType: file.mediaType ?? "application/octet-stream",
+      mediaType: inferAttachmentMediaType(file.filename, file.mediaType),
       filename: file.filename ?? `file-${index + 1}`,
       url: file.url ?? file.data ?? "",
     }))

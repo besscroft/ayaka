@@ -22,6 +22,7 @@ import type {
   WorkspaceMediaSaveResult,
   WorkspaceOrphan,
 } from "../../shared/types";
+import { inferAttachmentMediaType } from "../../shared/media-type";
 import type { UIMessage } from "ai";
 
 const DEFAULT_WORKSPACE_DIR = "workspaces";
@@ -215,7 +216,7 @@ export async function saveWorkspaceAttachment(
   return {
     path: `${ATTACHMENTS_DIR}/${filename}`,
     filename,
-    mediaType: input.mediaType || "application/octet-stream",
+    mediaType: inferAttachmentMediaType(filename, input.mediaType),
     size: bytes.byteLength,
   };
 }
@@ -276,7 +277,7 @@ export async function saveWorkspaceAttachments(
       refs.push({
         path: `${ATTACHMENTS_DIR}/${filename}`,
         filename,
-        mediaType: input.mediaType || "application/octet-stream",
+        mediaType: inferAttachmentMediaType(filename, input.mediaType),
         size: data.byteLength,
       });
     }
@@ -324,7 +325,7 @@ export async function readWorkspaceFileContent(
   return {
     path: path.relative(workspace.root_path, safePath).split(path.sep).join("/"),
     filename,
-    mediaType: guessMediaType(filename),
+    mediaType: inferAttachmentMediaType(filename),
     size: data.byteLength,
     data: bytes.buffer,
   };
@@ -402,9 +403,7 @@ export async function normalizeChatMediaInputs(
                 conversationId,
                 url.slice("workspace://".length),
               );
-              const mediaType = isMimeType(part.mediaType)
-                ? part.mediaType.trim()
-                : content.mediaType;
+              const mediaType = inferAttachmentMediaType(content.filename, part.mediaType);
               return {
                 ...part,
                 mediaType,
@@ -417,7 +416,8 @@ export async function normalizeChatMediaInputs(
 
           if (/^data:/i.test(url)) {
             if (!isValidBase64DataUrl(url)) throw new InvalidMediaInputError();
-            return { ...part, url };
+            const mediaType = inferAttachmentMediaType(part.filename, part.mediaType);
+            return { ...part, mediaType, url: replaceDataUrlMediaType(url, mediaType) };
           }
 
           if (/^https?:\/\//i.test(url)) {
@@ -439,10 +439,6 @@ export async function normalizeChatMediaInputs(
   );
 }
 
-function isMimeType(value: unknown): value is string {
-  return typeof value === "string" && /^[^\s/;,]+\/[^\s/;,]+$/.test(value.trim());
-}
-
 function isValidBase64DataUrl(value: string): boolean {
   const match = /^data:([^;,\s]+\/[^;,\s]+);base64,([A-Za-z0-9+/]*={0,2})$/i.exec(value);
   const payload = match?.[2] ?? "";
@@ -452,6 +448,10 @@ function isValidBase64DataUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function replaceDataUrlMediaType(value: string, mediaType: string): string {
+  return value.replace(/^data:[^;,]+(?:;[^,]*)?;base64,/i, `data:${mediaType};base64,`);
 }
 
 export async function listWorkspaceOrphans(): Promise<WorkspaceOrphan[]> {
@@ -611,26 +611,4 @@ function extensionForMediaType(mediaType: string): string {
     "video/quicktime": ".mov",
   };
   return extensions[normalized] ?? ".bin";
-}
-
-function guessMediaType(filename: string): string {
-  const extension = path.extname(filename).toLowerCase();
-  const types: Record<string, string> = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".svg": "image/svg+xml",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".ogg": "audio/ogg",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".mov": "video/quicktime",
-    ".json": "application/json",
-    ".txt": "text/plain",
-    ".md": "text/markdown",
-  };
-  return types[extension] ?? "application/octet-stream";
 }
