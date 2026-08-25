@@ -3850,7 +3850,7 @@ function DiagnosticsTab(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4 select-none">
         {events.length === 0 ? (
           <p className="rounded-md border border-border p-6 text-center text-sm text-muted-foreground">
             {t("tools.audit.empty")}
@@ -3887,10 +3887,10 @@ function DiagnosticsTab(): React.JSX.Element {
         {selectedEvent ? (
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle className="break-words">
+              <DialogTitle className="break-words select-none">
                 {t("settings.diagnostics.detail.title")}: {selectedEvent.title}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="select-none">
                 {selectedEvent.kind} / {selectedEvent.status} / {selectedEvent.severity}
               </DialogDescription>
             </DialogHeader>
@@ -3968,7 +3968,9 @@ function DiagnosticsTab(): React.JSX.Element {
               </dl>
 
               <div className="mt-5">
-                <h4 className="text-sm font-medium">{t("settings.diagnostics.detail.data")}</h4>
+                <h4 className="text-sm font-medium select-none">
+                  {t("settings.diagnostics.detail.data")}
+                </h4>
                 <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/20 p-3 font-mono text-xs leading-relaxed">
                   {formatRuntimeEventDetail(selectedEvent.detail_json)}
                 </pre>
@@ -3996,7 +3998,7 @@ function RuntimeEventDetailField({
 }): React.JSX.Element {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-foreground/45">{label}</dt>
+      <dt className="text-xs text-foreground/45 select-none">{label}</dt>
       <dd className="mt-1 break-words font-mono text-xs">{value ?? "-"}</dd>
     </div>
   );
