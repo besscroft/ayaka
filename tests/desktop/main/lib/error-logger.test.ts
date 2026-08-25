@@ -22,7 +22,7 @@ afterEach(async () => {
 
 void describe("error logger", () => {
   void it("writes redacted JSONL records and removes previous days", async () => {
-    let now = new Date(2026, 0, 2, 12).getTime();
+    let now = Date.UTC(2026, 0, 2, 4);
     const logger = new ErrorLogger({ userDataDir: root, now: () => now });
     const oldFile = join(root, "logs", getErrorLogFilename("2026-01-01"));
     await mkdir(join(root, "logs"), { recursive: true });
@@ -62,8 +62,8 @@ void describe("error logger", () => {
     );
   });
 
-  void it("rotates to a new local day on the next write", async () => {
-    let now = new Date(2026, 0, 2, 23, 59).getTime();
+  void it("rotates to a new Beijing day on the next write", async () => {
+    let now = Date.UTC(2026, 0, 2, 15, 59);
     const logger = new ErrorLogger({ userDataDir: root, now: () => now });
     await logger.initialize();
     logger.record({
@@ -74,7 +74,7 @@ void describe("error logger", () => {
     });
     await logger.flush();
 
-    now = new Date(2026, 0, 3, 0, 1).getTime();
+    now = Date.UTC(2026, 0, 2, 16, 1);
     logger.record({
       source: "main",
       level: "error",
@@ -89,7 +89,7 @@ void describe("error logger", () => {
   });
 
   void it("exports the current file, and distinguishes empty and cancelled exports", async () => {
-    const now = new Date(2026, 0, 2, 12).getTime();
+    const now = Date.UTC(2026, 0, 2, 4);
     const logger = new ErrorLogger({ userDataDir: root, now: () => now });
     await logger.initialize();
 
@@ -99,6 +99,12 @@ void describe("error logger", () => {
         filePath: join(root, "empty"),
       })),
       "empty",
+    );
+
+    await writeFile(
+      join(root, "logs", getErrorLogFilename("2026-01-02")),
+      `${JSON.stringify({ timestamp: "2026-01-02T04:00:00.000Z", message: "before update" })}\n`,
+      "utf8",
     );
 
     logger.record({
@@ -114,7 +120,12 @@ void describe("error logger", () => {
       return { canceled: false, filePath: exportPath };
     });
     assert.equal(saved, "saved");
-    assert.match(await readFile(exportPath, "utf8"), /boom/);
+    const exportedRecords = (await readFile(exportPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    assert.equal(exportedRecords[0]?.timestamp, "2026-01-02T12:00:00.000+08:00");
+    assert.equal(exportedRecords[1]?.message, "boom");
 
     assert.equal(await logger.exportCurrent(async () => ({ canceled: true })), "cancelled");
   });
@@ -136,6 +147,22 @@ void describe("error logger", () => {
 });
 
 void describe("error log normalization", () => {
+  void it("uses Beijing time for date keys and serialized timestamps", () => {
+    const timestamp = Date.UTC(2026, 0, 2, 16, 1, 2, 345);
+
+    assert.equal(getErrorLogDateKey(timestamp), "2026-01-03");
+    assert.equal(
+      normalizeErrorLogInput({
+        source: "main",
+        level: "error",
+        origin: "console",
+        message: "boom",
+        timestamp,
+      }).timestamp,
+      "2026-01-03T00:01:02.345+08:00",
+    );
+  });
+
   void it("preserves error metadata while redacting inline secrets", () => {
     const record = normalizeErrorLogInput({
       source: "renderer",

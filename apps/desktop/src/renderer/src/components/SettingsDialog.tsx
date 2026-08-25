@@ -5,6 +5,7 @@ import {
   Description,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,6 +31,7 @@ import { notify } from "../lib/toast";
 import { useSettings, type SettingsResetScope } from "../lib/settings";
 import { useT, LANGUAGE_OPTIONS, type TranslationKey } from "../lib/i18n";
 import { cn } from "../lib/utils";
+import { formatRuntimeEventDetail, formatRuntimeEventTime } from "../lib/runtime-diagnostics";
 import {
   getMediaCapableProviders,
   getVisionCapableProviders,
@@ -3793,8 +3795,9 @@ function safeJsonRecord(raw: string): Record<string, unknown> {
 }
 
 function DiagnosticsTab(): React.JSX.Element {
-  const { t, f, locale } = useT();
+  const { t, locale } = useT();
   const [events, setEvents] = useState<RuntimeEvent[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<RuntimeEvent | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -3852,11 +3855,15 @@ function DiagnosticsTab(): React.JSX.Element {
           </p>
         ) : (
           events.slice(0, 80).map((event) => (
-            <div
+            <button
+              type="button"
               key={event.id}
-              className="grid gap-2 rounded-md border border-border p-3 text-sm md:grid-cols-[160px_1fr_auto]"
+              className="grid w-full cursor-pointer gap-2 rounded-md border border-border p-3 text-left text-sm transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/40 md:grid-cols-[160px_1fr_auto]"
+              onClick={() => setSelectedEvent(event)}
             >
-              <div className="text-xs text-foreground/45">{f.dateTime(event.created_at)}</div>
+              <div className="text-xs text-foreground/45">
+                {formatRuntimeEventTime(event.created_at, locale)}
+              </div>
               <div className="min-w-0">
                 <p className="truncate font-medium">{event.title}</p>
                 <p className="mt-1 truncate text-xs text-foreground/45">
@@ -3864,10 +3871,131 @@ function DiagnosticsTab(): React.JSX.Element {
                 </p>
               </div>
               <span className="text-xs text-foreground/45">{event.severity}</span>
-            </div>
+            </button>
           ))
         )}
       </div>
+
+      <Dialog
+        open={selectedEvent !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEvent(null);
+        }}
+      >
+        {selectedEvent ? (
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="break-words">
+                {t("settings.diagnostics.detail.title")}: {selectedEvent.title}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedEvent.kind} / {selectedEvent.status} / {selectedEvent.severity}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="min-h-0 overflow-y-auto px-6 py-4">
+              <dl className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.time")}
+                  value={formatRuntimeEventTime(selectedEvent.created_at, locale)}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.id")}
+                  value={selectedEvent.id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.kind")}
+                  value={selectedEvent.kind}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.status")}
+                  value={selectedEvent.status}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.severity")}
+                  value={selectedEvent.severity}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.eventType")}
+                  value={selectedEvent.event_type}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.duration")}
+                  value={
+                    selectedEvent.duration_ms === null ? null : `${selectedEvent.duration_ms} ms`
+                  }
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.sequence")}
+                  value={selectedEvent.sequence}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.runId")}
+                  value={selectedEvent.run_id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.stepId")}
+                  value={selectedEvent.step_id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.conversationId")}
+                  value={selectedEvent.conversation_id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.agentId")}
+                  value={selectedEvent.agent_id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.toolId")}
+                  value={selectedEvent.tool_id}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.owner")}
+                  value={[selectedEvent.owner_type, selectedEvent.owner_id]
+                    .filter(Boolean)
+                    .join(" / ")}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.agentPath")}
+                  value={selectedEvent.agent_path}
+                />
+                <RuntimeEventDetailField
+                  label={t("settings.diagnostics.detail.parentAgentPath")}
+                  value={selectedEvent.parent_agent_path}
+                />
+              </dl>
+
+              <div className="mt-5">
+                <h4 className="text-sm font-medium">{t("settings.diagnostics.detail.data")}</h4>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/20 p-3 font-mono text-xs leading-relaxed">
+                  {formatRuntimeEventDetail(selectedEvent.detail_json)}
+                </pre>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="secondary" onPress={() => setSelectedEvent(null)}>
+                {t("common.close")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </section>
+  );
+}
+
+function RuntimeEventDetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}): React.JSX.Element {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-foreground/45">{label}</dt>
+      <dd className="mt-1 break-words font-mono text-xs">{value ?? "-"}</dd>
+    </div>
   );
 }

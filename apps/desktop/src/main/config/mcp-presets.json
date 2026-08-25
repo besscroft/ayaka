@@ -403,5 +403,27 @@
     "warnings": [
       "请确认 MySQL 主机、端口、数据库和账号权限。该服务器可以执行 SQL，建议使用最小权限账号并在启用前审查访问范围。"
     ]
+  },
+  {
+    "id": "memos-api-mcp",
+    "name": "MemOS 记忆操作系统",
+    "description": "提供跨会话记忆检索、消息存储、用户画像和知识库管理。",
+    "version": "latest",
+    "author": "MemTensor",
+    "category": "记忆与知识",
+    "tags": ["MemOS", "Memory", "记忆"],
+    "docsUrl": "https://www.modelscope.cn/mcp/servers/MemTensor/MemoryOperatingSystem",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@memtensor/memos-api-mcp@latest"],
+    "env": {
+      "MEMOS_API_KEY": "$secret:MEMOS_API_KEY",
+      "MEMOS_USER_ID": "$secret:MEMOS_USER_ID",
+      "MEMOS_CHANNEL": "MODELSCOPE"
+    },
+    "secretKeys": ["MEMOS_API_KEY", "MEMOS_USER_ID"],
+    "warnings": [
+      "需要 MemOS API Key 和稳定的自定义 User ID；该服务器会存储和管理记忆及知识库数据，请在启用前确认数据范围与隐私权限。"
+    ]
   }
 ]

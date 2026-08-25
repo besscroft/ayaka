@@ -1,4 +1,4 @@
-import { appendFile, copyFile, mkdir, readdir, rm, access } from "node:fs/promises";
+import { access, appendFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   ErrorLogError,
@@ -9,6 +9,7 @@ import type {
   ErrorLogRecord,
   ErrorLogSource,
 } from "../../shared/types";
+import { formatBeijingTimestamp, getBeijingDateKey } from "../../shared/time";
 import { resolveUserDataDir } from "./runtime-paths";
 
 const LOG_FILE_PREFIX = "ayaka-errors-";
@@ -45,11 +46,7 @@ export interface ErrorLoggerOptions {
 }
 
 export function getErrorLogDateKey(timestamp = Date.now()): string {
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return getBeijingDateKey(timestamp);
 }
 
 export function getErrorLogFilename(dateKey: string): string {
@@ -66,7 +63,7 @@ export function normalizeErrorLogInput(input: ErrorLogInput, now = Date.now()): 
   const timestamp = Number.isFinite(input.timestamp) ? input.timestamp! : now;
 
   return {
-    timestamp: new Date(timestamp).toISOString(),
+    timestamp: formatBeijingTimestamp(timestamp),
     source: normalizeSource(input.source),
     level: normalizeLevel(input.level),
     origin: normalizeOrigin(input.origin),
@@ -124,7 +121,8 @@ export class ErrorLogger {
     if (dialogResult.canceled || !dialogResult.filePath) return "cancelled";
 
     await this.flush();
-    await copyFile(sourcePath, dialogResult.filePath);
+    const sourceContent = await readFile(sourcePath, "utf8");
+    await writeFile(dialogResult.filePath, formatExportContent(sourceContent), "utf8");
     return "saved";
   }
 
@@ -375,6 +373,24 @@ function serializeRecord(record: ErrorLogRecord): string {
       : {}),
   };
   return `${JSON.stringify(compact)}\n`;
+}
+
+function formatExportContent(content: string): string {
+  return content
+    .split(/(\r?\n)/)
+    .map((part) => {
+      if (part === "\n" || part === "\r\n" || part.trim() === "") return part;
+
+      try {
+        const record = JSON.parse(part) as Record<string, unknown>;
+        const timestamp = typeof record.timestamp === "string" ? Date.parse(record.timestamp) : NaN;
+        if (Number.isFinite(timestamp)) record.timestamp = formatBeijingTimestamp(timestamp);
+        return JSON.stringify(record);
+      } catch {
+        return part;
+      }
+    })
+    .join("");
 }
 
 async function fileExists(filePath: string): Promise<boolean> {

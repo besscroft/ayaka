@@ -39,6 +39,7 @@ test("ships the reviewed MCP presets from JSON", () => {
       "drawio-mcp-server",
       "notion-mcp-server",
       "mysql-mcp-server",
+      "memos-api-mcp",
     ],
   );
   assert.equal(MCP_PRESETS[0]?.id, "filesystem");
@@ -82,9 +83,17 @@ test("ships the reviewed MCP presets from JSON", () => {
   assert.deepEqual(mysql?.secretKeys, ["MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE"]);
   assert.deepEqual(mysql?.args, ["--from", "mysql-mcp-server==0.4.4", "mysql_mcp_server"]);
   assert.equal(MCP_PRESETS.find((preset) => preset.id === "desktop-commander")?.version, "0.2.47");
+  const memos = MCP_PRESETS.find((preset) => preset.id === "memos-api-mcp");
+  assert.deepEqual(memos?.args, ["-y", "@memtensor/memos-api-mcp@latest"]);
+  assert.deepEqual(memos?.env, {
+    MEMOS_API_KEY: "$secret:MEMOS_API_KEY",
+    MEMOS_USER_ID: "$secret:MEMOS_USER_ID",
+    MEMOS_CHANNEL: "MODELSCOPE",
+  });
+  assert.deepEqual(memos?.secretKeys, ["MEMOS_API_KEY", "MEMOS_USER_ID"]);
   const result = searchMcpPresets({ page: 1, pageSize: 100 });
   assert.equal(result.items.length, MCP_PRESETS.length);
-  assert.equal(result.items.length, 25);
+  assert.equal(result.items.length, 26);
   assert.equal(result.hasMore, false);
 });
 
