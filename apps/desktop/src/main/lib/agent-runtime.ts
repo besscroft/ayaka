@@ -788,11 +788,9 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     activeTools: names,
     toolChoice: names.length ? "auto" : "none",
     builtinToolNames: [...builtinToolNames],
-    toolApproval: createGuardrailApproval(
-      context,
-      new Set(base.approvalToolNames ?? []),
-      builtinToolNames,
-    ),
+    toolApproval: bypassesChatPermissionApproval(context.permissionMode)
+      ? undefined
+      : createGuardrailApproval(context, new Set(base.approvalToolNames ?? []), builtinToolNames),
     stopWhen: ROOT_AGENT_STOP_WHEN,
     onStepEnd: (event) => {
       base.onStepEnd?.(event);
