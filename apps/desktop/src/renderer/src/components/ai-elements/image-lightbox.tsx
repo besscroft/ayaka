@@ -149,6 +149,7 @@ export function ImageLightbox({
             variant="ghost"
             size="icon"
             className="absolute right-3 top-3 rounded-full bg-black/45 text-white hover:bg-black/70 hover:text-white sm:right-6 sm:top-6"
+            data-image-lightbox-close="true"
             aria-label={t("image.action.close")}
             title={t("image.action.close")}
             onPress={() => onOpenChange(false)}

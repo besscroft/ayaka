@@ -232,6 +232,10 @@
   transition: transform 120ms ease;
 }
 
+:root[data-skin="zzz"] [data-image-lightbox-close="true"] {
+  position: absolute;
+}
+
 :root[data-skin="zzz"] [data-slot="button"]::after {
   position: absolute;
   inset: 0;

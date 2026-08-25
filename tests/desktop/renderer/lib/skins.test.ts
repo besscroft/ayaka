@@ -317,6 +317,21 @@ void describe("skin CSS contract", () => {
     assert.match(css, /window-control[\s\S]*transform:\s*translate\(-50%,\s*-50%\)/);
   });
 
+  void it("keeps the ZZZ image lightbox close control anchored to the top right", () => {
+    const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
+    const lightbox = readFileSync(
+      resolve(SKINS_ROOT, "..", "components/ai-elements/image-lightbox.tsx"),
+      "utf8",
+    );
+
+    assert.match(lightbox, /data-image-lightbox-close=["']true["']/);
+    assert.match(
+      css,
+      /:root\[data-skin=["']zzz["']\]\s+\[data-image-lightbox-close=["']true["']\]\s*\{[\s\S]*?position:\s*absolute/,
+    );
+    assert.match(lightbox, /className=["'][^"']*absolute\s+right-3\s+top-3/);
+  });
+
   void it("keeps the ZZZ tabs active pill fully rounded", () => {
     const css = readFileSync(resolve(SKINS_ROOT, "zzz/components.css"), "utf8");
     const tabsListRule = css.match(
