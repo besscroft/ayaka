@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AgentProfile } from "@shared/types";
+import { DEFAULT_AGENT_AVATAR_ID } from "@shared/agent-avatar";
 import { AgentAvatar } from "@renderer/components/AgentAvatar";
+import { AGENT_AVATAR_ASSETS } from "@renderer/lib/agent-avatar-assets";
 
 function makeAgent(kind: AgentProfile["kind"], avatar: string): AgentProfile {
   return {
@@ -42,12 +44,23 @@ void describe("AgentAvatar", () => {
     assert.match(html, /alt=""/);
   });
 
-  void it("keeps child agent avatars as text", () => {
+  void it("renders the default shared image for a child agent", () => {
     const html = renderToStaticMarkup(
-      <AgentAvatar profile={makeAgent("child", "F")} className="size-8" />,
+      <AgentAvatar profile={makeAgent("child", DEFAULT_AGENT_AVATAR_ID)} className="size-8" />,
     );
 
-    assert.doesNotMatch(html, /<img /);
-    assert.match(html, />F<\/span>/);
+    assert.match(html, /<img /);
+    assert.match(html, /bloub-cercle-attentif-bleu-anime\.svg/);
+  });
+
+  void it("renders a selected image and falls back from legacy text", () => {
+    const selectedHtml = renderToStaticMarkup(
+      <AgentAvatar profile={makeAgent("child", "bloub-cercle-surpris-bleu-anime")} />,
+    );
+    const legacyHtml = renderToStaticMarkup(<AgentAvatar profile={makeAgent("child", "F")} />);
+
+    assert.match(selectedHtml, /bloub-cercle-surpris-bleu-anime\.svg/);
+    assert.match(legacyHtml, /bloub-cercle-attentif-bleu-anime\.svg/);
+    assert.equal(AGENT_AVATAR_ASSETS.length, 16);
   });
 });

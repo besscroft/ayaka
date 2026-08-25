@@ -5,6 +5,11 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import {
+  DEFAULT_AGENT_AVATAR_ID,
+  isAgentAvatarId,
+  normalizeAgentAvatarId,
+} from "../../shared/agent-avatar";
 import { decrypt, encrypt, type EncryptedPayload } from "./crypto";
 import {
   DEFAULT_BUILTIN_TOOL_SEEDS,
@@ -3521,9 +3526,31 @@ function seedDefaults(): void {
     }
   }
 
+  migrateLegacyAgentAvatars();
+
   seedBuiltinTools(now);
   ensureSyncProfile();
   ensureAllagentRuntimeStates();
+}
+
+function migrateLegacyAgentAvatars(): void {
+  const legacyAgents = getDb()
+    .select({ id: agents.id, avatar: agents.avatar })
+    .from(agents)
+    .where(eq(agents.kind, "child"))
+    .all()
+    .filter((agent) => !isAgentAvatarId(agent.avatar));
+  if (legacyAgents.length === 0) return;
+
+  const updatedAt = Date.now();
+  getDb().transaction((tx) => {
+    for (const agent of legacyAgents) {
+      tx.update(agents)
+        .set({ avatar: DEFAULT_AGENT_AVATAR_ID, updated_at: updatedAt })
+        .where(eq(agents.id, agent.id))
+        .run();
+    }
+  });
 }
 
 function seedBuiltinTools(now: number): void {
@@ -3678,6 +3705,7 @@ function normalizeAgentInput(
     input.runtime_config_json ?? existingProfile?.runtime_config_json,
     DEFAULT_AGENT_RUNTIME_CONFIG,
   );
+  const kind = existing?.kind ?? (id === DEFAULT_AGENT_ID ? "main" : "child");
   return {
     agent: {
       id,
@@ -3686,9 +3714,12 @@ function normalizeAgentInput(
       instructions,
       persona,
       description,
-      avatar: normalizeAvatar(input.avatar ?? existingProfile?.avatar ?? name),
+      avatar:
+        kind === "main"
+          ? normalizeAvatar(input.avatar ?? existingProfile?.avatar ?? name)
+          : normalizeAgentAvatarId(input.avatar ?? existingProfile?.avatar),
       status: input.status ?? existingProfile?.status ?? "draft",
-      kind: existing?.kind ?? (id === DEFAULT_AGENT_ID ? "main" : "child"),
+      kind,
       parent_agent_id:
         existing?.parent_agent_id ?? (id === DEFAULT_AGENT_ID ? null : DEFAULT_AGENT_ID),
       locked: existing?.locked ?? (id === DEFAULT_AGENT_ID ? 1 : 0),

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import runningConversationIconUrl from "@ayaka/assets/emotions/bloub-cercle-neutre-bleu-anime.svg";
 import { Button } from "./ui";
 import { api } from "../lib/api";
 import { notify } from "../lib/toast";
 import { useT, type TranslationKey } from "../lib/i18n";
+import { getRunningConversationIds } from "../lib/agent-runtime-status";
 import {
   IconMessage,
   IconPlus,
@@ -63,6 +65,9 @@ export function AppShell({
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [runningConversationIds, setRunningConversationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const refresh = (): void => {
     void api.conversations.list().then(setConversations);
@@ -75,6 +80,34 @@ export function AppShell({
   useEffect(() => {
     refresh();
   }, [activeConversationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshRuntime = (): void => {
+      void api.agents
+        .runtimeSnapshot()
+        .then((snapshot) => {
+          if (cancelled) return;
+          const next = getRunningConversationIds(snapshot.runtimeRuns);
+          setRunningConversationIds((current) => {
+            if (current.size === next.size && [...next].every((id) => current.has(id))) {
+              return current;
+            }
+            return next;
+          });
+        })
+        .catch((error) => {
+          if (!cancelled) console.error("[app-shell] failed to refresh runtime state:", error);
+        });
+    };
+
+    refreshRuntime();
+    const intervalId = window.setInterval(refreshRuntime, 1_200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   // 鐩戝惉鑷姩/鎵嬪姩閲嶅懡鍚嶏細浼樺厛鐢ㄤ簨浠舵惡甯︾�?title 鐩存帴鏇存柊鏈�?state�?
   // 鑻ユ病鏈?title锛堜緥濡傛潵鑷叾浠栨笭閬擄級锛屽垯闄嶇骇涓哄叏�?refresh�?
@@ -307,7 +340,17 @@ export function AppShell({
                                     onSelectView("chat");
                                   }}
                                 >
-                                  <IconMessage className="size-3.5 shrink-0 opacity-60" />
+                                  {runningConversationIds.has(conv.id) ? (
+                                    <img
+                                      src={runningConversationIconUrl}
+                                      alt=""
+                                      aria-hidden="true"
+                                      data-slot="conversation-running-icon"
+                                      className="size-3.5 shrink-0 object-contain"
+                                    />
+                                  ) : (
+                                    <IconMessage className="size-3.5 shrink-0 opacity-60" />
+                                  )}
                                   <span className="flex-1 truncate text-xs">{conv.title}</span>
                                   <button
                                     type="button"

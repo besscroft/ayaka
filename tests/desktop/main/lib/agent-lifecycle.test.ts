@@ -13,6 +13,7 @@ import {
   type AgentRuntimeStatus,
   type ToolSkillInput,
 } from "@shared/types";
+import { DEFAULT_AGENT_AVATAR_ID } from "@shared/agent-avatar";
 
 const require = createRequire(import.meta.url);
 const electronPath = require.resolve("electron");
@@ -106,6 +107,28 @@ void describe("agent lifecycle persistence", () => {
     await db.closeDb();
     db.initDb();
     assert.equal(db.getToolRecord("workspace_run_command")?.requires_approval, 0);
+  });
+
+  void it("migrates legacy child avatars while preserving valid and main avatars", async () => {
+    const legacy = await db.createAgent(makeAgentInput("Legacy avatar"));
+    const selected = await db.createAgent({
+      ...makeAgentInput("Selected avatar"),
+      avatar: "bloub-cercle-surpris-bleu-anime",
+    });
+
+    db.getDb()
+      .update(db.schema.agents)
+      .set({ avatar: "F" })
+      .where(eq(db.schema.agents.id, legacy.id))
+      .run();
+    const rootAvatar = db.getAgent(DEFAULT_AGENT_ID)?.avatar;
+
+    await db.closeDb();
+    db.initDb();
+
+    assert.equal(db.getAgent(legacy.id)?.avatar, DEFAULT_AGENT_AVATAR_ID);
+    assert.equal(db.getAgent(selected.id)?.avatar, "bloub-cercle-surpris-bleu-anime");
+    assert.equal(db.getAgent(DEFAULT_AGENT_ID)?.avatar, rootAvatar);
   });
 
   void it("classifies only active runtime work as busy", () => {

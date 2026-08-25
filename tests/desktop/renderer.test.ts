@@ -1,4 +1,5 @@
 import "./renderer/components/AgentAvatar.test.tsx";
+import "./renderer/components/AgentAvatarPicker.test.tsx";
 import "./renderer/components/AgentStatusWidget.test.ts";
 import "./renderer/components/WorkspaceSidePanel.test.tsx";
 import "./renderer/components/ai-elements/image-lightbox-model.test.ts";
@@ -16,6 +17,7 @@ import "./renderer/components/ui/button.test.tsx";
 import "./renderer/components/ui/controls.test.tsx";
 import "./renderer/lib/agent-config.test.ts";
 import "./renderer/lib/agent-drawer-model.test.ts";
+import "./renderer/lib/agent-runtime-status.test.ts";
 import "./renderer/lib/changelog.test.ts";
 import "./renderer/lib/chat-media.test.ts";
 import "./renderer/lib/chat-messages.test.ts";

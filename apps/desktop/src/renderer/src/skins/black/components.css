@@ -1,0 +1,4 @@
+:root[data-skin="black"] [data-slot="agent-avatar"] {
+  background: transparent;
+  box-shadow: none;
+}

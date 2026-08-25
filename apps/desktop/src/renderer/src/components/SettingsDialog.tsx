@@ -42,6 +42,7 @@ import {
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AboutSettings } from "./AboutSettings";
 import { RuntimeSettings } from "./RuntimeSettings";
+import { AgentAvatar } from "./AgentAvatar";
 import {
   IconClose,
   IconKey,
@@ -3547,9 +3548,10 @@ function TrashTab(): React.JSX.Element {
               <div key={agent.id} className="rounded-md border border-border bg-card p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-lg">
-                      {agent.avatar || "A"}
-                    </div>
+                    <AgentAvatar
+                      profile={agent}
+                      className="size-10 rounded-md border border-border bg-muted text-lg"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{agent.name}</p>
                       <p className="mt-1 line-clamp-2 text-xs text-foreground/55">

@@ -6,7 +6,9 @@ import { DEFAULT_CHAT_TOOL_SELECTION, type RuntimeRun, type RuntimeStep } from "
 import {
   AgentStatusWidget,
   getAgentPanelAnimation,
+  getAgentPanelTransition,
   getRecentRuntimeSteps,
+  getStatusTriggerAvatarUrl,
   formatElapsed,
   resolveAgentPanelStatus,
   selectLatestConversationRun,
@@ -52,7 +54,21 @@ function makeStep(id: string, runId: string, startedAt: number): RuntimeStep {
 void describe("agent status widget runtime helpers", () => {
   void it("keeps the panel visible after its expand animation starts", () => {
     assert.deepEqual(getAgentPanelAnimation(true), { width: 320, opacity: 1 });
-    assert.deepEqual(getAgentPanelAnimation(false), { width: 80, opacity: 1 });
+    assert.deepEqual(getAgentPanelAnimation(false), { width: 40, opacity: 1 });
+  });
+
+  void it("uses a short eased transition and honors reduced motion", () => {
+    assert.deepEqual(getAgentPanelTransition(false), {
+      type: "tween",
+      duration: 0.22,
+      ease: [0.22, 1, 0.36, 1],
+    });
+    assert.deepEqual(getAgentPanelTransition(true), { duration: 0 });
+  });
+
+  void it("uses different trigger avatars for active and idle conversations", () => {
+    assert.match(getStatusTriggerAvatarUrl(true), /bloub-cercle-timide-bleu-anime\.svg/);
+    assert.match(getStatusTriggerAvatarUrl(false), /bloub-cercle-surpris-bleu-anime\.svg/);
   });
 
   void it("selects the latest run for the active conversation only", () => {
@@ -137,7 +153,8 @@ void describe("agent status widget runtime helpers", () => {
 
     assert.match(html, /data-slot="agent-status-toolbar"/);
     assert.match(html, /<button[^>]*data-slot="agent-status-indicator"/);
-    assert.match(html, /data-slot="agent-status-toggle"/);
+    assert.match(html, /bloub-cercle-surpris-bleu-anime\.svg/);
+    assert.doesNotMatch(html, /data-slot="agent-status-toggle"/);
     assert.match(html, /class="flex h-full items-center gap-1 px-1"/);
     assert.match(html, /relative h-10 border-l-0 bg-transparent/);
     assert.doesNotMatch(html, /top-1\/2|translate-y-1\/2/);
@@ -166,5 +183,6 @@ void describe("agent status widget runtime helpers", () => {
     assert.match(html, /data-open="true"/);
     assert.match(html, /class="[^"]*relative h-full[^"]*shadow-lg/);
     assert.doesNotMatch(html, /absolute right-0 top-0 z-40 h-10/);
+    assert.match(html, /will-change-\[width\]/);
   });
 });

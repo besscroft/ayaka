@@ -51,6 +51,7 @@ import {
   type RuntimeRun,
   type RuntimeStep,
 } from "@shared/types";
+import { DEFAULT_AGENT_AVATAR_ID, normalizeAgentAvatarId } from "@shared/agent-avatar";
 import { api } from "../lib/api";
 import { AGENT_RUNTIME_STATUS_KEYS } from "../lib/agent-runtime-status";
 import { getVisibleAgents, type AgentListTab } from "../lib/agent-list";
@@ -60,6 +61,7 @@ import { notify } from "../lib/toast";
 import { cn } from "../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { AgentAvatar } from "./AgentAvatar";
+import { AgentAvatarPicker } from "./AgentAvatarPicker";
 import {
   IconCheck,
   IconClose,
@@ -968,7 +970,7 @@ function AgentEditorModal({
 
             {tab === "basics" ? (
               <div className="grid gap-4">
-                <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+                <div className="grid gap-3 md:grid-cols-[1fr_minmax(12rem,18rem)]">
                   <Field label={t("agents.field.name")} error={validation.name}>
                     <Input
                       value={form.name}
@@ -976,10 +978,10 @@ function AgentEditorModal({
                     />
                   </Field>
                   <Field label={t("agents.field.avatar")}>
-                    <Input
+                    <AgentAvatarPicker
                       value={form.avatar}
-                      onChange={(event) => patch({ avatar: event.target.value })}
-                      maxLength={4}
+                      onChange={(avatar) => patch({ avatar })}
+                      ariaLabel={t("agents.field.avatar")}
                     />
                   </Field>
                 </div>
@@ -1409,7 +1411,10 @@ function createAgentForm(agent?: AgentProfile): AgentFormState {
     name: agent?.name ?? "",
     role: agent?.role ?? "",
     description: agent?.description ?? "",
-    avatar: agent?.avatar ?? "",
+    avatar:
+      agent?.kind === "main"
+        ? agent.avatar
+        : normalizeAgentAvatarId(agent?.avatar ?? DEFAULT_AGENT_AVATAR_ID),
     status: agent?.status ?? "draft",
     enabled: agent ? agent.enabled !== 0 : false,
     model_ref: agent?.model_ref ?? "",
@@ -1427,7 +1432,7 @@ function createAgentForm(agent?: AgentProfile): AgentFormState {
 
 function formToAgentInput(form: AgentFormState): AgentInput {
   return {
-    avatar: form.avatar.trim() || form.name.trim().slice(0, 1).toUpperCase(),
+    avatar: normalizeAgentAvatarId(form.avatar),
     description: form.description.trim(),
     enabled: form.status === "draft" ? false : form.enabled,
     handoff_config_json: JSON.stringify(form.handoffConfig),

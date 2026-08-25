@@ -1,4 +1,5 @@
 import type { AgentProfile } from "@shared/types";
+import { getAgentAvatarAsset } from "../lib/agent-avatar-assets";
 import { cn } from "../lib/utils";
 
 const ROOT_AGENT_AVATAR_URL = new URL("../../../../resources/icon.png", import.meta.url).href;
@@ -18,6 +19,7 @@ export function AgentAvatar({
 
   return (
     <span
+      data-slot="agent-avatar"
       className={cn(
         "flex shrink-0 items-center justify-center overflow-hidden select-none",
         className,
@@ -26,6 +28,13 @@ export function AgentAvatar({
       {profile?.kind === "main" ? (
         <img
           src={ROOT_AGENT_AVATAR_URL}
+          alt=""
+          aria-hidden="true"
+          className="size-full object-cover"
+        />
+      ) : profile ? (
+        <img
+          src={getAgentAvatarAsset(profile.avatar).url}
           alt=""
           aria-hidden="true"
           className="size-full object-cover"

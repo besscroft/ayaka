@@ -1434,6 +1434,11 @@
 /* ZZZ visual system: page surfaces, dark command surfaces, and signal states */
 /* -------------------------------------------------------------------------- */
 
+:root[data-skin="zzz"] [data-slot="agent-avatar"] {
+  background: transparent;
+  box-shadow: none;
+}
+
 :root[data-skin="zzz"] [data-slot="window-titlebar"]::after,
 :root[data-skin="zzz"] [data-slot="message-content"][data-from="user"]::after {
   display: none;

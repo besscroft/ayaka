@@ -9,6 +9,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./emotions": "./emotions/index.ts",
     "./emotions/*": "./emotions/*"
   }
 }

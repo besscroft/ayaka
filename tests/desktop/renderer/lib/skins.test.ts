@@ -14,12 +14,14 @@ const TOKEN_FILE_BY_ID: Record<SkinId, string> = {
 };
 
 const COMPONENT_HOOKS = {
+  black: ["agent-avatar"],
   zzz: [
     "window-titlebar",
     "window-sidebar-toggle",
     "window-brand",
     "window-controls",
     "button",
+    "agent-avatar",
     "tooltip-trigger",
     "tooltip-content",
     "message-content",
@@ -163,7 +165,7 @@ void describe("skin CSS contract", () => {
   void it("keeps component overrides isolated to their owning skin", () => {
     const indexCss = readFileSync(resolve(SKINS_ROOT, "index.css"), "utf8");
 
-    for (const skinId of ["zzz"] as const) {
+    for (const skinId of ["black", "zzz"] as const) {
       const css = readFileSync(resolve(SKINS_ROOT, skinId, "components.css"), "utf8");
       assert.match(css, new RegExp(`:root\\[data-skin=["']${skinId}["']\\]`));
       assert.match(indexCss, new RegExp(`@import ["']\\./${skinId}/components\\.css["']`));
@@ -439,6 +441,20 @@ void describe("skin CSS contract", () => {
     );
     assert.match(tokens, /--skin-background:\s*#edf2f4/);
     assert.match(tokens, /--skin-surface:\s*#ffffff/);
+  });
+
+  void it("removes the rectangular avatar surface from dark skins", () => {
+    for (const skinId of ["black", "zzz"] as const) {
+      const css = readFileSync(resolve(SKINS_ROOT, `${skinId}/components.css`), "utf8");
+      const avatarStart = css.indexOf(`:root[data-skin="${skinId}"] [data-slot="agent-avatar"]`);
+      const avatarEnd = css.indexOf("\n}", avatarStart);
+      const avatarCss = css.slice(avatarStart, avatarEnd);
+
+      assert.ok(avatarStart >= 0, skinId);
+      assert.ok(avatarEnd > avatarStart, skinId);
+      assert.match(avatarCss, /background:\s*transparent/, skinId);
+      assert.match(avatarCss, /box-shadow:\s*none/, skinId);
+    }
   });
 
   void it("keeps ZZZ chat text readable on dark surfaces", () => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AVATAR_ASSET_URLS } from "@ayaka/assets/emotions";
 import type {
   AgentProfile,
   ChatReasoningLevel,
@@ -38,7 +39,6 @@ import {
   IconCircleDashed,
   IconCircleX,
   IconPanelRightClose,
-  IconPanelRightOpen,
 } from "./icons";
 import { AgentAvatar } from "./AgentAvatar";
 
@@ -79,9 +79,24 @@ const ACTIVE_INSTANCE_STATUSES = new Set([
   "sandbox",
   "learning",
 ]);
+const AGENT_PANEL_TRANSITION = {
+  type: "tween",
+  duration: 0.22,
+  ease: [0.22, 1, 0.36, 1],
+} as const;
 
 export function getAgentPanelAnimation(open: boolean): { width: number; opacity: number } {
-  return { width: open ? 320 : 80, opacity: 1 };
+  return { width: open ? 320 : 40, opacity: 1 };
+}
+
+export function getAgentPanelTransition(reduceMotion: boolean | null) {
+  return reduceMotion ? { duration: 0 } : AGENT_PANEL_TRANSITION;
+}
+
+export function getStatusTriggerAvatarUrl(active: boolean): string {
+  return AVATAR_ASSET_URLS[
+    active ? "bloub-cercle-timide-bleu-anime" : "bloub-cercle-surpris-bleu-anime"
+  ];
 }
 
 export function selectLatestConversationRun(
@@ -398,11 +413,9 @@ export function AgentStatusWidget({
       initial={open ? { width: 0, opacity: 0 } : false}
       animate={getAgentPanelAnimation(open)}
       exit={open ? { width: 0, opacity: 0 } : { opacity: 0 }}
-      transition={
-        reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34, mass: 0.8 }
-      }
+      transition={getAgentPanelTransition(reduceMotion)}
       className={cn(
-        "max-w-[calc(100vw-2.5rem)] min-w-0 shrink-0 overflow-hidden",
+        "max-w-[calc(100vw-2.5rem)] min-w-0 shrink-0 overflow-hidden will-change-[width]",
         open
           ? "relative h-full border-l border-border bg-background shadow-lg"
           : "relative h-10 border-l-0 bg-transparent",
@@ -431,20 +444,12 @@ export function AgentStatusWidget({
             aria-expanded={false}
             title={title}
           >
-            <StatusIcon status={status} />
-          </button>
-          <button
-            type="button"
-            className="relative flex size-8 shrink-0 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
-            data-slot="agent-status-toggle"
-            data-icon-only="true"
-            data-icon-tone="neutral"
-            onClick={() => onOpenChange(true)}
-            aria-label={t("agentStatus.open")}
-            aria-expanded={false}
-            title={t("agentStatus.open")}
-          >
-            <IconPanelRightOpen className="size-4" aria-hidden="true" />
+            <img
+              src={getStatusTriggerAvatarUrl(active)}
+              alt=""
+              aria-hidden="true"
+              className="size-full object-contain"
+            />
           </button>
         </div>
       )}

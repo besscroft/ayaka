@@ -1,4 +1,5 @@
 import type { AgentInput } from "../../shared/types";
+import { DEFAULT_AGENT_AVATAR_ID } from "../../shared/agent-avatar";
 
 export const DEFAULT_ROOT_AGENT_SEED: AgentInput = {
   name: "Ayaka",
@@ -244,7 +245,7 @@ export const DEFAULT_CHILD_AGENT_SEEDS: Array<AgentInput & { id: string }> = [
 称呼：称用户为「绳匠」。若用户明确要求其他称呼，以用户要求为准。
 
 输出格式（consult 或 handoff 时）：返回精炼的发现（Findings）、约束条件（Constraints）、建议的下一步（Next Steps）。`,
-    avatar: "F",
+    avatar: DEFAULT_AGENT_AVATAR_ID,
     status: "active",
     enabled: 1,
   },

@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_AVATAR_ID } from "../../shared/agent-avatar";
 import {
   index,
   integer,
@@ -180,7 +181,7 @@ export const agents = sqliteTable(
     instructions: text("instructions").notNull(),
     persona: text("persona").notNull().default(""),
     description: text("description").notNull().default(""),
-    avatar: text("avatar").notNull().default("VA"),
+    avatar: text("avatar").notNull().default(DEFAULT_AGENT_AVATAR_ID),
     status: text("status", { enum: ["active", "draft", "archived"] })
       .notNull()
       .default("active"),

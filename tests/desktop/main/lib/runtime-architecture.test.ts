@@ -15,6 +15,7 @@ import {
   DEFAULT_CHILD_AGENT_SEEDS,
   DEFAULT_ROOT_AGENT_SEED,
 } from "@desktop-main/lib/runtime-defaults";
+import { DEFAULT_AGENT_AVATAR_ID } from "@shared/agent-avatar";
 import { getSandboxSessionOrThrow } from "@desktop-main/lib/sandbox-runtime";
 import { buildToolRegistryPreview } from "@desktop-main/lib/tool-registry";
 import { ROOT_AGENT_STOP_WHEN } from "@desktop-main/lib/agent-run-policy";
@@ -77,6 +78,7 @@ void describe("runtime architecture", () => {
       "0004_deep_the_spike.sql",
       "0005_rare_prodigy.sql",
       "0006_lazy_hitman.sql",
+      "0007_military_white_queen.sql",
     ]);
   });
 
@@ -151,6 +153,7 @@ void describe("runtime architecture", () => {
     assert.ok(DEFAULT_ROOT_AGENT_SEED.description.trim().length > 0);
     const researcher = DEFAULT_CHILD_AGENT_SEEDS.find((agent) => agent.id === "agent-researcher");
     assert.equal(researcher?.name, "Fairy");
+    assert.equal(researcher?.avatar, DEFAULT_AGENT_AVATAR_ID);
     assert.ok(researcher?.description.trim().length > 0);
     /*
       //
