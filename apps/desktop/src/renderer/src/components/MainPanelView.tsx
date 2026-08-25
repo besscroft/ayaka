@@ -37,6 +37,7 @@ import { McpPanel } from "./McpPanel";
 import { SkillsPanel } from "./SkillsPanel";
 import { AutomationPanel } from "./AutomationPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { RichContent } from "./ai-elements/rich-content";
 import {
   IconDatabase,
   IconEdit,
@@ -426,12 +427,7 @@ export function MemoryFilePanel({
         />
       ) : (
         <div className="max-h-[480px] overflow-auto rounded-md border border-border bg-background p-3">
-          <pre
-            data-slot="code-surface"
-            className="whitespace-pre-wrap font-mono text-sm text-foreground"
-          >
-            {snapshot.content}
-          </pre>
+          <RichContent value={snapshot.content} className="text-sm text-foreground" />
         </div>
       )}
 

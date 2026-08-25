@@ -25,6 +25,11 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from "@renderer/components/ai-elements";
+import {
+  REASONING_AUTO_STICK_THRESHOLD,
+  getReasoningScrollDistance,
+  shouldFollowReasoningContent,
+} from "@renderer/components/ai-elements/reasoning-scroll";
 import { getDisclosureScrollAdjustment } from "@renderer/components/ai-elements/use-conversation-scroll";
 import { normalizeToolState } from "@renderer/lib/generated-tool-ui";
 
@@ -125,6 +130,33 @@ void describe("chat message activity", () => {
 });
 
 void describe("reasoning display", () => {
+  void it("keeps streaming reasoning attached to the latest content near the bottom", () => {
+    assert.equal(
+      getReasoningScrollDistance({
+        scrollHeight: 1000,
+        scrollTop: 668,
+        clientHeight: 300,
+      }),
+      REASONING_AUTO_STICK_THRESHOLD,
+    );
+    assert.equal(
+      shouldFollowReasoningContent({
+        scrollHeight: 1000,
+        scrollTop: 668,
+        clientHeight: 300,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldFollowReasoningContent({
+        scrollHeight: 1000,
+        scrollTop: 667,
+        clientHeight: 300,
+      }),
+      false,
+    );
+  });
+
   void it("keeps reasoning segments separate and in order", () => {
     const displays = getReasoningDisplays(
       [

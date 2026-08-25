@@ -17,11 +17,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
 } from "react";
 
 import { RichContent } from "./rich-content";
+import { shouldFollowReasoningContent } from "./reasoning-scroll";
 import { Shimmer } from "./shimmer";
 import { useConversationScrollOptional } from "./use-conversation-scroll";
 
@@ -210,8 +212,42 @@ export const ReasoningContent = memo(function ReasoningContent({
   className,
   children,
   isStreaming = false,
+  onScroll,
   ...props
 }: ReasoningContentProps): React.JSX.Element {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const streamingContentRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+
+  const scrollToLatest = useCallback((): void => {
+    const node = scrollRef.current;
+    if (!node || !isStreaming || !shouldAutoScrollRef.current) return;
+    node.scrollTop = node.scrollHeight;
+  }, [isStreaming]);
+
+  const handleScroll = useCallback<
+    NonNullable<ComponentProps<typeof CollapsibleContent>["onScroll"]>
+  >(
+    (event) => {
+      shouldAutoScrollRef.current = shouldFollowReasoningContent(event.currentTarget);
+      onScroll?.(event);
+    },
+    [onScroll],
+  );
+
+  useLayoutEffect(() => {
+    scrollToLatest();
+  }, [children, scrollToLatest]);
+
+  useEffect(() => {
+    const node = streamingContentRef.current;
+    if (!node || !isStreaming || typeof ResizeObserver === "undefined") return undefined;
+
+    const observer = new ResizeObserver(scrollToLatest);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isStreaming, scrollToLatest]);
+
   return (
     <CollapsibleContent
       data-slot="reasoning-content"
@@ -223,10 +259,16 @@ export const ReasoningContent = memo(function ReasoningContent({
         "motion-safe:data-[ending-style]:-translate-y-1 motion-safe:data-[ending-style]:opacity-0",
         className,
       )}
+      onScroll={handleScroll}
+      ref={scrollRef}
       {...props}
     >
       {isStreaming ? (
-        <div data-streaming="true" className="whitespace-pre-wrap break-words">
+        <div
+          data-streaming="true"
+          className="whitespace-pre-wrap break-words"
+          ref={streamingContentRef}
+        >
           {children}
         </div>
       ) : (

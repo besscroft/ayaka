@@ -8,9 +8,9 @@ import { MemoryFilePanel } from "@renderer/components/MainPanelView";
 
 const snapshot: AgentMemoryFileSnapshot = {
   kind: "soul",
-  content: "# SOUL",
+  content: "# SOUL\n\n**Important**",
   charLimit: 4_000,
-  charCount: 6,
+  charCount: 21,
   updatedAt: 0,
 };
 
@@ -41,6 +41,15 @@ const agents: AgentProfile[] = [
 ];
 
 void describe("MemoryFilePanel agent selector", () => {
+  void it("renders memory file content as Markdown in view mode", () => {
+    const html = renderPanel("user");
+
+    assert.match(html, /data-slot="rich-content"/);
+    assert.match(html, /<h1[^>]*>SOUL<\/h1>/);
+    assert.match(html, /<strong[^>]*>Important<\/strong>/);
+    assert.doesNotMatch(html, /data-slot="code-surface"/);
+  });
+
   void it("renders the current agent selector in the Soul file header", () => {
     const html = renderPanel("soul");
 
