@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { useT } from "../lib/i18n";
 import {
   AgentStatusContent,
@@ -15,6 +16,24 @@ export type WorkspaceSidePanelTab = "runtime" | "generated-app";
 const OPEN_WORKSPACE_PANEL_EVENT = "ayaka:open-workspace-panel";
 const OPEN_GENERATED_APP_EVENT = "ayaka:open-generated-app";
 const WIDTH_BY_CONVERSATION = new Map<string, number>();
+const WORKSPACE_PANEL_TRANSITION = {
+  type: "spring",
+  stiffness: 320,
+  damping: 34,
+  mass: 0.8,
+  opacity: { duration: 0.18, ease: "easeOut" },
+} as const;
+
+export function getWorkspaceSidePanelAnimation(
+  open: boolean,
+  width: number,
+): { width: number; opacity: number } {
+  return { width: open ? width : 0, opacity: open ? 1 : 0 };
+}
+
+export function getWorkspaceSidePanelTransition(reduceMotion: boolean | null, isResizing: boolean) {
+  return reduceMotion || isResizing ? { duration: 0 } : WORKSPACE_PANEL_TRANSITION;
+}
 
 export function openWorkspaceSidePanel(tab: WorkspaceSidePanelTab, artifactId?: string): void {
   window.dispatchEvent(
@@ -44,7 +63,9 @@ export function WorkspaceSidePanel({
   onStop,
 }: WorkspaceSidePanelProps): React.JSX.Element {
   const { t } = useT();
+  const reduceMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceSidePanelTab>("runtime");
   const [requestedArtifactId, setRequestedArtifactId] = useState<string | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedAppSummary>({
@@ -105,6 +126,7 @@ export function WorkspaceSidePanel({
       dragRef.current = null;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      setIsResizing(false);
     };
     window.addEventListener("pointermove", handle);
     window.addEventListener("pointerup", stop);
@@ -146,12 +168,14 @@ export function WorkspaceSidePanel({
     generatedSummary.failedPreviews > 0;
 
   return (
-    <aside
+    <motion.aside
       data-slot="workspace-side-panel"
-      className="relative min-w-0 shrink-0 border-l border-border bg-background shadow-lg"
-      style={{ width }}
-      hidden={!open}
+      className="relative min-w-0 shrink-0 overflow-hidden border-l border-border bg-background shadow-lg will-change-[width]"
+      initial={false}
+      animate={getWorkspaceSidePanelAnimation(open, width)}
+      transition={getWorkspaceSidePanelTransition(reduceMotion, isResizing)}
       aria-hidden={!open}
+      inert={!open}
       aria-label={t("workspacePanel.title")}
     >
       <div
@@ -162,6 +186,7 @@ export function WorkspaceSidePanel({
         className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
+          setIsResizing(true);
           dragRef.current = {
             pointerId: event.pointerId,
             startX: event.clientX,
@@ -281,7 +306,7 @@ export function WorkspaceSidePanel({
           </section>
         </div>
       </div>
-    </aside>
+    </motion.aside>
   );
 }
 

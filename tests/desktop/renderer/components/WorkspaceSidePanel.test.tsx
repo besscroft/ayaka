@@ -3,9 +3,27 @@ import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_CHAT_TOOL_SELECTION } from "@shared/types";
-import { WorkspaceSidePanel } from "@renderer/components/WorkspaceSidePanel";
+import {
+  getWorkspaceSidePanelAnimation,
+  getWorkspaceSidePanelTransition,
+  WorkspaceSidePanel,
+} from "@renderer/components/WorkspaceSidePanel";
 
 void describe("workspace side panel", () => {
+  void it("animates between the closed and remembered widths", () => {
+    assert.deepEqual(getWorkspaceSidePanelAnimation(false, 460), { width: 0, opacity: 0 });
+    assert.deepEqual(getWorkspaceSidePanelAnimation(true, 460), { width: 460, opacity: 1 });
+    assert.deepEqual(getWorkspaceSidePanelTransition(false, false), {
+      type: "spring",
+      stiffness: 320,
+      damping: 34,
+      mass: 0.8,
+      opacity: { duration: 0.18, ease: "easeOut" },
+    });
+    assert.deepEqual(getWorkspaceSidePanelTransition(true, false), { duration: 0 });
+    assert.deepEqual(getWorkspaceSidePanelTransition(false, true), { duration: 0 });
+  });
+
   void it("renders the runtime and generated app tabs in one accessible container", () => {
     const html = renderToStaticMarkup(
       createElement(WorkspaceSidePanel, {
@@ -41,6 +59,8 @@ void describe("workspace side panel", () => {
       html,
       /id="conversation-1-workspace-generated-app-panel"[^>]*class="flex h-full min-h-0 flex-col"/,
     );
-    assert.match(html, /hidden=""/);
+    assert.match(html, /aria-hidden="true"/);
+    assert.match(html, /inert=""/);
+    assert.match(html, /will-change-\[width\]/);
   });
 });
