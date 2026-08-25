@@ -13,6 +13,7 @@ import {
   CONVERSATION_SCROLL_BUTTON_THRESHOLD,
   getConversationScrollDistance,
   getConversationScrollState,
+  getConversationScrollStateFromElement,
   isConversationDisclosureScrollLocked,
   shouldFollowConversationContent,
   shouldHandleConversationScroll,
@@ -52,9 +53,39 @@ void describe("conversation scroll state", () => {
     );
   });
 
+  void it("updates attachment state from the current viewport position", () => {
+    assert.equal(
+      getConversationScrollStateFromElement({
+        scrollHeight: 1000,
+        scrollTop: 668,
+        clientHeight: 300,
+      }).isAtLatest,
+      true,
+    );
+    assert.deepEqual(
+      getConversationScrollStateFromElement({
+        scrollHeight: 1400,
+        scrollTop: 700,
+        clientHeight: 300,
+      }),
+      { isAtLatest: false, isAwayFromLatest: true },
+    );
+  });
+
   void it("follows content changes only while attached", () => {
     assert.equal(shouldFollowConversationContent(true), true);
     assert.equal(shouldFollowConversationContent(false), false);
+  });
+
+  void it("does not follow a resize after the user has moved away from the latest content", () => {
+    const state = getConversationScrollStateFromElement({
+      scrollHeight: 1400,
+      scrollTop: 700,
+      clientHeight: 300,
+    });
+
+    assert.equal(state.isAtLatest, false);
+    assert.equal(shouldFollowConversationContent(state.isAtLatest), false);
   });
 
   void it("suppresses auto-follow during disclosure layout changes", () => {

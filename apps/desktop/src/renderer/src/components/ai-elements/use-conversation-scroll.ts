@@ -36,6 +36,12 @@ export function getConversationScrollDistance({
   return Math.max(0, scrollHeight - scrollTop - clientHeight);
 }
 
+export function getConversationScrollStateFromElement(
+  element: Pick<HTMLElement, "scrollHeight" | "scrollTop" | "clientHeight">,
+): ConversationScrollState {
+  return getConversationScrollState(getConversationScrollDistance(element));
+}
+
 export function shouldFollowConversationContent(
   autoStick: boolean,
   disclosureScrollLocked = false,
@@ -96,12 +102,18 @@ export function useConversationScrollController(): ConversationScrollController 
       const node = containerRef.current;
       if (!node || !shouldHandleConversationScroll(programmaticScrollRef.current)) return;
 
-      const state = getConversationScrollState(getConversationScrollDistance(node));
+      const state = getConversationScrollStateFromElement(node);
       autoStickRef.current = state.isAtLatest;
       setIsAwayFromLatest((previous) =>
         previous === state.isAwayFromLatest ? previous : state.isAwayFromLatest,
       );
     });
+  }, []);
+
+  const cancelScheduledFollow = useCallback((): void => {
+    if (followFrameRef.current === null) return;
+    window.cancelAnimationFrame(followFrameRef.current);
+    followFrameRef.current = null;
   }, []);
 
   const scheduleFollow = useCallback((): void => {
@@ -213,9 +225,17 @@ export function useConversationScrollController(): ConversationScrollController 
     const node = containerRef.current;
     if (!node) return;
 
-    const handleScroll = (): void => updateScrollState();
+    const handleScroll = (): void => {
+      if (shouldHandleConversationScroll(programmaticScrollRef.current)) {
+        cancelScheduledFollow();
+        const state = getConversationScrollStateFromElement(node);
+        autoStickRef.current = state.isAtLatest;
+      }
+      updateScrollState();
+    };
     const handleUserInteraction = (): void => {
       cancelProgrammaticScroll();
+      cancelScheduledFollow();
       updateScrollState();
     };
     const handleScrollEnd = (): void => finishProgrammaticScroll();
@@ -234,7 +254,12 @@ export function useConversationScrollController(): ConversationScrollController 
       node.removeEventListener("pointerdown", handleUserInteraction);
       node.removeEventListener("scrollend", handleScrollEnd);
     };
-  }, [cancelProgrammaticScroll, finishProgrammaticScroll, updateScrollState]);
+  }, [
+    cancelProgrammaticScroll,
+    cancelScheduledFollow,
+    finishProgrammaticScroll,
+    updateScrollState,
+  ]);
 
   useEffect(() => {
     if (!contentNode) return;
