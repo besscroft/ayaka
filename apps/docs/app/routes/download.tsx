@@ -1,7 +1,7 @@
 import { useLoaderData } from "react-router";
 
-import type { Route } from "./+types/home";
-import { SiteHome } from "../components/site-home";
+import type { Route } from "./+types/download";
+import { SiteDownload } from "../components/site-download";
 import { fetchLatestReleaseForRequest } from "../lib/release-client";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -10,16 +10,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export function meta() {
   return [
-    { title: "Ayaka" },
+    { title: "下载 Ayaka｜Windows x64" },
     {
       name: "description",
-      content:
-        "Ayaka 是一个本地优先的 AI 桌面工作台，把对话、智能体、记忆和工具连接成一条可追踪的运行链路。",
+      content: "下载 Ayaka Windows x64 版本，了解当前发布状态、本地数据边界和未来平台计划。",
     },
   ];
 }
 
-export default function Home() {
+export default function Download() {
   const releaseData = useLoaderData<typeof loader>();
-  return <SiteHome releaseData={releaseData} />;
+  return <SiteDownload releaseData={releaseData} />;
 }
