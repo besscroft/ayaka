@@ -15,6 +15,7 @@ import {
   MessageList,
   readMediaToolResult,
   saveMessageEdit,
+  shouldInitializeConversationScroll,
   shouldShowLiveThinking,
 } from "@renderer/components/MessageList";
 import {
@@ -278,6 +279,33 @@ void describe("execution details", () => {
       { index: 1, start: 248 },
     ]);
     assert.deepEqual(getMessageRenderItems([], []), []);
+  });
+
+  void it("waits for the virtualizer before initializing the latest position", () => {
+    const readyState = {
+      hasScrollElement: true,
+      messageCount: 4,
+      virtualItemCount: 3,
+    };
+
+    assert.equal(shouldInitializeConversationScroll({ ...readyState, hasPositioned: false }), true);
+    assert.equal(
+      shouldInitializeConversationScroll({
+        ...readyState,
+        hasScrollElement: false,
+        hasPositioned: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldInitializeConversationScroll({
+        ...readyState,
+        virtualItemCount: 0,
+        hasPositioned: false,
+      }),
+      false,
+    );
+    assert.equal(shouldInitializeConversationScroll({ ...readyState, hasPositioned: true }), false);
   });
 
   void it("renders reasoning at its original message part positions", () => {

@@ -10,11 +10,11 @@ import { Conversation, ConversationContent } from "@renderer/components/ai-eleme
 import {
   CONVERSATION_AUTO_STICK_THRESHOLD,
   CONVERSATION_DISCLOSURE_SCROLL_LOCK_MS,
-  CONVERSATION_SCROLL_BUTTON_THRESHOLD,
   getConversationScrollDistance,
   getConversationScrollState,
   getConversationScrollStateFromElement,
   isConversationDisclosureScrollLocked,
+  scrollConversationVirtualizerToLatest,
   shouldFollowConversationContent,
   shouldHandleConversationScroll,
 } from "@renderer/components/ai-elements/use-conversation-scroll";
@@ -31,26 +31,47 @@ void describe("conversation scroll state", () => {
     );
   });
 
-  void it("shows the latest button only after the larger distance threshold", () => {
+  void it("shows the latest button after the bottom safety distance", () => {
+    assert.equal(getConversationScrollState(0).isAwayFromLatest, false);
     assert.equal(
-      getConversationScrollState(CONVERSATION_SCROLL_BUTTON_THRESHOLD).isAwayFromLatest,
+      getConversationScrollState(CONVERSATION_AUTO_STICK_THRESHOLD).isAwayFromLatest,
       false,
     );
     assert.equal(
-      getConversationScrollState(CONVERSATION_SCROLL_BUTTON_THRESHOLD + 1).isAwayFromLatest,
+      getConversationScrollState(CONVERSATION_AUTO_STICK_THRESHOLD + 1).isAwayFromLatest,
       true,
     );
   });
 
   void it("calculates a non-negative distance from the latest content", () => {
     assert.equal(
-      getConversationScrollDistance({ scrollHeight: 1000, scrollTop: 700, clientHeight: 300 }),
+      getConversationScrollDistance({
+        scrollHeight: 1000,
+        scrollTop: 700,
+        clientHeight: 300,
+      }),
       0,
     );
     assert.equal(
-      getConversationScrollDistance({ scrollHeight: 1400, scrollTop: 700, clientHeight: 300 }),
+      getConversationScrollDistance({
+        scrollHeight: 1400,
+        scrollTop: 700,
+        clientHeight: 300,
+      }),
       400,
     );
+  });
+
+  void it("moves a newly mounted conversation to the virtualizer's latest content", () => {
+    let options: { behavior?: ScrollBehavior } | undefined;
+
+    scrollConversationVirtualizerToLatest({
+      scrollToEnd: (nextOptions) => {
+        options = nextOptions;
+      },
+    });
+
+    assert.deepEqual(options, { behavior: "auto" });
   });
 
   void it("updates attachment state from the current viewport position", () => {

@@ -14,7 +14,7 @@
  *  - onDeleteMessage(messageId)  删除该消息；如果删的是 user 消息，
  *    紧跟其后的 assistant 消息也会被一并删除（保持角色交替）
  */
-import { Fragment, memo, useCallback, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
@@ -61,7 +61,10 @@ import {
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
 import { IconBrain, IconCopy, IconTerminal } from "./icons";
-import { useConversationScroll } from "./ai-elements/use-conversation-scroll";
+import {
+  scrollConversationVirtualizerToLatest,
+  useConversationScroll,
+} from "./ai-elements/use-conversation-scroll";
 
 interface MessageListProps {
   conversationId?: string;
@@ -291,6 +294,20 @@ export function getMessageRenderItems(
     : messages.map((_, index) => ({ index, start: index * ESTIMATED_MESSAGE_SIZE }));
 }
 
+export function shouldInitializeConversationScroll({
+  hasScrollElement,
+  messageCount,
+  virtualItemCount,
+  hasPositioned,
+}: {
+  hasScrollElement: boolean;
+  messageCount: number;
+  virtualItemCount: number;
+  hasPositioned: boolean;
+}): boolean {
+  return !hasPositioned && hasScrollElement && messageCount > 0 && virtualItemCount > 0;
+}
+
 function VirtualMessageRows({
   conversationId,
   messages,
@@ -313,6 +330,64 @@ function VirtualMessageRows({
   });
   const virtualItems = virtualizer.getVirtualItems();
   const renderItems = getMessageRenderItems(messages, virtualItems);
+  const conversationKey = conversationId ?? null;
+  const positionedConversationRef = useRef<string | null>(null);
+  const cancelledConversationRef = useRef<string | null>(null);
+  const initializationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (
+      !shouldInitializeConversationScroll({
+        hasScrollElement: virtualizer.scrollElement !== null,
+        messageCount: messages.length,
+        virtualItemCount: virtualItems.length,
+        hasPositioned:
+          positionedConversationRef.current === conversationKey ||
+          cancelledConversationRef.current === conversationKey,
+      })
+    ) {
+      return;
+    }
+
+    const scrollElement = virtualizer.scrollElement;
+    if (!scrollElement) return;
+
+    const cancelInitialization = (): void => {
+      cancelledConversationRef.current = conversationKey;
+      if (initializationFrameRef.current !== null) {
+        window.cancelAnimationFrame(initializationFrameRef.current);
+        initializationFrameRef.current = null;
+      }
+    };
+    const eventOptions = { passive: true } as const;
+    scrollElement.addEventListener("wheel", cancelInitialization, eventOptions);
+    scrollElement.addEventListener("touchstart", cancelInitialization, eventOptions);
+    scrollElement.addEventListener("pointerdown", cancelInitialization, eventOptions);
+    scrollElement.addEventListener("scroll", cancelInitialization, eventOptions);
+
+    initializationFrameRef.current = window.requestAnimationFrame(() => {
+      initializationFrameRef.current = null;
+      scrollElement.removeEventListener("wheel", cancelInitialization);
+      scrollElement.removeEventListener("touchstart", cancelInitialization);
+      scrollElement.removeEventListener("pointerdown", cancelInitialization);
+      scrollElement.removeEventListener("scroll", cancelInitialization);
+      if (cancelledConversationRef.current === conversationKey) return;
+
+      positionedConversationRef.current = conversationKey;
+      scrollConversationVirtualizerToLatest(virtualizer);
+    });
+
+    return () => {
+      if (initializationFrameRef.current !== null) {
+        window.cancelAnimationFrame(initializationFrameRef.current);
+        initializationFrameRef.current = null;
+      }
+      scrollElement.removeEventListener("wheel", cancelInitialization);
+      scrollElement.removeEventListener("touchstart", cancelInitialization);
+      scrollElement.removeEventListener("pointerdown", cancelInitialization);
+      scrollElement.removeEventListener("scroll", cancelInitialization);
+    };
+  }, [conversationKey, messages.length, virtualItems.length, virtualizer]);
 
   return (
     <div
