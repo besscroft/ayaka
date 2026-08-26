@@ -293,6 +293,7 @@ const api = {
     updateTool: (id: string, patch: unknown) => ipcRenderer.invoke("tools:updateTool", id, patch),
     skills: {
       create: (input: unknown) => ipcRenderer.invoke("tools:skills:create", input),
+      importArchive: (bytes: Uint8Array) => ipcRenderer.invoke("tools:skills:importArchive", bytes),
       generateDraft: (input: unknown) => ipcRenderer.invoke("tools:skills:generateDraft", input),
       update: (id: string, input: unknown) => ipcRenderer.invoke("tools:skills:update", id, input),
       delete: (id: string) => ipcRenderer.invoke("tools:skills:delete", id),
@@ -304,8 +305,23 @@ const api = {
       purgeExpired: () => ipcRenderer.invoke("tools:skills:purgeExpired"),
       setEnabled: (id: string, enabled: boolean) =>
         ipcRenderer.invoke("tools:skills:setEnabled", id, enabled),
-      run: (skillId: string, input?: unknown) =>
-        ipcRenderer.invoke("tools:skills:run", skillId, input),
+      run: (skillIdOrInput: unknown, input?: unknown) =>
+        ipcRenderer.invoke("tools:skills:run", skillIdOrInput, input),
+      inspect: (skillId: string) => ipcRenderer.invoke("tools:skills:inspect", skillId),
+      entries: (skillId: string) => ipcRenderer.invoke("tools:skills:entries", skillId),
+      runs: (skillId: string, limit?: number) =>
+        ipcRenderer.invoke("tools:skills:runs", skillId, limit),
+      dependencies: (skillId: string) => ipcRenderer.invoke("tools:skills:dependencies", skillId),
+      confirmDependencies: (
+        skillId: string,
+        options?: { confirmed?: boolean; allowScripts?: boolean },
+      ) => ipcRenderer.invoke("tools:skills:confirmDependencies", skillId, options),
+      cancel: (runId: string) => ipcRenderer.invoke("tools:skills:cancel", runId),
+      onRunUpdated: (handler: (run: unknown) => void) => {
+        const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+        ipcRenderer.on("skills:run-updated", listener);
+        return () => ipcRenderer.removeListener("skills:run-updated", listener);
+      },
       setSecret: (input: unknown) => ipcRenderer.invoke("tools:skills:setSecret", input),
       deleteSecret: (id: string) => ipcRenderer.invoke("tools:skills:deleteSecret", id),
     },

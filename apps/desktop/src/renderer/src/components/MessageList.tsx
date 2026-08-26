@@ -476,6 +476,34 @@ export interface MessageItemProps {
   onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
 }
 
+export interface SaveMessageEditOptions {
+  messageId: string;
+  editValue: string;
+  originalText: string;
+  onEdit: (messageId: string, newText: string) => Promise<void> | void;
+  onSaved: () => void;
+  onInvalid: () => void;
+}
+
+/** Close the editor before waiting for the async edit/regeneration to finish. */
+export async function saveMessageEdit({
+  messageId,
+  editValue,
+  originalText,
+  onEdit,
+  onSaved,
+  onInvalid,
+}: SaveMessageEditOptions): Promise<void> {
+  const trimmed = editValue.trim();
+  if (!trimmed || trimmed === originalText) {
+    onInvalid();
+    return;
+  }
+
+  onSaved();
+  await onEdit(messageId, trimmed);
+}
+
 /**
  * 单条消息容器
  *  - 渲染 Message（外壳）+ MessageContent（气泡）+ MessageActions（操作条）
@@ -547,16 +575,19 @@ function MessageItem({
   /* ---------- 保存编辑：调用 onEdit 回调 ---------- */
   const handleEditSave = async (): Promise<void> => {
     if (!onEdit) return;
-    const trimmed = editValue.trim();
-    if (!trimmed || trimmed === fullText) {
-      cancelEdit();
-      return;
-    }
     setSaving(true);
     try {
-      await onEdit(message.id, trimmed);
-      setEditing(false);
-      setEditValue("");
+      await saveMessageEdit({
+        messageId: message.id,
+        editValue,
+        originalText: fullText,
+        onEdit,
+        onSaved: () => {
+          setEditing(false);
+          setEditValue("");
+        },
+        onInvalid: cancelEdit,
+      });
     } catch (err) {
       console.error("[chat] edit failed:", err);
     } finally {

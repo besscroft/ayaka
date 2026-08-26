@@ -342,7 +342,14 @@ function createtoolChatToolDescriptors(
     });
 
   const skillDescriptors = tools.skills.map((skill) => {
-    const available = false;
+    const pkg = tools.skillPackages.find((candidate) => candidate.skillId === skill.id);
+    const entries = tools.skillEntries.filter((entry) => entry.skillId === skill.id);
+    const available =
+      skill.enabled !== 0 &&
+      pkg?.status !== "error" &&
+      pkg?.status !== "disabled" &&
+      (Boolean(skill.instructions.trim()) || entries.length > 0 || !pkg);
+    const triggers = safeJsonArray(skill.trigger_keywords_json);
     return {
       id: `skill:${skill.id}`,
       label: skill.name,
@@ -350,16 +357,20 @@ function createtoolChatToolDescriptors(
       kind: "host",
       execution: "host",
       category: "skill",
-      defaultAuto: false,
+      defaultAuto: skill.auto_use !== 0 && triggers.length > 0,
       requiresApproval: skill.requires_approval !== 0,
       available,
       unavailableReason: available
         ? undefined
         : skill.enabled === 0
           ? "chatTools.unavailable.skillDisabled"
-          : supportsToolCalling
-            ? "chatTools.unavailable.skillInstructionsOnly"
-            : "chatTools.unavailable.toolCalling",
+          : skill.enabled === 0
+            ? "chatTools.unavailable.skillDisabled"
+            : pkg?.status === "error"
+              ? "chatTools.unavailable.skillPackageError"
+              : pkg?.status === "disabled"
+                ? "chatTools.unavailable.skillPackageDisabled"
+                : "chatTools.unavailable.skillNoInstructions",
       sourceId: skill.id,
       sourceName: skill.category,
     } satisfies ChatToolDescriptor;
@@ -374,6 +385,15 @@ function isNativeWebSearchProvider(kind: ProviderInfo["kind"]): boolean {
 
 function getWebSearchExecution(kind: ProviderInfo["kind"]): "provider" | "host" {
   return isNativeWebSearchProvider(kind) ? "provider" : "host";
+}
+
+function safeJsonArray(raw: string): unknown[] {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
 }
 
 function getUnavailableReason({

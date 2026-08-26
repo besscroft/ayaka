@@ -697,6 +697,107 @@ export const tools = sqliteTable(
   ],
 );
 
+export const skillPackages = sqliteTable(
+  "skill_packages",
+  {
+    id: text("id").primaryKey(),
+    skill_id: text("skill_id")
+      .notNull()
+      .references(() => tools.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["manual", "upload", "catalog", "system"] })
+      .notNull()
+      .default("manual"),
+    root_path: text("root_path").notNull(),
+    content_hash: text("content_hash").notNull(),
+    execution_mode: text("execution_mode", { enum: ["instructions", "scripts", "hybrid"] })
+      .notNull()
+      .default("instructions"),
+    status: text("status", {
+      enum: ["disabled", "ready", "needs_confirmation", "needs_runtime", "error"],
+    })
+      .notNull()
+      .default("disabled"),
+    manifest_json: text("manifest_json").notNull().default("{}"),
+    safety_json: text("safety_json").notNull().default("{}"),
+    last_error: text("last_error"),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_skill_packages_skill").on(table.skill_id),
+    index("idx_skill_packages_status").on(table.status),
+    index("idx_skill_packages_hash").on(table.content_hash),
+  ],
+);
+
+export const skillEntries = sqliteTable(
+  "skill_entries",
+  {
+    id: text("id").primaryKey(),
+    skill_id: text("skill_id")
+      .notNull()
+      .references(() => tools.id, { onDelete: "cascade" }),
+    package_id: text("package_id")
+      .notNull()
+      .references(() => skillPackages.id, { onDelete: "cascade" }),
+    relative_path: text("relative_path").notNull(),
+    name: text("name").notNull(),
+    runtime: text("runtime", { enum: ["node", "python", "powershell", "cmd", "shell"] }).notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    available: integer("available").notNull().default(1),
+    unavailable_reason: text("unavailable_reason"),
+    timeout_ms: integer("timeout_ms").notNull().default(60_000),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_skill_entries_skill").on(table.skill_id),
+    index("idx_skill_entries_package").on(table.package_id),
+    uniqueIndex("uq_skill_entries_package_path").on(table.package_id, table.relative_path),
+  ],
+);
+
+export const skillRuns = sqliteTable(
+  "skill_runs",
+  {
+    id: text("id").primaryKey(),
+    skill_id: text("skill_id")
+      .notNull()
+      .references(() => tools.id, { onDelete: "cascade" }),
+    entry_id: text("entry_id")
+      .notNull()
+      .references(() => skillEntries.id, { onDelete: "cascade" }),
+    conversation_id: text("conversation_id").references(() => conversations.id, {
+      onDelete: "set null",
+    }),
+    agent_id: text("agent_id").references(() => agents.id, { onDelete: "set null" }),
+    status: text("status", {
+      enum: ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"],
+    })
+      .notNull()
+      .default("queued"),
+    cwd: text("cwd").notNull(),
+    args_json: text("args_json").notNull().default("[]"),
+    stdout: text("stdout").notNull().default(""),
+    stderr: text("stderr").notNull().default(""),
+    exit_code: integer("exit_code"),
+    signal: text("signal"),
+    duration_ms: integer("duration_ms").notNull().default(0),
+    truncated: integer("truncated").notNull().default(0),
+    error: text("error"),
+    started_at: integer("started_at"),
+    finished_at: integer("finished_at"),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_skill_runs_skill_created").on(table.skill_id, table.created_at),
+    index("idx_skill_runs_entry").on(table.entry_id),
+    index("idx_skill_runs_conversation").on(table.conversation_id),
+    index("idx_skill_runs_status").on(table.status),
+  ],
+);
+
 export const toolSecrets = sqliteTable(
   "tool_secrets",
   {
@@ -1007,6 +1108,9 @@ export const schema = {
   mcpRuntimeStates,
   mcpDependencyInstallations,
   tools,
+  skillPackages,
+  skillEntries,
+  skillRuns,
   toolSecrets,
   memories,
   memoryObservations,
@@ -1064,6 +1168,12 @@ export type McpDependencyInstallation = typeof mcpDependencyInstallations.$infer
 export type NewMcpDependencyInstallation = typeof mcpDependencyInstallations.$inferInsert;
 export type ToolRecord = typeof tools.$inferSelect;
 export type NewToolRecord = typeof tools.$inferInsert;
+export type SkillPackage = typeof skillPackages.$inferSelect;
+export type NewSkillPackage = typeof skillPackages.$inferInsert;
+export type SkillEntry = typeof skillEntries.$inferSelect;
+export type NewSkillEntry = typeof skillEntries.$inferInsert;
+export type SkillRun = typeof skillRuns.$inferSelect;
+export type NewSkillRun = typeof skillRuns.$inferInsert;
 export type ToolSecret = typeof toolSecrets.$inferSelect;
 export type NewToolSecret = typeof toolSecrets.$inferInsert;
 export type MemoryRecord = typeof memories.$inferSelect;

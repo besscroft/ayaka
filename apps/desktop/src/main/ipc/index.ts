@@ -42,6 +42,13 @@ import {
   getSyncState,
   getRuntimeSnapshot,
   getToolsSnapshot,
+  getSkillInspection,
+  getSkillPackage,
+  getSkillTool,
+  insertRuntimeEvent,
+  deleteSkillPackageAsync,
+  listSkillRuns,
+  setSkillPackageStatusAsync,
   createToolServerAsync as createToolServer,
   updateToolServerAsync as updateToolServer,
   deleteToolServerAsync as deleteToolServer,
@@ -93,6 +100,7 @@ import type {
   SkillDraftRequest,
   ToolSecretInput,
   ToolSkillInput,
+  SkillRunInput,
   MemoryRecord,
   MessagePatch,
   MessageRow,
@@ -166,6 +174,18 @@ import {
   onManagedRuntimeStateChanged,
 } from "../lib/runtime-manager";
 import { runToolSkill } from "../lib/skill-runtime";
+import {
+  cancelSkillRunsForSkill,
+  cancelSkillRun,
+  onSkillRunUpdated,
+  runSkill,
+} from "../lib/skill-executor";
+import {
+  confirmSkillDependencies,
+  inspectSkillDependencies,
+  refreshSkillPackageStatus,
+} from "../lib/skill-dependencies";
+import { redactWorkspaceCommandInput } from "../lib/workspace-command";
 import { generateSkillDraft } from "../lib/skill-drafts";
 import {
   createCronJob,
@@ -180,11 +200,13 @@ import { getCronScheduler } from "../lib/cron-scheduler";
 import {
   getCatalogSnapshot,
   getCatalogItemDetail,
+  importSkillArchive,
   installCatalogItem,
   searchCatalogMcp,
   searchCatalogSkills,
   setArtifactInstallationEnabled,
   uninstallArtifact,
+  removeSkillPackageDirectory,
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
 import {
@@ -262,6 +284,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   );
   onMcpToolsChanged((event) => broadcast("mcp:tools-changed", event));
   onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
+  onSkillRunUpdated((run) => broadcast("skills:run-updated", run));
   onSandboxArtifactUpdated((artifact) => {
     const session = getSandboxSession(artifact.session_id);
     if (session?.conversation_id) {
@@ -885,6 +908,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   });
 
   ipcMain.handle("tools:skills:create", (_e, input: ToolSkillInput) => createSkillTool(input));
+  ipcMain.handle("tools:skills:importArchive", (_e, bytes: Uint8Array) =>
+    importSkillArchive(bytes, "upload"),
+  );
   ipcMain.handle("tools:skills:generateDraft", (_e, input: SkillDraftRequest) =>
     generateSkillDraft(input),
   );
@@ -892,24 +918,91 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     updateSkillTool(id, input),
   );
   ipcMain.handle("tools:skills:delete", async (_e, id: string) => {
+    await cancelSkillRunsForSkill(id);
+    removeSkillPackageDirectory(id);
+    await deleteSkillPackageAsync(id);
     await deleteSkillTool(id);
     return true;
   });
   ipcMain.handle("tools:skills:listDeleted", () => listDeletedSkillTools());
   ipcMain.handle("tools:skills:restore", (_e, id: string) => restoreSkillTool(id));
   ipcMain.handle("tools:skills:permanentDelete", async (_e, id: string) => {
+    await cancelSkillRunsForSkill(id);
+    removeSkillPackageDirectory(id);
+    await deleteSkillPackageAsync(id);
     await permanentlyDeleteSkillTool(id);
     return true;
   });
-  ipcMain.handle("tools:skills:permanentDeleteBatch", (_e, ids: string[]) =>
-    permanentlyDeleteSkillTools(ids),
+  ipcMain.handle("tools:skills:permanentDeleteBatch", async (_e, ids: string[]) => {
+    for (const id of ids) {
+      await cancelSkillRunsForSkill(id);
+      removeSkillPackageDirectory(id);
+      await deleteSkillPackageAsync(id);
+    }
+    return permanentlyDeleteSkillTools(ids);
+  });
+  ipcMain.handle("tools:skills:purgeExpired", async () => {
+    const now = Date.now();
+    for (const skill of listDeletedSkillTools()) {
+      if (skill.purge_after_at !== null && skill.purge_after_at <= now) {
+        removeSkillPackageDirectory(skill.id);
+      }
+    }
+    return purgeExpiredDeletedSkillTools(now);
+  });
+  ipcMain.handle("tools:skills:setEnabled", async (_e, id: string, enabled: boolean) => {
+    if (!enabled) await cancelSkillRunsForSkill(id);
+    const skill = await setSkillToolEnabled(id, enabled);
+    if (enabled) await refreshSkillPackageStatus(id);
+    else if (getSkillPackage(id)) await setSkillPackageStatusAsync(id, "disabled");
+    return skill;
+  });
+  ipcMain.handle("tools:skills:inspect", async (_e, skillId: string) => {
+    await refreshSkillPackageStatus(skillId);
+    const inspection = getSkillInspection(skillId);
+    return {
+      ...inspection,
+      dependencies: await inspectSkillDependencies(skillId),
+    };
+  });
+  ipcMain.handle(
+    "tools:skills:entries",
+    (_e, skillId: string) => getSkillInspection(skillId).entries,
   );
-  ipcMain.handle("tools:skills:purgeExpired", () => purgeExpiredDeletedSkillTools());
-  ipcMain.handle("tools:skills:setEnabled", (_e, id: string, enabled: boolean) =>
-    setSkillToolEnabled(id, enabled),
+  ipcMain.handle("tools:skills:runs", (_e, skillId: string, limit?: number) =>
+    listSkillRuns(skillId, limit),
   );
-  ipcMain.handle("tools:skills:run", (_e, skillId: string, input?: unknown) =>
-    runToolSkill({ skillId, input }),
+  ipcMain.handle("tools:skills:dependencies", (_e, skillId: string) =>
+    inspectSkillDependencies(skillId),
+  );
+  ipcMain.handle(
+    "tools:skills:confirmDependencies",
+    async (_e, skillId: string, options?: { confirmed?: boolean; allowScripts?: boolean }) => {
+      if (options?.confirmed !== true)
+        throw new Error("Skill dependency confirmation was not accepted.");
+      return confirmSkillDependencies(skillId, { allowScripts: options.allowScripts });
+    },
+  );
+  ipcMain.handle("tools:skills:cancel", (_e, runId: string) => cancelSkillRun(runId));
+  ipcMain.handle(
+    "tools:skills:run",
+    async (event, skillIdOrInput: string | SkillRunInput, input?: unknown) => {
+      const runInput =
+        typeof skillIdOrInput === "string" && isSkillScriptInput(input)
+          ? ({
+              ...input,
+              skillId: skillIdOrInput,
+            } as SkillRunInput)
+          : typeof skillIdOrInput === "string"
+            ? null
+            : skillIdOrInput;
+      if (runInput) {
+        const approved = await requestSkillRunApproval(event, runInput);
+        if (!approved) throw new Error("Skill execution was not approved.");
+        return runSkill(runInput);
+      }
+      return runToolSkill({ skillId: skillIdOrInput as string, input });
+    },
   );
   ipcMain.handle("tools:skills:setSecret", (_e, input: ToolSecretInput) =>
     setToolSecret({ ...input, ownerType: "tool" }),
@@ -992,6 +1085,80 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
       resourcesPath: process.resourcesPath,
     }),
   );
+}
+
+function isSkillScriptInput(value: unknown): value is Omit<SkillRunInput, "skillId"> {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as { entryId?: unknown }).entryId === "string",
+  );
+}
+
+async function requestSkillRunApproval(
+  event: Electron.IpcMainInvokeEvent,
+  input: SkillRunInput,
+): Promise<boolean> {
+  const skill = getSkillTool(input.skillId);
+  if (!skill) throw new Error("Skill not found.");
+  if (skill.requires_approval === 0) return true;
+
+  const auditInput = redactWorkspaceCommandInput({
+    args: Array.isArray(input.args) ? input.args : [],
+    cwd: input.cwd ?? "workspace",
+  });
+  insertRuntimeEvent({
+    kind: "approval",
+    title: "Approval requested: Skill script",
+    status: "queued",
+    tool_id: skill.id,
+    conversation_id: input.conversationId,
+    agent_id: input.agentId,
+    detail: {
+      skillId: skill.id,
+      entryId: input.entryId,
+      input: {
+        ...(auditInput && typeof auditInput === "object" ? auditInput : {}),
+        args: { count: Array.isArray(input.args) ? input.args.length : 0 },
+      },
+    },
+  });
+
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const result = parent
+    ? await dialog.showMessageBox(parent, {
+        type: "warning",
+        title: "Approve Skill execution",
+        message: `Run the '${skill.name}' Skill script?`,
+        detail:
+          "This runs a package-provided script on the local machine. It can access the selected working directory, network, and other local processes according to the script's own behavior.",
+        buttons: ["Cancel", "Run"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+    : await dialog.showMessageBox({
+        type: "warning",
+        title: "Approve Skill execution",
+        message: `Run the '${skill.name}' Skill script?`,
+        detail: "This runs a package-provided script on the local machine.",
+        buttons: ["Cancel", "Run"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+  const approved = result.response === 1;
+  insertRuntimeEvent({
+    kind: "approval",
+    title: `Approval ${approved ? "approved" : "denied"}: Skill script`,
+    status: approved ? "succeeded" : "cancelled",
+    tool_id: skill.id,
+    conversation_id: input.conversationId,
+    agent_id: input.agentId,
+    detail: { skillId: skill.id, entryId: input.entryId },
+  });
+  return approved;
 }
 
 function isTrayMenuLabels(value: unknown): value is TrayMenuLabels {

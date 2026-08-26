@@ -223,4 +223,36 @@ void describe("skill archive safety", () => {
     assert.equal(inspected.name, "direct");
     assert.deepEqual(Object.keys(inspected.files).sort(), ["SKILL.md", "references/guide.md"]);
   });
+
+  void it("discovers safe script entries and declared dependencies", () => {
+    const inspected = inspectSkillArchive(
+      zipSync({
+        "skill/SKILL.md": strToU8("---\nname: runner\ndescription: Runner\n---\n\nUse the runner."),
+        "skill/scripts/nested/run.js": strToU8("console.log('ok')"),
+        "skill/scripts/run.ts": strToU8("console.log('ignored')"),
+        "skill/agents/openai.yaml": strToU8(
+          "allow_implicit_invocation: true\ntrigger_keywords: [runner]\ndependencies:\n  - name: chrome-devtools\n    type: mcp\n",
+        ),
+      }),
+    );
+    assert.equal(inspected.executionMode, "hybrid");
+    assert.deepEqual(
+      inspected.scripts.map((entry) => entry.relativePath),
+      ["scripts/nested/run.js"],
+    );
+    assert.equal(inspected.scripts[0]?.runtime, "node");
+    assert.equal(inspected.manifest.allowImplicitInvocation, true);
+    assert.deepEqual(inspected.manifest.triggerKeywords, ["runner"]);
+    assert.equal(inspected.dependencies[0]?.name, "chrome-devtools");
+  });
+
+  void it("classifies a package with only scripts as scripts-only", () => {
+    const inspected = inspectSkillArchive(
+      zipSync({
+        "skill/SKILL.md": strToU8("---\nname: runner\ndescription: Runner\n---\n"),
+        "skill/scripts/run.js": strToU8("console.log('ok')"),
+      }),
+    );
+    assert.equal(inspected.executionMode, "scripts");
+  });
 });

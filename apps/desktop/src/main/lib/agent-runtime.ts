@@ -696,6 +696,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     conversationId: context.conversationId,
     agentId: DEFAULT_AGENT_ID,
     permissionMode: context.permissionMode,
+    userText: latestUserText(context.messages),
   });
 
   if (!context.modelContext.capabilities.toolCalling) {
@@ -812,6 +813,19 @@ function isWorkspaceCommandSelected(context: RuntimeContext): boolean {
     selection.mode === "auto" ||
     (selection.mode === "manual" && selection.selectedToolIds.includes(WORKSPACE_COMMAND_TOOL_ID))
   );
+}
+
+function latestUserText(messages: UIMessage[]): string | undefined {
+  const message = [...messages].reverse().find((item) => item.role === "user");
+  if (!message || !Array.isArray(message.parts)) return undefined;
+  return message.parts
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      const value = part as { type?: unknown; text?: unknown };
+      return value.type === "text" && typeof value.text === "string" ? value.text : "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function createWorkspaceCommandNote(
@@ -1328,6 +1342,7 @@ function buildSafeChildToolRuntime(
     conversationId: context.conversationId,
     agentId: child.id,
     permissionMode: context.permissionMode,
+    userText: latestUserText(context.messages),
   });
   const tools: ToolSet = { ...base.tools };
   const activeTools = new Set(base.activeTools ?? []);

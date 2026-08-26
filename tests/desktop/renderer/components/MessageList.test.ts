@@ -14,6 +14,7 @@ import {
   LiveThinkingPanel,
   MessageList,
   readMediaToolResult,
+  saveMessageEdit,
   shouldShowLiveThinking,
 } from "@renderer/components/MessageList";
 import {
@@ -538,6 +539,36 @@ void describe("message render memoization", () => {
       }),
       false,
     );
+  });
+});
+
+void describe("message editing", () => {
+  void it("closes the editor before the async edit finishes", async () => {
+    const events: string[] = [];
+    let resolveEdit!: () => void;
+    const editFinished = new Promise<void>((resolve) => {
+      resolveEdit = resolve;
+    });
+
+    const editPromise = saveMessageEdit({
+      messageId: "u1",
+      editValue: "Edited question",
+      originalText: "Question",
+      onEdit: async () => {
+        events.push("edit-started");
+        await editFinished;
+        events.push("edit-finished");
+      },
+      onSaved: () => events.push("editor-closed"),
+      onInvalid: () => events.push("edit-cancelled"),
+    });
+
+    await Promise.resolve();
+    assert.deepEqual(events, ["editor-closed", "edit-started"]);
+
+    resolveEdit();
+    await editPromise;
+    assert.deepEqual(events, ["editor-closed", "edit-started", "edit-finished"]);
   });
 });
 

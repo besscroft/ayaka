@@ -23,6 +23,13 @@ import type {
   ToolSecretPublic,
   ToolSkill,
   ToolSkillInput,
+  SkillInspection,
+  SkillEntry,
+  SkillDependencyStatus,
+  SkillRunInput,
+  SkillRunResult,
+  SkillRunRecord,
+  SkillPackage,
   ToolsSnapshot,
   RuntimeEvent,
   InteractionProfile,
@@ -292,6 +299,7 @@ export interface AyakaApi {
     ) => Promise<ToolRecord>;
     skills: {
       create: (input: ToolSkillInput) => Promise<ToolSkill>;
+      importArchive: (bytes: Uint8Array) => Promise<ToolSkill>;
       generateDraft: (input: SkillDraftRequest) => Promise<SkillDraftResult>;
       update: (id: string, input: Partial<ToolSkillInput>) => Promise<ToolSkill>;
       delete: (id: string) => Promise<boolean>;
@@ -301,7 +309,20 @@ export interface AyakaApi {
       permanentDeleteBatch: (ids: string[]) => Promise<number>;
       purgeExpired: () => Promise<number>;
       setEnabled: (id: string, enabled: boolean) => Promise<ToolSkill>;
-      run: (skillId: string, input?: unknown) => Promise<unknown>;
+      run: {
+        (input: SkillRunInput): Promise<SkillRunResult>;
+        (skillId: string, input?: unknown): Promise<unknown>;
+      };
+      inspect: (skillId: string) => Promise<SkillInspection>;
+      entries: (skillId: string) => Promise<SkillEntry[]>;
+      runs: (skillId: string, limit?: number) => Promise<SkillRunRecord[]>;
+      dependencies: (skillId: string) => Promise<SkillDependencyStatus[]>;
+      confirmDependencies: (
+        skillId: string,
+        options?: { confirmed?: boolean; allowScripts?: boolean },
+      ) => Promise<SkillPackage | null>;
+      cancel: (runId: string) => Promise<boolean>;
+      onRunUpdated: (handler: (run: SkillRunRecord) => void) => () => void;
       setSecret: (input: ToolSecretInput) => Promise<ToolSecretPublic>;
       deleteSecret: (id: string) => Promise<boolean>;
     };

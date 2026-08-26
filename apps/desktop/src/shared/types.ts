@@ -139,6 +139,9 @@ export interface CatalogItemDetail {
   totalBytes: number;
   contentHash: string;
   safetyChecks: string[];
+  executionMode?: SkillExecutionMode;
+  scripts?: SkillEntry[];
+  dependencies?: SkillDependencyStatus[];
   mcp?: CatalogMcpDetail;
 }
 
@@ -1355,6 +1358,103 @@ export interface ToolSkill {
   purge_after_at: number | null;
 }
 
+export type SkillExecutionMode = "instructions" | "scripts" | "hybrid";
+export type SkillPackageStatus =
+  | "disabled"
+  | "ready"
+  | "needs_confirmation"
+  | "needs_runtime"
+  | "error";
+export type SkillEntryRuntime = "node" | "python" | "powershell" | "cmd" | "shell";
+export type SkillRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "timed_out"
+  | "cancelled";
+
+export interface SkillEntry {
+  id: string;
+  skillId: string;
+  relativePath: string;
+  name: string;
+  runtime: SkillEntryRuntime;
+  enabled: boolean;
+  available: boolean;
+  unavailableReason?: string;
+  timeoutMs: number;
+}
+
+export interface SkillDependencyStatus {
+  id: string;
+  skillId: string;
+  kind: "mcp" | "runtime" | "browser";
+  name: string;
+  status: "ready" | "needs_confirmation" | "needs_runtime" | "needs_install" | "failed";
+  source?: string;
+  detail?: string;
+  error?: string;
+}
+
+export interface SkillPackage {
+  id: string;
+  skillId: string;
+  source: "manual" | "upload" | "catalog" | "system";
+  rootPath: string;
+  contentHash: string;
+  executionMode: SkillExecutionMode;
+  status: SkillPackageStatus;
+  manifest: JsonObject;
+  safety: JsonObject;
+  lastError: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SkillRunInput {
+  skillId: string;
+  entryId: string;
+  args: string[];
+  cwd?: "skill" | "workspace";
+  conversationId?: string;
+  agentId?: string | null;
+}
+
+export interface SkillRunResult {
+  runId: string;
+  skillId: string;
+  entryId: string;
+  status: Exclude<SkillRunStatus, "queued" | "running">;
+  exitCode: number | null;
+  signal: string | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  truncated: boolean;
+  error?: string;
+}
+
+export interface SkillRunRecord extends Omit<SkillRunResult, "status"> {
+  status: SkillRunStatus;
+  conversationId: string | null;
+  agentId: string | null;
+  cwd: string;
+  argsJson: string;
+  startedAt: number | null;
+  finishedAt: number | null;
+  createdAt: number;
+}
+
+export interface SkillInspection {
+  skill: ToolSkill;
+  package: SkillPackage | null;
+  files: Array<{ path: string; size: number }>;
+  entries: SkillEntry[];
+  dependencies: SkillDependencyStatus[];
+  runs: SkillRunRecord[];
+}
+
 export interface ToolSkillInput {
   name: string;
   description?: string;
@@ -1408,6 +1508,9 @@ export interface ToolsSnapshot {
   toolServers: ToolServer[];
   toolRecords: ToolRecord[];
   skills: ToolSkill[];
+  skillPackages: SkillPackage[];
+  skillEntries: SkillEntry[];
+  skillRuns: SkillRunRecord[];
   secrets: ToolSecretPublic[];
   runtimeEvents: RuntimeEvent[];
 }

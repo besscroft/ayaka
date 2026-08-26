@@ -35,7 +35,11 @@ import {
   type MemoryAccessContext,
 } from "./memory-access";
 import { createMcpToolDescriptors, createMcpToolSet } from "./mcp-manager";
-import { createSkillToolDescriptors, createSkillToolSet } from "./skill-runtime";
+import {
+  createSkillToolDescriptors,
+  createSkillToolSet,
+  getSelectedSkillInstructions,
+} from "./skill-runtime";
 import {
   createCronJob,
   deleteCronJob,
@@ -67,6 +71,7 @@ export interface BuildChatToolRuntimeOptions {
   conversationId?: string;
   agentId?: string | null;
   permissionMode?: ChatPermissionMode;
+  userText?: string;
 }
 
 export interface ChatToolRuntimeConfig {
@@ -425,7 +430,10 @@ export class ChatToolSelectionError extends Error {
   }
 }
 
-export function createChatToolDescriptors(model: ChatToolModelContext): ChatToolDescriptor[] {
+export function createChatToolDescriptors(
+  model: ChatToolModelContext,
+  userText?: string,
+): ChatToolDescriptor[] {
   const supportsTools = model.capabilities.toolCalling;
   const webSearchExecution = getWebSearchExecution(model);
   const workspaceCommandRecord = getToolRecord("workspace_run_command");
@@ -476,16 +484,18 @@ export function createChatToolDescriptors(model: ChatToolModelContext): ChatTool
     };
   });
 
-  const dynamicDescriptors = [...createMcpToolDescriptors(), ...createSkillToolDescriptors()].map(
-    (descriptor) =>
-      supportsTools
-        ? descriptor
-        : {
-            ...descriptor,
-            available: false,
-            defaultAuto: false,
-            unavailableReason: "Selected model does not advertise tool calling.",
-          },
+  const dynamicDescriptors = [
+    ...createMcpToolDescriptors(),
+    ...createSkillToolDescriptors(userText),
+  ].map((descriptor) =>
+    supportsTools
+      ? descriptor
+      : {
+          ...descriptor,
+          available: false,
+          defaultAuto: false,
+          unavailableReason: "Selected model does not advertise tool calling.",
+        },
   );
 
   return [...builtInDescriptors, ...dynamicDescriptors];
@@ -497,16 +507,28 @@ export function buildChatToolRuntime({
   conversationId,
   agentId,
   permissionMode = "approve_risky",
+  userText,
 }: BuildChatToolRuntimeOptions): ChatToolRuntimeConfig {
   const selection = normalizeChatToolSelection(rawSelection);
-  const descriptors = createChatToolDescriptors(model);
+  const descriptors = createChatToolDescriptors(model, userText);
   const descriptorById = new Map(descriptors.map((descriptor) => [descriptor.id, descriptor]));
+  const selectedSkillIds =
+    selection.mode === "manual"
+      ? selection.selectedToolIds.filter(isSkillToolReference)
+      : descriptors
+          .filter((descriptor) => descriptor.category === "skill" && descriptor.defaultAuto)
+          .map((descriptor) => descriptor.id);
+  const selectedSkillInstructions = getSelectedSkillInstructions(selectedSkillIds);
 
   if (selection.mode === "off" || !model.capabilities.toolCalling) {
-    if (selection.mode === "manual" && selection.selectedToolIds.length > 0) {
+    const nonSkillSelection =
+      selection.mode === "manual"
+        ? selection.selectedToolIds.filter((id) => !isSkillToolReference(id))
+        : [];
+    if (nonSkillSelection.length > 0) {
       throw new ChatToolSelectionError("Selected model does not support chat tools.");
     }
-    return { descriptors, toolChoice: "none" };
+    return { descriptors, toolChoice: "none", instructions: selectedSkillInstructions };
   }
 
   const selectedIds =
@@ -624,7 +646,9 @@ export function buildChatToolRuntime({
       conversationId,
       providerExecutedToolNames,
     }),
-    instructions: createToolInstructions(activeTools),
+    instructions: [createToolInstructions(activeTools), selectedSkillInstructions]
+      .filter(Boolean)
+      .join("\n\n"),
   };
 }
 

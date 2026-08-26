@@ -160,15 +160,15 @@ void describe("chat tool UI helpers", () => {
     assert.equal(mcp?.available, true);
     assert.equal(mcp?.defaultAuto, true);
     assert.equal(mcp?.requiresApproval, false);
-    assert.equal(skill?.available, false);
+    assert.equal(skill?.available, true);
     assert.equal(skill?.defaultAuto, false);
-    assert.equal(skill?.unavailableReason, "chatTools.unavailable.skillInstructionsOnly");
+    assert.equal(skill?.unavailableReason, undefined);
     assert.deepEqual(
       getActiveChatToolIds(
         { mode: "manual", selectedToolIds: ["memory_search", mcp!.id, skill!.id] },
         descriptors,
       ),
-      ["memory_search", "mcp:srv-1:search"],
+      ["memory_search", "mcp:srv-1:search", "skill:skill-1"],
     );
     assert.equal(
       getActiveChatToolIds({ mode: "auto", selectedToolIds: [] }, descriptors).includes(
@@ -347,6 +347,9 @@ function toolsnapshot(): ToolsSnapshot {
         purge_after_at: null,
       },
     ],
+    skillPackages: [],
+    skillEntries: [],
+    skillRuns: [],
     secrets: [],
     runtimeEvents: [],
   };

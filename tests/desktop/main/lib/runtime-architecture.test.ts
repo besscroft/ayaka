@@ -79,6 +79,7 @@ void describe("runtime architecture", () => {
       "0005_rare_prodigy.sql",
       "0006_lazy_hitman.sql",
       "0007_military_white_queen.sql",
+      "0008_dapper_captain_midlands.sql",
     ]);
   });
 

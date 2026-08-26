@@ -37,6 +37,10 @@ const ENV_ALLOWLIST = new Set([
   "NODE_ENV",
   "NO_COLOR",
   "FORCE_COLOR",
+  "AYAKA_SKILL_ROOT",
+  "AYAKA_WORKSPACE_ROOT",
+  "AYAKA_SKILL_ID",
+  "AYAKA_SKILL_RUN_ID",
 ]);
 
 const READ_ONLY_EXECUTABLES = new Set([
@@ -114,13 +118,20 @@ interface WorkspaceCommandSessionOptions {
 }
 
 export interface WorkspaceCommandSessionHandle {
-  execute(input: WorkspaceCommandInput, signal: AbortSignal): Promise<WorkspaceCommandResult>;
+  execute(
+    input: WorkspaceCommandInput,
+    signal: AbortSignal,
+    options?: { allowedArgumentRoots?: string[]; allowedExecutableRoots?: string[] },
+  ): Promise<WorkspaceCommandResult>;
   dispose(): Promise<void>;
 }
 
 const sessions = new Map<string, WorkspaceCommandSession>();
 
-export function evaluateWorkspaceCommandPolicy(input: unknown): WorkspaceCommandPolicyDecision {
+export function evaluateWorkspaceCommandPolicy(
+  input: unknown,
+  options?: { allowedArgumentRoots?: string[]; allowedExecutableRoots?: string[] },
+): WorkspaceCommandPolicyDecision {
   let normalized: NormalizedWorkspaceCommandInput;
   try {
     normalized = normalizeWorkspaceCommandInput(input);
@@ -132,7 +143,10 @@ export function evaluateWorkspaceCommandPolicy(input: unknown): WorkspaceCommand
     };
   }
 
-  if (looksLikePathEscape(normalized.executable)) {
+  if (
+    looksLikePathEscape(normalized.executable) &&
+    !isAllowedArgumentPath(normalized.executable, options?.allowedExecutableRoots ?? [])
+  ) {
     return {
       decision: "deny",
       risk: "unknown",
@@ -147,7 +161,13 @@ export function evaluateWorkspaceCommandPolicy(input: unknown): WorkspaceCommand
       reason: "The command cwd must remain inside the conversation workspace.",
     };
   }
-  if (normalized.args.some(looksLikePathEscape)) {
+  if (
+    normalized.args.some(
+      (value) =>
+        looksLikePathEscape(value) &&
+        !isAllowedArgumentPath(value, options?.allowedArgumentRoots ?? []),
+    )
+  ) {
     return {
       decision: "deny",
       risk: "unknown",
@@ -269,12 +289,17 @@ export async function executeWorkspaceCommand(options: {
   conversationId?: string;
   signal: AbortSignal;
   input: WorkspaceCommandInput;
+  allowedArgumentRoots?: string[];
+  allowedExecutableRoots?: string[];
 }): Promise<WorkspaceCommandResult> {
   const session = await getWorkspaceCommandSession({
     runId: options.runId,
     conversationId: options.conversationId,
   });
-  return session.execute(options.input, options.signal);
+  return session.execute(options.input, options.signal, {
+    allowedArgumentRoots: options.allowedArgumentRoots,
+    allowedExecutableRoots: options.allowedExecutableRoots,
+  });
 }
 
 export async function disposeWorkspaceCommandSession(runId: string): Promise<void> {
@@ -340,9 +365,10 @@ class WorkspaceCommandSession {
   async execute(
     input: WorkspaceCommandInput,
     signal: AbortSignal,
+    options?: { allowedArgumentRoots?: string[]; allowedExecutableRoots?: string[] },
   ): Promise<WorkspaceCommandResult> {
     const normalized = normalizeWorkspaceCommandInput(input);
-    const policy = evaluateWorkspaceCommandPolicy(normalized);
+    const policy = evaluateWorkspaceCommandPolicy(normalized, options);
     if (policy.decision === "deny") throw new Error(policy.reason);
 
     const cwd = normalized.cwd === undefined ? this.currentCwd : normalized.cwd || ".";
@@ -606,6 +632,19 @@ function isRelativeExecutablePath(executable: string): boolean {
 
 function looksLikePathEscape(value: string): boolean {
   return /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(value) || /(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value);
+}
+
+function isAllowedArgumentPath(value: string, roots: string[]): boolean {
+  if (!path.isAbsolute(value) || roots.length === 0) return false;
+  const candidate = path.resolve(value);
+  return roots.some((root) => {
+    const resolvedRoot = path.resolve(root);
+    const relative = path.relative(resolvedRoot, candidate);
+    return (
+      relative === "" ||
+      (!relative.startsWith(".." + path.sep) && relative !== ".." && !path.isAbsolute(relative))
+    );
+  });
 }
 
 function matchesAny(value: string, pattern: RegExp): boolean {

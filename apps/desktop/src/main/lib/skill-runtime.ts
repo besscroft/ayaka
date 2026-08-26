@@ -1,7 +1,15 @@
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type { ChatToolDescriptor, ToolSkill, JsonObject } from "../../shared/types";
-import { getSkillTool, insertRuntimeEvent, listSkillTools, markSkillToolRunAsync } from "./db";
+import {
+  getSkillPackage,
+  getSkillTool,
+  insertRuntimeEvent,
+  listSkillTools,
+  markSkillToolRunAsync,
+} from "./db";
 import type { ChatToolModelContext } from "./chat-tools";
+import { runSkill, isPackageHashCurrent } from "./skill-executor";
+import { validateSkillArgs } from "./skill-executor-policy";
 
 export function skillToolReference(skillId: string): string {
   return "skill:" + skillId;
@@ -16,29 +24,66 @@ export function skillToolRuntimeName(skillId: string): string {
   return "skill_" + toolNamePart(skillId);
 }
 
-export function createSkillToolDescriptors(): ChatToolDescriptor[] {
+export function createSkillToolDescriptors(prompt?: string): ChatToolDescriptor[] {
   try {
-    return listSkillTools().map((skill) => ({
-      id: skillToolReference(skill.id),
-      label: skill.name,
-      description: skill.description || "Agent skill",
-      kind: "host",
-      execution: "host",
-      category: "skill",
-      // Skills currently provide instructions only. Do not expose them as executable tools.
-      defaultAuto: false,
-      requiresApproval: skill.requires_approval !== 0,
-      available: false,
-      unavailableReason:
-        skill.enabled === 0
-          ? "Skill is disabled."
-          : "Skill execution is not configured; this Skill only provides instructions.",
-      sourceId: skill.id,
-      sourceName: skill.category,
-    }));
+    return listSkillTools().map((skill) => {
+      const availability = getSkillAvailability(skill);
+      const triggers = safeJsonArray(skill.trigger_keywords_json).filter(
+        (value): value is string => typeof value === "string" && value.trim().length > 0,
+      );
+      const keywordHit =
+        triggers.length > 0 &&
+        Boolean(prompt?.trim()) &&
+        triggers.some((keyword) => prompt!.toLowerCase().includes(keyword.toLowerCase()));
+      return {
+        id: skillToolReference(skill.id),
+        label: skill.name,
+        description: skill.description || "Agent skill",
+        kind: "host",
+        execution: "host",
+        category: "skill",
+        defaultAuto: skill.auto_use !== 0 && keywordHit,
+        requiresApproval: skill.requires_approval !== 0,
+        available: availability.available,
+        unavailableReason: availability.reason,
+        sourceId: skill.id,
+        sourceName: skill.category,
+      };
+    });
   } catch {
     return [];
   }
+}
+
+export function getSelectedSkillInstructions(references: string[]): string {
+  const selectedIds = new Set(
+    references.map(parseSkillToolReference).filter((value): value is string => Boolean(value)),
+  );
+  if (selectedIds.size === 0) return "";
+  const loaded: string[] = [];
+  for (const skill of listSkillTools()) {
+    if (!selectedIds.has(skill.id) || skill.enabled === 0) continue;
+    if (!getSkillAvailability(skill).available) continue;
+    const instructions = readSkillInstructions(skill);
+    if (!instructions) continue;
+    loaded.push("## Skill: " + skill.name + "\n" + instructions);
+    insertRuntimeEvent({
+      kind: "skill",
+      title: "Skill activated: " + skill.name,
+      status: "succeeded",
+      tool_id: skill.id,
+      detail: { skillId: skill.id, mode: "instructions" },
+    });
+    insertRuntimeEvent({
+      kind: "skill",
+      title: "Skill instructions loaded: " + skill.name,
+      status: "succeeded",
+      tool_id: skill.id,
+      detail: { skillId: skill.id, mode: "instructions" },
+    });
+    void markSkillToolRunAsync(skill.id);
+  }
+  return loaded.join("\n\n");
 }
 
 export function createSkillToolSet({
@@ -93,15 +138,26 @@ export async function runToolSkill({
   });
 
   try {
+    const value = normalizeInput(input);
+    const entryId = typeof value.entryId === "string" ? value.entryId : null;
+    const args = value.args === undefined ? [] : validateSkillArgs(value.args);
+    if (entryId) {
+      return await runSkill({
+        skillId: skill.id,
+        entryId,
+        args,
+        cwd: value.cwd === "skill" ? "skill" : "workspace",
+        conversationId,
+        agentId,
+      });
+    }
     const result = {
       skillId: skill.id,
       name: skill.name,
-      execution: "instructions_only" as const,
+      execution: "instructions" as const,
       executed: false,
-      warning:
-        "This Skill is registered as an instruction bundle. No scripts, files, or shell commands were executed.",
       instructions: readSkillInstructions(skill),
-      input: normalizeInput(input),
+      input: value,
       config: safeJson(skill.config_json, {}) as JsonObject,
       model: model ? { providerId: model.providerId, modelId: model.modelId } : null,
     };
@@ -158,6 +214,7 @@ function createToolDescription(skill: ToolSkill): string {
   return [
     skill.description,
     instructions ? "Instructions:\n" + instructions : "",
+    "For script execution, provide entryId from the discovered scripts and args as a string array.",
     triggers ? "Triggers: " + triggers : "",
   ]
     .filter(Boolean)
@@ -166,6 +223,53 @@ function createToolDescription(skill: ToolSkill): string {
 
 function readSkillInstructions(skill: ToolSkill): string {
   return skill.instructions.trim();
+}
+
+function getSkillAvailability(skill: ToolSkill): {
+  available: boolean;
+  reason?: string;
+} {
+  if (skill.enabled === 0) return { available: false, reason: "Skill is disabled." };
+  const pkg = getSkillPackage(skill.id);
+  if (!pkg) {
+    return readSkillInstructions(skill)
+      ? { available: true }
+      : { available: false, reason: "Skill has no instructions or executable entries." };
+  }
+  if (pkg.status === "error") {
+    return readSkillInstructions(skill)
+      ? {
+          available: true,
+          reason:
+            pkg.lastError ||
+            "Skill package execution is unavailable; instructions remain available.",
+        }
+      : { available: false, reason: pkg.lastError || "Skill package failed safety review." };
+  }
+  if (!isPackageHashCurrent(pkg.rootPath, pkg.contentHash)) {
+    return { available: false, reason: "Skill package content changed; review it again." };
+  }
+  if (pkg.status === "disabled") return { available: false, reason: "Skill package is disabled." };
+  if (pkg.status === "needs_runtime") {
+    return readSkillInstructions(skill)
+      ? {
+          available: true,
+          reason: "Executable runtime is unavailable; instructions remain available.",
+        }
+      : { available: false, reason: pkg.lastError || "Skill runtime is unavailable." };
+  }
+  if (pkg.status === "needs_confirmation") {
+    return readSkillInstructions(skill)
+      ? {
+          available: true,
+          reason: "Skill dependencies are not ready; instructions remain available.",
+        }
+      : {
+          available: false,
+          reason: pkg.lastError || "Skill dependencies require confirmation before execution.",
+        };
+  }
+  return { available: true };
 }
 
 function normalizeInput(input: unknown): JsonObject {

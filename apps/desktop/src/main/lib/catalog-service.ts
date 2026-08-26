@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { app } from "electron";
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
 import type {
   ArtifactInstallation,
@@ -36,6 +36,11 @@ import {
   deleteArtifactInstallation,
   deleteCatalogSource,
   deleteCatalogItemsExcept,
+  getSkillPackage,
+  upsertSkillPackageAsync,
+  replaceSkillEntriesAsync,
+  deleteSkillPackageAsync,
+  setSkillPackageStatusAsync,
 } from "./db";
 import { artifactInstallations, catalogItems, catalogSources } from "./schema";
 import {
@@ -62,6 +67,70 @@ import {
   inspectSkillFiles,
   type InspectedSkillArchive,
 } from "./catalog-safety";
+import { cancelSkillRunsForSkill } from "./skill-executor";
+import { refreshSkillPackageStatus } from "./skill-dependencies";
+
+export async function importSkillArchive(
+  bytes: Uint8Array,
+  source: "upload" | "manual" = "upload",
+): Promise<import("../../shared/types").ToolSkill> {
+  const inspected = inspectSkillArchive(bytes);
+  const skill = await createSkillTool({
+    name: inspected.name,
+    description: inspected.description,
+    instructions: inspected.markdown,
+    category: "skill",
+    enabled: false,
+    // Marketplace metadata may suggest automatic use, but enabling that mode
+    // is always an explicit user choice in the installed Skills page.
+    auto_use: false,
+    requires_approval: true,
+    tags: ["skill", source, "installed"],
+    triggerKeywords: Array.isArray(inspected.manifest.triggerKeywords)
+      ? inspected.manifest.triggerKeywords.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [],
+    config: { source },
+  });
+  const rootPath = join(app.getPath("userData"), "catalog", "skills", randomUUID());
+  atomicWriteSkill(rootPath, inspected.files);
+  const hash = skillPackageHash(inspected);
+  const pkg = await upsertSkillPackageAsync({
+    skillId: skill.id,
+    source,
+    rootPath,
+    contentHash: hash,
+    executionMode: inspected.executionMode,
+    status: "disabled",
+    manifest: inspected.manifest,
+    safety: {
+      packageSha256: hash,
+      fileCount: Object.keys(inspected.files).length,
+      totalBytes: inspected.totalBytes,
+      checks: [
+        "frontmatter",
+        "path-traversal",
+        "file-count",
+        "archive-size",
+        "no-symlink-materialization",
+      ],
+    },
+  });
+  await replaceSkillEntriesAsync(
+    skill.id,
+    pkg.id,
+    inspected.scripts.map((entry) => ({
+      relativePath: entry.relativePath,
+      name: entry.name,
+      runtime: entry.runtime,
+      available: entry.available,
+      unavailableReason: entry.unavailableReason,
+      timeoutMs: 60_000,
+    })),
+  );
+  return skill;
+}
 
 const MODELSCOPE_SKILLS_SOURCE: typeof catalogSources.$inferInsert = {
   id: MODELSCOPE_SOURCE_ID,
@@ -287,7 +356,23 @@ export async function getCatalogItemDetail(itemId: string): Promise<CatalogItemD
     files: Object.entries(inspected.files).map(([path, data]) => ({ path, size: data.byteLength })),
     totalBytes: inspected.totalBytes,
     contentHash,
-    safetyChecks: ["frontmatter", "path-traversal", "file-count", "package-size"],
+    safetyChecks: ["frontmatter", "path-traversal", "file-count", "package-size", "sha256"],
+    executionMode: inspected.executionMode,
+    scripts: inspected.scripts.map((entry) => ({
+      id: entry.relativePath,
+      skillId: itemId,
+      relativePath: entry.relativePath,
+      name: entry.name,
+      runtime: entry.runtime,
+      enabled: true,
+      available: entry.available,
+      unavailableReason: entry.unavailableReason,
+      timeoutMs: 60_000,
+    })),
+    dependencies: inspected.dependencies.map((dependency) => ({
+      ...dependency,
+      skillId: itemId,
+    })),
   };
 }
 
@@ -299,7 +384,13 @@ export async function setArtifactInstallationEnabled(
   try {
     if (row.artifact_type === "skill") {
       if (!row.skill_id) throw new Error("Installed skill record is missing.");
+      if (!enabled) await cancelSkillRunsForSkill(row.skill_id);
       await setSkillToolEnabled(row.skill_id, enabled);
+      const pkg = getSkillPackage(row.skill_id);
+      if (pkg) {
+        if (enabled) await refreshSkillPackageStatus(row.skill_id);
+        else await setSkillPackageStatusAsync(row.skill_id, "disabled");
+      }
     } else {
       if (!row.tool_server_id) throw new Error("Installed MCP server record is missing.");
       await setToolServerEnabled(row.tool_server_id, enabled);
@@ -333,13 +424,18 @@ export async function setArtifactInstallationEnabled(
 
 export async function uninstallArtifact(id: string): Promise<boolean> {
   const row = requireInstallation(id);
-  if (row.skill_id) await deleteSkillTool(row.skill_id);
+  if (row.skill_id) {
+    await cancelSkillRunsForSkill(row.skill_id);
+    removeSkillPackageDirectory(row.skill_id);
+    await deleteSkillPackageAsync(row.skill_id);
+    await deleteSkillTool(row.skill_id);
+  }
   if (row.tool_server_id) {
     await stopMcpServer(row.tool_server_id).catch(() => undefined);
     await uninstallMcpDependencies(row.tool_server_id).catch(() => undefined);
     await permanentlyDeleteToolServer(row.tool_server_id);
   }
-  if (row.install_path && existsSync(row.install_path))
+  if (row.install_path && !row.skill_id && existsSync(row.install_path))
     rmSync(row.install_path, { recursive: true, force: true });
   return deleteArtifactInstallation(id);
 }
@@ -364,6 +460,7 @@ async function installSkillItem(
         description: inspected.description,
         instructions: inspected.markdown,
         enabled: false,
+        triggerKeywords: getSkillTriggerKeywords(inspected),
         config: {
           installationId,
           installPath: target,
@@ -378,6 +475,7 @@ async function installSkillItem(
         enabled: false,
         auto_use: false,
         requires_approval: true,
+        triggerKeywords: getSkillTriggerKeywords(inspected),
         tags: ["catalog", "installed"],
         config: {
           installationId,
@@ -418,8 +516,66 @@ async function installSkillItem(
     updated_at: now,
   };
   await upsertInstallation(row);
+  const pkg = await upsertSkillPackageAsync({
+    skillId: skill.id,
+    source: "catalog",
+    rootPath: target,
+    contentHash: hash,
+    executionMode: inspected.executionMode,
+    status: "disabled",
+    manifest: inspected.manifest,
+    safety: {
+      packageSha256: hash,
+      fileCount: Object.keys(inspected.files).length,
+      totalBytes: inspected.totalBytes,
+      checks: [
+        "frontmatter",
+        "path-traversal",
+        "file-count",
+        "archive-size",
+        "no-symlink-materialization",
+      ],
+    },
+  });
+  await replaceSkillEntriesAsync(
+    skill.id,
+    pkg.id,
+    inspected.scripts.map((entry) => ({
+      relativePath: entry.relativePath,
+      name: entry.name,
+      runtime: entry.runtime,
+      available: entry.available,
+      unavailableReason: entry.unavailableReason,
+      timeoutMs: 60_000,
+    })),
+  );
   if (input.enable) return await setArtifactInstallationEnabled(installationId, true);
   return toInstallation(requireInstallation(installationId));
+}
+
+/**
+ * Remove only a Skill package that is inside Ayaka's managed Skill root. This
+ * is used by delete/uninstall paths after active runs have been cancelled.
+ */
+export function removeSkillPackageDirectory(skillId: string): void {
+  const pkg = getSkillPackage(skillId);
+  if (!pkg) return;
+  const skillRoot = resolve(join(app.getPath("userData"), "catalog", "skills"));
+  const target = resolve(pkg.rootPath);
+  const relativePath = relative(skillRoot, target);
+  if (
+    !relativePath ||
+    relativePath === ".." ||
+    relativePath.startsWith(".." + sep) ||
+    relativePath.split(sep).some((part) => part === "..")
+  ) {
+    throw new Error("Skill package path is outside the managed Skill installation root.");
+  }
+  if (!existsSync(target)) return;
+  if (lstatSync(target).isSymbolicLink() || !lstatSync(target).isDirectory()) {
+    throw new Error("Skill package path is not a regular directory.");
+  }
+  rmSync(target, { recursive: true, force: true });
 }
 
 async function installMcpItem(
@@ -553,6 +709,14 @@ function skillPackageHash(inspected: InspectedSkillArchive): string {
     hash.update(data);
   }
   return hash.digest("hex");
+}
+
+function getSkillTriggerKeywords(inspected: InspectedSkillArchive): string[] {
+  return Array.isArray(inspected.manifest.triggerKeywords)
+    ? inspected.manifest.triggerKeywords.filter(
+        (value): value is string => typeof value === "string" && value.trim().length > 0,
+      )
+    : [];
 }
 
 async function downloadSkillArchive(urlValue: string): Promise<Uint8Array> {

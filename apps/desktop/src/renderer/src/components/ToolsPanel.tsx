@@ -52,9 +52,16 @@ import type {
   CatalogItemDetail,
   CatalogSnapshot,
   CatalogSourceFilter,
+  SkillDependencyStatus,
+  SkillEntryRuntime,
+  SkillExecutionMode,
+  SkillPackageStatus,
   ToolRecord,
   ToolServer,
   ToolSkill,
+  SkillPackage,
+  SkillInspection,
+  SkillRunRecord,
 } from "@shared/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import {
@@ -336,6 +343,7 @@ export function InstalledSkillsPanel(): React.JSX.Element {
         ) : (
           <SkillsSection
             skills={snapshot?.skills ?? []}
+            packages={snapshot?.skillPackages ?? []}
             busy={busy}
             onDelete={setDeleteTarget}
             onToggle={(skill, enabled) =>
@@ -350,6 +358,12 @@ export function InstalledSkillsPanel(): React.JSX.Element {
                 t("tools.toast.saved"),
               )
             }
+            onAutoUse={(skill, autoUse) =>
+              runAction(
+                () => api.tools.skills.update(skill.id, { auto_use: autoUse }),
+                t("tools.toast.saved"),
+              )
+            }
             onDetail={(skill) => setDetailTarget({ type: "skill", item: skill })}
           />
         )}
@@ -358,9 +372,10 @@ export function InstalledSkillsPanel(): React.JSX.Element {
         open={skillOpen}
         busy={busy}
         onClose={() => setSkillOpen(false)}
-        onCreate={(markdown, source) =>
+        onCreate={(markdown, source, archive) =>
           runAction(async () => {
-            await api.tools.skills.create(buildSkillInputFromMarkdown(markdown, source));
+            if (archive) await api.tools.skills.importArchive(archive);
+            else await api.tools.skills.create(buildSkillInputFromMarkdown(markdown, source));
             setSkillOpen(false);
           }, t("tools.toast.saved"))
         }
@@ -511,17 +526,21 @@ function RegistrySection({
 
 function SkillsSection({
   skills,
+  packages,
   busy,
   onDelete,
   onToggle,
   onApprovalChange,
+  onAutoUse,
   onDetail,
 }: {
   skills: ToolSkill[];
+  packages: SkillPackage[];
   busy: boolean;
   onDelete: (skill: ToolSkill) => void;
   onToggle: (skill: ToolSkill, enabled: boolean) => void;
   onApprovalChange: (skill: ToolSkill, requiresApproval: boolean) => void;
+  onAutoUse: (skill: ToolSkill, autoUse: boolean) => void;
   onDetail: (skill: ToolSkill) => void;
 }): React.JSX.Element {
   const { t } = useT();
@@ -534,10 +553,12 @@ function SkillsSection({
         <SkillCard
           key={skill.id}
           skill={skill}
+          skillPackage={packages.find((item) => item.skillId === skill.id) ?? null}
           busy={busy}
           onDelete={() => onDelete(skill)}
           onToggle={(enabled) => onToggle(skill, enabled)}
           onApprovalChange={(requiresApproval) => onApprovalChange(skill, requiresApproval)}
+          onAutoUse={(autoUse) => onAutoUse(skill, autoUse)}
           onDetail={() => onDetail(skill)}
         />
       ))}
@@ -547,23 +568,28 @@ function SkillsSection({
 
 function SkillCard({
   skill,
+  skillPackage,
   busy,
   onDelete,
   onToggle,
   onApprovalChange,
+  onAutoUse,
   onDetail,
 }: {
   skill: ToolSkill;
+  skillPackage: SkillPackage | null;
   busy: boolean;
   onDelete: () => void;
   onToggle: (enabled: boolean) => void;
   onApprovalChange: (requiresApproval: boolean) => void;
+  onAutoUse: (autoUse: boolean) => void;
   onDetail: () => void;
 }): React.JSX.Element {
   const { t, f } = useT();
   const config = safeJsonObject(skill.config_json);
   const source = typeof config.source === "string" ? config.source : "manual";
   const instructions = skill.instructions;
+  const mode = skillPackage?.executionMode ?? "instructions";
   return (
     <Card>
       <Card.Header>
@@ -577,7 +603,23 @@ function SkillCard({
       <Card.Content className="flex flex-col gap-3 p-4">
         <div className="grid gap-2 text-xs sm:grid-cols-2">
           <ReadStat label={t("tools.field.category")} value={skill.category} />
-          <ReadStat label="Source" value={source} />
+          <ReadStat label={t("tools.field.source")} value={source} />
+          <ReadStat label={t("tools.field.capability")} value={localizeSkillMode(t, mode)} />
+          <ReadStat
+            label={t("tools.field.packageStatus")}
+            value={localizeSkillStatus(
+              t,
+              skillPackage?.status ?? (skill.enabled ? "ready" : "disabled"),
+            )}
+          />
+          <ReadStat
+            label={t("tools.field.safety")}
+            value={skillPackage ? formatSkillSafety(t, skillPackage) : t("tools.notAvailable")}
+          />
+          <ReadStat
+            label={t("tools.field.hash")}
+            value={skillPackage?.contentHash ?? t("tools.notAvailable")}
+          />
           <ReadStat
             label={t("tools.field.lastRun")}
             value={skill.last_run_at ? f.dateTime(skill.last_run_at) : t("tools.never")}
@@ -599,6 +641,14 @@ function SkillCard({
               onChange={onToggle}
             >
               {t("tools.enabled")}
+            </Switch>
+            <Switch
+              size="sm"
+              isSelected={skill.auto_use !== 0}
+              isDisabled={busy}
+              onChange={onAutoUse}
+            >
+              {t("tools.autoUse")}
             </Switch>
             <Switch
               size="sm"
@@ -638,6 +688,20 @@ export function ToolDetailModal({
   onClose: () => void;
 }): React.JSX.Element | null {
   const { t, f } = useT();
+  const [inspection, setInspection] = useState<SkillInspection | null>(null);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
+  useEffect(() => {
+    if (!detail || detail.type !== "skill") {
+      setInspection(null);
+      return;
+    }
+    setInspectionLoading(true);
+    void api.tools.skills
+      .inspect(detail.item.id)
+      .then(setInspection)
+      .catch(() => setInspection(null))
+      .finally(() => setInspectionLoading(false));
+  }, [detail]);
   if (!detail) return null;
 
   const isMcp = detail.type === "mcp";
@@ -753,7 +817,110 @@ export function ToolDetailModal({
                       : t("tools.never")
                   }
                 />
+                <ReadStat
+                  label={t("tools.field.capability")}
+                  value={localizeSkillMode(t, inspection?.package?.executionMode ?? "instructions")}
+                />
+                <ReadStat
+                  label={t("tools.field.packageStatus")}
+                  value={localizeSkillStatus(
+                    t,
+                    inspection?.package?.status ?? (item.enabled ? "ready" : "disabled"),
+                  )}
+                />
+                <ReadStat
+                  label={t("tools.field.safety")}
+                  value={
+                    inspection?.package
+                      ? formatSkillSafety(t, inspection.package)
+                      : t("tools.notAvailable")
+                  }
+                />
+                <ReadStat
+                  label={t("tools.field.hash")}
+                  value={inspection?.package?.contentHash ?? t("tools.notAvailable")}
+                />
               </div>
+              {inspectionLoading ? <LoadingIndicator label={t("main.loading")} /> : null}
+              {inspection?.files.length ? (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">{t("tools.detail.skillFiles")}</h4>
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2">
+                    {inspection.files.map((file) => (
+                      <div key={file.path} className="flex justify-between gap-2 text-xs">
+                        <span className="truncate">{file.path}</span>
+                        <span className="shrink-0 text-muted-foreground">{file.size} B</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {inspection?.entries.length ? (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">{t("tools.detail.skillEntries")}</h4>
+                  <div className="flex flex-col gap-1 rounded-md border border-border p-2">
+                    {inspection.entries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <span className="truncate">{entry.name}</span>
+                        <Chip size="sm" variant={entry.available ? "soft" : "secondary"}>
+                          {localizeSkillRuntime(t, entry.runtime)}
+                          {entry.available
+                            ? ""
+                            : " · " + (entry.unavailableReason ?? t("tools.unavailable"))}
+                        </Chip>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {inspection?.dependencies.length ? (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">{t("tools.detail.dependencies")}</h4>
+                  {inspection.dependencies.map((dependency) => (
+                    <div
+                      key={dependency.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate">{dependency.name}</span>
+                        {dependency.error ? (
+                          <span className="mt-1 block break-words text-danger">
+                            {dependency.error}
+                          </span>
+                        ) : null}
+                      </span>
+                      <Chip
+                        size="sm"
+                        variant={dependency.status === "ready" ? "soft" : "secondary"}
+                      >
+                        {localizeSkillDependencyStatus(t, dependency.status)}
+                      </Chip>
+                    </div>
+                  ))}
+                  {inspection.package?.status === "needs_confirmation" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() =>
+                        void api.tools.skills
+                          .confirmDependencies(detail.item.id, {
+                            confirmed: true,
+                            allowScripts: inspection.dependencies.some((dependency) =>
+                              dependency.error?.toLowerCase().includes("build scripts"),
+                            ),
+                          })
+                          .then(() => api.tools.skills.inspect(detail.item.id))
+                          .then(setInspection)
+                      }
+                    >
+                      {t("tools.confirmDependencies")}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               {(() => {
                 const instructions = (detail.item as ToolSkill).instructions;
                 return instructions ? (
@@ -768,6 +935,7 @@ export function ToolDetailModal({
                   </div>
                 ) : null;
               })()}
+              {inspection?.entries.length ? <SkillRunPanel inspection={inspection} /> : null}
             </div>
           )}
         </div>
@@ -781,6 +949,119 @@ export function ToolDetailModal({
   );
 }
 
+function SkillRunPanel({ inspection }: { inspection: SkillInspection }): React.JSX.Element {
+  const { t } = useT();
+  const [entryId, setEntryId] = useState(inspection.entries[0]?.id ?? "");
+  const [argsText, setArgsText] = useState("");
+  const [cwd, setCwd] = useState<"workspace" | "skill">("workspace");
+  const [running, setRunning] = useState(false);
+  const [activeRun, setActiveRun] = useState<SkillRunRecord | null>(null);
+  const [result, setResult] = useState<SkillRunRecord | null>(null);
+
+  useEffect(() => {
+    setEntryId(inspection.entries[0]?.id ?? "");
+  }, [inspection.entries]);
+
+  useEffect(() => {
+    return api.tools.skills.onRunUpdated((run) => {
+      if (run.skillId !== inspection.skill.id) return;
+      setActiveRun(run.status === "queued" || run.status === "running" ? run : null);
+      if (run.status !== "queued" && run.status !== "running") setResult(run);
+    });
+  }, [inspection.skill.id]);
+
+  const run = async (): Promise<void> => {
+    if (!entryId) return;
+    setRunning(true);
+    setResult(null);
+    try {
+      const next = await api.tools.skills.run({
+        skillId: inspection.skill.id,
+        entryId,
+        args: argsText ? argsText.split(/\r?\n/) : [],
+        cwd,
+      });
+      setResult(next as SkillRunRecord);
+    } catch (error) {
+      notify.error(t("tools.toast.failed"), error);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+      <h4 className="text-sm font-medium">{t("tools.detail.runSkill")}</h4>
+      <SelectField
+        value={entryId}
+        options={inspection.entries.map((entry) => ({
+          value: entry.id,
+          label: entry.name + " (" + entry.runtime + ")",
+          disabled: !entry.available || !entry.enabled,
+        }))}
+        onChange={setEntryId}
+        ariaLabel={t("tools.detail.skillEntries")}
+        placeholder={t("tools.detail.selectEntry")}
+      />
+      <TextArea
+        value={argsText}
+        onChange={(event) => setArgsText(event.target.value)}
+        placeholder={t("tools.detail.argsPlaceholder")}
+        aria-label={t("tools.field.args")}
+        rows={4}
+      />
+      <SelectField
+        value={cwd}
+        options={[
+          { value: "workspace", label: t("tools.detail.workspaceCwd") },
+          { value: "skill", label: t("tools.detail.skillCwd") },
+        ]}
+        onChange={(value) => setCwd(value as "workspace" | "skill")}
+        ariaLabel={t("tools.field.cwd")}
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onPress={() => void run()}
+          isDisabled={running || !entryId || inspection.package?.status !== "ready"}
+        >
+          {running ? t("tools.running") : t("tools.run")}
+        </Button>
+        {activeRun ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => void api.tools.skills.cancel(activeRun.runId)}
+          >
+            {t("tools.cancel")}
+          </Button>
+        ) : null}
+      </div>
+      {result ? (
+        <div className="flex flex-col gap-2 text-xs">
+          <div className="flex flex-wrap gap-2">
+            <Chip size="sm">{result.status}</Chip>
+            <Chip size="sm" variant="secondary">
+              exit {result.exitCode ?? "—"} · {result.durationMs}ms
+            </Chip>
+          </div>
+          {result.stdout ? (
+            <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2">
+              {result.stdout}
+            </pre>
+          ) : null}
+          {result.stderr ? (
+            <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-md bg-danger/10 p-2 text-danger">
+              {result.stderr}
+            </pre>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AddSkillModal({
   open,
   busy,
@@ -790,7 +1071,7 @@ function AddSkillModal({
   open: boolean;
   busy: boolean;
   onClose: () => void;
-  onCreate: (markdown: string, source: "upload" | "ai") => Promise<void>;
+  onCreate: (markdown: string, source: "upload" | "ai", archive?: Uint8Array) => Promise<void>;
 }): React.JSX.Element {
   const { t, locale } = useT();
   const skillFileRef = useRef<HTMLInputElement | null>(null);
@@ -800,6 +1081,7 @@ function AddSkillModal({
   const [draft, setDraft] = useState<SkillPackageDraft | null>(null);
   const [markdown, setMarkdown] = useState("");
   const [source, setSource] = useState<"upload" | "ai">("upload");
+  const [archive, setArchive] = useState<Uint8Array | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -808,18 +1090,24 @@ function AddSkillModal({
     setDraft(null);
     setMarkdown("");
     setSource("upload");
+    setArchive(null);
     setError(null);
   };
   const close = (): void => {
     reset();
     onClose();
   };
-  const loadMarkdown = (text: string, nextSource: "upload" | "ai"): void => {
+  const loadMarkdown = (
+    text: string,
+    nextSource: "upload" | "ai",
+    nextArchive?: Uint8Array,
+  ): void => {
     try {
       const nextDraft = parseSkillMarkdown(text, nextSource);
       setDraft(nextDraft);
       setMarkdown(nextDraft.markdown);
       setSource(nextSource);
+      setArchive(nextArchive ?? null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -828,7 +1116,7 @@ function AddSkillModal({
   const install = (): void => {
     try {
       parseSkillMarkdown(markdown, source);
-      void onCreate(markdown, source).catch((err) =>
+      void onCreate(markdown, source, archive ?? undefined).catch((err) =>
         setError(err instanceof Error ? err.message : String(err)),
       );
     } catch (err) {
@@ -1059,7 +1347,7 @@ export function EmptyTools({
 
 async function handleSkillFile(
   event: ChangeEvent<HTMLInputElement>,
-  onLoad: (markdown: string, source: "upload") => void,
+  onLoad: (markdown: string, source: "upload", archive?: Uint8Array) => void,
   onError: (error: string | null) => void,
 ): Promise<void> {
   const file = event.target.files?.[0];
@@ -1074,7 +1362,7 @@ async function handleSkillFile(
 
 async function handleSkillFolder(
   event: ChangeEvent<HTMLInputElement>,
-  onLoad: (markdown: string, source: "upload") => void,
+  onLoad: (markdown: string, source: "upload", archive?: Uint8Array) => void,
   onError: (error: string | null) => void,
 ): Promise<void> {
   const files = Array.from(event.target.files ?? []);
@@ -1095,7 +1383,7 @@ async function handleSkillFolder(
 
 async function handleSkillZip(
   event: ChangeEvent<HTMLInputElement>,
-  onLoad: (markdown: string, source: "upload") => void,
+  onLoad: (markdown: string, source: "upload", archive?: Uint8Array) => void,
   onError: (error: string | null) => void,
 ): Promise<void> {
   const file = event.target.files?.[0];
@@ -1107,7 +1395,8 @@ async function handleSkillZip(
       (name) => name === "SKILL.md" || name.endsWith("/SKILL.md"),
     );
     if (!entryName) throw new Error("ZIP must contain SKILL.md.");
-    onLoad(strFromU8(entries[entryName]!), "upload");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    onLoad(strFromU8(entries[entryName]!), "upload", bytes);
   } catch (err) {
     onError(err instanceof Error ? err.message : String(err));
   }
@@ -1470,7 +1759,34 @@ function CatalogDetailModal({
                 <span>{t("catalog.packageSize", { size: f.number(detail.totalBytes) })}</span>
                 <span>·</span>
                 <span>{t("catalog.validated")}</span>
+                {detail.executionMode ? (
+                  <span>· {localizeSkillMode(t, detail.executionMode)}</span>
+                ) : null}
               </div>
+              {detail.scripts?.length ? (
+                <div className="rounded-md border border-border p-3 text-xs">
+                  <p className="mb-2 font-medium">{t("tools.detail.skillEntries")}</p>
+                  <div className="flex flex-col gap-1">
+                    {detail.scripts.map((script) => (
+                      <div key={script.id} className="flex items-center justify-between gap-2">
+                        <span className="font-mono">{script.relativePath}</span>
+                        <span>{localizeSkillRuntime(t, script.runtime)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {detail.dependencies?.length ? (
+                <div className="rounded-md border border-border p-3 text-xs">
+                  <p className="mb-2 font-medium">{t("tools.detail.dependencies")}</p>
+                  {detail.dependencies.map((dependency) => (
+                    <div key={dependency.id} className="flex justify-between gap-2">
+                      <span>{dependency.name}</span>
+                      <span>{localizeSkillDependencyKind(t, dependency.kind)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="rounded-md border border-border p-4">
                 <RichContent value={detail.markdown} />
               </div>
@@ -1520,6 +1836,45 @@ function CatalogDetailModal({
 function localizeToolName(t: (key: string) => string, tool: ToolRecord): string {
   if (isChatToolId(tool.name)) return t(`chatTools.${tool.name}.label`);
   return tool.title ?? tool.name;
+}
+
+function localizeSkillMode(t: (key: string) => string, mode: SkillExecutionMode): string {
+  return t(`tools.skill.mode.${mode}`);
+}
+
+function localizeSkillStatus(t: (key: string) => string, status: SkillPackageStatus): string {
+  return t(`tools.skill.status.${status}`);
+}
+
+function localizeSkillRuntime(t: (key: string) => string, runtime: SkillEntryRuntime): string {
+  return t(`tools.skill.runtime.${runtime}`);
+}
+
+function localizeSkillDependencyKind(
+  t: (key: string) => string,
+  kind: SkillDependencyStatus["kind"],
+): string {
+  return t(`tools.skill.dependency.${kind}`);
+}
+
+function localizeSkillDependencyStatus(
+  t: (key: string) => string,
+  status: SkillDependencyStatus["status"],
+): string {
+  return t(`tools.skill.dependencyStatus.${status}`);
+}
+
+function formatSkillSafety(
+  t: (key: string, variables?: Record<string, string | number>) => string,
+  skillPackage: SkillPackage,
+): string {
+  const checks = Array.isArray(skillPackage.safety.checks)
+    ? skillPackage.safety.checks.filter((value): value is string => typeof value === "string")
+    : [];
+  if (checks.length === 0) return t("tools.notAvailable");
+  return skillPackage.safety.reviewed === true
+    ? t("tools.detail.safetyReviewed", { count: checks.length })
+    : t("tools.detail.safetyPassed", { count: checks.length });
 }
 
 function localizeToolDescription(t: (key: string) => string, tool: ToolRecord): string {

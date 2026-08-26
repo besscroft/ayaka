@@ -3,8 +3,8 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, or } from "dr
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import {
   DEFAULT_AGENT_AVATAR_ID,
   isAgentAvatarId,
@@ -51,6 +51,9 @@ import {
   runtimePreferences,
   mcpRuntimeStates,
   mcpDependencyInstallations,
+  skillPackages,
+  skillEntries,
+  skillRuns,
   type AgentRunInput as DbAgentRunInput,
   type AgentPolicy as DbAgentPolicy,
   type AgentInstance as DbAgentInstance,
@@ -84,6 +87,9 @@ import {
   type RuntimePreference as DbRuntimePreference,
   type McpRuntimeState as DbMcpRuntimeState,
   type McpDependencyInstallation as DbMcpDependencyInstallation,
+  type SkillPackage as DbSkillPackage,
+  type SkillEntry as DbSkillEntry,
+  type SkillRun as DbSkillRun,
 } from "./schema";
 import {
   DEFAULT_AGENT_HANDOFF_CONFIG,
@@ -136,6 +142,12 @@ import {
   type ToolSkill,
   type ToolSkillInput,
   type ToolsSnapshot,
+  type SkillExecutionMode,
+  type SkillPackageStatus,
+  type SkillEntry as SkillEntryView,
+  type SkillDependencyStatus,
+  type SkillRunRecord,
+  type SkillRunStatus,
   type ManagedRuntime,
   type RuntimePreference,
   type McpServerRuntimeState,
@@ -2977,6 +2989,287 @@ export function markSkillToolRun(id: string, at = Date.now()): void {
   getDb().update(tools).set({ last_run_at: at, updated_at: at }).where(eq(tools.id, id)).run();
 }
 
+export function listSkillPackages(skillId?: string): import("../../shared/types").SkillPackage[] {
+  const rows = getDb()
+    .select()
+    .from(skillPackages)
+    .where(skillId ? eq(skillPackages.skill_id, skillId) : undefined)
+    .orderBy(desc(skillPackages.updated_at))
+    .all();
+  return rows.map(toSkillPackage);
+}
+
+export function getSkillPackage(skillId: string): import("../../shared/types").SkillPackage | null {
+  const row = getDb()
+    .select()
+    .from(skillPackages)
+    .where(eq(skillPackages.skill_id, skillId))
+    .orderBy(desc(skillPackages.updated_at))
+    .limit(1)
+    .get();
+  return row ? toSkillPackage(row) : null;
+}
+
+export function listSkillEntries(skillId?: string): SkillEntryView[] {
+  const rows = getDb()
+    .select()
+    .from(skillEntries)
+    .where(skillId ? eq(skillEntries.skill_id, skillId) : undefined)
+    .orderBy(asc(skillEntries.name), asc(skillEntries.relative_path))
+    .all();
+  return rows.map(toSkillEntry);
+}
+
+export function listSkillRuns(skillId?: string, limit = 200): SkillRunRecord[] {
+  const rows = getDb()
+    .select()
+    .from(skillRuns)
+    .where(skillId ? eq(skillRuns.skill_id, skillId) : undefined)
+    .orderBy(desc(skillRuns.created_at))
+    .limit(Math.max(1, Math.min(500, limit)))
+    .all();
+  return rows.map(toSkillRun);
+}
+
+export function getSkillInspection(skillId: string): import("../../shared/types").SkillInspection {
+  const skill = getSkillTool(skillId);
+  if (!skill) throw new Error("Skill not found.");
+  const pkg = getSkillPackage(skillId);
+  return {
+    skill,
+    package: pkg,
+    files: pkg ? listSkillPackageFiles(pkg.rootPath) : [],
+    entries: listSkillEntries(skillId),
+    dependencies: skillDependencies(pkg),
+    runs: listSkillRuns(skillId),
+  };
+}
+
+function listSkillPackageFiles(rootPath: string): Array<{ path: string; size: number }> {
+  const root = join(rootPath);
+  const files: Array<{ path: string; size: number }> = [];
+  try {
+    const visit = (current: string): void => {
+      for (const entry of readdirSync(current, { withFileTypes: true })) {
+        const fullPath = join(current, entry.name);
+        if (entry.isSymbolicLink()) continue;
+        if (entry.isDirectory()) {
+          visit(fullPath);
+        } else if (entry.isFile()) {
+          files.push({
+            path: relative(root, fullPath).split("\\").join("/"),
+            size: statSync(fullPath).size,
+          });
+        }
+      }
+    };
+    visit(root);
+  } catch {
+    return [];
+  }
+  return files.sort((left, right) => left.path.localeCompare(right.path)).slice(0, 500);
+}
+
+export function upsertSkillPackage(input: {
+  id?: string;
+  skillId: string;
+  source: "manual" | "upload" | "catalog" | "system";
+  rootPath: string;
+  contentHash: string;
+  executionMode: SkillExecutionMode;
+  status?: SkillPackageStatus;
+  manifest?: Record<string, unknown>;
+  safety?: Record<string, unknown>;
+  lastError?: string | null;
+}): import("../../shared/types").SkillPackage {
+  const now = Date.now();
+  const existing = input.id
+    ? getDb().select().from(skillPackages).where(eq(skillPackages.id, input.id)).get()
+    : getDb()
+        .select()
+        .from(skillPackages)
+        .where(eq(skillPackages.skill_id, input.skillId))
+        .orderBy(desc(skillPackages.updated_at))
+        .limit(1)
+        .get();
+  const row: typeof skillPackages.$inferInsert = {
+    id: input.id ?? existing?.id ?? randomUUID(),
+    skill_id: input.skillId,
+    source: input.source,
+    root_path: normalizeRequiredText(input.rootPath, "Skill package root", 2_000),
+    content_hash: normalizeRequiredText(input.contentHash, "Skill package hash", 128),
+    execution_mode: input.executionMode,
+    status: input.status ?? existing?.status ?? "disabled",
+    manifest_json: normalizeJsonObjectString(input.manifest ?? {}),
+    safety_json: normalizeJsonObjectString(input.safety ?? {}),
+    last_error: normalizeNullableText(input.lastError ?? null, 2_000),
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
+  };
+  getDb()
+    .insert(skillPackages)
+    .values(row)
+    .onConflictDoUpdate({
+      target: skillPackages.id,
+      set: {
+        skill_id: row.skill_id,
+        source: row.source,
+        root_path: row.root_path,
+        content_hash: row.content_hash,
+        execution_mode: row.execution_mode,
+        status: row.status,
+        manifest_json: row.manifest_json,
+        safety_json: row.safety_json,
+        last_error: row.last_error,
+        updated_at: row.updated_at,
+      },
+    })
+    .run();
+  return toSkillPackage(
+    getDb().select().from(skillPackages).where(eq(skillPackages.id, row.id)).get()!,
+  );
+}
+
+export function replaceSkillEntries(
+  skillId: string,
+  packageId: string,
+  entries: Array<{
+    id?: string;
+    relativePath: string;
+    name: string;
+    runtime: SkillEntryView["runtime"];
+    enabled?: boolean;
+    available?: boolean;
+    unavailableReason?: string;
+    timeoutMs?: number;
+  }>,
+): SkillEntryView[] {
+  const now = Date.now();
+  getDb().delete(skillEntries).where(eq(skillEntries.package_id, packageId)).run();
+  for (const entry of entries) {
+    const row: typeof skillEntries.$inferInsert = {
+      id: entry.id ?? randomUUID(),
+      skill_id: skillId,
+      package_id: packageId,
+      relative_path: normalizeSkillRelativePath(entry.relativePath),
+      name: normalizeRequiredText(entry.name, "Skill entry name", 240),
+      runtime: entry.runtime,
+      enabled: entry.enabled === false ? 0 : 1,
+      available: entry.available === false ? 0 : 1,
+      unavailable_reason: normalizeNullableText(entry.unavailableReason ?? null, 500),
+      timeout_ms: clampNumber(entry.timeoutMs ?? 60_000, 1_000, 60_000),
+      created_at: now,
+      updated_at: now,
+    };
+    getDb().insert(skillEntries).values(row).run();
+  }
+  return listSkillEntries(skillId);
+}
+
+export function setSkillPackageStatus(
+  skillId: string,
+  status: SkillPackageStatus,
+  lastError?: string | null,
+): import("../../shared/types").SkillPackage | null {
+  const existing = getDb()
+    .select()
+    .from(skillPackages)
+    .where(eq(skillPackages.skill_id, skillId))
+    .orderBy(desc(skillPackages.updated_at))
+    .limit(1)
+    .get();
+  if (!existing) return null;
+  getDb()
+    .update(skillPackages)
+    .set({
+      status,
+      last_error: normalizeNullableText(lastError ?? null, 2_000),
+      updated_at: Date.now(),
+    })
+    .where(eq(skillPackages.id, existing.id))
+    .run();
+  return getSkillPackage(skillId);
+}
+
+export function createSkillRun(input: {
+  id?: string;
+  skillId: string;
+  entryId: string;
+  conversationId?: string | null;
+  agentId?: string | null;
+  cwd: string;
+  argsJson: string;
+}): SkillRunRecord {
+  const now = Date.now();
+  const row: typeof skillRuns.$inferInsert = {
+    id: input.id ?? randomUUID(),
+    skill_id: input.skillId,
+    entry_id: input.entryId,
+    conversation_id: input.conversationId ?? null,
+    agent_id: input.agentId ?? null,
+    status: "queued",
+    cwd: normalizeRequiredText(input.cwd, "Skill run cwd", 2_000),
+    args_json: input.argsJson,
+    stdout: "",
+    stderr: "",
+    exit_code: null,
+    signal: null,
+    duration_ms: 0,
+    truncated: 0,
+    error: null,
+    started_at: null,
+    finished_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+  getDb().insert(skillRuns).values(row).run();
+  return toSkillRun(row as DbSkillRun);
+}
+
+export function updateSkillRun(
+  id: string,
+  patch: Partial<{
+    status: SkillRunStatus;
+    cwd: string;
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    signal: string | null;
+    durationMs: number;
+    truncated: boolean;
+    error: string | null;
+    startedAt: number | null;
+    finishedAt: number | null;
+  }>,
+): SkillRunRecord | null {
+  const existing = getDb().select().from(skillRuns).where(eq(skillRuns.id, id)).get();
+  if (!existing) return null;
+  getDb()
+    .update(skillRuns)
+    .set({
+      status: patch.status ?? existing.status,
+      cwd: patch.cwd ?? existing.cwd,
+      stdout: patch.stdout ?? existing.stdout,
+      stderr: patch.stderr ?? existing.stderr,
+      exit_code: patch.exitCode === undefined ? existing.exit_code : patch.exitCode,
+      signal: patch.signal === undefined ? existing.signal : patch.signal,
+      duration_ms: patch.durationMs ?? existing.duration_ms,
+      truncated: patch.truncated === undefined ? existing.truncated : patch.truncated ? 1 : 0,
+      error: patch.error === undefined ? existing.error : normalizeNullableText(patch.error, 2_000),
+      started_at: patch.startedAt === undefined ? existing.started_at : patch.startedAt,
+      finished_at: patch.finishedAt === undefined ? existing.finished_at : patch.finishedAt,
+      updated_at: Date.now(),
+    })
+    .where(eq(skillRuns.id, id))
+    .run();
+  const row = getDb().select().from(skillRuns).where(eq(skillRuns.id, id)).get();
+  return row ? toSkillRun(row) : null;
+}
+
+export function deleteSkillPackage(skillId: string): void {
+  getDb().delete(skillPackages).where(eq(skillPackages.skill_id, skillId)).run();
+}
+
 export function setToolSecret(input: ToolSecretInput): ToolSecretPublic {
   const ownerType = normalizeSecretOwnerType(input.ownerType);
   const key = normalizeSecretKey(input.key);
@@ -3155,6 +3448,54 @@ export async function markSkillToolRunAsync(id: string, at = Date.now()): Promis
   if (shouldRouteWrites()) return writeDb<void>("markSkillToolRun", [id, at]);
   markSkillToolRun(id, at);
 }
+export async function upsertSkillPackageAsync(
+  input: Parameters<typeof upsertSkillPackage>[0],
+): Promise<import("../../shared/types").SkillPackage> {
+  return shouldRouteWrites()
+    ? writeDb<import("../../shared/types").SkillPackage>("upsertSkillPackage", [input])
+    : upsertSkillPackage(input);
+}
+export async function replaceSkillEntriesAsync(
+  skillId: string,
+  packageId: string,
+  entries: Parameters<typeof replaceSkillEntries>[2],
+): Promise<SkillEntryView[]> {
+  return shouldRouteWrites()
+    ? writeDb<SkillEntryView[]>("replaceSkillEntries", [skillId, packageId, entries])
+    : replaceSkillEntries(skillId, packageId, entries);
+}
+export async function setSkillPackageStatusAsync(
+  skillId: string,
+  status: SkillPackageStatus,
+  lastError?: string | null,
+): Promise<import("../../shared/types").SkillPackage | null> {
+  return shouldRouteWrites()
+    ? writeDb<import("../../shared/types").SkillPackage | null>("setSkillPackageStatus", [
+        skillId,
+        status,
+        lastError,
+      ])
+    : setSkillPackageStatus(skillId, status, lastError);
+}
+export async function createSkillRunAsync(
+  input: Parameters<typeof createSkillRun>[0],
+): Promise<SkillRunRecord> {
+  return shouldRouteWrites()
+    ? writeDb<SkillRunRecord>("createSkillRun", [input])
+    : createSkillRun(input);
+}
+export async function updateSkillRunAsync(
+  id: string,
+  patch: Parameters<typeof updateSkillRun>[1],
+): Promise<SkillRunRecord | null> {
+  return shouldRouteWrites()
+    ? writeDb<SkillRunRecord | null>("updateSkillRun", [id, patch])
+    : updateSkillRun(id, patch);
+}
+export async function deleteSkillPackageAsync(skillId: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteSkillPackage", [skillId]);
+  deleteSkillPackage(skillId);
+}
 export async function setToolSecretAsync(input: ToolSecretInput): Promise<ToolSecretPublic> {
   return shouldRouteWrites()
     ? writeDb<ToolSecretPublic>("setToolSecret", [input])
@@ -3239,6 +3580,9 @@ export function getToolsSnapshot(): ToolsSnapshot {
     toolServers: listToolServers(),
     toolRecords: listToolRecords(),
     skills: listSkillTools(),
+    skillPackages: listSkillPackages(),
+    skillEntries: listSkillEntries(),
+    skillRuns: listSkillRuns(),
     secrets: listToolSecretsPublic(),
     runtimeEvents: listRuntimeEvents(),
   };
@@ -3882,6 +4226,135 @@ function toToolSkill(row: DbToolRecord): ToolSkill {
     deleted_at: row.deleted_at,
     purge_after_at: row.purge_after_at,
   };
+}
+
+function toSkillPackage(row: DbSkillPackage): import("../../shared/types").SkillPackage {
+  return {
+    id: row.id,
+    skillId: row.skill_id,
+    source: row.source,
+    rootPath: row.root_path,
+    contentHash: row.content_hash,
+    executionMode: row.execution_mode,
+    status: row.status,
+    manifest: parseJsonObject(row.manifest_json),
+    safety: parseJsonObject(row.safety_json),
+    lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toSkillEntry(row: DbSkillEntry): SkillEntryView {
+  return {
+    id: row.id,
+    skillId: row.skill_id,
+    relativePath: row.relative_path,
+    name: row.name,
+    runtime: row.runtime,
+    enabled: row.enabled !== 0,
+    available: row.available !== 0,
+    unavailableReason: row.unavailable_reason ?? undefined,
+    timeoutMs: row.timeout_ms,
+  };
+}
+
+function toSkillRun(row: DbSkillRun): SkillRunRecord {
+  return {
+    runId: row.id,
+    skillId: row.skill_id,
+    entryId: row.entry_id,
+    status: row.status as SkillRunStatus,
+    exitCode: row.exit_code,
+    signal: row.signal,
+    stdout: row.stdout,
+    stderr: row.stderr,
+    durationMs: row.duration_ms,
+    truncated: row.truncated !== 0,
+    ...(row.error ? { error: row.error } : {}),
+    conversationId: row.conversation_id,
+    agentId: row.agent_id,
+    cwd: row.cwd,
+    argsJson: row.args_json,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    createdAt: row.created_at,
+  };
+}
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function skillDependencies(
+  pkg: import("../../shared/types").SkillPackage | null,
+): SkillDependencyStatus[] {
+  if (!pkg) return [];
+  const raw = pkg.manifest.dependencies;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const value = item as Record<string, unknown>;
+    const kind =
+      value.kind === "browser" || value.type === "browser"
+        ? "browser"
+        : value.kind === "runtime" || value.type === "runtime"
+          ? "runtime"
+          : value.type === "mcp" || value.kind === "mcp"
+            ? "mcp"
+            : null;
+    if (!kind) return [];
+    const status = [
+      "ready",
+      "needs_confirmation",
+      "needs_runtime",
+      "needs_install",
+      "failed",
+    ].includes(String(value.status))
+      ? (String(value.status) as SkillDependencyStatus["status"])
+      : kind === "runtime"
+        ? "needs_runtime"
+        : "needs_confirmation";
+    return [
+      {
+        id: typeof value.id === "string" ? value.id : `dependency-${index + 1}`,
+        skillId: pkg.skillId,
+        kind,
+        name: (typeof value.name === "string"
+          ? value.name
+          : typeof value.value === "string"
+            ? value.value
+            : `${kind}-${index + 1}`
+        ).slice(0, 200),
+        status,
+        source:
+          typeof value.source === "string"
+            ? value.source
+            : typeof value.url === "string"
+              ? value.url
+              : undefined,
+        detail: typeof value.description === "string" ? value.description : undefined,
+        error: typeof value.error === "string" ? value.error : undefined,
+      },
+    ];
+  });
+}
+
+function normalizeSkillRelativePath(raw: string): string {
+  const value = String(raw)
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "");
+  if (!value.startsWith("scripts/") || value.includes("\0") || value.split("/").includes("..")) {
+    throw new Error("Skill entry must remain inside scripts/.");
+  }
+  return value;
 }
 
 function normalizeToolServerInput(

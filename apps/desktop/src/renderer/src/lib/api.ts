@@ -22,6 +22,12 @@ import type {
   ToolSecretPublic,
   ToolSkill,
   ToolSkillInput,
+  SkillInspection,
+  SkillEntry,
+  SkillDependencyStatus,
+  SkillRunInput,
+  SkillRunRecord,
+  SkillPackage,
   ToolsSnapshot,
   RuntimeEvent,
   InteractionProfile,
@@ -340,6 +346,8 @@ export const api = {
     ): Promise<ToolRecord> => assertApi().tools.updateTool(id, patch),
     skills: {
       create: (input: ToolSkillInput): Promise<ToolSkill> => assertApi().tools.skills.create(input),
+      importArchive: (bytes: Uint8Array): Promise<ToolSkill> =>
+        assertApi().tools.skills.importArchive(bytes),
       generateDraft: (input: SkillDraftRequest): Promise<SkillDraftResult> =>
         assertApi().tools.skills.generateDraft(input),
       update: (id: string, input: Partial<ToolSkillInput>): Promise<ToolSkill> =>
@@ -354,8 +362,26 @@ export const api = {
       purgeExpired: (): Promise<number> => assertApi().tools.skills.purgeExpired(),
       setEnabled: (id: string, enabled: boolean): Promise<ToolSkill> =>
         assertApi().tools.skills.setEnabled(id, enabled),
-      run: (skillId: string, input?: unknown): Promise<unknown> =>
-        assertApi().tools.skills.run(skillId, input),
+      run: (inputOrSkillId: SkillRunInput | string, input?: unknown): Promise<unknown> =>
+        typeof inputOrSkillId === "string"
+          ? assertApi().tools.skills.run(inputOrSkillId, input)
+          : assertApi().tools.skills.run(inputOrSkillId),
+      inspect: (skillId: string): Promise<SkillInspection> =>
+        assertApi().tools.skills.inspect(skillId),
+      entries: (skillId: string): Promise<SkillEntry[]> =>
+        assertApi().tools.skills.entries(skillId),
+      runs: (skillId: string, limit?: number): Promise<SkillRunRecord[]> =>
+        assertApi().tools.skills.runs(skillId, limit),
+      dependencies: (skillId: string): Promise<SkillDependencyStatus[]> =>
+        assertApi().tools.skills.dependencies(skillId),
+      confirmDependencies: (
+        skillId: string,
+        options?: { confirmed?: boolean; allowScripts?: boolean },
+      ): Promise<SkillPackage | null> =>
+        assertApi().tools.skills.confirmDependencies(skillId, options),
+      cancel: (runId: string): Promise<boolean> => assertApi().tools.skills.cancel(runId),
+      onRunUpdated: (handler: (run: SkillRunRecord) => void): (() => void) =>
+        assertApi().tools.skills.onRunUpdated(handler),
       setSecret: (input: ToolSecretInput): Promise<ToolSecretPublic> =>
         assertApi().tools.skills.setSecret(input),
       deleteSecret: (id: string): Promise<boolean> => assertApi().tools.skills.deleteSecret(id),
