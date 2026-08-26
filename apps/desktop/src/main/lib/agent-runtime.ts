@@ -28,10 +28,12 @@ import {
   MEDIA_GENERATION_TOOL_NAME,
   SettingKey,
   isChatToolReference,
+  isSkillToolReference,
   normalizeChatPermissionMode,
   parseChatPermissionsSetting,
   normalizeMaxConcurrentSubagents,
   normalizeChatToolSelection,
+  type ChatToolReference,
   type AgentHandoffConfig,
   type AgentContextPolicy,
   type AgentProfile,
@@ -51,6 +53,7 @@ import {
   type WorkspaceCommandInput,
   type WorkspaceCommandResult,
 } from "../../shared/types";
+import { parseSkillInvocations, stripSkillInvocations } from "../../shared/skill-invocation";
 import { appendReactionFeedback, type ResolvedChatModel } from "./chat-agent";
 import {
   auditChatToolApprovalResponses,
@@ -137,6 +140,7 @@ export interface RunAgentChatOptions {
   preferredAgentId?: string | null;
   reasoning?: StreamTextOptions["reasoning"];
   toolSelection?: ChatToolSelectionRequest;
+  explicitSkillIds?: string[];
   permissionMode?: ChatPermissionMode;
   buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
   resolveModel?: (modelRef: string) => ResolvedChatModel;
@@ -167,6 +171,7 @@ interface RuntimeContext {
   preferredAgentId?: string | null;
   reasoning?: StreamTextOptions["reasoning"];
   toolSelection?: ChatToolSelectionRequest;
+  explicitSkillIds: string[];
   permissionMode: ChatPermissionMode;
   buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
   resolveModel: (modelRef: string) => ResolvedChatModel;
@@ -221,7 +226,12 @@ const consultInputSchema = jsonSchema<{ task: string; expectedOutput?: string }>
 });
 
 export async function runAgentChat(options: RunAgentChatOptions): Promise<Response> {
-  const initialMessages = removeIncompleteToolParts(options.messages);
+  const rawInitialMessages = removeIncompleteToolParts(options.messages);
+  const latestRawUserText = latestUserText(rawInitialMessages);
+  const explicitSkillIds = parseSkillInvocations(latestRawUserText ?? "").map(
+    (invocation) => invocation.skillId,
+  );
+  const initialMessages = stripLatestSkillInvocations(rawInitialMessages);
   const resolveModel = options.resolveModel ?? (await import("./providers")).resolveModel;
   const agentGraph = loadAgentGraph(DEFAULT_AGENT_ID);
   const { rootAgent, enabledChildren } = agentGraph;
@@ -363,6 +373,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<Respon
       options.toolSelection,
       readToolPolicy(rootAgent.tool_policy_json),
     ),
+    explicitSkillIds,
     permissionMode,
     buildAgentSystemPrompt: options.buildAgentSystemPrompt,
     resolveModel,
@@ -697,6 +708,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     agentId: DEFAULT_AGENT_ID,
     permissionMode: context.permissionMode,
     userText: latestUserText(context.messages),
+    explicitSkillIds: context.explicitSkillIds,
   });
 
   if (!context.modelContext.capabilities.toolCalling) {
@@ -826,6 +838,29 @@ function latestUserText(messages: UIMessage[]): string | undefined {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function stripLatestSkillInvocations(messages: UIMessage[]): UIMessage[] {
+  let latestUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex < 0) return messages;
+  return messages.map((message, index) => {
+    if (index !== latestUserIndex || !Array.isArray(message.parts)) return message;
+    return {
+      ...message,
+      parts: message.parts.map((part) => {
+        if (!part || typeof part !== "object") return part;
+        const value = part as { type?: unknown; text?: unknown };
+        if (value.type !== "text" || typeof value.text !== "string") return part;
+        return { ...part, text: stripSkillInvocations(value.text) };
+      }),
+    } as UIMessage;
+  });
 }
 
 function createWorkspaceCommandNote(
@@ -1220,7 +1255,7 @@ async function runChildAgent(
         id: runningInstance.agent_path,
         modelRef: childModelRef,
         resolved: childResolved,
-        instructions: await createChildInstructions(context, child, mode),
+        instructions: await createChildInstructions(context, child, mode, childRuntime),
         messages: [],
         runtimeConfig: childConfig,
         reasoning:
@@ -1331,18 +1366,33 @@ function buildSafeChildToolRuntime(
   model: ChatToolModelContext,
   agentPath: string,
 ): ChatToolRuntimeConfig {
-  if (!model.capabilities.toolCalling) {
-    return { descriptors: [], toolChoice: "none" };
-  }
   const policy = readToolPolicy(child.tool_policy_json);
+  const inheritedSelection = normalizeChatToolSelection(
+    applyAgentToolPolicy(context.toolSelection, policy),
+  );
+  const inheritedSkillIds =
+    inheritedSelection.mode === "manual"
+      ? inheritedSelection.selectedToolIds
+          .filter(isSkillToolReference)
+          .map((reference) => reference.slice("skill:".length))
+      : [];
+  const explicitSkillIds = [...new Set([...context.explicitSkillIds, ...inheritedSkillIds])];
   const allowed = selectedBaseToolIds(context.toolSelection, policy).filter((id) => id !== "cron");
+  const selection: ChatToolSelectionRequest = model.capabilities.toolCalling
+    ? inheritedSelection.mode === "auto"
+      ? { mode: "auto", selectedToolIds: [] }
+      : { mode: allowed.length ? "manual" : "off", selectedToolIds: allowed }
+    : inheritedSelection.mode === "auto"
+      ? { mode: "auto", selectedToolIds: [] }
+      : { mode: "off", selectedToolIds: [] };
   const base = buildChatToolRuntime({
-    selection: { mode: allowed.length ? "manual" : "off", selectedToolIds: allowed },
+    selection,
     model,
     conversationId: context.conversationId,
     agentId: child.id,
     permissionMode: context.permissionMode,
     userText: latestUserText(context.messages),
+    explicitSkillIds,
   });
   const tools: ToolSet = { ...base.tools };
   const activeTools = new Set(base.activeTools ?? []);
@@ -2178,6 +2228,7 @@ async function createChildInstructions(
   context: RuntimeContext,
   child: AgentProfile,
   mode: "consult" | "handoff",
+  toolRuntime: ChatToolRuntimeConfig,
 ): Promise<string> {
   const handoff = readHandoffConfig(child.handoff_config_json);
   const basePrompt = await context.buildAgentSystemPrompt(child.id, context.conversationId);
@@ -2188,6 +2239,7 @@ async function createChildInstructions(
       ? "Ownership has been transferred to you for this task."
       : `You are being consulted; ${context.rootAgent.name} will synthesize your output.`,
     "Expected output: " + handoff.expectedOutput,
+    toolRuntime.instructions,
   ].join("\n\n");
 }
 
@@ -2290,10 +2342,14 @@ function applyAgentToolPolicy(
 function selectedBaseToolIds(
   rawSelection: ChatToolSelectionRequest | undefined,
   policy: AgentToolPolicy,
-): ChatToolId[] {
+): ChatToolReference[] {
   const selection = normalizeChatToolSelection(applyAgentToolPolicy(rawSelection, policy));
   if (selection.mode === "off") return [];
-  if (selection.mode === "manual") return selection.selectedToolIds.filter(isBaseChatTool);
+  if (selection.mode === "manual") {
+    return selection.selectedToolIds.filter(
+      (id): id is ChatToolReference => isBaseChatTool(id) || isSkillToolReference(id),
+    );
+  }
   return ["web_search", "web_open", "current_time", "runtime_snapshot", "model_capabilities"];
 }
 

@@ -109,7 +109,12 @@ export function ToolSelector({
 
   useEffect(() => {
     void refreshToolsSnapshot();
-    return api.mcp.onToolsChanged(() => void refreshToolsSnapshot());
+    const offMcp = api.mcp.onToolsChanged(() => void refreshToolsSnapshot());
+    const offSkills = api.tools.skills.onChanged(() => void refreshToolsSnapshot());
+    return () => {
+      offMcp();
+      offSkills();
+    };
   }, [refreshToolsSnapshot]);
 
   const descriptors = useMemo(
@@ -339,9 +344,11 @@ function AutoToolList({
               </div>
               <p className="mt-0.5 break-words text-[11px] leading-snug text-foreground/55">
                 {descriptor.available
-                  ? descriptor.defaultAuto
-                    ? toolDescription(t, id, descriptor)
-                    : t("chatTools.auto.manualOnly")
+                  ? descriptor.category === "skill" && descriptor.defaultAuto
+                    ? t("chatTools.auto.skillOnDemand")
+                    : descriptor.defaultAuto
+                      ? toolDescription(t, id, descriptor)
+                      : t("chatTools.auto.manualOnly")
                   : toolUnavailableReason(t, descriptor)}
               </p>
             </div>

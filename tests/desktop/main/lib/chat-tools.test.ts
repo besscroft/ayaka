@@ -7,6 +7,9 @@ import {
   type MemoryRecord,
   type ModelCapabilities,
   type ModelProviderKind,
+  type SkillEntry,
+  type SkillPackage,
+  type ToolSkill,
   type ToolRecord,
   type ToolServer,
 } from "@shared/types";
@@ -60,6 +63,11 @@ const dbGetMcpServer = mock.fn(() => mcpServer);
 const dbGetMcpToolByReference = mock.fn(() => mcpTool);
 const dbListMcpServers = mock.fn(() => (mcpServer ? [mcpServer] : []));
 const dbListMcpTools = mock.fn(() => (mcpTool ? [mcpTool] : []));
+const dbGetSkillPackage = mock.fn<() => SkillPackage | null>(() => null);
+const dbGetSkillTool = mock.fn<(id: string) => ToolSkill | null>(() => null);
+const dbListSkillEntries = mock.fn<() => SkillEntry[]>(() => []);
+const dbListSkillTools = mock.fn(() => [] as ToolSkill[]);
+const dbMarkSkillToolRunAsync = mock.fn(() => Promise.resolve());
 
 mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.url).href, {
   namedExports: {
@@ -73,6 +81,11 @@ mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.u
     getMcpToolByReference: dbGetMcpToolByReference,
     listMcpServers: dbListMcpServers,
     listMcpTools: dbListMcpTools,
+    getSkillPackage: dbGetSkillPackage,
+    getSkillTool: dbGetSkillTool,
+    listSkillEntries: dbListSkillEntries,
+    listSkillTools: dbListSkillTools,
+    markSkillToolRunAsync: dbMarkSkillToolRunAsync,
     listMessages: dbListMessages,
     saveMemory: dbSaveMemory,
     upsertAgentRuntimeState: dbUpsertAgentRuntimeState,
@@ -122,6 +135,15 @@ afterEach(() => {
   dbGetMcpToolByReference.mock.resetCalls();
   dbListMcpServers.mock.resetCalls();
   dbListMcpTools.mock.resetCalls();
+  dbGetSkillPackage.mock.resetCalls();
+  dbGetSkillTool.mock.resetCalls();
+  dbListSkillEntries.mock.resetCalls();
+  dbListSkillTools.mock.resetCalls();
+  dbMarkSkillToolRunAsync.mock.resetCalls();
+  dbGetSkillPackage.mock.mockImplementation(() => null);
+  dbGetSkillTool.mock.mockImplementation(() => null);
+  dbListSkillEntries.mock.mockImplementation(() => []);
+  dbListSkillTools.mock.mockImplementation(() => []);
   mcpServer = null;
   mcpTool = null;
 });
@@ -137,6 +159,104 @@ void describe("chat tool runtime", () => {
     assert.equal(runtime.tools, undefined);
     assert.equal(runtime.activeTools, undefined);
     assert.equal(runtime.toolChoice, "none");
+  });
+
+  void it("exposes automatic Skill metadata and loads the full instructions on demand", async () => {
+    const skill = createInstructionSkill({ auto_use: 1 });
+    dbListSkillTools.mock.mockImplementation(() => [skill]);
+    dbGetSkillTool.mock.mockImplementation((id) => (id === skill.id ? skill : null));
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "auto", selectedToolIds: [] },
+      model: modelContext("openai-compatible"),
+    });
+
+    assert.deepEqual(runtime.activeTools, [
+      "web_search",
+      "web_open",
+      "current_time",
+      "runtime_snapshot",
+      "model_capabilities",
+      "cron",
+      "skill_load",
+      "skill_search",
+    ]);
+    assert.match(runtime.instructions ?? "", /<available-skill id="skill-1"/);
+    assert.doesNotMatch(runtime.instructions ?? "", /Follow the complete instruction/);
+
+    const loader = runtime.tools?.skill_load as {
+      execute?: (input: { name: string }) => Promise<{ instructions: string }>;
+    };
+    const loaded = await loader.execute?.({ name: skill.id });
+    assert.equal(loaded?.instructions, skill.instructions);
+    assert.equal(dbMarkSkillToolRunAsync.mock.callCount(), 1);
+  });
+
+  void it("loads an explicitly invoked Skill even when the model cannot call tools", () => {
+    const skill = createInstructionSkill({ auto_use: 0 });
+    dbListSkillTools.mock.mockImplementation(() => [skill]);
+    dbGetSkillTool.mock.mockImplementation((id) => (id === skill.id ? skill : null));
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "off", selectedToolIds: [] },
+      model: modelContext("openai-compatible", undefined, {
+        ...capabilities,
+        toolCalling: false,
+      }),
+      explicitSkillIds: [skill.id],
+    });
+
+    assert.equal(runtime.toolChoice, "none");
+    assert.match(runtime.instructions ?? "", /Follow the complete instruction/);
+    assert.equal(runtime.activeTools, undefined);
+  });
+
+  void it("rejects instruction loading when the Skill package hash has changed", () => {
+    const skill = createInstructionSkill({ auto_use: 1 });
+    dbListSkillTools.mock.mockImplementation(() => [skill]);
+    dbGetSkillPackage.mock.mockImplementation(
+      () =>
+        ({
+          id: "package-1",
+          skillId: skill.id,
+          source: "upload",
+          rootPath: "C:\\path-that-does-not-exist",
+          contentHash: "invalid",
+          executionMode: "instructions",
+          status: "error",
+          manifest: {},
+          safety: {},
+          lastError: "old package error",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }) as SkillPackage,
+    );
+
+    const descriptor = chatTools
+      .createChatToolDescriptors(modelContext("openai-compatible"))
+      .find((item) => item.id === "skill:" + skill.id);
+
+    assert.equal(descriptor?.available, false);
+    assert.equal(descriptor?.unavailableReason, "Skill package content changed; review it again.");
+  });
+
+  void it("reports a clear error when an explicit Skill is disabled", () => {
+    const skill = createInstructionSkill({ enabled: 0 });
+    dbListSkillTools.mock.mockImplementation(() => [skill]);
+    dbGetSkillTool.mock.mockImplementation((id) => (id === skill.id ? skill : null));
+
+    assert.throws(
+      () =>
+        chatTools.buildChatToolRuntime({
+          selection: { mode: "off", selectedToolIds: [] },
+          model: modelContext("openai-compatible", undefined, {
+            ...capabilities,
+            toolCalling: false,
+          }),
+          explicitSkillIds: [skill.id],
+        }),
+      /Skill is disabled: Instruction Skill/,
+    );
   });
 
   void it("maps auto mode to safe default tools including web search and cron", () => {
@@ -838,5 +958,29 @@ function modelContext(
           },
         ]
       : [],
+  };
+}
+
+function createInstructionSkill(overrides: Partial<ToolSkill> = {}): ToolSkill {
+  const now = Date.now();
+  return {
+    id: "skill-1",
+    name: "Instruction Skill",
+    description: "Use this Skill for the test.",
+    instructions: "Follow the complete instruction from this Skill.",
+    category: "test",
+    enabled: 1,
+    auto_use: 0,
+    requires_approval: 1,
+    trigger_keywords_json: "[]",
+    tags_json: "[]",
+    config_schema_json: "{}",
+    config_json: "{}",
+    last_run_at: null,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    purge_after_at: null,
+    ...overrides,
   };
 }

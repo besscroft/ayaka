@@ -21,6 +21,7 @@ import "./main/lib/providers.test.ts";
 import "./main/lib/runtime-architecture.test.ts";
 import "./main/lib/runtime-paths.test.ts";
 import "./main/lib/skill-executor-policy.test.ts";
+import "./main/lib/skill-invocation.test.ts";
 import "./main/lib/tray-menu.test.ts";
 import "./main/lib/sandbox-agents.test.ts";
 import "./main/lib/sandbox-artifact-manager.test.ts";

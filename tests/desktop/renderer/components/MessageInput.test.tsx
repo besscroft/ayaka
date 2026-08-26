@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ModelCapabilities, ProviderInfo } from "@shared/types";
 import { MessageInput } from "@renderer/components/MessageInput";
 import { CHAT_PERMISSION_MODE_OPTIONS } from "@renderer/components/ChatPermissionSelector";
+import { getNextMentionSkillIndex } from "@renderer/lib/skill-menu";
 
 const capabilities: ModelCapabilities = {
   textGeneration: true,
@@ -92,6 +93,21 @@ void describe("message input media routing", () => {
     const trigger = html.match(/<button[^>]*aria-label="会话权限"[^>]*>/)?.[0];
     assert.ok(trigger);
     assert.match(trigger, /disabled/);
+  });
+});
+
+void describe("message input Skill keyboard navigation", () => {
+  void it("wraps the active Skill when moving down or up", () => {
+    assert.equal(getNextMentionSkillIndex(0, 3, "ArrowDown"), 1);
+    assert.equal(getNextMentionSkillIndex(2, 3, "ArrowDown"), 0);
+    assert.equal(getNextMentionSkillIndex(0, 3, "ArrowUp"), 2);
+    assert.equal(getNextMentionSkillIndex(2, 3, "ArrowUp"), 1);
+  });
+
+  void it("does not move when the menu has no items or another key is pressed", () => {
+    assert.equal(getNextMentionSkillIndex(0, 0, "ArrowDown"), null);
+    assert.equal(getNextMentionSkillIndex(0, 3, "Enter"), null);
+    assert.equal(getNextMentionSkillIndex(0, 3, "Escape"), null);
   });
 });
 

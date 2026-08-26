@@ -36,9 +36,13 @@ import {
 } from "./memory-access";
 import { createMcpToolDescriptors, createMcpToolSet } from "./mcp-manager";
 import {
+  createSkillCatalogInstructions,
+  createSkillLoaderToolSet,
   createSkillToolDescriptors,
   createSkillToolSet,
+  getAutoSkillInstructionsForPrompt,
   getSelectedSkillInstructions,
+  skillToolReference,
 } from "./skill-runtime";
 import {
   createCronJob,
@@ -72,6 +76,7 @@ export interface BuildChatToolRuntimeOptions {
   agentId?: string | null;
   permissionMode?: ChatPermissionMode;
   userText?: string;
+  explicitSkillIds?: string[];
 }
 
 export interface ChatToolRuntimeConfig {
@@ -488,7 +493,7 @@ export function createChatToolDescriptors(
     ...createMcpToolDescriptors(),
     ...createSkillToolDescriptors(userText),
   ].map((descriptor) =>
-    supportsTools
+    supportsTools || descriptor.category === "skill"
       ? descriptor
       : {
           ...descriptor,
@@ -508,17 +513,34 @@ export function buildChatToolRuntime({
   agentId,
   permissionMode = "approve_risky",
   userText,
+  explicitSkillIds = [],
 }: BuildChatToolRuntimeOptions): ChatToolRuntimeConfig {
   const selection = normalizeChatToolSelection(rawSelection);
   const descriptors = createChatToolDescriptors(model, userText);
   const descriptorById = new Map(descriptors.map((descriptor) => [descriptor.id, descriptor]));
-  const selectedSkillIds =
-    selection.mode === "manual"
-      ? selection.selectedToolIds.filter(isSkillToolReference)
-      : descriptors
-          .filter((descriptor) => descriptor.category === "skill" && descriptor.defaultAuto)
-          .map((descriptor) => descriptor.id);
-  const selectedSkillInstructions = getSelectedSkillInstructions(selectedSkillIds);
+  const explicitSkillReferences = [...new Set(explicitSkillIds.map(skillToolReference))];
+  const manuallySelectedSkillReferences =
+    selection.mode === "manual" ? selection.selectedToolIds.filter(isSkillToolReference) : [];
+  const autoSkillReferences =
+    selection.mode === "auto"
+      ? descriptors
+          .filter(
+            (descriptor) =>
+              descriptor.category === "skill" && descriptor.defaultAuto && descriptor.available,
+          )
+          .map((descriptor) => descriptor.id)
+      : [];
+  const selectedSkillReferences = [
+    ...new Set([...manuallySelectedSkillReferences, ...explicitSkillReferences]),
+  ];
+  const selectedSkillInstructions = getSelectedSkillInstructions(selectedSkillReferences, true);
+  const autoSkillInstructions =
+    selection.mode === "auto" && !model.capabilities.toolCalling
+      ? getAutoSkillInstructionsForPrompt(userText)
+      : "";
+  const skillInstructions = [selectedSkillInstructions, autoSkillInstructions]
+    .filter(Boolean)
+    .join("\n\n");
 
   if (selection.mode === "off" || !model.capabilities.toolCalling) {
     const nonSkillSelection =
@@ -528,7 +550,7 @@ export function buildChatToolRuntime({
     if (nonSkillSelection.length > 0) {
       throw new ChatToolSelectionError("Selected model does not support chat tools.");
     }
-    return { descriptors, toolChoice: "none", instructions: selectedSkillInstructions };
+    return { descriptors, toolChoice: "none", instructions: skillInstructions };
   }
 
   const selectedIds =
@@ -596,7 +618,21 @@ export function buildChatToolRuntime({
       agentId,
     }),
     createSkillToolSet({
-      references: selectedIds.filter(isSkillToolReference),
+      references: [
+        ...new Set([
+          ...selectedIds.filter(isSkillToolReference),
+          ...selectedSkillReferences,
+          ...autoSkillReferences,
+        ]),
+      ],
+      model,
+      conversationId,
+      agentId,
+    }),
+    createSkillLoaderToolSet({
+      skillIds: autoSkillReferences
+        .map((reference) => reference.slice("skill:".length))
+        .filter(Boolean),
       model,
       conversationId,
       agentId,
@@ -625,7 +661,22 @@ export function buildChatToolRuntime({
     }
   }
 
-  if (activeTools.length === 0) return { descriptors, toolChoice: "none" };
+  if (activeTools.length === 0) {
+    return {
+      descriptors,
+      toolChoice: "none",
+      instructions: [
+        selection.mode === "auto"
+          ? createSkillCatalogInstructions(
+              autoSkillReferences.map((reference) => reference.slice("skill:".length)),
+            )
+          : "",
+        skillInstructions,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    };
+  }
 
   const toolChoice = resolveToolChoice(selection.mode, activeTools, model);
 
@@ -646,7 +697,15 @@ export function buildChatToolRuntime({
       conversationId,
       providerExecutedToolNames,
     }),
-    instructions: [createToolInstructions(activeTools), selectedSkillInstructions]
+    instructions: [
+      createToolInstructions(activeTools),
+      selection.mode === "auto"
+        ? createSkillCatalogInstructions(
+            autoSkillReferences.map((reference) => reference.slice("skill:".length)),
+          )
+        : "",
+      skillInstructions,
+    ]
       .filter(Boolean)
       .join("\n\n"),
   };

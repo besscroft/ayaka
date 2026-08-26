@@ -560,6 +560,7 @@ const entries = {
   "generatedApp.status.stopped": { zh: "已停止", en: "Stopped" },
   "generatedApp.status.failed": { zh: "启动失败", en: "Failed" },
   "chatTools.auto.manualOnly": { zh: "仅手动", en: "Manual only" },
+  "chatTools.auto.skillOnDemand": { zh: "自动按需加载", en: "Load automatically when needed" },
   "chatTools.badge.approval": { zh: "需审批", en: "Needs approval" },
   "chatTools.badge.host": { zh: "主机工具", en: "Host" },
   "chatTools.badge.mcp": { zh: "MCP", en: "MCP" },
@@ -718,6 +719,13 @@ const entries = {
     zh: "技能执行尚未配置；此技能目前仅提供说明。",
     en: "Skill execution is not configured; this Skill only provides instructions.",
   },
+  "skill.selector.title": { zh: "选择 Skill", en: "Select a Skill" },
+  "skill.selector.search": { zh: "搜索 Skill", en: "Search Skills" },
+  "skill.selector.hint": {
+    zh: "选择后将插入 /skill:<id>，可继续添加多个 Skill",
+    en: "Select a Skill to insert /skill:<id>; you can add more than one.",
+  },
+  "skill.selector.empty": { zh: "没有可用 Skill", en: "No available Skills" },
   "chatTools.web_search.description": {
     zh: "使用 {provider} 搜索 {host}",
     en: "Search {host} using {provider}",

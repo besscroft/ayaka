@@ -10,6 +10,7 @@ import {
 import {
   createClientChatToolDescriptors,
   filterUserVisibleChatToolDescriptors,
+  getEnabledSkillMentions,
   getActiveChatToolIds,
 } from "@renderer/lib/chat-tools";
 
@@ -161,7 +162,7 @@ void describe("chat tool UI helpers", () => {
     assert.equal(mcp?.defaultAuto, true);
     assert.equal(mcp?.requiresApproval, false);
     assert.equal(skill?.available, true);
-    assert.equal(skill?.defaultAuto, false);
+    assert.equal(skill?.defaultAuto, true);
     assert.equal(skill?.unavailableReason, undefined);
     assert.deepEqual(
       getActiveChatToolIds(
@@ -176,6 +177,9 @@ void describe("chat tool UI helpers", () => {
       ),
       true,
     );
+    assert.deepEqual(getEnabledSkillMentions(toolsnapshot()), [
+      { id: "skill-1", name: "Research Skill", description: "Run a research skill." },
+    ]);
   });
 
   void it("uses the persisted approval setting for the workspace command", () => {

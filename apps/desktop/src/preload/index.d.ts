@@ -323,6 +323,7 @@ export interface AyakaApi {
       ) => Promise<SkillPackage | null>;
       cancel: (runId: string) => Promise<boolean>;
       onRunUpdated: (handler: (run: SkillRunRecord) => void) => () => void;
+      onChanged: (handler: (event: { skillId?: string; reason: string }) => void) => () => void;
       setSecret: (input: ToolSecretInput) => Promise<ToolSecretPublic>;
       deleteSecret: (id: string) => Promise<boolean>;
     };

@@ -382,6 +382,8 @@ export const api = {
       cancel: (runId: string): Promise<boolean> => assertApi().tools.skills.cancel(runId),
       onRunUpdated: (handler: (run: SkillRunRecord) => void): (() => void) =>
         assertApi().tools.skills.onRunUpdated(handler),
+      onChanged: (handler: (event: { skillId?: string; reason: string }) => void): (() => void) =>
+        assertApi().tools.skills.onChanged(handler),
       setSecret: (input: ToolSecretInput): Promise<ToolSecretPublic> =>
         assertApi().tools.skills.setSecret(input),
       deleteSecret: (id: string): Promise<boolean> => assertApi().tools.skills.deleteSecret(id),

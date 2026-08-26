@@ -29,6 +29,12 @@ export {
   PromptInputSubmit,
   type PromptInputMessage,
 } from "./prompt-input";
+export {
+  SkillTokenInput,
+  type SkillTokenInputHandle,
+  type SkillTokenInputProps,
+  type SkillTokenOption,
+} from "./skill-token-input";
 
 export { Reasoning, ReasoningTrigger, ReasoningContent, useReasoning } from "./reasoning";
 export { Source, Sources, SourcesContent, SourcesTrigger } from "./sources";

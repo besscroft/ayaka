@@ -66,6 +66,7 @@ import { createIncrementalTokenCache } from "../lib/chat-token-cache";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import { getConversationWorkspaceForHeader } from "../lib/conversation-workspace";
+import { getEnabledSkillMentions } from "../lib/chat-tools";
 import {
   ConversationStatus,
   PromptSuggestions,
@@ -376,6 +377,14 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   useEffect(() => {
     let cancelled = false;
+    const refreshToolsSnapshot = (): void => {
+      void api.tools.snapshot().then(
+        (snapshot) => {
+          if (!cancelled) setToolsSnapshot(snapshot);
+        },
+        () => undefined,
+      );
+    };
     void Promise.allSettled([api.agents.list(), api.tools.snapshot()]).then(
       ([agentsResult, toolsResult]) => {
         if (cancelled) return;
@@ -383,8 +392,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         if (toolsResult.status === "fulfilled") setToolsSnapshot(toolsResult.value);
       },
     );
+    const offSkills = api.tools.skills.onChanged(refreshToolsSnapshot);
     return () => {
       cancelled = true;
+      offSkills();
     };
   }, []);
 
@@ -1391,6 +1402,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
               onPermissionChange={handlePermissionChange}
               onPermissionReset={handlePermissionReset}
               providers={providers}
+              mentionSkills={getEnabledSkillMentions(toolsSnapshot)}
               contextMetrics={contextMetrics}
             />
           </main>

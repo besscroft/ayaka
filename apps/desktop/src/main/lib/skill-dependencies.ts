@@ -11,6 +11,7 @@ import { discoverMcpServer } from "./mcp-manager";
 import { installMcpDependencies } from "./mcp-dependencies";
 import { installManagedRuntime, isRuntimeCommandAvailable } from "./runtime-manager";
 import { isSkillPackageHashCurrent } from "./skill-executor-policy";
+import { notifySkillChanged } from "./skill-events";
 
 const CHROME_DEBUG_URL = "http://127.0.0.1:9222/json/version";
 const CHROME_DEBUG_TIMEOUT_MS = 2_000;
@@ -65,7 +66,9 @@ export async function confirmSkillDependencies(
   }
 
   const statuses = await inspectSkillDependencies(skillId);
-  return setSkillPackageStatusAsync(skillId, packageStatusForDependencies(statuses));
+  const result = await setSkillPackageStatusAsync(skillId, packageStatusForDependencies(statuses));
+  notifySkillChanged({ skillId, reason: "dependencies" });
+  return result;
 }
 
 /** Update the persisted executable status without installing anything. */
@@ -75,14 +78,18 @@ export async function refreshSkillPackageStatus(skillId: string): Promise<SkillP
   const inspection = getSkillInspection(skillId);
   if (inspection.skill.enabled === 0 || packageRow.status === "error") return packageRow;
   if (!isSkillPackageHashCurrent(packageRow.rootPath, packageRow.contentHash)) {
-    return setSkillPackageStatusAsync(
+    const result = await setSkillPackageStatusAsync(
       skillId,
       "error",
       "Skill package content changed; review it again.",
     );
+    notifySkillChanged({ skillId, reason: "package" });
+    return result;
   }
   const statuses = await inspectSkillDependencies(skillId);
-  return setSkillPackageStatusAsync(skillId, packageStatusForDependencies(statuses));
+  const result = await setSkillPackageStatusAsync(skillId, packageStatusForDependencies(statuses));
+  notifySkillChanged({ skillId, reason: "dependencies" });
+  return result;
 }
 
 function packageStatusForDependencies(

@@ -63,6 +63,7 @@ interface PromptInputProps extends Omit<FormHTMLAttributes<HTMLFormElement>, "on
    * 提交回调。组件本身不维护 status，调用方根据 useChat 的 status 传入。
    */
   onSubmit: (message: PromptInputMessage) => void;
+  value?: string;
   status?: SubmitStatus;
   children?: ReactNode;
 }
@@ -73,15 +74,17 @@ interface PromptInputProps extends Omit<FormHTMLAttributes<HTMLFormElement>, "on
  */
 export function PromptInput({
   onSubmit,
+  value: controlledValue,
   status = "ready",
   className,
   children,
   ...rest
 }: PromptInputProps): React.JSX.Element {
   const [internalValue, setInternalValue] = useState("");
-  const valueRef = useRef(internalValue);
+  const value = controlledValue ?? internalValue;
+  const valueRef = useRef(value);
   // 保留最新值给 onSubmit 引用（避免 stale closure）
-  valueRef.current = internalValue;
+  valueRef.current = value;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -92,9 +95,7 @@ export function PromptInput({
   };
 
   return (
-    <PromptInputContext.Provider
-      value={{ value: internalValue, setValue: setInternalValue, onSubmit, status }}
-    >
+    <PromptInputContext.Provider value={{ value, setValue: setInternalValue, onSubmit, status }}>
       <form
         data-slot="prompt-input"
         className={cn("relative w-full", className)}

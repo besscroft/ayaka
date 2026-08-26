@@ -174,6 +174,7 @@ import {
   onManagedRuntimeStateChanged,
 } from "../lib/runtime-manager";
 import { runToolSkill } from "../lib/skill-runtime";
+import { onSkillChanged, notifySkillChanged } from "../lib/skill-events";
 import {
   cancelSkillRunsForSkill,
   cancelSkillRun,
@@ -279,12 +280,17 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   onMcpAuthChanged((serverId, status) => broadcast("mcp:auth-changed", { serverId, status }));
   onMcpInputRequested((request: McpInputRequest) => broadcast("mcp:input-requested", request));
   onMcpLifecycleStateChanged((state) => broadcast("mcp:state-changed", state));
-  onMcpDependencyStateChanged((installation) =>
-    broadcast("mcp:dependency-state-changed", installation),
-  );
+  onMcpDependencyStateChanged((installation) => {
+    broadcast("mcp:dependency-state-changed", installation);
+    notifySkillChanged({ reason: "dependencies" });
+  });
   onMcpToolsChanged((event) => broadcast("mcp:tools-changed", event));
-  onManagedRuntimeStateChanged((snapshot) => broadcast("runtime:state-changed", snapshot));
+  onManagedRuntimeStateChanged((snapshot) => {
+    broadcast("runtime:state-changed", snapshot);
+    notifySkillChanged({ reason: "dependencies" });
+  });
   onSkillRunUpdated((run) => broadcast("skills:run-updated", run));
+  onSkillChanged((event) => broadcast("skills:changed", event));
   onSandboxArtifactUpdated((artifact) => {
     const session = getSandboxSession(artifact.session_id);
     if (session?.conversation_id) {
@@ -548,11 +554,28 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     input?.artifactType === "mcp" ? searchCatalogMcp(input) : searchCatalogSkills(input),
   );
   ipcMain.handle("catalog:detail", (_e, itemId: string) => getCatalogItemDetail(itemId));
-  ipcMain.handle("catalog:install", (_e, input: CatalogInstallInput) => installCatalogItem(input));
-  ipcMain.handle("catalog:enable", (_e, id: string, enabled: boolean) =>
-    setArtifactInstallationEnabled(id, enabled),
-  );
-  ipcMain.handle("catalog:uninstall", (_e, id: string) => uninstallArtifact(id));
+  ipcMain.handle("catalog:install", async (_e, input: CatalogInstallInput) => {
+    const result = await installCatalogItem(input);
+    if (result.artifactType === "skill" || result.skillId) {
+      notifySkillChanged({ skillId: result.skillId ?? undefined, reason: "imported" });
+    }
+    return result;
+  });
+  ipcMain.handle("catalog:enable", async (_e, id: string, enabled: boolean) => {
+    const result = await setArtifactInstallationEnabled(id, enabled);
+    if (result.artifactType === "skill" || result.skillId) {
+      notifySkillChanged({
+        skillId: result.skillId ?? undefined,
+        reason: enabled ? "enabled" : "disabled",
+      });
+    }
+    return result;
+  });
+  ipcMain.handle("catalog:uninstall", async (_e, id: string) => {
+    const result = await uninstallArtifact(id);
+    notifySkillChanged({ reason: "deleted" });
+    return result;
+  });
 
   // ---------- 璁剧疆 ----------
   ipcMain.handle("settings:get", (_e, key: string) => getSetting(key));
@@ -907,30 +930,44 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     return true;
   });
 
-  ipcMain.handle("tools:skills:create", (_e, input: ToolSkillInput) => createSkillTool(input));
-  ipcMain.handle("tools:skills:importArchive", (_e, bytes: Uint8Array) =>
-    importSkillArchive(bytes, "upload"),
-  );
+  ipcMain.handle("tools:skills:create", async (_e, input: ToolSkillInput) => {
+    const skill = await createSkillTool(input);
+    notifySkillChanged({ skillId: skill.id, reason: "created" });
+    return skill;
+  });
+  ipcMain.handle("tools:skills:importArchive", async (_e, bytes: Uint8Array) => {
+    const skill = await importSkillArchive(bytes, "upload");
+    notifySkillChanged({ skillId: skill.id, reason: "imported" });
+    return skill;
+  });
   ipcMain.handle("tools:skills:generateDraft", (_e, input: SkillDraftRequest) =>
     generateSkillDraft(input),
   );
-  ipcMain.handle("tools:skills:update", (_e, id: string, input: Partial<ToolSkillInput>) =>
-    updateSkillTool(id, input),
-  );
+  ipcMain.handle("tools:skills:update", async (_e, id: string, input: Partial<ToolSkillInput>) => {
+    const skill = await updateSkillTool(id, input);
+    notifySkillChanged({ skillId: id, reason: "updated" });
+    return skill;
+  });
   ipcMain.handle("tools:skills:delete", async (_e, id: string) => {
     await cancelSkillRunsForSkill(id);
     removeSkillPackageDirectory(id);
     await deleteSkillPackageAsync(id);
     await deleteSkillTool(id);
+    notifySkillChanged({ skillId: id, reason: "deleted" });
     return true;
   });
   ipcMain.handle("tools:skills:listDeleted", () => listDeletedSkillTools());
-  ipcMain.handle("tools:skills:restore", (_e, id: string) => restoreSkillTool(id));
+  ipcMain.handle("tools:skills:restore", async (_e, id: string) => {
+    const skill = await restoreSkillTool(id);
+    notifySkillChanged({ skillId: id, reason: "restored" });
+    return skill;
+  });
   ipcMain.handle("tools:skills:permanentDelete", async (_e, id: string) => {
     await cancelSkillRunsForSkill(id);
     removeSkillPackageDirectory(id);
     await deleteSkillPackageAsync(id);
     await permanentlyDeleteSkillTool(id);
+    notifySkillChanged({ skillId: id, reason: "deleted" });
     return true;
   });
   ipcMain.handle("tools:skills:permanentDeleteBatch", async (_e, ids: string[]) => {
@@ -939,7 +976,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
       removeSkillPackageDirectory(id);
       await deleteSkillPackageAsync(id);
     }
-    return permanentlyDeleteSkillTools(ids);
+    const result = await permanentlyDeleteSkillTools(ids);
+    for (const id of ids) notifySkillChanged({ skillId: id, reason: "deleted" });
+    return result;
   });
   ipcMain.handle("tools:skills:purgeExpired", async () => {
     const now = Date.now();
@@ -948,13 +987,16 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
         removeSkillPackageDirectory(skill.id);
       }
     }
-    return purgeExpiredDeletedSkillTools(now);
+    const result = await purgeExpiredDeletedSkillTools(now);
+    if (result > 0) notifySkillChanged({ reason: "deleted" });
+    return result;
   });
   ipcMain.handle("tools:skills:setEnabled", async (_e, id: string, enabled: boolean) => {
     if (!enabled) await cancelSkillRunsForSkill(id);
     const skill = await setSkillToolEnabled(id, enabled);
     if (enabled) await refreshSkillPackageStatus(id);
     else if (getSkillPackage(id)) await setSkillPackageStatusAsync(id, "disabled");
+    notifySkillChanged({ skillId: id, reason: enabled ? "enabled" : "disabled" });
     return skill;
   });
   ipcMain.handle("tools:skills:inspect", async (_e, skillId: string) => {
@@ -980,7 +1022,11 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     async (_e, skillId: string, options?: { confirmed?: boolean; allowScripts?: boolean }) => {
       if (options?.confirmed !== true)
         throw new Error("Skill dependency confirmation was not accepted.");
-      return confirmSkillDependencies(skillId, { allowScripts: options.allowScripts });
+      const result = await confirmSkillDependencies(skillId, {
+        allowScripts: options.allowScripts,
+      });
+      notifySkillChanged({ skillId, reason: "dependencies" });
+      return result;
     },
   );
   ipcMain.handle("tools:skills:cancel", (_e, runId: string) => cancelSkillRun(runId));

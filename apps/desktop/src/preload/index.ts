@@ -322,6 +322,11 @@ const api = {
         ipcRenderer.on("skills:run-updated", listener);
         return () => ipcRenderer.removeListener("skills:run-updated", listener);
       },
+      onChanged: (handler: (event: unknown) => void) => {
+        const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+        ipcRenderer.on("skills:changed", listener);
+        return () => ipcRenderer.removeListener("skills:changed", listener);
+      },
       setSecret: (input: unknown) => ipcRenderer.invoke("tools:skills:setSecret", input),
       deleteSecret: (id: string) => ipcRenderer.invoke("tools:skills:deleteSecret", id),
     },

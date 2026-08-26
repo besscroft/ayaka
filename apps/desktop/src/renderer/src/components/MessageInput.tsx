@@ -25,7 +25,8 @@ import {
   ContextPopover,
   PromptInput,
   PromptInputSubmit,
-  PromptInputTextarea,
+  SkillTokenInput,
+  type SkillTokenInputHandle,
   type AttachmentItem,
   type ContextMetrics,
   type FilePartLike,
@@ -34,12 +35,14 @@ import {
 import { IconPaperclip } from "./icons";
 import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
+import type { MentionSkill } from "../lib/chat-tools";
+import { getNextMentionSkillIndex } from "../lib/skill-menu";
 
 export interface PendingAttachment extends AttachmentItem {
   file: File;
 }
 
-interface MessageInputProps {
+export interface MessageInputProps {
   conversationId?: string;
   isLoading: boolean;
   isRunActive?: boolean;
@@ -59,6 +62,7 @@ interface MessageInputProps {
   maxFileSize?: number;
   accept?: string;
   contextMetrics?: ContextMetrics;
+  mentionSkills?: MentionSkill[];
 }
 
 const DEFAULT_ACCEPT =
@@ -85,13 +89,85 @@ export function MessageInput({
   maxFileSize = DEFAULT_MAX_SIZE,
   accept = DEFAULT_ACCEPT,
   contextMetrics,
+  mentionSkills = [],
 }: MessageInputProps): React.JSX.Element {
   const { t } = useT();
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillMenuIndex, setSkillMenuIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<SkillTokenInputHandle | null>(null);
+  const skillMenuRangeRef = useRef<{ start: number; end: number } | null>(null);
+  const skillMenuIndexRef = useRef(0);
+  const skillOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const resetSkillMenuIndex = useCallback((): void => {
+    skillMenuIndexRef.current = 0;
+    setSkillMenuIndex(0);
+  }, []);
+
+  const updateSkillMenu = useCallback(
+    (value: string, cursor: number): void => {
+      const beforeCursor = value.slice(0, cursor);
+      const match = /(?:^|\s)\/([^\s]*)$/.exec(beforeCursor);
+      const query = match?.[1] ?? "";
+      if (!match || query.startsWith("skill:")) {
+        skillMenuRangeRef.current = null;
+        setSkillMenuOpen(false);
+        setSkillQuery("");
+        resetSkillMenuIndex();
+        return;
+      }
+      const slashOffset = match[0].indexOf("/");
+      skillMenuRangeRef.current = {
+        start: (match.index ?? 0) + slashOffset,
+        end: cursor,
+      };
+      setSkillQuery(query);
+      resetSkillMenuIndex();
+      setSkillMenuOpen(true);
+    },
+    [resetSkillMenuIndex],
+  );
+
+  const filteredMentionSkills = useMemo(() => {
+    const query = skillQuery.trim().toLowerCase();
+    if (!query) return mentionSkills;
+    return mentionSkills.filter((skill) =>
+      `${skill.id} ${skill.name} ${skill.description}`.toLowerCase().includes(query),
+    );
+  }, [mentionSkills, skillQuery]);
+
+  const closeSkillMenu = useCallback(
+    (focusInput: boolean): void => {
+      setSkillMenuOpen(false);
+      setSkillQuery("");
+      skillMenuRangeRef.current = null;
+      resetSkillMenuIndex();
+      if (focusInput) requestAnimationFrame(() => editorRef.current?.focus());
+    },
+    [resetSkillMenuIndex],
+  );
+
+  const selectMentionSkill = useCallback(
+    (skill: MentionSkill): void => {
+      const range = skillMenuRangeRef.current;
+      if (!range) return;
+      const token = `/skill:${skill.id} `;
+      const next = input.slice(0, range.start) + token + input.slice(range.end);
+      const cursor = range.start + token.length;
+      setInput(next);
+      closeSkillMenu(false);
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+        editorRef.current?.setCaretOffset(cursor);
+      });
+    },
+    [closeSkillMenu, input],
+  );
 
   useEffect(() => {
     const handleInsertPrompt = (event: Event): void => {
@@ -105,7 +181,7 @@ export function MessageInput({
         return;
       }
       setInput((current) => (current.trim() ? `${current}\n\n${detail.text}` : detail.text!));
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      requestAnimationFrame(() => editorRef.current?.focus());
     };
     window.addEventListener("ayaka:mcp-insert-prompt", handleInsertPrompt);
     return () => window.removeEventListener("ayaka:mcp-insert-prompt", handleInsertPrompt);
@@ -192,7 +268,7 @@ export function MessageInput({
     if (event.dataTransfer?.files) ingestFiles(event.dataTransfer.files);
   };
 
-  const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+  const handlePaste = (event: ClipboardEvent<HTMLDivElement>): void => {
     const items = event.clipboardData?.items;
     if (!items) return;
     const files: File[] = [];
@@ -213,10 +289,41 @@ export function MessageInput({
     }
   };
 
-  const handleKeyDownExtra = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+  const handleSkillMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (!skillMenuOpen) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSkillMenu(true);
+      return;
+    }
+    const nextIndex = getNextMentionSkillIndex(
+      skillMenuIndexRef.current,
+      filteredMentionSkills.length,
+      event.key,
+    );
+    if (nextIndex !== null) {
+      event.preventDefault();
+      skillMenuIndexRef.current = nextIndex;
+      setSkillMenuIndex(nextIndex);
+      requestAnimationFrame(() =>
+        skillOptionRefs.current[nextIndex]?.scrollIntoView({ block: "nearest" }),
+      );
+      return;
+    }
+    if ((event.key === "Enter" || event.key === "Tab") && filteredMentionSkills.length > 0) {
+      event.preventDefault();
+      const selectedSkill = filteredMentionSkills[skillMenuIndexRef.current];
+      if (selectedSkill) selectMentionSkill(selectedSkill);
+      return;
+    }
+  };
+
+  const handleKeyDownExtra = (event: KeyboardEvent<HTMLDivElement>): void => {
+    handleSkillMenuKeyDown(event);
+    if (event.defaultPrevented) return;
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
-      event.currentTarget.form?.requestSubmit();
+      event.currentTarget.closest("form")?.requestSubmit();
     }
   };
 
@@ -239,6 +346,7 @@ export function MessageInput({
         >
           <div className="px-4 pb-2 pt-4">
             <PromptInput
+              value={input}
               status={isLoading ? "streaming" : "ready"}
               onSubmit={handleSubmit}
               className="relative"
@@ -260,10 +368,14 @@ export function MessageInput({
                 </div>
               ) : null}
 
-              <PromptInputTextarea
-                ref={textareaRef}
+              <SkillTokenInput
+                ref={editorRef}
                 value={input}
-                onChange={(event) => setInput(event.currentTarget.value)}
+                skills={mentionSkills}
+                onValueChange={(value, caretOffset) => {
+                  setInput(value);
+                  updateSkillMenu(value, caretOffset);
+                }}
                 onPaste={handlePaste}
                 onKeyDown={handleKeyDownExtra}
                 placeholder={
@@ -272,8 +384,68 @@ export function MessageInput({
                     : t("input.placeholder")
                 }
                 aria-label={t("input.placeholder")}
+                aria-expanded={skillMenuOpen}
+                aria-controls={skillMenuOpen ? "skill-mention-menu" : undefined}
+                aria-activedescendant={
+                  skillMenuOpen && filteredMentionSkills.length > 0
+                    ? `skill-mention-option-${skillMenuIndex}`
+                    : undefined
+                }
                 className="select-text"
               />
+
+              {skillMenuOpen ? (
+                <div
+                  role="listbox"
+                  aria-label={t("skill.selector.title")}
+                  id="skill-mention-menu"
+                  data-slot="skill-mention-menu"
+                  onKeyDown={handleSkillMenuKeyDown}
+                  className="absolute inset-x-3 bottom-[4.25rem] z-20 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 shadow-xl"
+                >
+                  <div className="px-2.5 py-1.5 text-[11px] font-medium text-foreground/55">
+                    {skillQuery ? t("skill.selector.search") : t("skill.selector.hint")}
+                  </div>
+                  {filteredMentionSkills.length > 0 ? (
+                    filteredMentionSkills.map((skill, index) => (
+                      <button
+                        key={skill.id}
+                        ref={(node) => {
+                          skillOptionRefs.current[index] = node;
+                        }}
+                        id={`skill-mention-option-${index}`}
+                        type="button"
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={index === skillMenuIndex}
+                        data-active={index === skillMenuIndex ? "true" : undefined}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectMentionSkill(skill)}
+                        className={cn(
+                          "flex w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left",
+                          index === skillMenuIndex
+                            ? "bg-accent/12 text-foreground"
+                            : "text-foreground/80 hover:bg-muted",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">{skill.name}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-foreground/50">
+                            {skill.description || skill.id}
+                          </span>
+                        </span>
+                        <span className="shrink-0 pt-0.5 text-[10px] text-foreground/40">
+                          {skill.id}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-2.5 py-2 text-xs text-foreground/50">
+                      {t("skill.selector.empty")}
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               <div className="relative flex min-h-11 items-start gap-2 px-3 pt-2">
                 <div className="inline-flex w-fit min-w-0 max-w-[calc(100%-2.75rem)] flex-wrap items-center gap-1.5">
