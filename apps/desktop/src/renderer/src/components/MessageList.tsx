@@ -50,6 +50,7 @@ import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { readChatMessageMetadata } from "../lib/chat-messages";
 import { GeneratedToolResult } from "./GeneratedToolResult";
+import type { MentionSkill } from "../lib/chat-tools";
 import {
   getToolPartName,
   getToolSummary,
@@ -65,6 +66,7 @@ import { useConversationScroll } from "./ai-elements/use-conversation-scroll";
 interface MessageListProps {
   conversationId?: string;
   messages: UIMessage[];
+  skillMentions?: readonly MentionSkill[];
   isLoading: boolean;
   status: ConversationStatusKind;
   error?: Error;
@@ -97,6 +99,7 @@ export function isMessageStreaming(isLoading: boolean, index: number, lastIndex:
 export function MessageList({
   conversationId,
   messages,
+  skillMentions,
   isLoading,
   status,
   error,
@@ -188,6 +191,7 @@ export function MessageList({
         <VirtualMessageRows
           conversationId={conversationId}
           messages={messages}
+          skillMentions={skillMentions}
           isLoading={isLoading}
           onEdit={onEditMessage ? stableEditMessage : undefined}
           onResend={onResendMessage ? stableResendMessage : undefined}
@@ -262,6 +266,7 @@ export function MessageList({
 interface VirtualMessageRowsProps {
   conversationId?: string;
   messages: UIMessage[];
+  skillMentions?: readonly MentionSkill[];
   isLoading: boolean;
   onEdit?: (messageId: string, text: string) => Promise<void> | void;
   onResend?: (messageId: string) => Promise<void> | void;
@@ -289,6 +294,7 @@ export function getMessageRenderItems(
 function VirtualMessageRows({
   conversationId,
   messages,
+  skillMentions,
   isLoading,
   onEdit,
   onResend,
@@ -334,6 +340,7 @@ function VirtualMessageRows({
             <MemoMessageItem
               conversationId={conversationId}
               message={message}
+              skillMentions={skillMentions}
               isLastMessage={virtualItem.index === messages.length - 1}
               isStreaming={isMessageStreaming(isLoading, virtualItem.index, messages.length - 1)}
               onEdit={onEdit}
@@ -467,6 +474,7 @@ export function getReasoningDisplays(
 export interface MessageItemProps {
   conversationId?: string;
   message: UIMessage;
+  skillMentions?: readonly MentionSkill[];
   isLastMessage: boolean;
   isStreaming: boolean;
   onEdit?: (messageId: string, newText: string) => Promise<void> | void;
@@ -513,6 +521,7 @@ export async function saveMessageEdit({
 function MessageItem({
   conversationId,
   message,
+  skillMentions,
   isLastMessage,
   isStreaming,
   onEdit,
@@ -714,7 +723,11 @@ function MessageItem({
 
           if (part.type === "text") {
             return (
-              <MessageResponse key={key} streaming={messageStreaming}>
+              <MessageResponse
+                key={key}
+                streaming={messageStreaming}
+                skillMentions={isUser ? skillMentions : undefined}
+              >
                 {part.text}
               </MessageResponse>
             );
@@ -847,6 +860,7 @@ export function areMessageItemPropsEqual(
   return (
     previous.message === next.message &&
     previous.conversationId === next.conversationId &&
+    previous.skillMentions === next.skillMentions &&
     previous.isLastMessage === next.isLastMessage &&
     previous.isStreaming === next.isStreaming &&
     previous.onEdit === next.onEdit &&

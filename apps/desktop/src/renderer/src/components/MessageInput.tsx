@@ -32,7 +32,7 @@ import {
   type FilePartLike,
   type PromptInputMessage,
 } from "./ai-elements";
-import { IconPaperclip } from "./icons";
+import { IconCheck, IconPaperclip } from "./icons";
 import { useT } from "../lib/i18n";
 import { cn } from "../lib/utils";
 import type { MentionSkill } from "../lib/chat-tools";
@@ -289,10 +289,11 @@ export function MessageInput({
     }
   };
 
-  const handleSkillMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+  const handleSkillMenuKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (!skillMenuOpen) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       closeSkillMenu(true);
       return;
     }
@@ -303,6 +304,7 @@ export function MessageInput({
     );
     if (nextIndex !== null) {
       event.preventDefault();
+      event.stopPropagation();
       skillMenuIndexRef.current = nextIndex;
       setSkillMenuIndex(nextIndex);
       requestAnimationFrame(() =>
@@ -312,10 +314,31 @@ export function MessageInput({
     }
     if ((event.key === "Enter" || event.key === "Tab") && filteredMentionSkills.length > 0) {
       event.preventDefault();
+      event.stopPropagation();
       const selectedSkill = filteredMentionSkills[skillMenuIndexRef.current];
       if (selectedSkill) selectMentionSkill(selectedSkill);
       return;
     }
+  };
+
+  const handlePromptKeyDownCapture = (event: KeyboardEvent<HTMLElement>): void => {
+    handleSkillMenuKeyDown(event);
+    if (
+      event.defaultPrevented ||
+      event.key !== "/" ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      skillMenuOpen
+    ) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      updateSkillMenu(editor.getValue(), editor.getCaretOffset());
+    });
   };
 
   const handleKeyDownExtra = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -349,6 +372,7 @@ export function MessageInput({
               value={input}
               status={isLoading ? "streaming" : "ready"}
               onSubmit={handleSubmit}
+              onKeyDownCapture={handlePromptKeyDownCapture}
               className="relative"
             >
               {attachments.length > 0 ? (
@@ -407,38 +431,56 @@ export function MessageInput({
                     {skillQuery ? t("skill.selector.search") : t("skill.selector.hint")}
                   </div>
                   {filteredMentionSkills.length > 0 ? (
-                    filteredMentionSkills.map((skill, index) => (
-                      <button
-                        key={skill.id}
-                        ref={(node) => {
-                          skillOptionRefs.current[index] = node;
-                        }}
-                        id={`skill-mention-option-${index}`}
-                        type="button"
-                        role="option"
-                        tabIndex={-1}
-                        aria-selected={index === skillMenuIndex}
-                        data-active={index === skillMenuIndex ? "true" : undefined}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => selectMentionSkill(skill)}
-                        className={cn(
-                          "flex w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left",
-                          index === skillMenuIndex
-                            ? "bg-accent/12 text-foreground"
-                            : "text-foreground/80 hover:bg-muted",
-                        )}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold">{skill.name}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-foreground/50">
-                            {skill.description || skill.id}
+                    filteredMentionSkills.map((skill, index) => {
+                      const active = index === skillMenuIndex;
+                      return (
+                        <button
+                          key={skill.id}
+                          ref={(node) => {
+                            skillOptionRefs.current[index] = node;
+                          }}
+                          id={`skill-mention-option-${index}`}
+                          type="button"
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={active}
+                          data-active={active ? "true" : undefined}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => selectMentionSkill(skill)}
+                          className={cn(
+                            "flex w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left outline-none transition-colors",
+                            active
+                              ? "bg-accent text-accent-foreground ring-1 ring-accent/60"
+                              : "text-foreground/80 hover:bg-muted",
+                          )}
+                        >
+                          <span className="flex min-w-0 flex-1 items-start gap-2">
+                            {active ? <IconCheck className="mt-0.5 size-3.5 shrink-0" /> : null}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-semibold">
+                                {skill.name}
+                              </span>
+                              <span
+                                className={cn(
+                                  "mt-0.5 block truncate text-[11px]",
+                                  active ? "text-accent-foreground/75" : "text-foreground/50",
+                                )}
+                              >
+                                {skill.description || skill.id}
+                              </span>
+                            </span>
                           </span>
-                        </span>
-                        <span className="shrink-0 pt-0.5 text-[10px] text-foreground/40">
-                          {skill.id}
-                        </span>
-                      </button>
-                    ))
+                          <span
+                            className={cn(
+                              "shrink-0 pt-0.5 text-[10px]",
+                              active ? "text-accent-foreground/75" : "text-foreground/40",
+                            )}
+                          >
+                            {skill.id}
+                          </span>
+                        </button>
+                      );
+                    })
                   ) : (
                     <div className="px-2.5 py-2 text-xs text-foreground/50">
                       {t("skill.selector.empty")}

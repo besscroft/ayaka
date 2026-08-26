@@ -1,6 +1,6 @@
 import { type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
-import { RichContent } from "./rich-content";
+import { RichContent, type RichContentSkillMention } from "./rich-content";
 
 type MessageRole = "user" | "assistant" | "system";
 
@@ -60,11 +60,13 @@ export function MessageContent({
 interface MessageResponseProps extends HTMLAttributes<HTMLDivElement> {
   children?: string;
   streaming?: boolean;
+  skillMentions?: readonly RichContentSkillMention[];
 }
 
 export function MessageResponse({
   children,
   streaming = false,
+  skillMentions,
   className,
   ...rest
 }: MessageResponseProps): React.JSX.Element {
@@ -73,6 +75,7 @@ export function MessageResponse({
       data-slot="message-response"
       data-streaming={streaming ? "true" : undefined}
       value={children ?? ""}
+      skillMentions={skillMentions}
       className={className}
       {...rest}
     />

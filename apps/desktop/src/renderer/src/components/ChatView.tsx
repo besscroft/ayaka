@@ -66,7 +66,7 @@ import { createIncrementalTokenCache } from "../lib/chat-token-cache";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import { getConversationWorkspaceForHeader } from "../lib/conversation-workspace";
-import { getEnabledSkillMentions } from "../lib/chat-tools";
+import { getEnabledSkillMentions, getSkillMentions } from "../lib/chat-tools";
 import {
   ConversationStatus,
   PromptSuggestions,
@@ -158,6 +158,11 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [toolsSnapshot, setToolsSnapshot] = useState<ToolsSnapshot | null>(null);
+  const skillMentionCatalog = useMemo(() => getSkillMentions(toolsSnapshot), [toolsSnapshot]);
+  const enabledSkillMentions = useMemo(
+    () => getEnabledSkillMentions(toolsSnapshot),
+    [toolsSnapshot],
+  );
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<Pick<
     RuntimeSnapshot,
     | "runtimeRuns"
@@ -1369,6 +1374,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
                 key={conversationId}
                 conversationId={conversationId}
                 messages={renderedMessages}
+                skillMentions={skillMentionCatalog}
                 isLoading={isLoading}
                 status={statusKind}
                 error={chat.error}
@@ -1402,7 +1408,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
               onPermissionChange={handlePermissionChange}
               onPermissionReset={handlePermissionReset}
               providers={providers}
-              mentionSkills={getEnabledSkillMentions(toolsSnapshot)}
+              mentionSkills={enabledSkillMentions}
               contextMetrics={contextMetrics}
             />
           </main>

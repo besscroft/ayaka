@@ -1,5 +1,6 @@
 import { Fragment, createElement, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
+import { IconSparkles } from "../icons";
 import {
   getMediaKindFromUrl,
   parseRichContentBlocks,
@@ -10,6 +11,12 @@ import {
 
 interface RichContentProps extends HTMLAttributes<HTMLDivElement> {
   value: string;
+  skillMentions?: readonly RichContentSkillMention[];
+}
+
+export interface RichContentSkillMention {
+  id: string;
+  name: string;
 }
 
 const BLOCKED_HTML_TAGS = new Set([
@@ -79,8 +86,14 @@ const ALLOWED_HTML_TAGS = new Set([
 ]);
 const VOID_HTML_TAGS = new Set(["br", "hr", "img", "source"]);
 
-export function RichContent({ value, className, ...rest }: RichContentProps): React.JSX.Element {
+export function RichContent({
+  value,
+  skillMentions = [],
+  className,
+  ...rest
+}: RichContentProps): React.JSX.Element {
   const blocks = parseRichContentBlocks(value);
+  const skillMentionById = new Map(skillMentions.map((skill) => [skill.id, skill]));
 
   return (
     <div
@@ -88,19 +101,23 @@ export function RichContent({ value, className, ...rest }: RichContentProps): Re
       className={cn("rich-content flex min-w-0 flex-col gap-3 break-words", className)}
       {...rest}
     >
-      {blocks.map((block, index) => renderBlock(block, `block-${index}`))}
+      {blocks.map((block, index) => renderBlock(block, `block-${index}`, skillMentionById))}
     </div>
   );
 }
 
-function renderBlock(block: RichContentBlock, key: string): ReactNode {
+function renderBlock(
+  block: RichContentBlock,
+  key: string,
+  skillMentionById: ReadonlyMap<string, RichContentSkillMention>,
+): ReactNode {
   switch (block.type) {
     case "paragraph": {
       const mediaUrl = getStandaloneMediaUrl(block.text);
       if (mediaUrl) return <MediaEmbed key={key} url={mediaUrl} alt="" />;
       return (
         <p key={key} className="m-0 leading-7">
-          {renderInlineMarkdown(block.text, key)}
+          {renderInlineMarkdown(block.text, key, skillMentionById)}
         </p>
       );
     }
@@ -108,7 +125,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
       const Tag = `h${block.depth}` as "h1" | "h2" | "h3" | "h4";
       return (
         <Tag key={key} className={headingClass(block.depth)}>
-          {renderInlineMarkdown(block.text, key)}
+          {renderInlineMarkdown(block.text, key, skillMentionById)}
         </Tag>
       );
     }
@@ -137,7 +154,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
         >
           {block.text.split(/\n{2,}/).map((paragraph, index) => (
             <p key={`${key}-q-${index}`} className={cn("m-0", index > 0 && "mt-2")}>
-              {renderInlineMarkdown(paragraph, `${key}-q-${index}`)}
+              {renderInlineMarkdown(paragraph, `${key}-q-${index}`, skillMentionById)}
             </p>
           ))}
         </blockquote>
@@ -159,7 +176,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
                   {item.checked ? "✓" : ""}
                 </span>
               ) : null}
-              {renderInlineMarkdown(item.text, `${key}-item-${index}`)}
+              {renderInlineMarkdown(item.text, `${key}-item-${index}`, skillMentionById)}
             </li>
           ))}
         </Tag>
@@ -180,7 +197,7 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
                     key={`${key}-th-${index}`}
                     className="border-b border-border px-3 py-2 font-semibold"
                   >
-                    {renderInlineMarkdown(header, `${key}-th-${index}`)}
+                    {renderInlineMarkdown(header, `${key}-th-${index}`, skillMentionById)}
                   </th>
                 ))}
               </tr>
@@ -190,7 +207,11 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
                 <tr key={`${key}-tr-${rowIndex}`} className="border-t border-border">
                   {row.map((cell, cellIndex) => (
                     <td key={`${key}-td-${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top">
-                      {renderInlineMarkdown(cell, `${key}-td-${rowIndex}-${cellIndex}`)}
+                      {renderInlineMarkdown(
+                        cell,
+                        `${key}-td-${rowIndex}-${cellIndex}`,
+                        skillMentionById,
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -206,12 +227,16 @@ function renderBlock(block: RichContentBlock, key: string): ReactNode {
   }
 }
 
-function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+function renderInlineMarkdown(
+  text: string,
+  keyPrefix: string,
+  skillMentionById: ReadonlyMap<string, RichContentSkillMention>,
+): ReactNode[] {
   if (containsHtmlTag(text)) return [<SafeHtml key={`${keyPrefix}-html`} html={text} inline />];
 
   const nodes: ReactNode[] = [];
   const pattern =
-    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)|\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)|`([^`\n]+)`|\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|\*([^*\n]+)\*|_([^_\n]+)_|(https?:\/\/[^\s<>)]+|mailto:[^\s<>)]+)/g;
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)|\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)|`([^`\n]+)`|\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|\*([^*\n]+)\*|_([^_\n]+)_|(https?:\/\/[^\s<>)]+|mailto:[^\s<>)]+)|(?<!\S)\/skill:([A-Za-z0-9_.-]+)(?!\S)/g;
   let lastIndex = 0;
   let matchIndex = 0;
 
@@ -246,7 +271,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
             rel="noreferrer noopener"
             className="font-medium text-link underline decoration-link/35 underline-offset-3 hover:decoration-link"
           >
-            {renderInlineMarkdown(match[4], `${keyPrefix}-a-${matchIndex}`)}
+            {renderInlineMarkdown(match[4], `${keyPrefix}-a-${matchIndex}`, skillMentionById)}
           </a>
         ) : (
           <span key={`${keyPrefix}-bad-a-${matchIndex}`}>{match[4]}</span>
@@ -262,20 +287,20 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       const value = match[8] ?? match[9] ?? "";
       nodes.push(
         <strong key={`${keyPrefix}-strong-${matchIndex}`} className="font-semibold">
-          {renderInlineMarkdown(value, `${keyPrefix}-strong-${matchIndex}`)}
+          {renderInlineMarkdown(value, `${keyPrefix}-strong-${matchIndex}`, skillMentionById)}
         </strong>,
       );
     } else if (match[10] !== undefined) {
       nodes.push(
         <del key={`${keyPrefix}-del-${matchIndex}`} className="text-foreground/60">
-          {renderInlineMarkdown(match[10], `${keyPrefix}-del-${matchIndex}`)}
+          {renderInlineMarkdown(match[10], `${keyPrefix}-del-${matchIndex}`, skillMentionById)}
         </del>,
       );
     } else if (match[11] !== undefined || match[12] !== undefined) {
       const value = match[11] ?? match[12] ?? "";
       nodes.push(
         <em key={`${keyPrefix}-em-${matchIndex}`}>
-          {renderInlineMarkdown(value, `${keyPrefix}-em-${matchIndex}`)}
+          {renderInlineMarkdown(value, `${keyPrefix}-em-${matchIndex}`, skillMentionById)}
         </em>,
       );
     } else if (match[13] !== undefined) {
@@ -297,6 +322,22 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
         ) : (
           match[13]
         ),
+      );
+    } else if (match[14] !== undefined) {
+      const skillId = match[14];
+      const skill = skillMentionById.get(skillId);
+      nodes.push(
+        <span
+          key={`${keyPrefix}-skill-${matchIndex}`}
+          data-slot="skill-mention"
+          data-skill-id={skillId}
+          title={`/skill:${skillId}`}
+          aria-label={skill?.name ?? skillId}
+          className="mx-0.5 inline-flex max-w-full items-center gap-1 rounded-full border border-current/20 bg-current/10 px-2 py-0.5 align-baseline text-[0.9em] font-medium text-current"
+        >
+          <IconSparkles className="size-3 shrink-0" aria-hidden="true" />
+          <span className="truncate">{skill?.name ?? skillId}</span>
+        </span>,
       );
     }
 

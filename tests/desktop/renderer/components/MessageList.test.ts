@@ -428,6 +428,25 @@ void describe("execution details", () => {
     assert.match(completedHtml, /class="rich-content/);
   });
 
+  void it("renders user Skill invocations as named chips", () => {
+    const html = renderToStaticMarkup(
+      createElement(MessageList, {
+        messages: [userMessage("user-skill", "/skill:skill-one /skill:skill-two")],
+        skillMentions: [
+          { id: "skill-one", name: "Writing Skill", description: "" },
+          { id: "skill-two", name: "Browser Skill", description: "" },
+        ],
+        isLoading: false,
+        status: "ready",
+      }),
+    );
+
+    assert.equal((html.match(/data-slot="skill-mention"/g) ?? []).length, 2);
+    assert.match(html, /data-skill-id="skill-one"/);
+    assert.match(html, />Writing Skill<\/span>/);
+    assert.match(html, />Browser Skill<\/span>/);
+  });
+
   void it("renders virtual rows with stable message ids", () => {
     const html = renderToStaticMarkup(
       createElement(MessageList, {

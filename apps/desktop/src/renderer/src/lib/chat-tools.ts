@@ -296,15 +296,24 @@ export interface MentionSkill {
   description: string;
 }
 
-export function getEnabledSkillMentions(tools: ToolsSnapshot | null | undefined): MentionSkill[] {
+export function getSkillMentions(tools: ToolsSnapshot | null | undefined): MentionSkill[] {
   return (tools?.skills ?? [])
-    .filter((skill) => skill.enabled !== 0 && skill.deleted_at === null)
+    .filter((skill) => skill.deleted_at === null)
     .map((skill) => ({
       id: skill.id,
       name: skill.name,
       description: skill.description || "",
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getEnabledSkillMentions(tools: ToolsSnapshot | null | undefined): MentionSkill[] {
+  const enabledIds = new Set(
+    (tools?.skills ?? [])
+      .filter((skill) => skill.enabled !== 0 && skill.deleted_at === null)
+      .map((skill) => skill.id),
+  );
+  return getSkillMentions(tools).filter((skill) => enabledIds.has(skill.id));
 }
 
 export function getActiveChatToolIds(

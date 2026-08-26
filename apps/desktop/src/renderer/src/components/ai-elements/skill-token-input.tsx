@@ -17,6 +17,7 @@ export interface SkillTokenOption {
 
 export interface SkillTokenInputHandle {
   focus(): void;
+  getValue(): string;
   getCaretOffset(): number;
   setCaretOffset(offset: number): void;
 }
@@ -63,6 +64,10 @@ export const SkillTokenInput = forwardRef<SkillTokenInputHandle, SkillTokenInput
       forwardedRef,
       () => ({
         focus: () => editorRef.current?.focus(),
+        getValue: () => {
+          const editor = editorRef.current;
+          return editor ? serializeEditor(editor) : value;
+        },
         getCaretOffset: () => {
           const editor = editorRef.current;
           if (!editor) return value.length;
