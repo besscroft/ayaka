@@ -40,3 +40,9 @@ export function stripSkillInvocations(text: string): string {
     .replace(/\n[ \t]+/g, "\n")
     .trim();
 }
+
+export function isSkillOnlyInvocation(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || parseSkillInvocations(trimmed).length === 0) return false;
+  return trimmed.replace(new RegExp(SKILL_INVOCATION_TOKEN_SOURCE, "g"), "").trim() === "";
+}

@@ -906,6 +906,10 @@ const entries = {
   "input.media.transcription": { zh: "语音转录", en: "Transcription" },
   "input.media.voice": { zh: "声音", en: "Voice" },
   "input.noModel": { zh: "先选择一个模型", en: "Choose a model first" },
+  "input.error.skillOnly": {
+    zh: "请在 Skill 后补充具体任务，再发送消息。",
+    en: "Add a specific task after the Skill before sending the message.",
+  },
   "input.params": { zh: "参数", en: "Params" },
   "input.placeholder": { zh: "问 Ayaka 任何事", en: "Ask Ayaka anything" },
   "input.placeholder.withAttachments": {

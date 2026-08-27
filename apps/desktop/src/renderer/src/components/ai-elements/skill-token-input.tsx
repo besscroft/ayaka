@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   type ClipboardEventHandler,
+  type KeyboardEvent,
   type KeyboardEventHandler,
   type HTMLAttributes,
 } from "react";
@@ -91,6 +92,15 @@ export const SkillTokenInput = forwardRef<SkillTokenInputHandle, SkillTokenInput
       onValueChange(nextValue, caretOffset);
     };
 
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+      onKeyDown?.(event);
+      if (event.defaultPrevented) return;
+      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        event.currentTarget.closest("form")?.requestSubmit();
+      }
+    };
+
     return (
       <div
         ref={editorRef}
@@ -109,7 +119,7 @@ export const SkillTokenInput = forwardRef<SkillTokenInputHandle, SkillTokenInput
           className,
         )}
         onInput={handleInput}
-        onKeyDown={onKeyDown}
+        onKeyDown={handleKeyDown}
         onPaste={onPaste}
         {...rest}
       />

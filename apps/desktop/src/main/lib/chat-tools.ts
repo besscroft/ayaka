@@ -38,10 +38,12 @@ import { createMcpToolDescriptors, createMcpToolSet } from "./mcp-manager";
 import {
   createSkillCatalogInstructions,
   createSkillLoaderToolSet,
+  createSkillResourceToolSet,
   createSkillToolDescriptors,
   createSkillToolSet,
   getAutoSkillInstructionsForPrompt,
   getSelectedSkillInstructions,
+  parseSkillToolReference,
   skillToolReference,
 } from "./skill-runtime";
 import {
@@ -634,6 +636,17 @@ export function buildChatToolRuntime({
         .map((reference) => reference.slice("skill:".length))
         .filter(Boolean),
       model,
+      conversationId,
+      agentId,
+    }),
+    createSkillResourceToolSet({
+      skillIds: [
+        ...new Set(
+          [...selectedSkillReferences, ...autoSkillReferences]
+            .map((reference) => parseSkillToolReference(reference))
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ],
       conversationId,
       agentId,
     }),

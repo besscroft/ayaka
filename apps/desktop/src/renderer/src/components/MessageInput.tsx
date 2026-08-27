@@ -34,9 +34,11 @@ import {
 } from "./ai-elements";
 import { IconCheck, IconPaperclip } from "./icons";
 import { useT } from "../lib/i18n";
+import { notify } from "../lib/toast";
 import { cn } from "../lib/utils";
 import type { MentionSkill } from "../lib/chat-tools";
 import { getNextMentionSkillIndex } from "../lib/skill-menu";
+import { isSkillOnlyInvocation } from "@shared/skill-invocation";
 
 export interface PendingAttachment extends AttachmentItem {
   file: File;
@@ -203,6 +205,10 @@ export function MessageInput({
 
   const handleSubmit = (message: PromptInputMessage): void => {
     if (!canSend) return;
+    if (attachments.length === 0 && isSkillOnlyInvocation(message.text)) {
+      notify.error(t("input.error.skillOnly"));
+      return;
+    }
     void flushSubmit(message.text);
   };
 

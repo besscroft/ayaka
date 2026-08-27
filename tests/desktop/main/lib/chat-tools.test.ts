@@ -1,6 +1,9 @@
 import { afterEach, before, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import Module, { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { ChatToolModelContext } from "@desktop-main/lib/chat-tools";
 import {
   CHAT_TOOL_IDS,
@@ -180,16 +183,74 @@ void describe("chat tool runtime", () => {
       "cron",
       "skill_load",
       "skill_search",
+      "skill_read_file",
     ]);
     assert.match(runtime.instructions ?? "", /<available-skill id="skill-1"/);
+    assert.match(runtime.instructions ?? "", /sandbox_list_files/);
     assert.doesNotMatch(runtime.instructions ?? "", /Follow the complete instruction/);
 
     const loader = runtime.tools?.skill_load as {
       execute?: (input: { name: string }) => Promise<{ instructions: string }>;
     };
     const loaded = await loader.execute?.({ name: skill.id });
-    assert.equal(loaded?.instructions, skill.instructions);
+    assert.match(loaded?.instructions ?? "", /Follow the complete instruction/);
+    assert.match(loaded?.instructions ?? "", /skill_read_file/);
     assert.equal(dbMarkSkillToolRunAsync.mock.callCount(), 1);
+  });
+
+  void it("reads an auxiliary file only for a selected Skill", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "ayaka-chat-skill-resource-"));
+    try {
+      await mkdir(path.join(root, "references"));
+      await writeFile(path.join(root, "references", "base-en.txt"), "Base instructions", "utf8");
+      const skill = createInstructionSkill({
+        auto_use: 1,
+        config_json: JSON.stringify({ installPath: root }),
+      });
+      dbListSkillTools.mock.mockImplementation(() => [skill]);
+      dbGetSkillTool.mock.mockImplementation((id) => (id === skill.id ? skill : null));
+
+      const runtime = chatTools.buildChatToolRuntime({
+        selection: { mode: "auto", selectedToolIds: [] },
+        model: modelContext("openai-compatible"),
+      });
+      const reader = runtime.tools?.skill_read_file as {
+        execute?: (input: { skill: string; path: string }) => Promise<{
+          skillId: string;
+          path: string;
+          content: string;
+        }>;
+      };
+      const result = await reader.execute?.({
+        skill: skill.name,
+        path: "references/base-en.txt",
+      });
+
+      assert.equal(result?.skillId, skill.id);
+      assert.equal(result?.path, "references/base-en.txt");
+      assert.equal(result?.content, "Base instructions");
+      const byId = await reader.execute?.({
+        skill: skill.id,
+        path: "references/base-en.txt",
+      });
+      assert.equal(byId?.content, "Base instructions");
+      assert.doesNotMatch(JSON.stringify(dbInsertRuntimeEvent.mock.calls), /Base instructions/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  void it("exposes resource reading for manually selected Skills", () => {
+    const skill = createInstructionSkill({ auto_use: 0 });
+    dbListSkillTools.mock.mockImplementation(() => [skill]);
+    dbGetSkillTool.mock.mockImplementation((id) => (id === skill.id ? skill : null));
+
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["skill:" + skill.id] },
+      model: modelContext("openai-compatible"),
+    });
+
+    assert.deepEqual(runtime.activeTools, ["skill_read_file"]);
   });
 
   void it("loads an explicitly invoked Skill even when the model cannot call tools", () => {

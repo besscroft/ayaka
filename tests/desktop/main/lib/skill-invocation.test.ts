@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   MAX_SKILL_INVOCATIONS,
+  isSkillOnlyInvocation,
   parseSkillInvocations,
   stripSkillInvocations,
 } from "@shared/skill-invocation";
@@ -32,5 +33,18 @@ void describe("Skill invocation tokens", () => {
       { skillId: "old", token: "/skill:old" },
       { skillId: "current", token: "/skill:current" },
     ]);
+  });
+
+  void it("recognizes a message that contains only supported Skill invocations", () => {
+    assert.equal(isSkillOnlyInvocation(" /skill:writing /skill:research "), true);
+    assert.equal(
+      isSkillOnlyInvocation(
+        "/skill:s0 /skill:s1 /skill:s2 /skill:s3 /skill:s4 /skill:s5 /skill:s6 /skill:s7 /skill:s8",
+      ),
+      true,
+    );
+    assert.equal(isSkillOnlyInvocation("/skill:writing\n\nPlease summarize this"), false);
+    assert.equal(isSkillOnlyInvocation("Please use /skill:writing"), false);
+    assert.equal(isSkillOnlyInvocation("/skill:invalid/path"), false);
   });
 });
