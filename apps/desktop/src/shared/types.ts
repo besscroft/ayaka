@@ -17,7 +17,7 @@ export interface TrayMenuLabels {
   quit: string;
 }
 
-/** 娑堟伅璁板綍锛堝搴?DB 涓殑 messages 琛級 */
+/** 消息记录（对应 DB 中的 messages 表） */
 export interface MessageRow {
   id: string;
   conversation_id: string;
@@ -2526,42 +2526,42 @@ export const DEFAULT_MEDIA_GENERATION_SETTINGS: MediaGenerationSettings = {
 };
 
 /**
- * 搴旂敤璁剧疆閿悕鏋氫妇锛堥伩鍏嶆嫾鍐欓敊璇級
+ * 应用设置键名枚举（避免拼写错误）
  *
- * 鎵€鏈夎缃」缁熶竴浠ュ瓧绗︿覆瀛樺叆 settings 琛ㄧ殑 KV 缁撴瀯銆?
- * 澶嶆潅缁撴瀯锛堝 accent锛変篃浠ュ瓧绗︿覆褰㈠紡瀛樺偍锛岀敱娓叉煋灞傝В鏋愩€?
+ * 所有设置项统一以字符串存入 settings 表的 KV 结构。
+ * 复杂结构（如 accent）也以字符串形式存储，由渲染层解析。
  */
 export const SettingKey = {
-  // 鈥斺€?涓婚 / 澶栬 鈥斺€?
-  /** 涓婚妯″紡锛?light' | 'dark' | 'system' */
+  // ——— 主题 / 外观 ———
+  /** 主题模式：'light' | 'dark' | 'system' */
   Skin: "skin",
-  /** 璇嗗埆鏍峰紡棰勮id */
-  /** UI 瀛椾綋 CSS font-family锛涚┖瀛楃涓茶〃绀烘部鐢ㄤ富棰橀粯璁?*/
+  /** 识别样式预设 ID */
+  /** UI 字体 CSS font-family；空字符串表示沿用主题默认值 */
   FontFamily: "font_family",
-  /** 绛夊瀛椾綋 CSS font-family锛涚┖瀛楃涓茶〃绀烘部鐢ㄤ富棰橀粯璁?*/
+  /** 等宽字体 CSS font-family；空字符串表示沿用主题默认值 */
   MonoFontFamily: "mono_font_family",
-  /** 浜や簰鍏冪礌浣跨敤鎸囬拡鍏夋爣 */
+  /** 交互元素使用指针光标 */
   UsePointerCursor: "use_pointer_cursor",
-  /** 鍑忓皯鍔ㄦ€佹晥鏋滐細'system' | 'on' | 'off' */
+  /** 减少动态效果：'system' | 'on' | 'off' */
   ReduceMotion: "reduce_motion",
-  /** 瀛楀彿绾у埆锛?xs' | 'sm' | 'base' | 'lg' | 'xl' */
+  /** 字号级别：'xs' | 'sm' | 'base' | 'lg' | 'xl' */
   FontSize: "font_size",
-  /** 浠ｇ爜瀛椾綋澶у皬锛坧x锛?*/
+  /** 代码字体大小（px） */
   CodeFontSizePx: "code_font_size_px",
-  /** 宸紓鏍囪锛?color' | 'symbol' */
+  /** 差异标记：'color' | 'symbol' */
   DiffMark: "diff_mark",
-  /** 鐣岄潰瀵嗗害锛?compact' | 'comfortable' | 'loose' */
+  /** 界面密度：'compact' | 'comfortable' | 'loose' */
   LayoutDensity: "layout_density",
-  /** 鐣岄潰璇█锛?zh-CN' | 'en' */
+  /** 界面语言：'zh-CN' | 'en' */
   Language: "language",
-  // 鈥斺€?妯″瀷 鈥斺€?
-  /** 褰撳墠閫変腑鐨勬ā鍨嬪紩鐢紝褰㈠ "openai/gpt-4o" */
+  // ——— 模型 ———
+  /** 当前选中的模型引用，形如 "openai/gpt-4o" */
   SelectedModel: "selected_model",
-  /** 閲囨牱娓╁害 0~2锛岄粯璁?0.7 */
+  /** 采样温度 0~2，默认 0.7 */
   ModelTemperature: "model_temperature",
-  /** 鏈€澶ц緭鍑?token 鏁帮紝榛樿 4096 */
+  /** 最大输出 token 数，默认 4096 */
   ModelMaxTokens: "model_max_tokens",
-  /** nucleus sampling 姒傜巼 0~1锛岄粯璁?1 */
+  /** nucleus sampling 概率 0~1，默认 1 */
   ModelTopP: "model_top_p",
   /** Chat reasoning effort level. */
   ChatReasoningLevel: "chat_reasoning_level",
@@ -2577,10 +2577,10 @@ export const SettingKey = {
   BuiltinModelCatalog: "builtin_model_catalog",
   /** Global limit for child agents running at the same time. */
   MaxConcurrentSubagents: "max_concurrent_subagents",
-  // 鈥斺€?鍏跺畠 鈥斺€?
-  /** 褰撳墠浼氳瘽 ID */
+  // ——— 其它 ———
+  /** 当前会话 ID */
   ActiveConversationId: "active_conversation_id",
-  /** 褰撳墠鏅鸿兘浣?ID */
+  /** 当前智能体 ID */
   ActiveAgentId: "active_agent_id",
   WorkspaceParentDirectory: "workspace_parent_directory",
 } as const;
@@ -2627,30 +2627,30 @@ export interface WorkspaceMediaSaveResult {
 }
 
 // ============================================================
-// 璁剧疆椤圭被鍨嬪畾涔?
+// 设置项类型定义
 // ============================================================
 
-/** 涓婚妯″紡 */
+/** 主题模式 */
 export type SkinId = "white" | "black" | "zzz";
 
-/** 瀛楀彿绾у埆 */
+/** 字号级别 */
 export type FontSizeLevel = "xs" | "sm" | "base" | "lg" | "xl";
 
-/** 鐣岄潰瀵嗗害 */
+/** 界面密度 */
 export type LayoutDensity = "compact" | "comfortable" | "loose";
 
-/** 鍑忓皯鍔ㄦ€佹晥鏋滃亸濂?*/
+/** 减少动态效果偏好 */
 export type ReduceMotion = "system" | "on" | "off";
 
-/** 宸紓鏍囪鏂瑰紡 */
+/** 差异标记方式 */
 export type DiffMark = "color" | "symbol";
 
-/** 鏀寔鐨勭晫闈㈣瑷€ */
+/** 支持的界面语言 */
 export type AppLanguage = "zh-CN" | "en";
 
 export type LanguageMode = "system" | AppLanguage;
 
-/** 瀛楀彿绾у埆鍒板儚绱犲€肩殑鏄犲皠锛堝簲鐢ㄤ簬鏍?font-size锛?*/
+/** 字号级别到像素值的映射（应用于 CSS font-size） */
 export const FONT_SIZE_PX: Record<FontSizeLevel, number> = {
   xs: 13,
   sm: 14,
@@ -2659,11 +2659,11 @@ export const FONT_SIZE_PX: Record<FontSizeLevel, number> = {
   xl: 18,
 };
 
-/** UI 瀛椾綋棰勮 */
+/** UI 字体预设 */
 export interface FontPreset {
   id: string;
   label: string;
-  /** CSS font-family 瀛楃涓?*/
+  /** CSS font-family 字符串 */
   value: string;
 }
 
@@ -2719,9 +2719,9 @@ export interface RuntimeSnapshot {
 }
 
 /**
- * 搴旂敤璁剧疆鑱氬悎锛堟覆鏌撳眰浣跨敤锛?
+ * 应用设置聚合（渲染层使用）
  *
- * 姣忎釜瀛楁閮藉彲鐙珛鎸佷箙鍖栵紝鑱氬悎鍚庝究浜庡湪 UI 涓粺涓€娑堣垂涓庡疄鏃跺簲鐢ㄣ€?
+ * 每个字段都可独立持久化，聚合后便于在 UI 中统一消费与实时应用。
  */
 export interface AppSettings {
   skin: SkinId;
@@ -2742,9 +2742,9 @@ export interface AppSettings {
 }
 
 /**
- * 榛樿璁剧疆
+ * 默认设置
  *
- * "鎭㈠榛樿璁剧疆" 涓€閿噸缃埌姝ゅ璞°€?
+ * "恢复默认设置" 一键重置到此对象。
  */
 export const DEFAULT_SETTINGS: AppSettings = {
   skin: "white",

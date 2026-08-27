@@ -77,9 +77,10 @@ SSE 预设示例：
 
 ```powershell
 vp run ayaka-desktop#typecheck:node
-vp run ayaka-desktop#typecheck:web
 vp run ayaka-desktop#test:main
-vp run ayaka-desktop#test:renderer
+vp run ayaka-desktop#test:electron
 ```
+
+桌面验证仅覆盖 Main 和 Electron 后台测试；不要新增、恢复或运行页面/renderer 测试，也不要使用浏览器自动化测试页面。
 
 添加预设后，至少确认 JSON 可解析、它能在 MCP 预设页显示、详情配置正确、安装后保持禁用，并在输入所需 secret 后成功审查和启用。stdio 预设还应确认 command、args 和外部依赖由用户环境提供。

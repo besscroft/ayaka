@@ -83,12 +83,12 @@ import type {
 import type { UIMessage } from "ai";
 
 /**
- * 娓叉煋灞傚 window.api 鐨勭被鍨嬪寲灏佽
+ * 渲染层对 window.api 的类型化封装
  *
- * 閫氳繃姝ゆā鍧楃粺涓€璁块棶 IPC锛屼究浜庯細
- * - 绫诲瀷鎺ㄥ
- * - 鍗曠偣淇敼 IPC 璋冪敤鏂瑰紡
- * - 鍗曞厓娴嬭瘯 mock
+ * 通过此模块统一访问 IPC，便于：
+ * - 类型推导
+ * - 单点修改 IPC 调用方式
+ * - 单元测试 mock
  */
 
 function assertApi(): NonNullable<Window["api"]> {

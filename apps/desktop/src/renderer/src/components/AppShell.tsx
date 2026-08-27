@@ -109,8 +109,8 @@ export function AppShell({
     };
   }, []);
 
-  // 鐩戝惉鑷姩/鎵嬪姩閲嶅懡鍚嶏細浼樺厛鐢ㄤ簨浠舵惡甯︾�?title 鐩存帴鏇存柊鏈�?state�?
-  // 鑻ユ病鏈?title锛堜緥濡傛潵鑷叾浠栨笭閬擄級锛屽垯闄嶇骇涓哄叏�?refresh�?
+  // 监听自动/手动重命名：优先用事件携带的 title 直接更新本地 state。
+  // 若没有 title（例如来自其他渠道），则降级为全量 refresh。
   useEffect(() => {
     const handler = (e: Event): void => {
       const detail = (e as CustomEvent<{ id: string; title?: string }>).detail;
@@ -148,12 +148,13 @@ export function AppShell({
   };
 
   /**
-   * 杩囨�?+ 鍒嗙粍锛堟寜 updated_at 鍊掑簭锛?
+   * 过滤 + 分组（按 updated_at 倒序）
    *
-   * 鍒嗙粍绛栫暐�?
-   *  - 浠婂ぉ锛歶pdated_at 涓庝粖澶╁湪鍚屼竴澶?
-   *  - 鏄ㄥぉ锛氱浉�?1 澶╀笖璺ㄦ棩
-   *  - 鏈懆锛? 澶╁�?   *  - 鏇存棭锛氬叾�?
+   * 分组策略：
+   *  - 今天：updated_at 与今天在同一天
+   *  - 昨天：相差 1 天且跨日
+   *  - 本周：7 天内
+   *  - 更早：其他日期
    */
   const groupedConversations = useMemo<Array<{ label: string; items: Conversation[] }>>(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -181,7 +182,7 @@ export function AppShell({
       (groups[label] ??= []).push(c);
     }
 
-    // 鍥哄畾鍒嗙粍椤哄簭锛氫粖澶╀笌鏄ㄥぉ涓庡悓鍚屼竴澶╀笌鏈懆涓庡叾浠?
+    // 固定分组顺序：今天、昨天、本周、其他。
     const order = [
       t("shell.group.today"),
       t("shell.group.yesterday"),
@@ -275,7 +276,7 @@ export function AppShell({
                 </Button>
               </div>
 
-              {/* 创意：搜索框（仅在会话时显示�?*/}
+              {/* 搜索框（仅在有会话时显示） */}
               {conversations.length > 0 && (
                 <div className="relative px-3 pb-2">
                   <div className="relative">

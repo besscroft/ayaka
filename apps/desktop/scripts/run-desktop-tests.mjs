@@ -10,7 +10,6 @@ const testsRoot = resolve(desktopRoot, "../../tests/desktop");
 const group = process.argv[2];
 
 const manifestByGroup = {
-  renderer: "renderer.test.ts",
   main: "main.test.ts",
   electron: "electron.test.ts",
 };
@@ -32,17 +31,9 @@ if (testFiles.length === 0) {
 const isElectron = group === "electron";
 const tsxCli = require.resolve("tsx/cli");
 const runner = isElectron ? require("electron") : process.execPath;
-const args = [
-  tsxCli,
-  "--tsconfig",
-  isElectron || group === "main" ? "tsconfig.test.node.json" : "tsconfig.web.json",
-];
+const args = [tsxCli, "--tsconfig", "tsconfig.test.node.json"];
 
-if (isElectron || group === "main") {
-  args.push("--experimental-test-module-mocks");
-}
-
-args.push("--test", ...testFiles);
+args.push("--experimental-test-module-mocks", "--test", ...testFiles);
 
 const result = spawnSync(runner, args, {
   cwd: desktopRoot,

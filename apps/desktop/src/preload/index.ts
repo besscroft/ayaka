@@ -11,13 +11,13 @@ import type {
 } from "../shared/types";
 
 /**
- * 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
+ * 暴露给渲染进程的 API
  *
- * 璁捐瑕佺偣锛?
- * - 浠呴€氳繃 contextBridge.exposeInMainWorld 鏆撮湶鐧藉悕鍗曟柟娉?
- * - 娓叉煋灞傞€氳繃 window.api.* 璋冪敤锛屾棤鐩存帴 ipcRenderer 璁块棶
- * - 鎵€鏈夋柟娉曡繑鍥?Promise锛坕pcRenderer.invoke 璇箟锛?
- * - API key 鏄庢枃涓嶅嚭涓昏繘绋嬶紙鏃?get 鏂规硶锛?
+ * 设计要点：
+ * - 仅通过 contextBridge.exposeInMainWorld 暴露白名单方法
+ * - 渲染层通过 window.api.* 调用，无直接 ipcRenderer 访问
+ * - 所有方法返回 Promise（ipcRenderer.invoke 语义）
+ * - API key 明文不出主进程（无 get 方法）
  */
 function sendRendererError(input: Omit<ErrorLogInput, "source">): void {
   try {
@@ -462,7 +462,7 @@ const api = {
   },
 } as const;
 
-// contextIsolation 鍚敤鏃堕€氳繃 contextBridge 鏆撮湶锛涘惁鍒欑洿鎺ユ寕鍒?window
+// contextIsolation 启用时通过 contextBridge 暴露；否则直接挂载到 window
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld("electron", electronAPI);
@@ -471,8 +471,8 @@ if (process.contextIsolated) {
     console.error(error);
   }
 } else {
-  // @ts-expect-error 鐢?d.ts 澹版槑
+  // @ts-expect-error 使用 d.ts 声明
   window.electron = electronAPI;
-  // @ts-expect-error 鐢?d.ts 澹版槑
+  // @ts-expect-error 使用 d.ts 声明
   window.api = api;
 }

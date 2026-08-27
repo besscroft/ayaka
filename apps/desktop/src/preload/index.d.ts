@@ -85,12 +85,12 @@ import type {
 import type { UIMessage } from "ai";
 
 /**
- * Ayaka 鏆撮湶缁欐覆鏌撹繘绋嬬殑 API
+ * Ayaka 暴露给渲染进程的 API
  *
- * 璁捐鍘熷垯锛?
- * - 浠呴€氳繃 contextBridge 鏆撮湶鐧藉悕鍗曟柟娉曪紝娓叉煋灞傛棤娉曠洿鎺ヨ闂?Node API
- * - API key 鏄庢枃涓嶅嚭涓昏繘绋嬶紱杩欓噷鍙彁渚?set/list锛屼笉鎻愪緵 get
- * - 鎵€鏈夋柟娉曡繑鍥?Promise锛坕pcRenderer.invoke 鐨勮涔夛級
+ * 设计原则：
+ * - 仅通过 contextBridge 暴露白名单方法，渲染层无法直接访问 Node API
+ * - API key 明文不出主进程；这里只提供 set/list，不提供 get
+ * - 所有方法返回 Promise（ipcRenderer.invoke 的语义）
  */
 export interface AyakaApi {
   windowControls: {
@@ -100,7 +100,7 @@ export interface AyakaApi {
     close: () => Promise<void>;
     onMaximizedChange: (handler: (maximized: boolean) => void) => () => void;
   };
-  // 浼氳瘽鍘嗗彶
+  // 会话历史
   tray: {
     onAction: (handler: (action: TrayAction) => void) => () => void;
     setLabels: (labels: TrayMenuLabels) => Promise<boolean>;
@@ -117,7 +117,7 @@ export interface AyakaApi {
     purgeExpired: () => Promise<number>;
     touch: (id: string, title?: string) => Promise<boolean>;
   };
-  // 娑堟伅
+  // 消息
   messages: {
     list: (conversationId: string) => Promise<MessageSnapshot>;
     save: (msg: MessageRow) => Promise<boolean>;
@@ -190,7 +190,7 @@ export interface AyakaApi {
     enable: (id: string, enabled: boolean) => Promise<ArtifactInstallation>;
     uninstall: (id: string) => Promise<boolean>;
   };
-  // 搴旂敤璁剧疆
+  // 应用设置
   settings: {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<boolean>;
@@ -199,7 +199,7 @@ export interface AyakaApi {
   logs: {
     export: () => Promise<ErrorLogExportResult>;
   };
-  // API Key 绠＄悊锛堟槑鏂囦笉澶栨硠锛?
+  // API Key 管理（明文不外泄）
   apikeys: {
     list: () => Promise<string[]>;
     set: (provider: string, apiKey: string) => Promise<boolean>;
@@ -290,7 +290,7 @@ export interface AyakaApi {
   sync: {
     get: () => Promise<SyncState>;
   };
-  // Provider 鍏冧俊鎭?
+  // Provider 元信息
   tools: {
     snapshot: () => Promise<ToolsSnapshot>;
     updateTool: (
@@ -416,7 +416,7 @@ export interface AyakaApi {
     deleteCustomModel: (providerId: string, modelId: string) => Promise<boolean>;
     onCatalogUpdated: (handler: (event: { providerId: string }) => void) => () => void;
   };
-  // 鏈湴 AI 鏈嶅姟
+  // 本地 AI 服务
   server: {
     port: () => Promise<number>;
     info: () => Promise<LocalServerInfo>;

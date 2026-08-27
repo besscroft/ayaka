@@ -26,7 +26,7 @@ This is a pnpm workspace for a local-first AI desktop application.
 - `apps/desktop/drizzle`: checked-in SQLite migrations and Drizzle metadata. The runtime database is created under Electron's `userData/data/ayaka.db`, not in the repository.
 - `apps/desktop/resources`: packaged desktop assets, including pet resources.
 - `tests/vite-plus`: root-level Vite+ smoke tests.
-- `tests/desktop`: desktop main-process and renderer tests, kept separate from production `src` code.
+- `tests/desktop`: desktop backend tests, kept separate from production `src` code.
 - `docs`: architecture notes, component notes, and implementation specifications. `docs/architecture.md` is the source of truth for the product/runtime model.
 - `.agents/skills`: local agent skills. Root formatting and linting intentionally ignore skill trees.
 
@@ -63,11 +63,10 @@ Validation and builds:
 ```bash
 vp check                         # repository formatting, lint, and type-aware checks
 vp test                          # root tests configured in vite.config.ts
-vp run ayaka-desktop#test              # full desktop renderer + main-process test suite
-vp run ayaka-desktop#test:renderer     # desktop renderer tests
+vp run ayaka-desktop#test              # full desktop backend test suite
 vp run ayaka-desktop#test:main         # desktop main-process tests
 vp run ayaka-desktop#test:electron     # Electron-backed desktop tests
-vp run ayaka-desktop#typecheck:test    # test-only TypeScript checks
+vp run ayaka-desktop#typecheck:test    # backend test-only TypeScript checks
 vp run ayaka-desktop#typecheck         # node and web TypeScript projects
 vp run ayaka-desktop#typecheck:web
 vp run ayaka-desktop#typecheck:node
@@ -78,7 +77,14 @@ vp run docs#build
 
 The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are stale after changing Node/Electron versions, run `vp run ayaka-desktop#rebuild:native` before retrying. The package also exposes `ayaka-desktop#db:generate`, `ayaka-desktop#db:studio`, and `ayaka-desktop#db:migrate` for Drizzle work.
 
-`vp run ayaka-desktop#test` uses Node's built-in test runner through `tsx` and includes separate renderer/web, main/node, and Electron-backed groups. Tests live under `tests/desktop` and are registered through the renderer, main, and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
+`vp run ayaka-desktop#test` uses Node's built-in test runner through `tsx` and includes the main/node and Electron-backed backend groups. Tests live under `tests/desktop` and are registered through the main and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
+
+### Desktop Test Scope
+
+- Desktop tests are backend-only. The page/renderer test suite has been intentionally removed to keep validation focused and avoid spending tokens on UI tests.
+- Do not add, restore, or run page/renderer tests or browser automation for desktop pages. In particular, do not recreate or reference `tests/desktop/renderer/**`, `tests/desktop/renderer.test.ts`, `apps/desktop/tsconfig.test.web.json`, `test:renderer`, or `typecheck:test:web`.
+- The permitted desktop test commands are `vp run ayaka-desktop#test:main`, `vp run ayaka-desktop#test:electron`, and the aggregate `vp run ayaka-desktop#test`. Test-only type checking is Node-only via `vp run ayaka-desktop#typecheck:test`.
+- `vp run ayaka-desktop#typecheck:web` remains a production renderer type check when build/type safety requires it; it is not a reason to add or run page tests. `tests/vite-plus` remains in scope because it is a root-level toolchain/API test group, not a desktop page test.
 
 ## Change Guidelines
 
@@ -87,7 +93,7 @@ The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are s
 - Add user-facing strings to `apps/desktop/src/renderer/src/lib/i18n.messages.ts` rather than hard-coding copy in components. Preserve both Chinese and English entries when changing shared UI text.
 - Prefer narrow main-process modules under `apps/desktop/src/main/lib`. Keep IPC handlers thin and put validation/business logic in the owning module so it can be unit tested without a window.
 - For agent, workflow, tool, memory, approval, sandbox, or provider changes, add or update focused tests under `tests/desktop/main` while mirroring the production source area. Include runtime event/step assertions when the change affects execution or diagnostics.
-- For UI changes, add or update the corresponding test under `tests/desktop/renderer`; do not add a browser automation dependency for a pure helper or state transition.
+- For renderer/UI changes, do not add page tests or browser automation; use only the production type check/build when needed and test backend behavior through `tests/desktop/main` or `tests/desktop/electron.test.ts` when applicable.
 - Do not commit build output, native rebuild output, local databases, secrets, or generated temporary files. Keep unrelated worktree changes intact.
 
 ## Review Checklist

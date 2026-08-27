@@ -253,15 +253,15 @@ import {
 } from "../lib/error-logger";
 
 /**
- * IPC handlers 娉ㄥ唽
+ * IPC handlers 注册
  *
- * 鍛藉悕绾﹀畾锛歝hannel 褰㈠ "domain:action"
+ * 命名约定：channel 形如 "domain:action"
  *  - conversations:list / conversations:create / conversations:delete / conversations:get
  *  - messages:list / messages:save
  *  - settings:get / settings:set
  *  - apikeys:list / apikeys:set / apikeys:delete
- *  - server:port         鑾峰彇鏈湴 AI 鏈嶅姟绔彛
- *  - providers:list      鑾峰彇 provider 鍒楄〃锛堝惈妯″瀷銆乭elpUrl锛?
+ *  - server:port         获取本地 AI 服务端口
+ *  - providers:list      获取 provider 列表（含模型、helpUrl）
  */
 
 export interface IpcHandlerOptions {
@@ -359,7 +359,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   ipcMain.handle("updates:download", () => updateManager.download());
   ipcMain.handle("updates:install", () => updateManager.install());
 
-  // ---------- 浼氳瘽鍘嗗彶 ----------
+  // ---------- 会话历史 ----------
   ipcMain.handle("conversations:list", () => listConversations());
 
   ipcMain.handle("conversations:get", (_e, id: string) => getConversation(id));
@@ -520,7 +520,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     },
   );
 
-  // ---------- 娑堟伅 ----------
+  // ---------- 消息 ----------
   ipcMain.handle("messages:list", (_e, conversationId: string) =>
     getMessagesSnapshot(conversationId),
   );
@@ -577,7 +577,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     return result;
   });
 
-  // ---------- 璁剧疆 ----------
+  // ---------- 设置 ----------
   ipcMain.handle("settings:get", (_e, key: string) => getSetting(key));
 
   ipcMain.handle("settings:set", async (_e, key: string, value: string) => {
@@ -603,9 +603,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     await deleteApiKey(provider);
     return true;
   });
-  // 娉ㄦ剰锛氫笉鏆撮湶 apikeys:get 鏄庢枃鎺ュ彛锛屾覆鏌撳眰鏃犻渶璇诲彇鏄庢枃 key
+  // 注意：不暴露 apikeys:get 明文接口，渲染层无需读取明文 key
 
-  // ---------- AI 宸ヤ綔鍙?----------
+  // ---------- AI 工作台 ----------
   ipcMain.handle("runtime:snapshot", () => getRuntimeSnapshot());
   ipcMain.handle(
     "runtime:enqueueInput",
@@ -1218,5 +1218,5 @@ function isTrayMenuLabels(value: unknown): value is TrayMenuLabels {
   );
 }
 
-/** 瀵煎嚭绫诲瀷渚?preload 浣跨敤 */
+/** 导出类型供 preload 使用 */
 export type { Conversation, MessageRow };

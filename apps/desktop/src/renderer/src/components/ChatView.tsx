@@ -1,15 +1,15 @@
 /**
  * ChatView
  *
- * 娓叉煋灞傦細鎶?浼氳瘽"鍜?娑堟伅"涓や欢浜嬩覆璧锋潵
+ * 渲染层：把"会话"和"消息"两件事串起来
  *
- * 鑱岃矗锛?
- *  - 鍔犺浇鍘嗗彶娑堟伅 -> 浜ょ粰 useChat
- *  - 鍙戦€侊細鎶婄敤鎴锋秷鎭啓鍏?DB锛坧re-save锛夊悗鍐?sendMessage
- *  - 娴佸紡缁撴潫 -> 鎶婃渶鏂板揩鐓у啓鍥?DB
- *  - 澶撮儴灞曠ず锛氬璇濈姸鎬佸窘绔狅紙娴佸紡 / 灏辩华 / 閿欒 / 鍋滄锛? 涓婁笅鏂囩敤閲?
- *  - 鏍囬鑷姩鐢熸垚锛氶娆?user + assistant 瀹屾暣鍑虹幇鍚庤皟鐢?/api/title
- *  - 娑堟伅鍔ㄤ綔锛圗dit / Resend / Delete锛夌敱鏈粍浠跺疄鐜帮紝浼犻€掔粰 MessageList
+ * 职责：
+ *  - 加载历史消息 -> 交给 useChat
+ *  - 发送：把用户消息写入 DB（pre-save）后再 sendMessage
+ *  - 流式结束 -> 把最新快照写回 DB
+ *  - 头部展示：对话状态徽章（流式 / 就绪 / 错误 / 停止）+ 上下文用量
+ *  - 标题自动生成：首次 user + assistant 完整出现后调用 /api/title
+ *  - 消息动作（Edit / Resend / Delete）由本组件实现，传递给 MessageList
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
@@ -104,9 +104,9 @@ interface ChatViewProps {
 type AutoTitleStatus = "running" | "completed";
 
 /**
- * 妯″瀷涓婁笅鏂囩獥鍙ｆ煡鎵撅紙绮楃暐锛夈€?
- *  - 閮ㄥ垎涓绘祦妯″瀷浠庡凡鐭ョ殑"鍘傚晢鎯緥"缁欓粯璁ゅ€?
- *  - 鎵句笉鍒板垯鍥炶惤鍒?32K
+ * 模型上下文窗口查找（粗略）。
+ *  - 部分主流模型从已知的"厂商惯例"给默认值
+ *  - 找不到则回落到 32K
  */
 const CONTEXT_WINDOW_BY_MODEL: Array<{ match: RegExp; tokens: number }> = [
   { match: /^gpt-4o-mini|^gpt-4o$|^chatgpt-4o/i, tokens: 128_000 },
@@ -185,7 +185,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
   const [permissionSource, setPermissionSource] = useState<"default" | "conversation">("default");
   const [mcpInputRequest, setMcpInputRequest] = useState<McpInputRequest | null>(null);
-  /** 鏄惁宸蹭负鏈璇濈敓鎴愯繃鏍囬锛堥槻姝㈤噸澶嶇敓鎴愶級 */
+  /** 是否已为本对话生成过标题（防止重复生成） */
   const titleStateRef = useRef<Map<string, AutoTitleStatus>>(new Map());
   const createdAtRef = useRef<Map<string, number>>(new Map());
   const selectedModelRef = useRef<string | null>(null);
@@ -494,7 +494,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       lastNonEmptyMessagesRef.current = cachedMessages.length > 0 ? cachedMessages : [];
       explicitEmptyMessagesRef.current = cachedMessages.length === 0;
     }
-    // 涓嶉噸缃?titledRef锛氫繚鐣欒法浼氳瘽璁板綍锛岄伩鍏嶉噸澶嶇敓鎴愶紙鍒囨崲鍥炲埌鏃у璇濅篃涓嶉噸鐢熸垚锛?
+    // 不重置 titledRef：保留跨会话记录，避免重复生成（切换回到旧对话也不重生成）。
 
     let cancelled = false;
     let loadedConversationTitle: string | null = null;
@@ -538,7 +538,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
         setInitialMessages(messages);
         setHydrationState("ready");
         hydrationStateRef.current = "ready";
-        // 濡傛灉鍘嗗彶涓凡缁忔湁鏍囬锛圖B 宸叉湁锛夛紝鏍囪涓哄凡鐢熸垚锛岄伩鍏嶅啀娆¤Е鍙?
+        // 如果历史中已经有标题（DB 已有），标记为已生成，避免再次触发。
         if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
           titleStateRef.current.set(conversationId, "completed");
         }
@@ -910,7 +910,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
   }, [conversationId, renderedMessages.length, isLoading, fetchStarterSuggestions]);
 
-  /* ---------- 鐘舵€佹槧灏?---------- */
+  /* ---------- 状态徽章 ---------- */
   const statusKind: ConversationStatusKind = chat.error
     ? "error"
     : isChatLoading
@@ -931,7 +931,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     return { usedTokens, maxTokens, costUsd: undefined as number | undefined };
   }, [renderedMessages, modelContextWindows, selectedModel]);
 
-  /* ---------- 鍙戦€?---------- */
+  /* ---------- 发送 ---------- */
   const handleSend = async ({
     text,
     files,
@@ -1198,7 +1198,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (target.role !== "user") return;
     manualMessageMutationRef.current = true;
 
-    // 1. 鎵惧埌璇?user 娑堟伅锛屾浛鎹?text part锛屽垹闄ゅ悗缁墍鏈夋秷鎭?
+    // 1. 找到该 user 消息，替换 text part，删除后续所有消息。
     const updated: UIMessage = {
       ...target,
       parts: [
@@ -1213,7 +1213,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     explicitEmptyMessagesRef.current = nextMessages.length === 0;
     createdAtRef.current.delete(messageId);
 
-    // 2. 鎸佷箙鍖栨柊蹇収锛堝垹闄ゅ悗缁秷鎭級
+    // 2. 持久化新快照（删除后续消息）。
     persistInBackground(
       nextMessages,
       "edited message",
@@ -1226,7 +1226,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setChatError(null);
     chat.clearError();
 
-    // 3. 瑙﹀彂閲嶆柊鐢熸垚
+    // 3. 触发重新生成。
     try {
       await chat.regenerate({ messageId: target.id });
     } catch (err) {
@@ -1234,7 +1234,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
   };
 
-  /* ---------- 娑堟伅鍔ㄤ綔锛氶噸鏂板彂閫?---------- */
+  /* ---------- 消息动作：重新发送 ---------- */
   const handleResendMessage = async (messageId: string): Promise<void> => {
     const idx = renderedMessages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
@@ -1242,7 +1242,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (target.role !== "user") return;
     manualMessageMutationRef.current = true;
 
-    // 1. 鎴柇鍒拌 user 娑堟伅
+    // 1. 截断到该 user 消息。
     const nextMessages = renderedMessages.slice(0, idx + 1);
     chat.setMessages(nextMessages);
     latestMessagesRef.current = nextMessages;
@@ -1255,14 +1255,14 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     setChatError(null);
     chat.clearError();
 
-    // 2. 鎸佷箙鍖栵紙鍒犻櫎鍚庣画娑堟伅锛?
+    // 2. 持久化（删除后续消息）。
     persistInBackground(
       nextMessages,
       "resent message",
       renderedMessages.slice(idx + 1).map((message) => message.id),
     );
 
-    // 3. 瑙﹀彂閲嶆柊鐢熸垚
+    // 3. 触发重新生成。
     try {
       await chat.regenerate({ messageId: target.id });
     } catch (err) {
@@ -1270,7 +1270,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     }
   };
 
-  /* ---------- 娑堟伅鍔ㄤ綔锛氬垹闄?---------- */
+  /* ---------- 消息动作：删除 ---------- */
   const handleDeleteMessage = (messageId: string): void => {
     const idx = renderedMessages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
@@ -1279,7 +1279,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (!confirmed) return;
     manualMessageMutationRef.current = true;
 
-    // 1. 鍒犻櫎鐩爣 + 濡傛灉鐩爣鏄?user 娑堟伅锛岀揣璺熺殑 assistant 涔熶竴骞跺垹闄?
+    // 1. 删除目标；如果目标是 user 消息，紧跟的 assistant 也一并删除。
     const next = [...renderedMessages];
     const deletedIds = [target.id];
     next.splice(idx, 1);
@@ -1293,10 +1293,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     explicitEmptyMessagesRef.current = next.length === 0;
     createdAtRef.current.delete(messageId);
     if (next[idx - 1]?.role === "user") {
-      // 鍚屾鍒犻櫎鍙兘瀛樺湪鐨?createdAt
+      // 同步删除可能存在的 createdAt。
     }
 
-    // 2. 鎸佷箙鍖栵紙鐩爣娑堟伅涓庡彲鑳界殑 assistant 鍚屾浠?DB 涓垹闄わ級
+    // 2. 持久化（目标消息与可能的 assistant 同步从 DB 中删除）。
     persistInBackground(next, "message deletion", deletedIds);
     notify.success(t("chat.messageDeleted"));
   };
@@ -1433,7 +1433,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
 }
 
-/* ---------- 澶撮儴 ---------- */
+/* ---------- 头部 ---------- */
 
 interface ChatHeaderProps {
   status: ConversationStatusKind;
@@ -1442,7 +1442,7 @@ interface ChatHeaderProps {
 }
 
 /**
- * 澶撮儴鍙睍绀?瀵硅瘽鍚?+ 鐘舵€佸窘绔?锛涗笂涓嬫枃鐢ㄩ噺宸茶縼鑷宠緭鍏ユ鐨?ContextPopover銆?
+ * 头部只展示对话名 + 状态徽章；上下文用量已迁至输入框的 ContextPopover。
  */
 function ChatHeader({ status, workspace, agentStatus }: ChatHeaderProps): React.JSX.Element {
   const { t } = useT();
@@ -1478,15 +1478,15 @@ function ChatHeader({ status, workspace, agentStatus }: ChatHeaderProps): React.
   );
 }
 
-/* ---------- 鎸佷箙鍖?---------- */
+/* ---------- 持久化 ---------- */
 
-/* ---------- 鑷姩鏍囬鐢熸垚 ---------- */
+/* ---------- 自动标题生成 ---------- */
 
 /**
- * 褰撴湰杞?user + assistant 瀹屾暣鍑虹幉鍚庯紝璋冪敤 /api/title 鐢熸垚鏍囬
- *  - 浠呴娆★紙宸茬敓鎴愯繃鐨勫璇濅笉鍐嶇敓鎴愶級
- *  - 镓惧埌绗竴𨱒?user 娑堟伅鍙婂叾钖庨潬镄勭涓€𨱒?assistant 娑堟伅浣滀负鎹?锛?
- *    涓嶅己姘旗被鍨嬩綅缃纸鍏铡嗗彶/绯荤粺娑堟伅鍓|銆佹。搴忓彉鍖栵级锛岃€屼笉鏄镆?messages[0]/messages[1]銆?
+ * 当本轮 user + assistant 完整出现后，调用 /api/title 生成标题。
+ *  - 仅首次（已生成过的对话不再生成）
+ *  - 找到第一条 user 消息及其后面靠前的第一条 assistant 消息作为依据
+ *    不强制类型位置（兼容历史/系统消息前缀、档序变化），而不是检查 messages[0]/messages[1]。
  */
 function tryAutoTitle(
   conversationId: string,

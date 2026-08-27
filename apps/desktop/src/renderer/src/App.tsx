@@ -52,8 +52,8 @@ function AppContent(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>("appearance");
   const announcedUpdateVersion = useRef<string | null>(null);
-  // 鏈嶅姟绔彛锛歶seChat 蹇呴』鍦ㄩ娆℃覆鏌撳氨鎷垮埌姝ｇ‘ transport锛?
-  // 鍥犳绔彛灏辩华鍓嶄笉鎸傝浇 ChatView銆?
+  // 服务端口：useChat 必须在首次渲染就拿到正确 transport。
+  // 因此端口就绪前不挂载 ChatView。
   const [serverInfo, setServerInfo] = useState<LocalServerInfo | null>(null);
 
   const createNewConversation = useCallback(async (): Promise<void> => {
@@ -90,7 +90,7 @@ function AppContent(): React.JSX.Element {
   }, [createNewConversation]);
 
   useEffect(() => {
-    // 鎻愭棭鎷夊彇鏈湴鏈嶅姟绔彛锛岄伩鍏?ChatView 鍐呴儴 useEffect 鎶㈣窇
+    // 提早拉取本地服务端口，避免 ChatView 内部 useEffect 抢跑。
     void api.server.info().then(setServerInfo);
   }, []);
 

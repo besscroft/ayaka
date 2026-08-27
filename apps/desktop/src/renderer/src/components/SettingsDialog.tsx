@@ -98,9 +98,9 @@ import {
 import { SKIN_DEFINITIONS } from "../skins/registry";
 
 interface SettingsDialogProps {
-  /** 鎺у埗鏄鹃殣 */
+  /** 控制显示与隐藏 */
   open: boolean;
-  /** 鍏抽棴鍥炶皟 */
+  /** 关闭回调 */
   onClose: () => void;
   initialTab?: SettingsTabId;
 }
@@ -120,7 +120,7 @@ function customProviderApiFormatOptions(
   }));
 }
 
-/** Tab 瀹氫箟 */
+/** Tab 定义 */
 export type SettingsTabId =
   | "appearance"
   | "general"
@@ -132,19 +132,15 @@ export type SettingsTabId =
   | "about";
 
 /**
- * 璁剧疆寮圭獥锛堝垎 Tab 缁撴瀯锛?
+ * 设置弹窗（分 Tab 结构）
  *
- * 甯冨眬绀烘剰锛?
- * 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
- * 鈹?璁剧疆                                     [鉁昡 鈹?
- * 鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
- * 鈹?馃帹 澶栬    鈹?                                鈹?
- * 鈹?馃 妯″瀷    鈹?     <褰撳墠 Tab 鍐呭>            鈹?
- * 鈹?馃棏 鍥炴敹绔? 鈹?                                鈹?
- * 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
- *
- * 鎵€鏈夊瑙?妯″瀷璁剧疆鍗虫椂搴旂敤骞舵寔涔呭寲锛堝疄鏃堕瑙堬級锛?
- * 鐮村潖鎬ф搷浣滐紙閲嶇疆銆佹竻缂撳瓨銆佸垹 Key锛夐€氳繃 ConfirmDialog 浜屾纭銆?
+ * 布局示意：
+ * 左侧是设置 Tab 列表，右侧是当前 Tab 内容。
+ * 当前选中的 Tab 显示在右侧内容区域。
+ * Tab 包括外观、模型和回收站等页面。
+ * 设置面板在窄窗口下切换为纵向布局。
+ * 所有外观和模型设置即时应用并持久化（实时预览）。
+ * 破坏性操作（重置、清缓存、删 Key）通过 ConfirmDialog 二次确认。
  */
 export function SettingsDialog({
   open,
@@ -161,7 +157,7 @@ export function SettingsDialog({
     if (open) setTab(initialTab);
   }, [initialTab, open]);
 
-  // ESC 鍏抽棴
+  // ESC 关闭
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent): void => {
@@ -216,7 +212,7 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="h-[calc(100vh-32px)] max-h-[860px] w-[calc(100vw-32px)] max-w-[1280px] p-0">
         <div data-page="settings-dialog" className="flex h-full min-h-0 flex-col overflow-hidden">
-          {/* 澶撮儴 */}
+          {/* 头部 */}
           <div
             data-slot="settings-header"
             className="flex items-center justify-between border-b border-border px-6 py-3.5"
@@ -238,9 +234,9 @@ export function SettingsDialog({
             </button>
           </div>
 
-          {/* 涓讳綋锛氬鑸?+ 鍐呭锛岀獎灞忕旱鍚戝竷灞€ */}
+          {/* 主体：导航 + 内容，窄屏纵向布局 */}
           <div data-slot="settings-layout" className="flex min-h-0 flex-1 overflow-hidden">
-            {/* 瀵艰埅 */}
+            {/* 导航 */}
             <nav
               data-slot="settings-nav"
               aria-label={t("settings.nav")}
@@ -294,7 +290,7 @@ export function SettingsDialog({
             </div>
           </div>
 
-          {/* 搴曢儴 */}
+          {/* 底部 */}
           <div className="flex items-center justify-between border-t border-border px-6 py-2.5">
             <span aria-hidden="true" />
             <Button variant="secondary" onPress={onClose}>
@@ -304,7 +300,7 @@ export function SettingsDialog({
         </div>
       </DialogContent>
 
-      {/* 鎭㈠榛樿纭 */}
+      {/* 恢复默认确认 */}
       <ConfirmDialog
         open={!!confirmResetScope}
         title={
@@ -332,14 +328,14 @@ export function SettingsDialog({
 }
 
 // ============================================================
-// 閫氱敤灏忕粍浠?
+// 通用小组件
 // ============================================================
 
 /**
- * 璁剧疆鍖哄潡
+ * 设置区块
  *
- * 瑙嗚涓婂憟鐜颁负涓€寮?鍒嗙粍鍗?锛氬乏渚у甫娓愬彉鑹茬粏鏉＄殑鏍囬鍖?+ 鍙充晶鐨勫唴瀹瑰尯銆?
- * 璁╁涓缃」鎸変富棰樿仛鍚堝湪涓€璧凤紝閬垮厤鍗曡璁剧疆鏄惧緱闆舵暎銆?
+ * 视觉上呈现为一个分组卡片：左侧为标题区，右侧为内容区。
+ * 让多个设置项按主题聚合在一起，避免单行设置显得零散。
  */
 function SettingSection({
   title,
@@ -379,7 +375,7 @@ function SettingSection({
   );
 }
 
-/** 鍗曡璁剧疆椤癸細宸︿晶鏍囬/鎻忚堪锛屽彸渚ф帶浠?*/
+/** 单行设置项：左侧标题/描述，右侧控件 */
 function SettingItem({
   title,
   desc,
@@ -426,13 +422,13 @@ function ResettableTabHeader({
 }
 
 // ============================================================
-// 澶栬 Tab
+// 外观 Tab
 // ============================================================
 
 /**
- * 涓婚妯″紡棰勮鍗★細涓庡浘涓竴鑷寸殑涓夊紶鍗＄墖锛屾í鍚戝苟鍒?
- *  - 涓婂崐閮ㄥ垎浣跨敤 50/50 宸﹀彸鍒嗗睆鐨?绐楀彛"棰勮
- *  - 杈规棰滆壊闅忛€変腑鐘舵€佸彉鍖栵紙accent / 榛樿锛?
+ * 主题模式预览卡：三张卡片横向排列。
+ * 上半部分使用 50/50 左右分屏模拟窗口预览。
+ * 边框颜色随选中状态变化（accent / 默认）。
  */
 function SkinPreviewCard({
   value,
@@ -543,9 +539,9 @@ function AppearanceTab({
           </div>
         </SettingSection>
 
-        {/* 鈥斺€?涓婚妯″紡棰勮鍗?鈥斺€?*/}
-        {/* 鈥斺€?涓婚鍖?+ 寮鸿皟鑹?骞跺垪 鈥斺€?*/}
-        {/* 鈥斺€?瀛椾綋 鈥斺€?*/}
+        {/* 主题模式预览 */}
+        {/* 主题色和强调色并列 */}
+        {/* 字体 */}
         {/* 字体与排版（合并卡片）：一行四列，字号 tabs 横向 */}
         <SettingSection
           title={t("appearance.fonts")}
@@ -610,9 +606,9 @@ function AppearanceTab({
           </div>
         </SettingSection>
 
-        {/* 鈥斺€?鎺掔増 鈥斺€?*/}
+        {/* 排版 */}
 
-        {/* 鈥斺€?浜や簰 鈥斺€?*/}
+        {/* 交互 */}
         <SettingSection title={t("appearance.interaction")}>
           <SettingItem
             title={t("appearance.pointer")}
@@ -670,7 +666,7 @@ function AppearanceTab({
           />
         </SettingSection>
 
-        {/* 鈥斺€?楂樼骇/宸紓鍖?鈥斺€?*/}
+        {/* 高级/差异化 */}
         <SettingSection title={t("appearance.advanced")}>
           <SettingItem
             title={t("appearance.diff")}
@@ -1003,10 +999,10 @@ function GeneralSettings(): React.JSX.Element {
 }
 
 // ============================================================
-// 瀛楁瀛愮粍浠?
+// 字段子组件
 // ============================================================
 
-/** 瀛椾綋杈撳叆琛岋細鏍囩 + 棰勮涓嬫媺 + 鑷畾涔夎緭鍏?*/
+/** 字体输入行：标签 + 预设下拉 + 自定义输入 */
 /** 字号档位（按从小到大排列，供 Slider 索引映射） */
 const FONT_SIZE_LEVELS: FontSizeLevel[] = ["xs", "sm", "base", "lg", "xl"];
 
@@ -1026,7 +1022,7 @@ function FontSelectRow({
   onChange: (v: string) => void;
 }): React.JSX.Element {
   const { t } = useT();
-  // 褰撳墠 value 鍛戒腑鏌愪釜棰勮鏃堕珮浜畠
+  // 当前 value 命中某个预设时高亮它
   const matchedPreset = presets.find((p) => p.value === value);
   return (
     <div className="flex h-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
@@ -1061,7 +1057,7 @@ function FontSelectRow({
 }
 
 // ============================================================
-// 妯″瀷 Tab
+// 模型 Tab
 // ============================================================
 function ModelTab({
   settings,
@@ -1772,7 +1768,7 @@ function ModelEditorDialog({
 }
 
 // ============================================================
-// 鍥炴敹绔?Tab
+// 回收站 Tab
 // ============================================================
 const DEFAULT_MODEL_CAPABILITIES: ModelCapabilities = {
   textGeneration: true,
