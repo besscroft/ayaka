@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.1.37]
+
+### 中文
+
+#### 新增
+
+- 新增技能脚本执行系统，支持技能包安装与导入、脚本入口管理、依赖检查、运行记录和输出截断，并通过执行策略与路径校验提升安全性。
+- 新增技能显式调用与自动按需加载能力，支持在输入框使用 `/skill:<id>` 语法、技能提及菜单和键盘导航。
+- 新增技能辅助资源读取能力，支持技能安全读取包内资源，并完善空技能调用与输入校验提示。
+- 新增文档站下载页面，支持展示最新 Windows x64 版本、安装包大小、校验和与平台信息。
+
+#### 变更
+
+- 优化技能管理与聊天工具集成，支持技能自动触发、指令加载、技能列表实时更新及不可用状态提示。
+- 优化技能提及输入体验，将 `/skill:<id>` 文本渲染为可编辑技能芯片，并改进菜单筛选、键盘交互和回车提交逻辑。
+- 优化会话消息滚动，首次打开会话自动定位到最新消息；用户主动滚动后立即停止自动跟随。
+- 简化沙箱产物预览流程，移除授权交互，HTML 和静态产物可直接预览。
+- 优化消息编辑流程，保存有效编辑后立即关闭编辑器，再执行异步重新生成。
+- 更新官网产品定位与文案，统一调整为“数字生命体”相关叙事，并完善首页与下载页体验。
+
+### English
+
+#### Added
+
+- Added a Skill script-execution system with Skill package installation and import, script-entry management, dependency checks, run records, output truncation, and execution/path safety validation.
+- Added explicit Skill invocation and on-demand loading with `/skill:<id>` syntax, a Skill mention menu, and keyboard navigation.
+- Added secure access to auxiliary resources inside Skill packages, along with clearer validation for empty Skill invocations and invalid input.
+- Added a documentation-site download page showing the latest Windows x64 release, package size, checksum, and platform details.
+
+#### Changed
+
+- Improved Skill management and chat-tool integration with automatic triggering, instruction loading, live Skill-list updates, and unavailable-state guidance.
+- Improved Skill mentions by rendering `/skill:<id>` text as editable Skill chips and refining menu filtering, keyboard interactions, and Enter-to-submit behavior.
+- Improved conversation scrolling so a newly opened conversation starts at the latest message while user scrolling immediately suspends automatic following.
+- Simplified sandbox-artifact previews by removing authorization interactions and allowing HTML and static artifacts to open directly.
+- Improved message editing so the editor closes immediately after a valid save before asynchronous regeneration begins.
+- Updated the website’s product positioning and copy around the “digital lifeform” direction, with a refined home page and download experience.
+
 ## [0.1.36]
 
 ### 中文
