@@ -190,6 +190,10 @@ void describe("runtime architecture", () => {
       DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "workspace_run_command")?.defaultAuto,
       1,
     );
+    assert.equal(
+      DEFAULT_BUILTIN_TOOL_SEEDS.find((tool) => tool.id === "sandbox_run_command")?.defaultAuto,
+      1,
+    );
     assert.ok(
       DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "cron" && tool.defaultAuto === 1),
     );
@@ -262,6 +266,7 @@ void describe("runtime architecture", () => {
     assert.equal(runtime.toolChoice, "auto");
     assert.ok(runtime.activeTools?.includes("web_open"));
     assert.ok(runtime.activeTools?.includes("runtime_snapshot"));
+    assert.ok(runtime.activeTools?.includes("sandbox_run_command"));
     assert.ok(runtime.activeTools?.includes("cron"));
   });
 

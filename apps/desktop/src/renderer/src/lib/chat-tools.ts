@@ -20,6 +20,7 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "model_capabilities",
   "sandbox_list_files",
   "sandbox_read_file",
+  "sandbox_run_command",
   "sandbox_snapshot",
   "sandbox_list_artifacts",
   "sandbox_publish_artifact",
@@ -146,7 +147,8 @@ const TOOL_METADATA: Record<
   },
   sandbox_run_command: {
     label: "Run sandbox command",
-    description: "Run a command in the current sandbox session.",
+    description:
+      "Run a structured command in the current sandbox session; use it to create files for sandbox previews.",
     kind: "host",
     category: "sandbox",
     requiresApproval: false,

@@ -383,10 +383,11 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
   {
     id: "sandbox_run_command",
     title: "Run sandbox command",
-    description: "Run a command in the active sandbox.",
+    description:
+      "Run a structured command in the active sandbox; use it to create files for sandbox previews.",
     category: "sandbox",
     requiresApproval: 0,
-    defaultAuto: 0,
+    defaultAuto: 1,
   },
   {
     id: "sandbox_snapshot",

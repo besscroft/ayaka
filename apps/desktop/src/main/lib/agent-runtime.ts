@@ -752,14 +752,14 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     activeTools.add(WORKSPACE_COMMAND_TOOL_ID);
   }
 
-  if (base.toolChoice !== "none" || workspaceCommandSelected) {
+  const policy = readToolPolicy(context.rootAgent.tool_policy_json);
+  const sandboxToolIds = selectedSandboxToolIds(context, policy);
+  if (base.toolChoice !== "none" || workspaceCommandSelected || sandboxToolIds.length > 0) {
     if (context.disableCronTools) {
       delete tools.cron;
       activeTools.delete("cron");
     }
-    const policy = readToolPolicy(context.rootAgent.tool_policy_json);
 
-    const sandboxToolIds = selectedSandboxToolIds(context, policy);
     if (sandboxToolIds.length > 0) {
       context.sandbox = await getOrCreateSandboxSession({
         conversationId: context.conversationId,
@@ -871,6 +871,7 @@ function createWorkspaceCommandNote(
   return [
     "Workspace command execution:",
     "- Use workspace_run_command only when the user explicitly needs a local command run.",
+    "- Do not use workspace_run_command to create files for sandbox previews; use sandbox_run_command instead.",
     "- Always provide a structured executable and string argv array; never compose a shell command string.",
     "- cwd is relative to the conversation workspace and persists for this Agent run; env applies only to this call.",
     "- On Windows, prefer the real rg executable for reading and searching files (for example, rg --files or rg -n). Do not invoke PowerShell or cmd just to read a file.",
@@ -2271,6 +2272,8 @@ function createSandboxIsolationNote(context: RuntimeContext): string | undefined
       ? "- Docker was unavailable or not selected; commands are restricted to a local sandbox directory."
       : "- Docker was detected; this session records docker-capable isolation.",
     "- All file paths must be relative to the sandbox root.",
+    "- Use sandbox_run_command for commands that create or update files intended for sandbox previews; executable and args are structured, and cwd is sandbox-relative.",
+    "- Do not use workspace_run_command for sandbox files; the workspace and sandbox have different roots.",
     "Generated HTML and small-app previews:",
     "- Do not place generated HTML only in the chat response and expect it to render as an app.",
     "- After writing a standalone .html file, call sandbox_publish_artifact with kind html.",
@@ -2363,6 +2366,7 @@ function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy
   return [
     "sandbox_list_files",
     "sandbox_read_file",
+    "sandbox_run_command",
     "sandbox_snapshot",
     "sandbox_list_artifacts",
     "sandbox_publish_artifact",

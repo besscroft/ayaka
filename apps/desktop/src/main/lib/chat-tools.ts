@@ -343,10 +343,11 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   sandbox_run_command: {
     id: "sandbox_run_command",
     label: "Run sandbox command",
-    description: "Run a command in the current sandbox session.",
+    description:
+      "Run a structured command in the current sandbox session; use it to create files for sandbox previews.",
     kind: "host",
     category: "sandbox",
-    defaultAuto: false,
+    defaultAuto: true,
     requiresApproval: false,
   },
   sandbox_snapshot: {
