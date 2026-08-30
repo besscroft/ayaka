@@ -1115,3 +1115,60 @@ void describe("local chat server /api/title", () => {
     assert.deepEqual(model.doGenerateCalls[0]?.providerOptions, providerOptions);
   });
 });
+
+void describe("local chat server /api/followups", () => {
+  void it("rejects follow-up posts without the active session token", async () => {
+    const app = createApp({ sessionToken: token });
+
+    const response = await app.request("/api/followups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: validMessages, model: "mock/chat" }),
+    });
+
+    assert.equal(response.status, 401);
+  });
+
+  void it("does not return suggestions that were shown in the previous turn", async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [
+          {
+            type: "text" as const,
+            text: '["上一轮建议", "本轮建议"]',
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+        usage: {
+          inputTokens: { total: 5, noCache: 5, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 3, text: 3, reasoning: undefined },
+        },
+        warnings: [],
+      },
+    });
+    const app = createApp({
+      sessionToken: token,
+      resolveModel: () => ({ model, temperature: 0.7, topP: 1, maxOutputTokens: 256 }),
+    });
+
+    const response = await app.request("/api/followups", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: token,
+      },
+      body: JSON.stringify({
+        model: "mock/chat",
+        generationId: "followup-test-1",
+        messages: [
+          { id: "u1", role: "user", parts: [{ type: "text", text: "解释流式响应" }] },
+          { id: "a1", role: "assistant", parts: [{ type: "text", text: "流式响应会逐步返回" }] },
+        ],
+        previousSuggestions: ["上一轮建议"],
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { suggestions: ["本轮建议"] });
+  });
+});

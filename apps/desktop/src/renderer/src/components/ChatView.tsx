@@ -41,6 +41,7 @@ import {
   isNonEmptyUIMessage,
   normalizeFollowupSuggestions,
   prepareFailedChatSnapshot,
+  readFollowupSuggestions,
   toFileUIParts,
   updateFollowupSuggestions,
 } from "../lib/chat-messages";
@@ -205,6 +206,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const errorReportedRef = useRef(false);
   const retryFallbackRef = useRef({ active: false, attempted: false });
   const followupRequestRef = useRef<string | null>(null);
+  const followupAbortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef(createIncrementalTokenCache());
   const session = chatSessionRegistry.getOrCreate({ conversationId, serverInfo });
   const runIdRef = session.runIdRef;
@@ -235,6 +237,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
   const [starterSuggestions, setStarterSuggestions] = useState<string[]>([]);
   const [starterLoading, setStarterLoading] = useState<boolean>(true);
+  const [followupLoading, setFollowupLoading] = useState(false);
 
   /** 异步生成「新建对话」的开场建议（随机） */
   const fetchStarterSuggestions = useCallback(async (): Promise<void> => {
@@ -325,28 +328,49 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   );
 
   /** 异步生成追问建议 */
-  const fetchFollowupSuggestions = useCallback(async (messages: UIMessage[]): Promise<string[]> => {
-    try {
-      const settings = await api.settings.getAll([SettingKey.SelectedModel]);
-      const model = settings[SettingKey.SelectedModel];
-      if (!model) return [];
-      const info = await api.server.info();
-      if (messages.length < 2) return [];
-      const res = await fetch(`http://127.0.0.1:${info.port}/api/followups`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [CHAT_SESSION_HEADER]: info.token,
-        },
-        body: JSON.stringify({ model, messages }),
-      });
-      if (!res.ok) return [];
-      const data = (await res.json()) as { suggestions?: unknown };
-      return normalizeFollowupSuggestions(data.suggestions);
-    } catch (err) {
-      console.error("[chat] fetch followup suggestions error:", err);
-      return [];
-    }
+  const fetchFollowupSuggestions = useCallback(
+    async (messages: UIMessage[], signal: AbortSignal): Promise<string[]> => {
+      try {
+        const settings = await api.settings.getAll([SettingKey.SelectedModel]);
+        const model = settings[SettingKey.SelectedModel];
+        if (!model) return [];
+        const info = await api.server.info();
+        if (signal.aborted || messages.length < 2) return [];
+        const previousAssistantMessage = messages
+          .slice(0, -1)
+          .reverse()
+          .find((message) => message.role === "assistant");
+        const res = await fetch(`http://127.0.0.1:${info.port}/api/followups`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            [CHAT_SESSION_HEADER]: info.token,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            generationId: crypto.randomUUID(),
+            previousSuggestions: readFollowupSuggestions(previousAssistantMessage),
+          }),
+          signal,
+        });
+        if (!res.ok) return [];
+        const data = (await res.json()) as { suggestions?: unknown };
+        return normalizeFollowupSuggestions(data.suggestions);
+      } catch (err) {
+        if (signal.aborted) return [];
+        console.error("[chat] fetch followup suggestions error:", err);
+        return [];
+      }
+    },
+    [],
+  );
+
+  const cancelFollowupSuggestions = useCallback((): void => {
+    followupRequestRef.current = null;
+    followupAbortControllerRef.current?.abort();
+    followupAbortControllerRef.current = null;
+    setFollowupLoading(false);
   }, []);
 
   useEffect(() => {
@@ -470,7 +494,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     } else {
       errorReportedRef.current = session.errorMessage !== null;
     }
-    followupRequestRef.current = null;
+    cancelFollowupSuggestions();
     setToolSelection(DEFAULT_CHAT_TOOL_SELECTION);
     setPermissionMode(DEFAULT_CHAT_PERMISSION_MODE);
     setPermissionSource("default");
@@ -563,9 +587,16 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     });
     return () => {
       cancelled = true;
-      followupRequestRef.current = null;
+      cancelFollowupSuggestions();
     };
-  }, [conversationId, hydrationRetry, locale, persistenceQueue, session]);
+  }, [
+    cancelFollowupSuggestions,
+    conversationId,
+    hydrationRetry,
+    locale,
+    persistenceQueue,
+    session,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -599,6 +630,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       }
       session.isStopped = false;
       setIsStopped(false);
+      cancelFollowupSuggestions();
       const learningKey = isAbort
         ? null
         : getAgentLearningQueueKey(conversationId, messages, isError);
@@ -629,29 +661,50 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           .find((message) => message.role === "assistant");
         if (assistantMessage) {
           const requestKey = `${conversationId}:${assistantMessage.id}`;
+          followupAbortControllerRef.current?.abort();
+          const controller = new AbortController();
+          followupAbortControllerRef.current = controller;
           followupRequestRef.current = requestKey;
-          void fetchFollowupSuggestions(messages).then((suggestions) => {
-            if (followupRequestRef.current !== requestKey || suggestions.length === 0) return;
-            const updatedMessages = updateFollowupSuggestions({
-              messages: latestMessagesRef.current,
-              messageId: assistantMessage.id,
-              suggestions,
+          setFollowupLoading(true);
+          void fetchFollowupSuggestions(messages, controller.signal)
+            .then((suggestions) => {
+              if (followupRequestRef.current !== requestKey || suggestions.length === 0) return;
+              const updatedMessages = updateFollowupSuggestions({
+                messages: latestMessagesRef.current,
+                messageId: assistantMessage.id,
+                suggestions,
+              });
+              if (updatedMessages === latestMessagesRef.current) return;
+              latestMessagesRef.current = updatedMessages;
+              if (updatedMessages.length > 0) lastNonEmptyMessagesRef.current = updatedMessages;
+              explicitEmptyMessagesRef.current = updatedMessages.length === 0;
+              chatRef.current?.setMessages(updatedMessages);
+              persistInBackground(updatedMessages, "follow-up suggestions");
+            })
+            .finally(() => {
+              if (followupRequestRef.current !== requestKey) return;
+              followupRequestRef.current = null;
+              followupAbortControllerRef.current = null;
+              setFollowupLoading(false);
             });
-            if (updatedMessages === latestMessagesRef.current) return;
-            latestMessagesRef.current = updatedMessages;
-            if (updatedMessages.length > 0) lastNonEmptyMessagesRef.current = updatedMessages;
-            explicitEmptyMessagesRef.current = updatedMessages.length === 0;
-            chatRef.current?.setMessages(updatedMessages);
-            persistInBackground(updatedMessages, "follow-up suggestions");
-          });
+        } else {
+          cancelFollowupSuggestions();
         }
       }
     },
-    [conversationId, fetchFollowupSuggestions, persistAndTouch, persistInBackground, session],
+    [
+      cancelFollowupSuggestions,
+      conversationId,
+      fetchFollowupSuggestions,
+      persistAndTouch,
+      persistInBackground,
+      session,
+    ],
   );
 
   const handleChatError = useCallback(
     (err: Error): void => {
+      cancelFollowupSuggestions();
       const info = getChatErrorInfo(err, locale);
       const retryFallback = retryFallbackRef.current;
       if (
@@ -699,7 +752,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       retryFallback.active = false;
       reportChatError("streaming", err, { persistSnapshot: latestMessagesRef.current });
     },
-    [locale, persistInBackground, reportChatError, session],
+    [cancelFollowupSuggestions, locale, persistInBackground, reportChatError, session],
   );
 
   useEffect(() => {
@@ -942,6 +995,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     let finalFiles = toFileUIParts(files);
 
     if (!selectedModel) return;
+    cancelFollowupSuggestions();
 
     const wasTemporary = !isPersistedConversation;
     try {
@@ -1091,6 +1145,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
 
   const handleRetry = (): void => {
     if (!chatErrorRetryable) return;
+    cancelFollowupSuggestions();
     const snapshot = prepareFailedChatSnapshot(renderedMessages);
     const currentRunId = runIdRef.current;
     const currentRun = currentRunId
@@ -1196,6 +1251,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (idx < 0) return;
     const target = renderedMessages[idx];
     if (target.role !== "user") return;
+    cancelFollowupSuggestions();
     manualMessageMutationRef.current = true;
 
     // 1. 找到该 user 消息，替换 text part，删除后续所有消息。
@@ -1240,6 +1296,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     if (idx < 0) return;
     const target = renderedMessages[idx];
     if (target.role !== "user") return;
+    cancelFollowupSuggestions();
     manualMessageMutationRef.current = true;
 
     // 1. 截断到该 user 消息。
@@ -1277,6 +1334,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     const target = renderedMessages[idx];
     const confirmed = window.confirm(t("msg.delete.confirm"));
     if (!confirmed) return;
+    cancelFollowupSuggestions();
     manualMessageMutationRef.current = true;
 
     // 1. 删除目标；如果目标是 user 消息，紧跟的 assistant 也一并删除。
@@ -1381,6 +1439,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
                 errorDetail={chatError}
                 emptySuggestions={starterSuggestions}
                 followupSuggestions={followupSuggestions}
+                followupLoading={followupLoading}
                 onRetry={chatErrorRetryable ? handleRetry : undefined}
                 onDismissError={handleDismissError}
                 onEditMessage={handleEditMessage}

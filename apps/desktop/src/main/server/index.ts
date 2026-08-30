@@ -355,7 +355,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
    * POST /api/followups
    *
    * 用 LLM 基于对话上下文生成追问建议（2-4 条）。
-   *  - 入参：{ model, messages: UIMessage[] }
+   *  - 入参：{ model, messages: UIMessage[], generationId?: string, previousSuggestions?: string[] }
    *  - 出参：{ suggestions: string[] }
    *
    * 取最近几轮对话作为上下文，使用非流式 generateText。
@@ -368,6 +368,8 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     const body = (await c.req.json()) as {
       messages?: UIMessage[];
       model?: string;
+      generationId?: string;
+      previousSuggestions?: unknown;
     };
 
     if (!body.messages?.length) {
@@ -383,6 +385,17 @@ export function createApp(options: CreateAppOptions = {}): Hono {
 
       // 取最近 6 条消息（约 3 轮）作为上下文
       const excerpt = body.messages.slice(-6);
+      const generationId = body.generationId?.trim() || randomUUID();
+      const previousSuggestions = Array.isArray(body.previousSuggestions)
+        ? body.previousSuggestions
+            .filter((suggestion): suggestion is string => typeof suggestion === "string")
+            .map((suggestion) => suggestion.trim())
+            .filter((suggestion) => suggestion.length > 0 && suggestion.length <= 60)
+            .slice(0, 4)
+        : [];
+      const previousSuggestionSet = new Set(
+        previousSuggestions.map((suggestion) => suggestion.toLocaleLowerCase()),
+      );
       const promptText = excerpt
         .map((m) => {
           const text = (m.parts ?? [])
@@ -404,8 +417,13 @@ export function createApp(options: CreateAppOptions = {}): Hono {
           "2) 问题必须与当前对话主题紧密相关、有实际价值；" +
           "3) 不要泛泛而谈（如「请详细说明」），要具体到对话内容；" +
           "4) 使用对话所使用的语言；" +
-          '5) 仅输出 JSON 数组，格式：["问题1","问题2","问题3"]，不要输出其他内容。',
-        prompt: promptText,
+          "5) 每次请求都要根据当前对话重新生成，不能直接复用之前的建议；" +
+          '6) 仅输出 JSON 数组，格式：["问题1","问题2","问题3"]，不要输出其他内容。',
+        prompt:
+          `${promptText}\n\n这是一次新的建议生成请求（编号：${generationId}），请换一个切入角度重新生成。` +
+          (previousSuggestions.length > 0
+            ? `\n上一轮已经展示过这些建议，请不要重复：${JSON.stringify(previousSuggestions)}`
+            : ""),
         temperature: 0.7,
         maxOutputTokens: 256,
         providerOptions: resolved.providerOptions,
@@ -429,6 +447,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
       const suggestions = parsed
         .filter((s): s is string => typeof s === "string" && s.trim().length > 0 && s.length <= 60)
         .map((s) => s.trim())
+        .filter((suggestion) => !previousSuggestionSet.has(suggestion.toLocaleLowerCase()))
         .slice(0, 4);
       return c.json({ suggestions });
     } catch (err) {

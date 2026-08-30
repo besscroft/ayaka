@@ -79,11 +79,10 @@ export function readFollowupSuggestions(message: UIMessage | undefined): string[
 }
 
 export function getLatestFollowupSuggestions(messages: UIMessage[]): string[] {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const suggestions = readFollowupSuggestions(messages[index]);
-    if (suggestions.length > 0) return suggestions;
-  }
-  return [];
+  // Suggestions belong to one completed assistant response. Do not walk
+  // backwards through the conversation, otherwise a new response without
+  // suggestions temporarily revives an older response's suggestions.
+  return readFollowupSuggestions(messages.at(-1));
 }
 
 export function updateFollowupSuggestions({

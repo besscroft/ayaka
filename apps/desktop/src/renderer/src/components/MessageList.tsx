@@ -77,6 +77,7 @@ interface MessageListProps {
   /** 后备建议（empty 状态） */
   emptySuggestions?: string[];
   followupSuggestions?: string[];
+  followupLoading?: boolean;
   onRetry?: () => void;
   onRetryMessage?: (messageId: string) => Promise<void> | void;
   onDismissError?: () => void;
@@ -109,6 +110,7 @@ export function MessageList({
   errorDetail,
   emptySuggestions,
   followupSuggestions,
+  followupLoading = false,
   onRetry,
   onRetryMessage,
   onDismissError,
@@ -162,7 +164,7 @@ export function MessageList({
     !error &&
     lastMessage?.role === "assistant" &&
     !!onSuggestion &&
-    !!followupSuggestions?.length;
+    (followupLoading || !!followupSuggestions?.length);
 
   if (messages.length === 0 && !isLoading) {
     return (
@@ -215,6 +217,7 @@ export function MessageList({
               title={t("chat.followups.title")}
               suggestions={followupSuggestions ?? []}
               onSelect={(prompt) => onSuggestion?.(prompt)}
+              loading={followupLoading}
               className="max-w-[min(1050px,100%)] pr-6 sm:pr-10 lg:pr-16"
             />
           </motion.div>
