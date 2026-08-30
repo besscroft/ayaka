@@ -1,11 +1,14 @@
 import type { SVGProps } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowDown,
   ArrowUp,
   BarChart3,
   BookOpen,
   Brain,
   Bug,
+  Camera,
   Check,
   CheckSquare,
   ChevronDown,
@@ -91,6 +94,8 @@ export const IconPanelRightOpen = fromLucide(PanelRightOpen);
 export const IconSend = fromLucide(Send);
 export const IconArrowUp = fromLucide(ArrowUp);
 export const IconArrowDown = fromLucide(ArrowDown);
+export const IconArrowLeft = fromLucide(ArrowLeft);
+export const IconArrowRight = fromLucide(ArrowRight);
 export const IconDots = fromLucide(MoreHorizontal);
 export const IconWrench = fromLucide(Wrench);
 export const IconCircleCheck = fromLucide(CircleCheck);
@@ -128,6 +133,7 @@ export const IconRefresh = fromLucide(RefreshCw);
 export const IconEdit = fromLucide(Pencil);
 export const IconSend2 = fromLucide(CornerDownLeft);
 export const IconImage = fromLucide(Image);
+export const IconCamera = fromLucide(Camera);
 export const IconList = fromLucide(List);
 export const IconChartBar = fromLucide(BarChart3);
 export const IconCurrency = fromLucide(DollarSign);

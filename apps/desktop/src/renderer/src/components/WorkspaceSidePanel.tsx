@@ -8,10 +8,11 @@ import {
   type AgentStatusWidgetProps,
 } from "./AgentStatusWidget";
 import { GeneratedAppPane, type GeneratedAppSummary } from "./GeneratedAppPane";
+import { BrowserPane } from "./BrowserPane";
 import { Button } from "./ui";
-import { IconBrain, IconEye, IconPanelRightClose } from "./icons";
+import { IconBrain, IconEye, IconGlobe, IconPanelRightClose } from "./icons";
 
-export type WorkspaceSidePanelTab = "runtime" | "generated-app";
+export type WorkspaceSidePanelTab = "runtime" | "generated-app" | "browser";
 
 const OPEN_WORKSPACE_PANEL_EVENT = "ayaka:open-workspace-panel";
 const OPEN_GENERATED_APP_EVENT = "ayaka:open-generated-app";
@@ -79,10 +80,12 @@ export function WorkspaceSidePanel({
   const tabIds = {
     runtime: `${conversationId}-workspace-runtime-tab`,
     generatedApp: `${conversationId}-workspace-generated-app-tab`,
+    browser: `${conversationId}-workspace-browser-tab`,
   };
   const panelIds = {
     runtime: `${conversationId}-workspace-runtime-panel`,
     generatedApp: `${conversationId}-workspace-generated-app-panel`,
+    browser: `${conversationId}-workspace-browser-panel`,
   };
 
   useEffect(() => {
@@ -236,7 +239,24 @@ export function WorkspaceSidePanel({
                   setActiveTab("runtime");
                 } else if (event.key === "ArrowRight" || event.key === "End") {
                   event.preventDefault();
+                  setActiveTab("browser");
+                }
+              }}
+            />
+            <TabButton
+              id={tabIds.browser}
+              panelId={panelIds.browser}
+              active={activeTab === "browser"}
+              icon={<IconGlobe className="size-3.5" />}
+              label={t("workspacePanel.browser")}
+              onClick={() => setActiveTab("browser")}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft" || event.key === "Home") {
+                  event.preventDefault();
                   setActiveTab("generated-app");
+                } else if (event.key === "ArrowRight" || event.key === "End") {
+                  event.preventDefault();
+                  setActiveTab("runtime");
                 }
               }}
             />
@@ -293,6 +313,20 @@ export function WorkspaceSidePanel({
                 setOpen(true);
               }}
               onSummaryChange={handleGeneratedSummary}
+            />
+          </section>
+          <section
+            id={panelIds.browser}
+            role="tabpanel"
+            aria-labelledby={tabIds.browser}
+            aria-hidden={activeTab !== "browser"}
+            hidden={activeTab !== "browser"}
+            className="flex h-full min-h-0 flex-col"
+          >
+            <BrowserPane
+              key={conversationId}
+              conversationId={conversationId}
+              visible={open && activeTab === "browser"}
             />
           </section>
         </div>

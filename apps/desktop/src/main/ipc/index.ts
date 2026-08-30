@@ -246,6 +246,26 @@ import {
 } from "../lib/sandbox-preview-manager";
 import { onSandboxArtifactUpdated } from "../lib/sandbox-artifact-manager";
 import {
+  captureBrowserPage,
+  clickBrowserElement,
+  closeBrowserSessionTab,
+  createBrowserSessionTab,
+  deleteBrowserSession,
+  getBrowserSession,
+  navigateBrowserTab,
+  onBrowserFocusRequested,
+  onBrowserSessionUpdated,
+  pressBrowserKey,
+  readBrowserScreenshot,
+  scrollBrowserPage,
+  selectBrowserSessionTab,
+  setBrowserBounds,
+  setBrowserVisible,
+  snapshotBrowserPage,
+  typeBrowserText,
+  waitForBrowserPage,
+} from "../lib/browser-session-manager";
+import {
   exportCurrentErrorLog,
   recordErrorLog,
   type ErrorLogSaveDialog,
@@ -301,6 +321,8 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     }
   });
   onSandboxPreviewUpdated((preview) => broadcast("sandbox:preview-updated", preview));
+  onBrowserSessionUpdated((event) => broadcast("browser:updated", event));
+  onBrowserFocusRequested((event) => broadcast("browser:focus-requested", event));
   subscribeProviderCatalogUpdated((providerId) =>
     broadcast("providers:catalog-updated", { providerId }),
   );
@@ -386,15 +408,24 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   });
 
   ipcMain.handle("conversations:permanentDelete", async (_e, id: string) => {
+    await deleteBrowserSession(id);
     await permanentlyDeleteConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:permanentDeleteBatch", (_e, ids: string[]) => {
+  ipcMain.handle("conversations:permanentDeleteBatch", async (_e, ids: string[]) => {
+    await Promise.all(ids.map((id) => deleteBrowserSession(id)));
     return permanentlyDeleteConversations(ids);
   });
 
-  ipcMain.handle("conversations:purgeExpired", () => purgeExpiredDeletedConversations());
+  ipcMain.handle("conversations:purgeExpired", async () => {
+    const now = Date.now();
+    const expired = listDeletedConversations()
+      .filter((conversation) => (conversation.purge_after_at ?? Number.POSITIVE_INFINITY) <= now)
+      .map((conversation) => conversation.id);
+    await Promise.all(expired.map((id) => deleteBrowserSession(id)));
+    return purgeExpiredDeletedConversations(now);
+  });
 
   ipcMain.handle("workspace:get", (_e, conversationId: string) =>
     getConversationWorkspaceInfo(conversationId),
@@ -519,6 +550,45 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
       setSandboxPreviewVisible(input.previewId, input.conversationId, window, input.visible);
     },
   );
+
+  // ---------- 内置浏览器 ----------
+  ipcMain.handle("browser:session", (_event, conversationId: string) =>
+    getBrowserSession(conversationId),
+  );
+  ipcMain.handle("browser:tabs:create", (_event, input: { conversationId: string; url?: string }) =>
+    createBrowserSessionTab(input.conversationId, input.url),
+  );
+  ipcMain.handle(
+    "browser:tabs:select",
+    (_event, input: { conversationId: string; tabId: string }) =>
+      selectBrowserSessionTab(input.conversationId, input.tabId),
+  );
+  ipcMain.handle("browser:tabs:close", (_event, input: { conversationId: string; tabId: string }) =>
+    closeBrowserSessionTab(input.conversationId, input.tabId),
+  );
+  ipcMain.handle("browser:navigate", (_event, input) => navigateBrowserTab(input));
+  ipcMain.handle("browser:snapshot", (_event, input) => snapshotBrowserPage(input));
+  ipcMain.handle("browser:click", (_event, input) => clickBrowserElement(input));
+  ipcMain.handle("browser:type", (_event, input) => typeBrowserText(input));
+  ipcMain.handle("browser:pressKey", (_event, input) => pressBrowserKey(input));
+  ipcMain.handle("browser:scroll", (_event, input) => scrollBrowserPage(input));
+  ipcMain.handle("browser:wait", (_event, input) => waitForBrowserPage(input));
+  ipcMain.handle("browser:capture", (_event, input) => captureBrowserPage(input));
+  ipcMain.handle(
+    "browser:readScreenshot",
+    (_event, input: { conversationId: string; path: string }) =>
+      readBrowserScreenshot(input.conversationId, input.path),
+  );
+  ipcMain.handle("browser:setBounds", (event, input) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error("Browser window is unavailable.");
+    setBrowserBounds(input.conversationId, input.tabId, window, input.bounds);
+  });
+  ipcMain.handle("browser:setVisible", (event, input) => {
+    if (!BrowserWindow.fromWebContents(event.sender))
+      throw new Error("Browser window is unavailable.");
+    setBrowserVisible(input.conversationId, input.tabId, input.visible);
+  });
 
   // ---------- 消息 ----------
   ipcMain.handle("messages:list", (_e, conversationId: string) =>

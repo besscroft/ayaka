@@ -19,6 +19,7 @@ import {
   DEFAULT_CHAT_TOOL_SELECTION,
 } from "@shared/types";
 import { readChatRunIdHeader } from "./chat-retry";
+import { sanitizeBrowserScreenshotMessage } from "@shared/browser-message";
 
 export type ChatSessionFinishEvent = Parameters<ChatOnFinishCallback<UIMessage>>[0];
 
@@ -261,6 +262,12 @@ export class ChatSessionRegistry {
         permissionMode: entry.requestConfig.permissionMode,
         runId: entry.runIdRef.current ?? undefined,
         mode: entry.runModeRef.current,
+      }),
+      prepareSendMessagesRequest: ({ messages, body }) => ({
+        body: {
+          ...body,
+          messages: messages.map(sanitizeBrowserScreenshotMessage),
+        },
       }),
     });
   }

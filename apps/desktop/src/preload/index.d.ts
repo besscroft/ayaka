@@ -81,6 +81,10 @@ import type {
   SandboxArtifactUpdate,
   SandboxArtifactReadResult,
   SandboxPreview,
+  BrowserCaptureResult,
+  BrowserPageSnapshot,
+  BrowserSessionSnapshot,
+  BrowserSessionUpdate,
 } from "../shared/types";
 import type { UIMessage } from "ai";
 
@@ -170,6 +174,70 @@ export interface AyakaApi {
       visible: boolean;
     }) => Promise<void>;
     onUpdated: (handler: (preview: SandboxPreview) => void) => () => void;
+  };
+  browser: {
+    getSession: (conversationId: string) => Promise<BrowserSessionSnapshot>;
+    createTab: (input: { conversationId: string; url?: string }) => Promise<BrowserSessionSnapshot>;
+    selectTab: (input: {
+      conversationId: string;
+      tabId: string;
+    }) => Promise<BrowserSessionSnapshot>;
+    closeTab: (input: { conversationId: string; tabId: string }) => Promise<BrowserSessionSnapshot>;
+    navigate: (input: {
+      conversationId: string;
+      tabId?: string;
+      url?: string;
+      action?: "open" | "back" | "forward" | "reload";
+    }) => Promise<BrowserSessionSnapshot>;
+    snapshot: (input: { conversationId: string; tabId?: string }) => Promise<BrowserPageSnapshot>;
+    click: (input: {
+      conversationId: string;
+      tabId?: string;
+      ref: string;
+    }) => Promise<BrowserSessionSnapshot>;
+    type: (input: {
+      conversationId: string;
+      tabId?: string;
+      ref: string;
+      text: string;
+      submit?: boolean;
+    }) => Promise<BrowserSessionSnapshot>;
+    pressKey: (input: {
+      conversationId: string;
+      tabId?: string;
+      key: string;
+      modifiers?: string[];
+    }) => Promise<BrowserSessionSnapshot>;
+    scroll: (input: {
+      conversationId: string;
+      tabId?: string;
+      left?: number;
+      top?: number;
+    }) => Promise<BrowserSessionSnapshot>;
+    wait: (input: {
+      conversationId: string;
+      tabId?: string;
+      milliseconds?: number;
+      urlIncludes?: string;
+      textIncludes?: string;
+      timeoutMs?: number;
+    }) => Promise<BrowserPageSnapshot>;
+    capture: (input: { conversationId: string; tabId?: string }) => Promise<BrowserCaptureResult>;
+    readScreenshot: (input: { conversationId: string; path: string }) => Promise<ArrayBuffer>;
+    setBounds: (input: {
+      conversationId: string;
+      tabId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }) => Promise<void>;
+    setVisible: (input: {
+      conversationId: string;
+      tabId: string;
+      visible: boolean;
+    }) => Promise<void>;
+    onUpdated: (handler: (event: BrowserSessionUpdate) => void) => () => void;
+    onFocusRequested: (
+      handler: (event: { conversationId: string; tabId: string }) => void,
+    ) => () => void;
   };
   cron: {
     list: () => Promise<CronJob[]>;

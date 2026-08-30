@@ -49,6 +49,7 @@ import {
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { readChatMessageMetadata } from "../lib/chat-messages";
+import { redactBrowserInput } from "@shared/browser-message";
 import { GeneratedToolResult } from "./GeneratedToolResult";
 import type { MentionSkill } from "../lib/chat-tools";
 import {
@@ -817,13 +818,15 @@ function MessageItem({
             const approval = part.approval;
             const toolName = getToolPartName(part);
             const displayInput =
-              toolName === "workspace_run_command"
-                ? (normalizeWorkspaceCommandInput(part.input) ?? part.input)
-                : part.input;
+              toolName === "browser_type"
+                ? redactBrowserInput(part.input)
+                : toolName === "workspace_run_command"
+                  ? (normalizeWorkspaceCommandInput(part.input) ?? part.input)
+                  : part.input;
             const mediaResult = state === "output-available" ? readMediaToolResult(part) : null;
             const generatedResult =
               state === "output-available" && !mediaResult ? (
-                <GeneratedToolResult part={part} />
+                <GeneratedToolResult part={part} conversationId={conversationId} />
               ) : null;
             const summary = getToolSummary(part);
             return (

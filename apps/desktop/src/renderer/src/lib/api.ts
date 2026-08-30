@@ -79,6 +79,10 @@ import type {
   SandboxArtifactReadResult,
   SandboxArtifactUpdate,
   SandboxPreview,
+  BrowserCaptureResult,
+  BrowserPageSnapshot,
+  BrowserSessionSnapshot,
+  BrowserSessionUpdate,
 } from "@shared/types";
 import type { UIMessage } from "ai";
 
@@ -207,6 +211,77 @@ export const api = {
     }): Promise<void> => assertApi().sandboxPreviews.setVisible(input),
     onUpdated: (handler: (preview: SandboxPreview) => void): (() => void) =>
       assertApi().sandboxPreviews.onUpdated(handler),
+  },
+  browser: {
+    getSession: (conversationId: string): Promise<BrowserSessionSnapshot> =>
+      assertApi().browser.getSession(conversationId),
+    createTab: (input: { conversationId: string; url?: string }): Promise<BrowserSessionSnapshot> =>
+      assertApi().browser.createTab(input),
+    selectTab: (input: {
+      conversationId: string;
+      tabId: string;
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.selectTab(input),
+    closeTab: (input: { conversationId: string; tabId: string }): Promise<BrowserSessionSnapshot> =>
+      assertApi().browser.closeTab(input),
+    navigate: (input: {
+      conversationId: string;
+      tabId?: string;
+      url?: string;
+      action?: "open" | "back" | "forward" | "reload";
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.navigate(input),
+    snapshot: (input: { conversationId: string; tabId?: string }): Promise<BrowserPageSnapshot> =>
+      assertApi().browser.snapshot(input),
+    click: (input: {
+      conversationId: string;
+      tabId?: string;
+      ref: string;
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.click(input),
+    type: (input: {
+      conversationId: string;
+      tabId?: string;
+      ref: string;
+      text: string;
+      submit?: boolean;
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.type(input),
+    pressKey: (input: {
+      conversationId: string;
+      tabId?: string;
+      key: string;
+      modifiers?: string[];
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.pressKey(input),
+    scroll: (input: {
+      conversationId: string;
+      tabId?: string;
+      left?: number;
+      top?: number;
+    }): Promise<BrowserSessionSnapshot> => assertApi().browser.scroll(input),
+    wait: (input: {
+      conversationId: string;
+      tabId?: string;
+      milliseconds?: number;
+      urlIncludes?: string;
+      textIncludes?: string;
+      timeoutMs?: number;
+    }): Promise<BrowserPageSnapshot> => assertApi().browser.wait(input),
+    capture: (input: { conversationId: string; tabId?: string }): Promise<BrowserCaptureResult> =>
+      assertApi().browser.capture(input),
+    readScreenshot: (input: { conversationId: string; path: string }): Promise<ArrayBuffer> =>
+      assertApi().browser.readScreenshot(input),
+    setBounds: (input: {
+      conversationId: string;
+      tabId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }): Promise<void> => assertApi().browser.setBounds(input),
+    setVisible: (input: {
+      conversationId: string;
+      tabId: string;
+      visible: boolean;
+    }): Promise<void> => assertApi().browser.setVisible(input),
+    onUpdated: (handler: (event: BrowserSessionUpdate) => void): (() => void) =>
+      assertApi().browser.onUpdated(handler),
+    onFocusRequested: (
+      handler: (event: { conversationId: string; tabId: string }) => void,
+    ): (() => void) => assertApi().browser.onFocusRequested(handler),
   },
   cron: {
     list: (): Promise<CronJob[]> => assertApi().cron.list(),

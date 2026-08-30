@@ -14,6 +14,7 @@ import {
 import { registerAyakaMediaProtocol } from "./lib/media-assets";
 import { readSandboxArtifactResource } from "./lib/sandbox-artifact-manager";
 import { closeAllSandboxPreviews } from "./lib/sandbox-preview-manager";
+import { closeAllBrowserSessions } from "./lib/browser-session-manager";
 import { registerIpcHandlers } from "./ipc";
 import { startCronScheduler, stopCronScheduler } from "./lib/cron-scheduler";
 import { ensureBuiltinCatalogSources } from "./lib/catalog-service";
@@ -295,6 +296,7 @@ if (!hasSingleInstanceLock) {
       .then(() => closeMcpOAuthLoopback())
       .then(async () => {
         await closeAllSandboxPreviews();
+        await closeAllBrowserSessions();
         stopServer();
         await closeDb();
         await flushErrorLogs();

@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai";
 import { applyMessagesPatch, getMessagesSnapshot } from "./db";
 import type { MessageRow } from "../../shared/types";
+import { sanitizeBrowserScreenshotMessage } from "../../shared/browser-message";
 
 const MAX_PERSIST_ATTEMPTS = 3;
 
@@ -21,7 +22,9 @@ export async function persistChatStreamSnapshot(
   conversationId: string,
   messages: UIMessage[],
 ): Promise<ChatSnapshotPersistenceResult> {
-  const persistableMessages = messages.filter(isPersistableMessage);
+  const persistableMessages = messages
+    .filter(isPersistableMessage)
+    .map(sanitizeBrowserScreenshotMessage);
   let snapshot = getMessagesSnapshot(conversationId);
 
   for (let attempt = 0; attempt < MAX_PERSIST_ATTEMPTS; attempt += 1) {

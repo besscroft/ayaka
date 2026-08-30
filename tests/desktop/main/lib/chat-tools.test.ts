@@ -177,6 +177,14 @@ void describe("chat tool runtime", () => {
     assert.deepEqual(runtime.activeTools, [
       "web_search",
       "web_open",
+      "browser_tabs",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_click",
+      "browser_type",
+      "browser_press_key",
+      "browser_scroll",
+      "browser_wait",
       "current_time",
       "runtime_snapshot",
       "model_capabilities",
@@ -330,6 +338,14 @@ void describe("chat tool runtime", () => {
     assert.deepEqual(runtime.activeTools, [
       "web_search",
       "web_open",
+      "browser_tabs",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_click",
+      "browser_type",
+      "browser_press_key",
+      "browser_scroll",
+      "browser_wait",
       "current_time",
       "runtime_snapshot",
       "model_capabilities",
@@ -346,7 +362,10 @@ void describe("chat tool runtime", () => {
       model: modelContext("openai", "web_search"),
     });
     assert.deepEqual(single.activeTools, ["memory_search"]);
-    assert.deepEqual(single.toolChoice, { type: "tool", toolName: "memory_search" });
+    assert.deepEqual(single.toolChoice, {
+      type: "tool",
+      toolName: "memory_search",
+    });
 
     const multiple = chatTools.buildChatToolRuntime({
       selection: {
@@ -450,21 +469,30 @@ void describe("chat tool runtime", () => {
       model: modelContext("openai", "web_search"),
     });
     assert.deepEqual(openai.activeTools, ["web_search"]);
-    assert.deepEqual(openai.toolChoice, { type: "tool", toolName: "web_search" });
+    assert.deepEqual(openai.toolChoice, {
+      type: "tool",
+      toolName: "web_search",
+    });
 
     const anthropic = chatTools.buildChatToolRuntime({
       selection: { mode: "manual", selectedToolIds: ["web_search"] },
       model: modelContext("anthropic", "web_search"),
     });
     assert.deepEqual(anthropic.activeTools, ["web_search"]);
-    assert.deepEqual(anthropic.toolChoice, { type: "tool", toolName: "web_search" });
+    assert.deepEqual(anthropic.toolChoice, {
+      type: "tool",
+      toolName: "web_search",
+    });
 
     const google = chatTools.buildChatToolRuntime({
       selection: { mode: "manual", selectedToolIds: ["web_search"] },
       model: modelContext("google", "google_search"),
     });
     assert.deepEqual(google.activeTools, ["google_search"]);
-    assert.deepEqual(google.toolChoice, { type: "tool", toolName: "google_search" });
+    assert.deepEqual(google.toolChoice, {
+      type: "tool",
+      toolName: "google_search",
+    });
     assert.deepEqual(google.builtinToolNames, ["google_search"]);
   });
 
@@ -501,8 +529,13 @@ void describe("chat tool runtime", () => {
     };
 
     assert.deepEqual(runtime.activeTools, ["web_open"]);
-    assert.deepEqual(runtime.toolChoice, { type: "tool", toolName: "web_open" });
-    const output = (await webOpen.execute?.({ url: "https://93.184.216.34/page" })) as {
+    assert.deepEqual(runtime.toolChoice, {
+      type: "tool",
+      toolName: "web_open",
+    });
+    const output = (await webOpen.execute?.({
+      url: "https://93.184.216.34/page",
+    })) as {
       finalUrl: string;
       title: string;
       text: string;
@@ -539,7 +572,10 @@ void describe("chat tool runtime", () => {
     assert.equal(descriptors.find((item) => item.id === "file_search")?.available, true);
 
     const runtime = chatTools.buildChatToolRuntime({
-      selection: { mode: "manual", selectedToolIds: ["code_interpreter", "file_search"] },
+      selection: {
+        mode: "manual",
+        selectedToolIds: ["code_interpreter", "file_search"],
+      },
       model,
     });
     assert.deepEqual(runtime.activeTools, ["code_interpreter", "file_search"]);
@@ -557,7 +593,10 @@ void describe("chat tool runtime", () => {
     });
 
     const runtime = chatTools.buildChatToolRuntime({
-      selection: { mode: "manual", selectedToolIds: ["tool_search", "memory_search"] },
+      selection: {
+        mode: "manual",
+        selectedToolIds: ["tool_search", "memory_search"],
+      },
       model,
     });
     const memoryTool = runtime.tools?.memory_search as {
@@ -684,7 +723,10 @@ void describe("chat tool runtime", () => {
       execute?: (input: { query: string; maxResults?: number }) => Promise<unknown>;
     };
 
-    const output = (await webTool.execute?.({ query: "fresh news", maxResults: 2 })) as {
+    const output = (await webTool.execute?.({
+      query: "fresh news",
+      maxResults: 2,
+    })) as {
       query: string;
       source: string;
       count: number;
@@ -735,7 +777,10 @@ void describe("chat tool runtime", () => {
       execute?: (input: { query: string; maxResults?: number }) => Promise<unknown>;
     };
 
-    const output = (await webTool.execute?.({ query: "Wuhan weather today", maxResults: 3 })) as {
+    const output = (await webTool.execute?.({
+      query: "Wuhan weather today",
+      maxResults: 3,
+    })) as {
       count: number;
       results: Array<{ title: string; url: string; snippet: string }>;
     };
@@ -748,7 +793,10 @@ void describe("chat tool runtime", () => {
 
   void it("reports host fallback web search request failures clearly", async () => {
     globalThis.fetch = (async () =>
-      new Response("blocked", { status: 503, statusText: "Service Unavailable" })) as typeof fetch;
+      new Response("blocked", {
+        status: 503,
+        statusText: "Service Unavailable",
+      })) as typeof fetch;
 
     const runtime = chatTools.buildChatToolRuntime({
       selection: { mode: "manual", selectedToolIds: ["web_search"] },
@@ -788,6 +836,45 @@ void describe("chat tool runtime", () => {
         id === "workspace_run_command" || id === "sandbox_start_preview",
       );
     }
+  });
+
+  void it("provides browser automation in auto mode and gates screenshots on vision", () => {
+    const descriptors = chatTools.createChatToolDescriptors(modelContext("openai-compatible"));
+    for (const id of [
+      "browser_tabs",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_click",
+      "browser_type",
+      "browser_press_key",
+      "browser_scroll",
+      "browser_wait",
+    ] as const) {
+      const descriptor = descriptors.find((item) => item.id === id);
+      assert.ok(descriptor);
+      assert.equal(descriptor.defaultAuto, true);
+      assert.equal(descriptor.requiresApproval, false);
+      assert.equal(descriptor.available, true);
+    }
+    const screenshot = descriptors.find((item) => item.id === "browser_screenshot");
+    assert.ok(screenshot);
+    assert.equal(screenshot.available, false);
+
+    const visionCapabilities = { ...capabilities, vision: true };
+    const visionDescriptors = chatTools.createChatToolDescriptors(
+      modelContext("openai-compatible", undefined, visionCapabilities),
+    );
+    assert.equal(
+      visionDescriptors.find((item) => item.id === "browser_screenshot")?.available,
+      true,
+    );
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: { mode: "auto", selectedToolIds: [] },
+      model: modelContext("openai-compatible", undefined, visionCapabilities),
+    });
+    assert.equal(typeof runtime.tools?.browser_snapshot, "object");
+    assert.equal(typeof runtime.tools?.browser_screenshot, "object");
+    assert.match(runtime.instructions ?? "", /browser_snapshot/);
   });
 
   void it("includes memory tools in manual mode", () => {

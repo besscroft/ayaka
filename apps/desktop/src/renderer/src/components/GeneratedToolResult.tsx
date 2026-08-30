@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   asRecord,
   getToolPartName,
@@ -17,6 +17,7 @@ import {
   type RenderableToolPart,
 } from "../lib/generated-tool-ui";
 import { useT } from "../lib/i18n";
+import { api } from "../lib/api";
 import {
   IconBookOpen,
   IconCheck,
@@ -32,9 +33,13 @@ import { RichContent } from "./ai-elements";
 
 interface GeneratedToolResultProps {
   part: RenderableToolPart;
+  conversationId?: string;
 }
 
-export function GeneratedToolResult({ part }: GeneratedToolResultProps): React.JSX.Element | null {
+export function GeneratedToolResult({
+  part,
+  conversationId,
+}: GeneratedToolResultProps): React.JSX.Element | null {
   const toolName = getToolPartName(part);
   if (!toolName || part.output === undefined) return null;
 
@@ -43,6 +48,18 @@ export function GeneratedToolResult({ part }: GeneratedToolResultProps): React.J
       return <WebSearchResult output={part.output} />;
     case "web_open":
       return <WebOpenResult output={part.output} />;
+    case "browser_tabs":
+    case "browser_navigate":
+    case "browser_snapshot":
+    case "browser_click":
+    case "browser_type":
+    case "browser_press_key":
+    case "browser_scroll":
+    case "browser_wait":
+    case "browser_screenshot":
+      return (
+        <BrowserResult toolName={toolName} output={part.output} conversationId={conversationId} />
+      );
     case "memory_search":
       return <MemorySearchResult output={part.output} />;
     case "memory_save":
@@ -86,6 +103,107 @@ export function GeneratedToolResult({ part }: GeneratedToolResultProps): React.J
     default:
       return null;
   }
+}
+
+function BrowserResult({
+  toolName,
+  output,
+  conversationId,
+}: {
+  toolName: string;
+  output: unknown;
+  conversationId?: string;
+}): React.JSX.Element {
+  const { t } = useT();
+  const record = asRecord(output);
+  const tabs = readArray(record?.tabs);
+  const title = readString(record?.title) ?? readString(asRecord(tabs[0])?.title);
+  const url = readString(record?.url) ?? readString(asRecord(tabs[0])?.url);
+  const elements = readArray(record?.elements).length;
+  const screenshot = extractScreenshot(output);
+  return (
+    <ResultStack>
+      <div className="flex min-w-0 items-center gap-2">
+        <IconGlobe className="size-3 shrink-0 text-foreground/50" />
+        <span className="shrink-0 text-[10px] text-foreground/55">
+          {t("tool.generated.browserAction", { action: toolName.replace("browser_", "") })}
+        </span>
+        {title ? (
+          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">{title}</span>
+        ) : null}
+      </div>
+      {url && /^https?:\/\//i.test(url) ? <SafeLink href={url}>{url}</SafeLink> : null}
+      {tabs.length > 0 ? (
+        <p className="text-[10px] text-foreground/45">
+          {t("tool.generated.browserTabs", { count: tabs.length })}
+        </p>
+      ) : null}
+      {elements > 0 ? (
+        <p className="text-[10px] text-foreground/45">
+          {t("tool.generated.browserElements", { count: elements })}
+        </p>
+      ) : null}
+      {screenshot && conversationId ? (
+        <BrowserScreenshotPreview conversationId={conversationId} screenshot={screenshot} />
+      ) : null}
+    </ResultStack>
+  );
+}
+
+function BrowserScreenshotPreview({
+  conversationId,
+  screenshot,
+}: {
+  conversationId: string;
+  screenshot: { path: string; filename: string };
+}): React.JSX.Element {
+  const { t } = useT();
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    void api.browser
+      .readScreenshot({ conversationId, path: screenshot.path })
+      .then((data) => {
+        objectUrl = URL.createObjectURL(new Blob([data], { type: "image/png" }));
+        setUrl(objectUrl);
+      })
+      .catch(() => setUrl(null));
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [conversationId, screenshot.path]);
+  if (!url) return <p className="text-[10px] text-foreground/45">{screenshot.filename}</p>;
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <img
+        src={url}
+        alt={t("browser.screenshot")}
+        className="max-h-64 max-w-full rounded-md border border-border object-contain"
+      />
+      <p className="truncate text-[10px] text-foreground/45" title={screenshot.path}>
+        {screenshot.path}
+      </p>
+    </div>
+  );
+}
+
+function extractScreenshot(output: unknown): { path: string; filename: string } | null {
+  const record = asRecord(output);
+  const values = readArray(record?.value);
+  for (const value of values) {
+    const item = asRecord(value);
+    const text = readString(item?.text);
+    if (!text) continue;
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      const screenshot = asRecord(asRecord(parsed)?.screenshot);
+      const path = readString(screenshot?.path);
+      if (path) return { path, filename: readString(screenshot?.filename) ?? path };
+    } catch {
+      // Other browser content is not screenshot metadata.
+    }
+  }
+  return null;
 }
 
 function WebSearchResult({ output }: { output: unknown }): React.JSX.Element {

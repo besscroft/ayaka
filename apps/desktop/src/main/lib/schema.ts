@@ -1085,6 +1085,29 @@ export const sandboxArtifacts = sqliteTable(
   ],
 );
 
+export const browserTabs = sqliteTable(
+  "browser_tabs",
+  {
+    id: text("id").primaryKey(),
+    conversation_id: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    url: text("url").notNull().default("about:blank"),
+    title: text("title").notNull().default("New tab"),
+    favicon_url: text("favicon_url"),
+    position: integer("position").notNull().default(0),
+    active: integer("active").notNull().default(0),
+    loading: integer("loading").notNull().default(0),
+    can_go_back: integer("can_go_back").notNull().default(0),
+    can_go_forward: integer("can_go_forward").notNull().default(0),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("idx_browser_tabs_conversation").on(table.conversation_id, table.position),
+    index("idx_browser_tabs_active").on(table.conversation_id, table.active),
+  ],
+);
+
 export const schema = {
   conversations,
   messages,
@@ -1125,6 +1148,7 @@ export const schema = {
   sandboxSessions,
   sandboxSnapshots,
   sandboxArtifacts,
+  browserTabs,
 };
 
 export type Conversation = typeof conversations.$inferSelect;
@@ -1196,3 +1220,5 @@ export type SandboxSnapshot = typeof sandboxSnapshots.$inferSelect;
 export type NewSandboxSnapshot = typeof sandboxSnapshots.$inferInsert;
 export type SandboxArtifact = typeof sandboxArtifacts.$inferSelect;
 export type NewSandboxArtifact = typeof sandboxArtifacts.$inferInsert;
+export type BrowserTab = typeof browserTabs.$inferSelect;
+export type NewBrowserTab = typeof browserTabs.$inferInsert;

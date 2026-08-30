@@ -54,6 +54,7 @@ import {
   type WorkspaceCommandResult,
 } from "../../shared/types";
 import { parseSkillInvocations, stripSkillInvocations } from "../../shared/skill-invocation";
+import { redactBrowserInput } from "../../shared/browser-message";
 import { appendReactionFeedback, type ResolvedChatModel } from "./chat-agent";
 import {
   auditChatToolApprovalResponses,
@@ -1751,7 +1752,9 @@ function createGuardrailApproval(
         ? redactWorkspaceCommandInput(input)
         : toolName === "sandbox_start_preview"
           ? redactSandboxPreviewInput(input)
-          : redactMemoryContentForAudit(toolName, input);
+          : toolName === "browser_type"
+            ? redactBrowserInput(input)
+            : redactMemoryContentForAudit(toolName, input);
     const decision = evaluateToolGuardrail(
       context,
       toolName,
@@ -2353,7 +2356,22 @@ function selectedBaseToolIds(
       (id): id is ChatToolReference => isBaseChatTool(id) || isSkillToolReference(id),
     );
   }
-  return ["web_search", "web_open", "current_time", "runtime_snapshot", "model_capabilities"];
+  return [
+    "web_search",
+    "web_open",
+    "browser_tabs",
+    "browser_navigate",
+    "browser_snapshot",
+    "browser_click",
+    "browser_type",
+    "browser_press_key",
+    "browser_scroll",
+    "browser_wait",
+    "browser_screenshot",
+    "current_time",
+    "runtime_snapshot",
+    "model_capabilities",
+  ];
 }
 
 function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy): ChatToolId[] {

@@ -23,6 +23,7 @@ import type {
   WorkspaceOrphan,
 } from "../../shared/types";
 import { inferAttachmentMediaType } from "../../shared/media-type";
+import { readScreenshotPath } from "../../shared/browser-message";
 import type { UIMessage } from "ai";
 
 const DEFAULT_WORKSPACE_DIR = "workspaces";
@@ -388,7 +389,7 @@ export async function normalizeChatMediaInputs(
       ...message,
       parts: await Promise.all(
         (message.parts ?? []).map(async (part) => {
-          if (part.type !== "file") return part;
+          if (part.type !== "file") return materializeBrowserScreenshotPart(conversationId, part);
           if (typeof part.url !== "string" || !part.url.trim()) {
             throw new InvalidMediaInputError();
           }
@@ -437,6 +438,44 @@ export async function normalizeChatMediaInputs(
       ),
     })),
   );
+}
+
+async function materializeBrowserScreenshotPart(
+  conversationId: string | undefined,
+  part: UIMessage["parts"][number],
+): Promise<UIMessage["parts"][number]> {
+  if (!conversationId) return part;
+  const record = part as unknown as Record<string, unknown>;
+  const toolName =
+    part.type === "dynamic-tool"
+      ? typeof record.toolName === "string"
+        ? record.toolName
+        : ""
+      : part.type.startsWith("tool-")
+        ? part.type.slice("tool-".length)
+        : "";
+  if (toolName !== "browser_screenshot") return part;
+  const screenshotPath = readScreenshotPath(record.output);
+  const output = record.output;
+  const outputRecord =
+    output && typeof output === "object" ? (output as Record<string, unknown>) : null;
+  if (!screenshotPath || outputRecord?.type !== "content" || !Array.isArray(outputRecord.value))
+    return part;
+  const value = await Promise.all(
+    outputRecord.value.map(async (item: unknown) => {
+      const content = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+      const data =
+        content?.data && typeof content.data === "object"
+          ? (content.data as Record<string, unknown>)
+          : null;
+      if (content?.type !== "file" || data?.type !== "url" || typeof data.url !== "string")
+        return item;
+      if (data.url !== `workspace://${screenshotPath}`) return item;
+      const file = await readWorkspaceFileContent(conversationId, screenshotPath);
+      return { ...content, data: { type: "data", data: new Uint8Array(file.data) } };
+    }),
+  );
+  return { ...part, output: { ...outputRecord, value } } as typeof part;
 }
 
 function isValidBase64DataUrl(value: string): boolean {

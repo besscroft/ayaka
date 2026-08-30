@@ -27,6 +27,7 @@ import "./main/lib/tray-menu.test.ts";
 import "./main/lib/sandbox-agents.test.ts";
 import "./main/lib/sandbox-artifact-manager.test.ts";
 import "./main/lib/sandbox-preview-manager.test.ts";
+import "./main/lib/browser-message.test.ts";
 import "./main/lib/update-manager.test.ts";
 import "./main/lib/web-page-reader.test.ts";
 import "./main/lib/agent-context-manager.test.ts";

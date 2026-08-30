@@ -68,6 +68,7 @@ import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import { getConversationWorkspaceForHeader } from "../lib/conversation-workspace";
 import { getEnabledSkillMentions, getSkillMentions } from "../lib/chat-tools";
+import { sanitizeBrowserScreenshotMessage } from "@shared/browser-message";
 import {
   ConversationStatus,
   PromptSuggestions,
@@ -348,7 +349,7 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
           },
           body: JSON.stringify({
             model,
-            messages,
+            messages: messages.map(sanitizeBrowserScreenshotMessage),
             generationId: crypto.randomUUID(),
             previousSuggestions: readFollowupSuggestions(previousAssistantMessage),
           }),
@@ -1648,7 +1649,7 @@ async function fetchTitle(
         "Content-Type": "application/json",
         [CHAT_SESSION_HEADER]: info.token,
       },
-      body: JSON.stringify({ model, messages }),
+      body: JSON.stringify({ model, messages: messages.map(sanitizeBrowserScreenshotMessage) }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { title?: string };

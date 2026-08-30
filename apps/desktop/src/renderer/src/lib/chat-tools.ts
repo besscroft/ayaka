@@ -15,6 +15,15 @@ import {
 const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "web_search",
   "web_open",
+  "browser_tabs",
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_press_key",
+  "browser_scroll",
+  "browser_wait",
+  "browser_screenshot",
   "current_time",
   "runtime_snapshot",
   "model_capabilities",
@@ -45,6 +54,70 @@ const TOOL_METADATA: Record<
     description: "Read a public HTML web page provided by the user.",
     kind: "host",
     category: "web",
+    requiresApproval: false,
+  },
+  browser_tabs: {
+    label: "Browser tabs",
+    description: "List, create, select, or close tabs in the conversation browser.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_navigate: {
+    label: "Browser navigation",
+    description: "Open an HTTP(S) URL or move backward, forward, or reload the current page.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_snapshot: {
+    label: "Browser snapshot",
+    description: "Read the current page text and interactive elements with stable references.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_click: {
+    label: "Browser click",
+    description: "Click an interactive element from the latest browser snapshot by reference.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_type: {
+    label: "Browser type",
+    description:
+      "Type text into an input from the latest browser snapshot and optionally submit it.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_press_key: {
+    label: "Browser key press",
+    description: "Send a keyboard key or key combination to the active browser page.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_scroll: {
+    label: "Browser scroll",
+    description: "Scroll the current browser page by a bounded horizontal and vertical offset.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_wait: {
+    label: "Browser wait",
+    description: "Wait for loading, a URL fragment, page text, or a specified duration.",
+    kind: "host",
+    category: "browser",
+    requiresApproval: false,
+  },
+  browser_screenshot: {
+    label: "Browser screenshot",
+    description: "Capture the current browser viewport as a PNG for the model and workspace.",
+    kind: "host",
+    category: "browser",
     requiresApproval: false,
   },
   file_search: {
@@ -426,6 +499,9 @@ function getUnavailableReason({
   if (id === "web_search") {
     return "chatTools.unavailable.webSearchToolCalling";
   }
+  if (id === "browser_screenshot" && !selected.model.capabilities.vision) {
+    return "chatTools.unavailable.vision";
+  }
   if (id === "file_search") {
     return "chatTools.unavailable.fileSearchConfig";
   }
@@ -440,6 +516,7 @@ function getUnavailableReason({
 
 function isClientToolAvailable(id: ChatToolId, selected: SelectedChatModelInfo): boolean {
   if (selected.model.capabilities.toolCapabilities?.[id] === false) return false;
+  if (id === "browser_screenshot") return selected.model.capabilities.vision === true;
   if (id === "web_search" || !["file_search", "code_interpreter", "tool_search"].includes(id)) {
     return true;
   }

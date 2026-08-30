@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai";
 import type { MessageRow } from "@shared/types";
 import { api } from "./api";
+import { sanitizeBrowserScreenshotMessage } from "@shared/browser-message";
 
 export interface MessagePersistenceRequest {
   messages: UIMessage[];
@@ -138,7 +139,7 @@ function buildChangedMessageSnapshotRows({
     const previous = persisted.get(message.id);
     if (previous?.message === message) continue;
 
-    const content = JSON.stringify(message);
+    const content = JSON.stringify(sanitizeBrowserScreenshotMessage(message));
     if (previous?.content === content) {
       // A new wrapper with identical content is still safe to remember without
       // paying for another IPC upsert.

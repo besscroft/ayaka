@@ -44,6 +44,15 @@ const NATIVE_ONLY_TOOL_IDS = new Set<ChatToolId>([
 const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "web_search",
   "web_open",
+  "browser_tabs",
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_press_key",
+  "browser_scroll",
+  "browser_wait",
+  "browser_screenshot",
   "current_time",
   "runtime_snapshot",
   "model_capabilities",
@@ -66,11 +75,13 @@ export function createBuiltinToolDescriptors(model: ChatToolModelContext): ChatT
     const id = seed.id as ChatToolId;
     const isWebSearch = id === "web_search";
     const isNativeOnly = NATIVE_ONLY_TOOL_IDS.has(id);
+    const visionRequired = id === "browser_screenshot";
     const nativeTool = model.nativeTools.find((tool) => tool.id === id);
     const overridden = model.capabilities.toolCapabilities?.[id];
     const available =
       supportsTools &&
       overridden !== false &&
+      (!visionRequired || model.capabilities.vision) &&
       (isWebSearch ? !!webSearchExecution : isNativeOnly ? !!nativeTool : true);
     const execution = isWebSearch
       ? webSearchExecution
@@ -98,13 +109,15 @@ export function createBuiltinToolDescriptors(model: ChatToolModelContext): ChatT
         ? undefined
         : !supportsTools
           ? "Selected model does not advertise tool calling."
-          : isNativeOnly && overridden === false
-            ? "This tool is disabled for the selected model."
-            : isNativeOnly
-              ? "This provider has not registered the hosted tool for the selected model."
-              : isWebSearch
-                ? webSearchUnavailableReason(model)
-                : "Tool calling is unavailable for the selected model.",
+          : visionRequired
+            ? "Selected model does not advertise vision input."
+            : isNativeOnly && overridden === false
+              ? "This tool is disabled for the selected model."
+              : isNativeOnly
+                ? "This provider has not registered the hosted tool for the selected model."
+                : isWebSearch
+                  ? webSearchUnavailableReason(model)
+                  : "Tool calling is unavailable for the selected model.",
     } satisfies ChatToolDescriptor;
   });
 }

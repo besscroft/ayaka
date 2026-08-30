@@ -58,6 +58,20 @@ import { getCronScheduler } from "./cron-scheduler";
 import type { CronJobInput } from "../../shared/types";
 import { readWebPage } from "./web-page-reader";
 import { isChatPermissionSensitiveTool } from "./chat-permission-policy";
+import {
+  captureBrowserPage,
+  clickBrowserElement,
+  closeBrowserSessionTab,
+  createBrowserSessionTab,
+  focusBrowserSession,
+  navigateBrowserTab,
+  pressBrowserKey,
+  scrollBrowserPage,
+  selectBrowserSessionTab,
+  snapshotBrowserPage,
+  typeBrowserText,
+  waitForBrowserPage,
+} from "./browser-session-manager";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 
@@ -163,6 +177,49 @@ interface WebOpenInput {
   url: string;
 }
 
+interface BrowserTabsInput {
+  action: "list" | "create" | "select" | "close";
+  tabId?: string;
+  url?: string;
+}
+
+interface BrowserNavigateInput {
+  action: "open" | "back" | "forward" | "reload";
+  tabId?: string;
+  url?: string;
+}
+
+interface BrowserTabInput {
+  tabId?: string;
+}
+
+interface BrowserElementInput {
+  tabId?: string;
+  ref: string;
+}
+
+interface BrowserTypeInput extends BrowserElementInput {
+  text: string;
+  submit?: boolean;
+}
+
+interface BrowserKeyInput extends BrowserTabInput {
+  key: string;
+  modifiers?: string[];
+}
+
+interface BrowserScrollInput extends BrowserTabInput {
+  left?: number;
+  top?: number;
+}
+
+interface BrowserWaitInput extends BrowserTabInput {
+  milliseconds?: number;
+  urlIncludes?: string;
+  textIncludes?: string;
+  timeoutMs?: number;
+}
+
 interface ConversationSearchInput {
   query: string;
   limit?: number;
@@ -211,6 +268,88 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     description: "Read a public HTML web page provided by the user.",
     kind: "host",
     category: "web",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_tabs: {
+    id: "browser_tabs",
+    label: "Browser tabs",
+    description: "List, create, select, or close tabs in the conversation browser.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_navigate: {
+    id: "browser_navigate",
+    label: "Browser navigation",
+    description: "Open an HTTP(S) URL or move backward, forward, or reload the current page.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_snapshot: {
+    id: "browser_snapshot",
+    label: "Browser snapshot",
+    description: "Read the current page text and interactive elements with stable references.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_click: {
+    id: "browser_click",
+    label: "Browser click",
+    description: "Click an interactive element from the latest browser snapshot by reference.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_type: {
+    id: "browser_type",
+    label: "Browser type",
+    description:
+      "Type text into an input from the latest browser snapshot and optionally submit it.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_press_key: {
+    id: "browser_press_key",
+    label: "Browser key press",
+    description: "Send a keyboard key or key combination to the active browser page.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_scroll: {
+    id: "browser_scroll",
+    label: "Browser scroll",
+    description: "Scroll the current browser page by a bounded horizontal and vertical offset.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_wait: {
+    id: "browser_wait",
+    label: "Browser wait",
+    description: "Wait for loading, a URL fragment, page text, or a specified duration.",
+    kind: "host",
+    category: "browser",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  browser_screenshot: {
+    id: "browser_screenshot",
+    label: "Browser screenshot",
+    description: "Capture the current browser viewport as a PNG for the model and workspace.",
+    kind: "host",
+    category: "browser",
     defaultAuto: true,
     requiresApproval: false,
   },
@@ -451,21 +590,25 @@ export function createChatToolDescriptors(
     const nativeTool = model.nativeTools.find((item) => item.id === id);
     const isNativeOnly = base.kind === "provider" && id !== "web_search";
     const overridden = model.capabilities.toolCapabilities?.[id];
+    const visionRequired = id === "browser_screenshot";
     const available =
       supportsTools &&
       overridden !== false &&
+      (!visionRequired || model.capabilities.vision) &&
       (id === "web_search" ? !!webSearchExecution : isNativeOnly ? !!nativeTool : true);
     const unavailableReason = available
       ? undefined
       : !supportsTools
         ? "Selected model does not advertise tool calling."
-        : id === "web_search"
-          ? webSearchUnavailableReason(model)
-          : isNativeOnly && overridden === false
-            ? "This tool is disabled for the selected model."
-            : isNativeOnly
-              ? "This provider has not registered the hosted tool for the selected model."
-              : "Tool calling is unavailable for the selected model.";
+        : visionRequired
+          ? "Selected model does not advertise vision input."
+          : id === "web_search"
+            ? webSearchUnavailableReason(model)
+            : isNativeOnly && overridden === false
+              ? "This tool is disabled for the selected model."
+              : isNativeOnly
+                ? "This provider has not registered the hosted tool for the selected model."
+                : "Tool calling is unavailable for the selected model.";
 
     const requiresApproval =
       id === "workspace_run_command" && workspaceCommandRecord
@@ -758,6 +901,24 @@ export async function executeChatHostTool({
           return searchWebFallback(input as WebSearchInput);
         case "web_open":
           return readWebPage((input as WebOpenInput).url);
+        case "browser_tabs":
+          return executeBrowserTabs(input as BrowserTabsInput, conversationId);
+        case "browser_navigate":
+          return executeBrowserNavigate(input as BrowserNavigateInput, conversationId);
+        case "browser_snapshot":
+          return executeBrowserSnapshot(input as BrowserTabInput, conversationId);
+        case "browser_click":
+          return executeBrowserClick(input as BrowserElementInput, conversationId);
+        case "browser_type":
+          return executeBrowserType(input as BrowserTypeInput, conversationId);
+        case "browser_press_key":
+          return executeBrowserPressKey(input as BrowserKeyInput, conversationId);
+        case "browser_scroll":
+          return executeBrowserScroll(input as BrowserScrollInput, conversationId);
+        case "browser_wait":
+          return executeBrowserWait(input as BrowserWaitInput, conversationId);
+        case "browser_screenshot":
+          return executeBrowserScreenshot(input as BrowserTabInput, conversationId);
         case "memory_search": {
           const value = input as MemorySearchInput;
           const query = normalizeQuery(value.query);
@@ -854,6 +1015,13 @@ function createToolInstructions(activeTools: string[]): string | undefined {
       "Use the returned page text and final URL as the source of truth; do not infer page contents from the URL alone.",
     );
   }
+  const browserTools = activeTools.filter((toolName) => toolName.startsWith("browser_"));
+  if (browserTools.length > 0) {
+    instructions.push(
+      "Use the conversation browser tools for interactive web tasks. Call browser_snapshot before browser_click or browser_type and use its element refs; refs become invalid after any page change, so take a fresh snapshot before the next element action.",
+      "Use browser_tabs for multi-page workflows, browser_wait after navigation or submissions, and browser_screenshot when visual layout or image content matters. Do not claim an action succeeded until the browser tool returns success.",
+    );
+  }
   if (activeTools.includes("cron")) {
     instructions.push(
       "When the user asks to schedule a reminder or recurring task, use the cron tool instead of only describing a schedule.",
@@ -926,6 +1094,192 @@ function createHostTools({
             ),
         })
       : undefined,
+    browser_tabs: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_tabs.description,
+          inputSchema: jsonSchema<BrowserTabsInput>({
+            type: "object",
+            properties: {
+              action: { type: "string", enum: ["list", "create", "select", "close"] },
+              tabId: { type: "string", description: "Tab id for select or close." },
+              url: { type: "string", description: "Optional HTTP(S) URL for a new tab." },
+            },
+            required: ["action"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit(
+              "browser_tabs",
+              `Browser tabs: ${input.action}`,
+              model,
+              conversationId,
+              () => executeBrowserTabs(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_navigate: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_navigate.description,
+          inputSchema: jsonSchema<BrowserNavigateInput>({
+            type: "object",
+            properties: {
+              action: { type: "string", enum: ["open", "back", "forward", "reload"] },
+              tabId: { type: "string" },
+              url: { type: "string", description: "HTTP(S) URL when action is open." },
+            },
+            required: ["action"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit(
+              "browser_navigate",
+              `Browser navigation: ${input.action}`,
+              model,
+              conversationId,
+              () => executeBrowserNavigate(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_snapshot: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_snapshot.description,
+          inputSchema: jsonSchema<BrowserTabInput>({
+            type: "object",
+            properties: { tabId: { type: "string" } },
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit("browser_snapshot", "Browser snapshot", model, conversationId, () =>
+              executeBrowserSnapshot(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_click: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_click.description,
+          inputSchema: jsonSchema<BrowserElementInput>({
+            type: "object",
+            properties: {
+              tabId: { type: "string" },
+              ref: { type: "string", description: "Element ref from browser_snapshot." },
+            },
+            required: ["ref"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit(
+              "browser_click",
+              `Browser click: ${input.ref}`,
+              model,
+              conversationId,
+              () => executeBrowserClick(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_type: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_type.description,
+          inputSchema: jsonSchema<BrowserTypeInput>({
+            type: "object",
+            properties: {
+              tabId: { type: "string" },
+              ref: { type: "string", description: "Input ref from browser_snapshot." },
+              text: { type: "string", description: "Text to enter; passwords are never logged." },
+              submit: { type: "boolean", description: "Submit the input form after typing." },
+            },
+            required: ["ref", "text"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit(
+              "browser_type",
+              `Browser type: ${input.ref}`,
+              model,
+              conversationId,
+              () => executeBrowserType(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_press_key: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_press_key.description,
+          inputSchema: jsonSchema<BrowserKeyInput>({
+            type: "object",
+            properties: {
+              tabId: { type: "string" },
+              key: { type: "string", description: "Key such as Enter, Escape, Tab, or A." },
+              modifiers: { type: "array", items: { type: "string" } },
+            },
+            required: ["key"],
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit(
+              "browser_press_key",
+              `Browser key: ${input.key}`,
+              model,
+              conversationId,
+              () => executeBrowserPressKey(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_scroll: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_scroll.description,
+          inputSchema: jsonSchema<BrowserScrollInput>({
+            type: "object",
+            properties: {
+              tabId: { type: "string" },
+              left: { type: "number" },
+              top: { type: "number" },
+            },
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit("browser_scroll", "Browser scroll", model, conversationId, () =>
+              executeBrowserScroll(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_wait: model.capabilities.toolCalling
+      ? tool({
+          description: TOOL_DEFINITIONS.browser_wait.description,
+          inputSchema: jsonSchema<BrowserWaitInput>({
+            type: "object",
+            properties: {
+              tabId: { type: "string" },
+              milliseconds: { type: "number" },
+              urlIncludes: { type: "string" },
+              textIncludes: { type: "string" },
+              timeoutMs: { type: "number" },
+            },
+            additionalProperties: false,
+          }),
+          execute: (input) =>
+            executeWithAudit("browser_wait", "Browser wait", model, conversationId, () =>
+              executeBrowserWait(input, conversationId),
+            ),
+        })
+      : undefined,
+    browser_screenshot:
+      model.capabilities.toolCalling && model.capabilities.vision
+        ? tool({
+            description: TOOL_DEFINITIONS.browser_screenshot.description,
+            inputSchema: jsonSchema<BrowserTabInput>({
+              type: "object",
+              properties: { tabId: { type: "string" } },
+              additionalProperties: false,
+            }),
+            execute: (input) =>
+              executeWithAudit(
+                "browser_screenshot",
+                "Browser screenshot",
+                model,
+                conversationId,
+                () => executeBrowserScreenshot(input, conversationId),
+              ),
+          })
+        : undefined,
     memory_search: tool({
       description: TOOL_DEFINITIONS.memory_search.description,
       inputSchema: jsonSchema<MemorySearchInput>({
@@ -1209,6 +1563,122 @@ function createHostTools({
           executeCronTool(input),
         ),
     }),
+  };
+}
+
+function requireBrowserConversation(conversationId: string | undefined): string {
+  if (!conversationId) throw new Error("Browser tools require a conversation.");
+  return conversationId;
+}
+
+async function executeBrowserTabs(
+  input: BrowserTabsInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  const id = requireBrowserConversation(conversationId);
+  switch (input.action) {
+    case "list":
+      return focusBrowserSession(id);
+    case "create":
+      return createBrowserSessionTab(id, input.url);
+    case "select":
+      if (!input.tabId) throw new Error("tabId is required to select a browser tab.");
+      return selectBrowserSessionTab(id, input.tabId);
+    case "close":
+      if (!input.tabId) throw new Error("tabId is required to close a browser tab.");
+      return closeBrowserSessionTab(id, input.tabId);
+  }
+}
+
+function executeBrowserNavigate(
+  input: BrowserNavigateInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return navigateBrowserTab({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+}
+
+function executeBrowserSnapshot(
+  input: BrowserTabInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return snapshotBrowserPage({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+}
+
+function executeBrowserClick(
+  input: BrowserElementInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return clickBrowserElement({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+}
+
+function executeBrowserType(
+  input: BrowserTypeInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return typeBrowserText({ conversationId: requireBrowserConversation(conversationId), ...input });
+}
+
+function executeBrowserPressKey(
+  input: BrowserKeyInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return pressBrowserKey({ conversationId: requireBrowserConversation(conversationId), ...input });
+}
+
+function executeBrowserScroll(
+  input: BrowserScrollInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return scrollBrowserPage({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+}
+
+function executeBrowserWait(
+  input: BrowserWaitInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  return waitForBrowserPage({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+}
+
+async function executeBrowserScreenshot(
+  input: BrowserTabInput,
+  conversationId: string | undefined,
+): Promise<unknown> {
+  const result = await captureBrowserPage({
+    conversationId: requireBrowserConversation(conversationId),
+    ...input,
+  });
+  return {
+    type: "content",
+    value: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          screenshot: result.screenshot,
+          note: "The screenshot is attached as image content. The workspace path is a reference for later retrieval.",
+        }),
+      },
+      {
+        type: "file",
+        data: { type: "data", data: new Uint8Array(result.data) },
+        mediaType: result.screenshot.mediaType,
+        filename: result.screenshot.filename,
+      },
+    ],
   };
 }
 

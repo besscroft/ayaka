@@ -895,6 +895,84 @@ export interface SandboxPreview {
   updated_at: number;
 }
 
+export interface BrowserTab {
+  id: string;
+  conversation_id: string;
+  url: string;
+  title: string;
+  favicon_url: string | null;
+  position: number;
+  active: number;
+  loading: number;
+  can_go_back: number;
+  can_go_forward: number;
+  updated_at: number;
+}
+
+export interface BrowserElementSnapshot {
+  ref: string;
+  tag: string;
+  role?: string;
+  name?: string;
+  text?: string;
+  value?: string;
+  placeholder?: string;
+  href?: string;
+  type?: string;
+  checked?: boolean;
+  disabled?: boolean;
+}
+
+export interface BrowserPageSnapshot {
+  tabId: string;
+  url: string;
+  title: string;
+  text: string;
+  elements: BrowserElementSnapshot[];
+  snapshotId: string;
+}
+
+export interface BrowserScreenshot {
+  id: string;
+  tabId: string;
+  path: string;
+  filename: string;
+  mediaType: "image/png";
+  width: number;
+  height: number;
+  sizeBytes: number;
+  createdAt: number;
+}
+
+export interface BrowserDownload {
+  id: string;
+  tabId: string;
+  filename: string;
+  path: string;
+  url: string;
+  sizeBytes: number | null;
+  status: "progressing" | "completed" | "cancelled" | "interrupted";
+  createdAt: number;
+}
+
+export interface BrowserSessionSnapshot {
+  conversationId: string;
+  tabs: BrowserTab[];
+  activeTabId: string | null;
+  latestScreenshot: BrowserScreenshot | null;
+  downloads: BrowserDownload[];
+}
+
+export interface BrowserSessionUpdate {
+  conversationId: string;
+  session: BrowserSessionSnapshot;
+}
+
+export interface BrowserCaptureResult {
+  screenshot: BrowserScreenshot;
+  data: ArrayBuffer;
+}
+
 export interface SandboxArtifactReadResult {
   artifactId: string;
   kind: "html";
@@ -1621,6 +1699,15 @@ export interface ChatErrorResponse {
 export const CHAT_TOOL_IDS = [
   "web_search",
   "web_open",
+  "browser_tabs",
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_press_key",
+  "browser_scroll",
+  "browser_wait",
+  "browser_screenshot",
   "file_search",
   "code_interpreter",
   "tool_search",
@@ -1783,6 +1870,7 @@ export interface ChatToolDescriptor {
   execution?: "provider" | "host";
   category:
     | "web"
+    | "browser"
     | "system"
     | "memory"
     | "runtime"

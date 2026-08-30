@@ -38,6 +38,7 @@ import {
   sandboxArtifacts,
   sandboxSessions,
   sandboxSnapshots,
+  browserTabs,
   schema,
   settings,
   syncProfiles,
@@ -80,6 +81,8 @@ import {
   type SandboxArtifact,
   type SandboxSession,
   type SandboxSnapshot,
+  type BrowserTab as DbBrowserTab,
+  type NewBrowserTab,
   type ToolRecord as DbToolRecord,
   type ToolSecret as DbToolSecret,
   type ToolServer as DbToolServer,
@@ -420,6 +423,83 @@ export function listDeletedConversations(): Conversation[] {
 
 export function getConversation(id: string): Conversation | null {
   return getDb().select().from(conversations).where(eq(conversations.id, id)).get() ?? null;
+}
+
+export function listBrowserTabs(conversationId: string): DbBrowserTab[] {
+  return getDb()
+    .select()
+    .from(browserTabs)
+    .where(eq(browserTabs.conversation_id, conversationId))
+    .orderBy(asc(browserTabs.position), asc(browserTabs.updated_at))
+    .all();
+}
+
+export async function createBrowserTab(input: NewBrowserTab): Promise<DbBrowserTab> {
+  if (shouldRouteWrites()) return writeDb<DbBrowserTab>("createBrowserTab", [input]);
+  getDb().insert(browserTabs).values(input).run();
+  const row = getDb().select().from(browserTabs).where(eq(browserTabs.id, input.id)).get();
+  if (!row) throw new Error("Browser tab could not be created.");
+  return row;
+}
+
+export async function updateBrowserTab(
+  id: string,
+  patch: Partial<Omit<DbBrowserTab, "id" | "conversation_id">>,
+): Promise<DbBrowserTab> {
+  if (shouldRouteWrites()) return writeDb<DbBrowserTab>("updateBrowserTab", [id, patch]);
+  getDb()
+    .update(browserTabs)
+    .set({ ...patch, updated_at: patch.updated_at ?? Date.now() })
+    .where(eq(browserTabs.id, id))
+    .run();
+  const row = getDb().select().from(browserTabs).where(eq(browserTabs.id, id)).get();
+  if (!row) throw new Error("Browser tab was not found.");
+  return row;
+}
+
+export async function setBrowserActiveTab(
+  conversationId: string,
+  tabId: string,
+): Promise<DbBrowserTab> {
+  if (shouldRouteWrites())
+    return writeDb<DbBrowserTab>("setBrowserActiveTab", [conversationId, tabId]);
+  const row = getDb()
+    .select()
+    .from(browserTabs)
+    .where(and(eq(browserTabs.id, tabId), eq(browserTabs.conversation_id, conversationId)))
+    .get();
+  if (!row) throw new Error("Browser tab does not belong to this conversation.");
+  getDb().transaction((tx) => {
+    tx.update(browserTabs)
+      .set({ active: 0, updated_at: Date.now() })
+      .where(eq(browserTabs.conversation_id, conversationId))
+      .run();
+    tx.update(browserTabs)
+      .set({ active: 1, updated_at: Date.now() })
+      .where(eq(browserTabs.id, tabId))
+      .run();
+  });
+  const updated = getDb().select().from(browserTabs).where(eq(browserTabs.id, tabId)).get();
+  if (!updated) throw new Error("Browser tab was not found.");
+  return updated;
+}
+
+export async function deleteBrowserTab(id: string, conversationId?: string): Promise<void> {
+  if (shouldRouteWrites()) return writeDb<void>("deleteBrowserTab", [id, conversationId]);
+  getDb()
+    .delete(browserTabs)
+    .where(
+      conversationId
+        ? and(eq(browserTabs.id, id), eq(browserTabs.conversation_id, conversationId))
+        : eq(browserTabs.id, id),
+    )
+    .run();
+}
+
+export async function deleteBrowserTabsForConversation(conversationId: string): Promise<void> {
+  if (shouldRouteWrites())
+    return writeDb<void>("deleteBrowserTabsForConversation", [conversationId]);
+  getDb().delete(browserTabs).where(eq(browserTabs.conversation_id, conversationId)).run();
 }
 
 export function getConversationWorkspace(conversationId: string): ConversationWorkspace | null {

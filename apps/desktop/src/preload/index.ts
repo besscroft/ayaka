@@ -8,6 +8,8 @@ import type {
   TrayMenuLabels,
   SandboxArtifactUpdate,
   SandboxPreview,
+  BrowserCaptureResult,
+  BrowserSessionUpdate,
 } from "../shared/types";
 
 /**
@@ -191,6 +193,73 @@ const api = {
         handler(preview);
       ipcRenderer.on("sandbox:preview-updated", listener);
       return () => ipcRenderer.removeListener("sandbox:preview-updated", listener);
+    },
+  },
+  browser: {
+    getSession: (conversationId: string) => ipcRenderer.invoke("browser:session", conversationId),
+    createTab: (input: { conversationId: string; url?: string }) =>
+      ipcRenderer.invoke("browser:tabs:create", input),
+    selectTab: (input: { conversationId: string; tabId: string }) =>
+      ipcRenderer.invoke("browser:tabs:select", input),
+    closeTab: (input: { conversationId: string; tabId: string }) =>
+      ipcRenderer.invoke("browser:tabs:close", input),
+    navigate: (input: {
+      conversationId: string;
+      tabId?: string;
+      url?: string;
+      action?: "open" | "back" | "forward" | "reload";
+    }) => ipcRenderer.invoke("browser:navigate", input),
+    snapshot: (input: { conversationId: string; tabId?: string }) =>
+      ipcRenderer.invoke("browser:snapshot", input),
+    click: (input: { conversationId: string; tabId?: string; ref: string }) =>
+      ipcRenderer.invoke("browser:click", input),
+    type: (input: {
+      conversationId: string;
+      tabId?: string;
+      ref: string;
+      text: string;
+      submit?: boolean;
+    }) => ipcRenderer.invoke("browser:type", input),
+    pressKey: (input: {
+      conversationId: string;
+      tabId?: string;
+      key: string;
+      modifiers?: string[];
+    }) => ipcRenderer.invoke("browser:pressKey", input),
+    scroll: (input: { conversationId: string; tabId?: string; left?: number; top?: number }) =>
+      ipcRenderer.invoke("browser:scroll", input),
+    wait: (input: {
+      conversationId: string;
+      tabId?: string;
+      milliseconds?: number;
+      urlIncludes?: string;
+      textIncludes?: string;
+      timeoutMs?: number;
+    }) => ipcRenderer.invoke("browser:wait", input),
+    capture: (input: { conversationId: string; tabId?: string }): Promise<BrowserCaptureResult> =>
+      ipcRenderer.invoke("browser:capture", input),
+    readScreenshot: (input: { conversationId: string; path: string }): Promise<ArrayBuffer> =>
+      ipcRenderer.invoke("browser:readScreenshot", input),
+    setBounds: (input: {
+      conversationId: string;
+      tabId: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }) => ipcRenderer.invoke("browser:setBounds", input),
+    setVisible: (input: { conversationId: string; tabId: string; visible: boolean }) =>
+      ipcRenderer.invoke("browser:setVisible", input),
+    onUpdated: (handler: (event: BrowserSessionUpdate) => void) => {
+      const listener = (_event: IpcRendererEvent, update: BrowserSessionUpdate): void =>
+        handler(update);
+      ipcRenderer.on("browser:updated", listener);
+      return () => ipcRenderer.removeListener("browser:updated", listener);
+    },
+    onFocusRequested: (handler: (event: { conversationId: string; tabId: string }) => void) => {
+      const listener = (
+        _event: IpcRendererEvent,
+        request: { conversationId: string; tabId: string },
+      ): void => handler(request);
+      ipcRenderer.on("browser:focus-requested", listener);
+      return () => ipcRenderer.removeListener("browser:focus-requested", listener);
     },
   },
   cron: {

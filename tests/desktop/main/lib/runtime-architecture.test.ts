@@ -80,6 +80,7 @@ void describe("runtime architecture", () => {
       "0006_lazy_hitman.sql",
       "0007_military_white_queen.sql",
       "0008_dapper_captain_midlands.sql",
+      "0009_chubby_doctor_spectrum.sql",
     ]);
   });
 
@@ -268,6 +269,19 @@ void describe("runtime architecture", () => {
     assert.ok(runtime.activeTools?.includes("runtime_snapshot"));
     assert.ok(runtime.activeTools?.includes("sandbox_run_command"));
     assert.ok(runtime.activeTools?.includes("cron"));
+    assert.equal(runtime.activeTools?.includes("browser_screenshot"), false);
+
+    const visionRuntime = buildToolRegistryPreview({
+      selection: { mode: "auto", selectedToolIds: [] },
+      model: {
+        providerId: "test",
+        providerKind: "openai-compatible",
+        modelId: "model",
+        capabilities: { ...capabilities, vision: true },
+        nativeTools: [],
+      },
+    });
+    assert.ok(visionRuntime.activeTools?.includes("browser_screenshot"));
   });
 
   void it("classifies approval and sandbox policy risks", () => {

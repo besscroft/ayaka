@@ -176,6 +176,15 @@ export function isGeneratedToolName(toolName: string | null): boolean {
     [
       "web_search",
       "web_open",
+      "browser_tabs",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_click",
+      "browser_type",
+      "browser_press_key",
+      "browser_scroll",
+      "browser_wait",
+      "browser_screenshot",
       "memory_search",
       "memory_save",
       "memory_update",
@@ -222,6 +231,28 @@ export function getToolSummary(part: RenderableToolPart): ToolSummary | null {
         ? { key: "tool.generated.page", params: { title: truncateText(title, 80) } }
         : null;
     }
+    case "browser_tabs": {
+      const count = readArray(output?.tabs).length;
+      return { key: "tool.generated.browserTabs", params: { count } };
+    }
+    case "browser_navigate": {
+      const action = readString(input?.action) ?? "open";
+      return { key: "tool.generated.browserNavigation", params: { action } };
+    }
+    case "browser_snapshot":
+      return { key: "tool.generated.browserAction", params: { action: "snapshot" } };
+    case "browser_click":
+      return { key: "tool.generated.browserAction", params: { action: "click" } };
+    case "browser_type":
+      return { key: "tool.generated.browserAction", params: { action: "type" } };
+    case "browser_press_key":
+      return { key: "tool.generated.browserAction", params: { action: "key press" } };
+    case "browser_scroll":
+      return { key: "tool.generated.browserAction", params: { action: "scroll" } };
+    case "browser_wait":
+      return { key: "tool.generated.browserAction", params: { action: "wait" } };
+    case "browser_screenshot":
+      return { key: "tool.generated.browserScreenshot" };
     case "memory_search": {
       const count = readNumber(output?.count) ?? readArray(output?.results).length;
       return { key: "tool.generated.memories", params: { count } };
