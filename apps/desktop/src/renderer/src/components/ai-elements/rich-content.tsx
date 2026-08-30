@@ -1,15 +1,32 @@
-import { Fragment, createElement, type HTMLAttributes, type ReactNode } from "react";
+import {
+  Fragment,
+  createElement,
+  useEffect,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { cn } from "../../lib/utils";
-import { IconSparkles } from "../icons";
+import { useT } from "../../lib/i18n";
+import { notify } from "../../lib/toast";
+import { IconCheck, IconChevronDown, IconCopy, IconSparkles } from "../icons";
+import {
+  AnimatedDisclosure,
+  AnimatedDisclosureChevron,
+  AnimatedDisclosureContent,
+  AnimatedDisclosureTrigger,
+} from "./animated-disclosure";
 import {
   getMediaKindFromUrl,
+  isLongRichContent,
   parseRichContentBlocks,
   sanitizeRichContentUrl,
   type MediaKind,
   type RichContentBlock,
 } from "./rich-content-utils";
 
-interface RichContentProps extends HTMLAttributes<HTMLDivElement> {
+export interface RichContentProps extends HTMLAttributes<HTMLDivElement> {
   value: string;
   skillMentions?: readonly RichContentSkillMention[];
 }
@@ -130,22 +147,7 @@ function renderBlock(
       );
     }
     case "code":
-      return (
-        <div
-          data-slot="rich-content-code"
-          key={key}
-          className="overflow-hidden rounded-lg border border-border"
-        >
-          {block.lang ? (
-            <div className="border-b border-border bg-muted px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {block.lang}
-            </div>
-          ) : null}
-          <pre className="m-0 max-w-full overflow-x-auto bg-muted/50 p-3 text-[12px] leading-6">
-            <code className="bg-transparent p-0 font-mono font-normal">{block.code}</code>
-          </pre>
-        </div>
-      );
+      return <RichCodeBlock key={key} code={block.code} lang={block.lang} />;
     case "blockquote":
       return (
         <blockquote
@@ -225,6 +227,75 @@ function renderBlock(
     case "hr":
       return <hr key={key} className="my-1 border-border" />;
   }
+}
+
+function RichCodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.Element {
+  const { locale, t } = useT();
+  const isLong = isLongRichContent(code);
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const copyTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== undefined) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  const handleCopy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyState("copied");
+      if (copyTimerRef.current !== undefined) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => {
+        copyTimerRef.current = undefined;
+        setCopyState("idle");
+      }, 1500);
+    } catch (error) {
+      notify.error(t("rich.code.copyFailed"), error, locale);
+    }
+  };
+
+  const copyLabel = copyState === "copied" ? t("rich.code.copied") : t("rich.code.copy");
+
+  return (
+    <AnimatedDisclosure
+      data-slot="rich-content-code"
+      defaultOpen={!isLong}
+      className="overflow-hidden rounded-lg border border-border"
+    >
+      <div
+        data-slot="rich-content-code-toolbar"
+        className="flex min-h-8 items-center gap-1 border-b border-border bg-muted px-1.5"
+      >
+        <AnimatedDisclosureTrigger className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground outline-none transition hover:bg-background/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          <span className="min-w-0 truncate">{lang || t("rich.code.label")}</span>
+          <AnimatedDisclosureChevron className="flex size-3.5 shrink-0 items-center justify-center">
+            <IconChevronDown className="size-3.5" />
+          </AnimatedDisclosureChevron>
+        </AnimatedDisclosureTrigger>
+        <button
+          type="button"
+          data-slot="rich-content-code-copy"
+          data-state={copyState}
+          aria-label={copyLabel}
+          title={copyLabel}
+          onClick={() => void handleCopy()}
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition hover:bg-background/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {copyState === "copied" ? (
+            <IconCheck className="size-3.5 text-success" />
+          ) : (
+            <IconCopy className="size-3.5" />
+          )}
+        </button>
+      </div>
+      <AnimatedDisclosureContent innerClassName="bg-muted/50">
+        <pre className="m-0 max-w-full overflow-x-auto p-3 text-[12px] leading-6">
+          <code className="bg-transparent p-0 font-mono font-normal">{code}</code>
+        </pre>
+      </AnimatedDisclosureContent>
+    </AnimatedDisclosure>
+  );
 }
 
 function renderInlineMarkdown(
@@ -386,6 +457,16 @@ function renderDomNode(node: ChildNode, key: string): ReactNode | null {
   const tag = element.tagName.toLowerCase();
   if (BLOCKED_HTML_TAGS.has(tag)) return null;
 
+  if (tag === "pre") {
+    return (
+      <RichCodeBlock
+        key={key}
+        code={element.textContent ?? ""}
+        lang={getHtmlCodeLanguage(element)}
+      />
+    );
+  }
+
   const children = renderDomChildren(element.childNodes, key);
   if (!ALLOWED_HTML_TAGS.has(tag)) return <Fragment key={key}>{children}</Fragment>;
 
@@ -393,6 +474,12 @@ function renderDomNode(node: ChildNode, key: string): ReactNode | null {
   if (props === null) return null;
   if (VOID_HTML_TAGS.has(tag)) return createElement(tag, { key, ...props });
   return createElement(tag, { key, ...props }, children);
+}
+
+function getHtmlCodeLanguage(element: HTMLElement): string | undefined {
+  const codeClass = element.querySelector("code")?.getAttribute("class") ?? "";
+  const className = `${element.getAttribute("class") ?? ""} ${codeClass}`;
+  return /(?:language|lang)-([A-Za-z0-9+.#_-]+)/i.exec(className)?.[1];
 }
 
 function getSafeHtmlProps(tag: string, element: HTMLElement): Record<string, unknown> | null {
@@ -567,8 +654,6 @@ function htmlClassName(tag: string): string | undefined {
       return "pl-1";
     case "blockquote":
       return "m-0 border-l-2 border-accent/60 pl-3 text-foreground/70";
-    case "pre":
-      return "m-0 max-w-full overflow-x-auto rounded-lg border border-border bg-muted p-3 text-[12px] leading-6";
     case "code":
       return "font-mono";
     case "table":

@@ -11,6 +11,16 @@ export type RichContentBlock =
 export type UrlKind = "link" | "image" | "media";
 export type MediaKind = "image" | "audio" | "video";
 
+export const RICH_CONTENT_COLLAPSE_LINE_LIMIT = 20;
+export const RICH_CONTENT_COLLAPSE_CHAR_LIMIT = 1200;
+
+export function isLongRichContent(value: string): boolean {
+  return (
+    value.length > RICH_CONTENT_COLLAPSE_CHAR_LIMIT ||
+    value.split(/\r?\n/).length > RICH_CONTENT_COLLAPSE_LINE_LIMIT
+  );
+}
+
 const HTML_BLOCK_TAGS =
   "address|article|aside|audio|blockquote|br|details|div|figure|figcaption|h[1-6]|hr|img|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul|video";
 

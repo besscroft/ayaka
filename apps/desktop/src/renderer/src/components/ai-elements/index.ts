@@ -15,13 +15,14 @@ export {
   ConversationScrollButton,
 } from "./conversation";
 
-export { Message, MessageContent, MessageResponse } from "./message";
+export { Message, MessageContent, MessageResponse, type MessageResponseProps } from "./message";
 export {
   getMediaKindFromUrl,
+  isLongRichContent,
   parseRichContentBlocks,
   sanitizeRichContentUrl,
 } from "./rich-content-utils";
-export { RichContent } from "./rich-content";
+export { RichContent, type RichContentProps } from "./rich-content";
 
 export {
   PromptInput,

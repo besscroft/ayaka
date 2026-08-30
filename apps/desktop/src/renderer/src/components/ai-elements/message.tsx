@@ -57,7 +57,7 @@ export function MessageContent({
   );
 }
 
-interface MessageResponseProps extends HTMLAttributes<HTMLDivElement> {
+export interface MessageResponseProps extends HTMLAttributes<HTMLDivElement> {
   children?: string;
   streaming?: boolean;
   skillMentions?: readonly RichContentSkillMention[];
