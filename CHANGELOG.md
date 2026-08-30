@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.38]
+
+### 中文
+
+#### 新增
+
+- 新增代码块复制、折叠与展开功能，支持显示代码语言并提供复制状态提示，长代码块默认折叠。
+- 新增临时会话转为永久会话后的创建事件通知，并自动刷新会话列表。
+
+#### 变更
+
+- 将 `sandbox_run_command` 设为默认自动启用工具，并完善工具描述，明确区分工作区命令与沙箱命令的用途。
+- 优化追问建议生成与展示，仅基于最新助手消息生成建议，并增加加载状态、请求取消和历史建议去重，减少重复建议。
+
+### English
+
+#### Added
+
+- Added code-block copying, collapsing, and expanding, with language labels, copy-status feedback, and automatic collapsing for long code blocks.
+- Added a conversation-created event after a temporary conversation becomes persistent, with automatic conversation-list refresh.
+
+#### Changed
+
+- Made `sandbox_run_command` enabled by default as an automatic tool and improved its description to clarify the distinction between workspace and sandbox commands.
+- Improved follow-up suggestion generation and display by using only the latest assistant message, adding loading states and request cancellation, and filtering suggestions shown previously to reduce duplicates.
+
 ## [0.1.37]
 
 ### 中文
