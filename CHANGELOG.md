@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.39]
+
+### 中文
+
+#### 新增
+
+- 新增内置浏览器工具链，提供标签页管理、页面导航、页面快照、点击、输入、按键、滚动、等待和截图共 9 个工具，支持智能体执行交互式网页任务。
+- 新增工作台浏览器面板，支持浏览器标签页管理、地址导航、前进后退、刷新、页面操作及截图预览。
+- 新增浏览器会话与标签页持久化，支持按会话恢复浏览器工作状态。
+
+#### 变更
+
+- 优化浏览器消息处理，对输入内容和截图数据进行脱敏与安全路径转换，避免敏感信息和临时数据被直接持久化或重新发送。
+
+### English
+
+#### Added
+
+- Added a built-in browser toolchain with nine tools for tab management, navigation, snapshots, clicking, typing, key presses, scrolling, waiting, and screenshots, enabling agents to perform interactive web tasks.
+- Added a browser pane to the workspace with tab management, address navigation, back/forward controls, reload, page actions, and screenshot previews.
+- Added persistent browser sessions and tabs so browser state can be restored per conversation.
+
+#### Changed
+
+- Improved browser-message handling by redacting input values and converting screenshot data to safe workspace paths, preventing sensitive information and temporary data from being persisted or resent directly.
+
 ## [0.1.38]
 
 ### 中文
