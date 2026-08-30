@@ -1119,7 +1119,14 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
       reportChatError("save user message", err);
       return;
     }
-    if (wasTemporary) setIsPersistedConversation(true);
+    if (wasTemporary) {
+      setIsPersistedConversation(true);
+      window.dispatchEvent(
+        new CustomEvent("ayaka:conversation-created", {
+          detail: { id: conversationId },
+        }),
+      );
+    }
     void chat.sendMessage(userMessage).catch((err) => {
       reportChatError("send", err, { persistSnapshot: pendingMessages });
     });

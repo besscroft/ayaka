@@ -126,6 +126,14 @@ export function AppShell({
     return () => window.removeEventListener("ayaka:conversation-renamed", handler);
   }, []);
 
+  useEffect(() => {
+    const handleCreated = (): void => {
+      refresh();
+    };
+    window.addEventListener("ayaka:conversation-created", handleCreated);
+    return () => window.removeEventListener("ayaka:conversation-created", handleCreated);
+  }, []);
+
   const confirmDeleteConversation = (): void => {
     if (!pendingDelete) return;
     const id = pendingDelete.id;
