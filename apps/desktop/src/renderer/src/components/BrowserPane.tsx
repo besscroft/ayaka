@@ -37,7 +37,10 @@ export function BrowserPane({
     }
   }, [conversationId]);
 
+  // 仅在面板真正展示时才拉取/创建浏览器会话：会话创建会顺带 prepare 工作区并
+  // 落库会话记录，不能在点开新会话（尚未发送消息）时就触发。
   useEffect(() => {
+    if (!visible) return;
     let cancelled = false;
     void api.browser.getSession(conversationId).then(
       (session) => {
@@ -50,7 +53,7 @@ export function BrowserPane({
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [conversationId, visible]);
 
   useEffect(() => {
     const offUpdated = api.browser.onUpdated((event) => {
