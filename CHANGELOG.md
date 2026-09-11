@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.40]
+
+### 中文
+
+#### 新增
+
+- 新增长期记忆模型配置，支持在通用设置中分别选择记忆 LLM 和 Embedding 模型，或使用自动选择，并兼容 OpenAI 及 OpenAI 兼容服务商。
+- 新增会话工作区侧栏布局持久化，按会话保存侧栏的显示状态和宽度，并在切换会话时自动恢复。
+
+#### 变更
+
+- 优化长期记忆配置变更处理，模型、服务商或 API 密钥更新后自动重置并重新初始化记忆实例。
+- 优化浏览器面板初始化，仅在面板实际展示时拉取或创建浏览器会话，避免新会话尚未发送消息时提前写入工作区和会话记录。
+
+### English
+
+#### Added
+
+- Added configurable long-term memory models in General settings, allowing separate Memory LLM and embedding selections with automatic selection support for OpenAI and OpenAI-compatible providers.
+- Added persistent per-conversation workspace-panel layouts, restoring the panel’s visibility and width when switching conversations.
+
+#### Changed
+
+- Improved long-term memory configuration handling so memory instances are automatically reset and reinitialized when models, providers, or API keys change.
+- Improved browser-pane initialization by fetching or creating browser sessions only when the pane is visible, preventing premature workspace and conversation records for new conversations before the first message is sent.
+
 ## [0.1.39]
 
 ### 中文
