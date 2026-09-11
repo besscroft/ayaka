@@ -2337,6 +2337,8 @@ export interface ModelOption {
   capabilitySources?: ModelCapabilitySources;
   /** Last successful provider catalog sync timestamp. */
   lastSyncedAt?: number;
+  /** Provider-level or model-level API key is configured; never contains the key itself. */
+  hasApiKey?: boolean;
 }
 
 /** Provider metadata without API keys. */
@@ -2653,6 +2655,10 @@ export const SettingKey = {
   ModelTopP: "model_top_p",
   /** Chat reasoning effort level. */
   ChatReasoningLevel: "chat_reasoning_level",
+  /** Memory LLM model reference; empty means automatic selection. */
+  MemoryLlmModel: "memory_llm_model",
+  /** Memory embedding model reference; empty means automatic selection. */
+  MemoryEmbeddingModel: "memory_embedding_model",
   /** Per-conversation chat tool mode and manual selections. */
   ChatTools: "chat_tools",
   /** Global and per-conversation chat permission modes. */
@@ -2829,6 +2835,8 @@ export interface AppSettings {
   modelMaxTokens: number;
   modelTopP: number;
   chatReasoningLevel: ChatReasoningLevel;
+  memoryLlmModel: string | null;
+  memoryEmbeddingModel: string | null;
 }
 
 /**
@@ -2852,4 +2860,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modelMaxTokens: 4096,
   modelTopP: 1,
   chatReasoningLevel: "provider-default",
+  memoryLlmModel: null,
+  memoryEmbeddingModel: null,
 };

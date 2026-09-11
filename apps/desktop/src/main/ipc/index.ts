@@ -113,8 +113,8 @@ import type {
   ErrorLogInput,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
-import { DEFAULT_AGENT_ID } from "../../shared/types";
-import { queueAgentLearning } from "../lib/agent-learning";
+import { DEFAULT_AGENT_ID, SettingKey } from "../../shared/types";
+import { notifyMemoryConfigurationChanged, queueAgentLearning } from "../lib/agent-learning";
 import { memoryOrchestrator } from "../lib/memory-orchestrator";
 import { createMemoryAccessContext } from "../lib/memory-access";
 import {
@@ -323,9 +323,10 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   onSandboxPreviewUpdated((preview) => broadcast("sandbox:preview-updated", preview));
   onBrowserSessionUpdated((event) => broadcast("browser:updated", event));
   onBrowserFocusRequested((event) => broadcast("browser:focus-requested", event));
-  subscribeProviderCatalogUpdated((providerId) =>
-    broadcast("providers:catalog-updated", { providerId }),
-  );
+  subscribeProviderCatalogUpdated((providerId) => {
+    broadcast("providers:catalog-updated", { providerId });
+    notifyMemoryConfigurationChanged();
+  });
 
   const updateToolAndNotify = async (
     id: string,
@@ -652,6 +653,13 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   ipcMain.handle("settings:set", async (_e, key: string, value: string) => {
     await setSetting(key, value);
+    if (
+      key === SettingKey.SelectedModel ||
+      key === SettingKey.MemoryLlmModel ||
+      key === SettingKey.MemoryEmbeddingModel
+    ) {
+      notifyMemoryConfigurationChanged();
+    }
     return true;
   });
 
@@ -666,11 +674,13 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   ipcMain.handle("apikeys:set", async (_e, provider: string, apiKey: string) => {
     await setApiKey(provider, apiKey);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 
   ipcMain.handle("apikeys:delete", async (_e, provider: string) => {
     await deleteApiKey(provider);
+    notifyMemoryConfigurationChanged();
     return true;
   });
   // 注意：不暴露 apikeys:get 明文接口，渲染层无需读取明文 key
@@ -1132,39 +1142,49 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   ipcMain.handle("providers:listManagedModels", () => listManagedModels());
 
-  ipcMain.handle("providers:upsertCustomProvider", (_e, input: CustomProviderInput) =>
-    upsertCustomProvider(input),
-  );
+  ipcMain.handle("providers:upsertCustomProvider", async (_e, input: CustomProviderInput) => {
+    const result = await upsertCustomProvider(input);
+    notifyMemoryConfigurationChanged();
+    return result;
+  });
 
   ipcMain.handle("providers:deleteCustomProvider", async (_e, providerId: string) => {
     await deleteCustomProvider(providerId);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 
   ipcMain.handle("providers:setProviderApiKey", async (_e, providerId: string, apiKey: string) => {
     await saveProviderApiKey(providerId, apiKey);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 
   ipcMain.handle("providers:deleteProviderApiKey", async (_e, providerId: string) => {
     await clearProviderApiKey(providerId);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 
   ipcMain.handle("providers:testProvider", (_e, providerId: string) => testProvider(providerId));
 
-  ipcMain.handle("providers:syncAvailableModels", (_e, providerId: string) =>
-    syncAvailableModels(providerId),
-  );
+  ipcMain.handle("providers:syncAvailableModels", async (_e, providerId: string) => {
+    const result = await syncAvailableModels(providerId);
+    notifyMemoryConfigurationChanged();
+    return result;
+  });
 
-  ipcMain.handle("providers:upsertCustomModel", (_e, input: CustomModelInput) =>
-    upsertCustomModel(input),
-  );
+  ipcMain.handle("providers:upsertCustomModel", async (_e, input: CustomModelInput) => {
+    const result = await upsertCustomModel(input);
+    notifyMemoryConfigurationChanged();
+    return result;
+  });
 
   ipcMain.handle(
     "providers:updateModelEnabled",
     async (_e, providerId: string, modelId: string, enabled: boolean) => {
       await updateModelEnabled(providerId, modelId, enabled);
+      notifyMemoryConfigurationChanged();
       return true;
     },
   );
@@ -1173,17 +1193,20 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     "providers:setModelApiKey",
     async (_e, providerId: string, modelId: string, apiKey: string) => {
       await saveModelApiKey(providerId, modelId, apiKey);
+      notifyMemoryConfigurationChanged();
       return true;
     },
   );
 
   ipcMain.handle("providers:deleteModelApiKey", async (_e, providerId: string, modelId: string) => {
     await clearModelApiKey(providerId, modelId);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 
   ipcMain.handle("providers:deleteCustomModel", async (_e, providerId: string, modelId: string) => {
     await deleteCustomModel(providerId, modelId);
+    notifyMemoryConfigurationChanged();
     return true;
   });
 

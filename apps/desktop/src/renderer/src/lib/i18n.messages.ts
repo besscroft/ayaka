@@ -1282,8 +1282,8 @@ const entries = {
   "tools.mcp.state.error": { zh: "错误", en: "Error" },
   "settings.general.title": { zh: "通用设置", en: "General settings" },
   "settings.general.desc": {
-    zh: "选择各类媒体和视觉输入使用的默认模型。",
-    en: "Choose the default models for media generation and visual input.",
+    zh: "选择媒体、视觉输入和长期记忆使用的默认模型。",
+    en: "Choose the default models for media, visual input, and long-term memory.",
   },
   "settings.general.media.title": { zh: "媒体模型", en: "Media models" },
   "settings.general.media.desc": {
@@ -1308,6 +1308,29 @@ const entries = {
     en: "Only models supporting both text generation and vision are shown.",
   },
   "settings.general.vision.inherit": { zh: "继承聊天模型", en: "Inherit chat model" },
+  "settings.general.memory.title": { zh: "记忆模型", en: "Memory models" },
+  "settings.general.memory.desc": {
+    zh: "用于长期记忆的语义整理和检索；未指定时自动选择。",
+    en: "Used for semantic long-term memory; automatic selection is used when unset.",
+  },
+  "settings.general.memory.llm": { zh: "记忆 LLM", en: "Memory LLM" },
+  "settings.general.memory.llmDesc": {
+    zh: "用于整理和提取记忆，支持 OpenAI 兼容的聊天模型。",
+    en: "Used to consolidate and extract memories through an OpenAI-compatible chat model.",
+  },
+  "settings.general.memory.embedding": { zh: "记忆 Embedding", en: "Memory Embedding" },
+  "settings.general.memory.embeddingDesc": {
+    zh: "用于语义检索，需选择支持 Embedding 的 OpenAI 兼容模型。",
+    en: "Used for semantic retrieval; choose an OpenAI-compatible embedding model.",
+  },
+  "settings.general.memory.unavailable": {
+    zh: "暂无可用的记忆模型；本地记忆仍可正常使用。",
+    en: "No usable memory models are configured; local memory remains available.",
+  },
+  "settings.general.memory.unavailableSelection": {
+    zh: "当前选择暂不可用",
+    en: "Current selection is unavailable",
+  },
   "settings.media.desc": {
     zh: "智能体决定输出类型；这里配置各类媒体使用的默认模型和参数。",
     en: "The agent chooses the output type; configure default models and parameters here.",

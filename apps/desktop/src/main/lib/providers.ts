@@ -101,6 +101,20 @@ export interface ResolvedModelConfig {
   countInputTokens?: (input: ExactTokenCountInput) => Promise<number>;
 }
 
+/** Main-process-only model configuration for the Mem0 OpenAI adapter. */
+export interface ResolvedMemoryModel {
+  ref: string;
+  providerId: string;
+  modelId: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface ResolvedMemoryConfiguration {
+  llm: ResolvedMemoryModel | null;
+  embedding: ResolvedMemoryModel | null;
+}
+
 export interface NativeChatTool {
   id: ChatToolId;
   toolName: string;
@@ -661,7 +675,6 @@ function mergeProviderConfigs(
 export function listProviders(): ProviderInfo[] {
   const catalog = readCatalog();
   const providerKeys = new Set(listApiKeyProviders());
-  const modelKeyRefs = listModelApiKeyRefs();
   const customProviders: ProviderConfig[] = catalog.providers.map((provider) => ({
     id: provider.id,
     label: provider.label,
@@ -672,15 +685,20 @@ export function listProviders(): ProviderInfo[] {
     models: [],
   }));
 
-  return mergeProviderConfigs(builtinProviderConfigs(), customProviders).map((provider) => ({
-    ...provider,
-    authKind: providerAuthKind(provider),
-    hasProviderApiKey: providerKeys.has(provider.id),
-    hasApiKey:
-      providerKeys.has(provider.id) ||
-      modelKeyRefs.some((ref) => ref.startsWith(provider.id + "/")),
-    models: mergeModels(provider, catalog),
-  }));
+  return mergeProviderConfigs(builtinProviderConfigs(), customProviders).map((provider) => {
+    const hasProviderApiKey = providerKeys.has(provider.id) && getApiKey(provider.id) !== null;
+    const models = mergeModels(provider, catalog).map((model) => ({
+      ...model,
+      hasApiKey: hasProviderApiKey || getModelApiKey(provider.id, model.id) !== null,
+    }));
+    return {
+      ...provider,
+      authKind: providerAuthKind(provider),
+      hasProviderApiKey,
+      hasApiKey: hasProviderApiKey || models.some((model) => model.hasApiKey),
+      models,
+    };
+  });
 }
 
 export function listManagedModels(): ManagedModelInfo[] {
@@ -720,6 +738,95 @@ export function listManagedModels(): ManagedModelInfo[] {
 
 export function getProviderConfig(providerId: string): ProviderInfo | null {
   return listProviders().find((provider) => provider.id === providerId) ?? null;
+}
+
+/**
+ * Resolve the two independent models used by Mem0. This function is intentionally
+ * main-process-only because its result contains decrypted API keys.
+ */
+export function resolveMemoryConfiguration(): ResolvedMemoryConfiguration {
+  const providers = listProviders();
+  const llmCandidates = providers.flatMap((provider) =>
+    provider.models
+      .filter(
+        (model) => isMemoryProvider(provider) && model.enabled && model.capabilities.textGeneration,
+      )
+      .map((model) => resolveMemoryModel(provider, model))
+      .filter(isResolvedMemoryModel),
+  );
+  const embeddingCandidates = providers.flatMap((provider) =>
+    provider.models
+      .filter(
+        (model) => isMemoryProvider(provider) && model.enabled && model.capabilities.embedding,
+      )
+      .map((model) => resolveMemoryModel(provider, model))
+      .filter(isResolvedMemoryModel),
+  );
+
+  const llm =
+    resolveConfiguredMemoryModel(getSetting(SettingKey.MemoryLlmModel), llmCandidates) ??
+    resolveSelectedChatMemoryModel(llmCandidates) ??
+    llmCandidates[0] ??
+    null;
+  const embedding =
+    resolveConfiguredMemoryModel(
+      getSetting(SettingKey.MemoryEmbeddingModel),
+      embeddingCandidates,
+    ) ??
+    embeddingCandidates.find((candidate) => candidate?.providerId === llm?.providerId) ??
+    embeddingCandidates[0] ??
+    null;
+
+  return { llm, embedding };
+}
+
+export function hasUsableMemoryConfiguration(): boolean {
+  const configuration = resolveMemoryConfiguration();
+  return configuration.llm !== null && configuration.embedding !== null;
+}
+
+function isMemoryProvider(provider: ProviderInfo): boolean {
+  if (provider.kind !== "openai" && provider.kind !== "openai-compatible") return false;
+  if (provider.authKind === "none" || !provider.baseUrl) return false;
+  return (
+    provider.source !== "custom" || getCustomProviderApiFormat(provider) === "chat-completions"
+  );
+}
+
+function resolveMemoryModel(
+  provider: ProviderInfo,
+  model: ModelOption,
+): ResolvedMemoryModel | null {
+  const apiKey = resolveProviderCredential(provider, model.id);
+  if (!apiKey || !provider.baseUrl) return null;
+  return {
+    ref: providerModelRef(provider.id, model.id),
+    providerId: provider.id,
+    modelId: model.id,
+    baseUrl: provider.baseUrl,
+    apiKey,
+  };
+}
+
+function isResolvedMemoryModel(model: ResolvedMemoryModel | null): model is ResolvedMemoryModel {
+  return model !== null;
+}
+
+function resolveConfiguredMemoryModel(
+  rawRef: string | null,
+  candidates: readonly ResolvedMemoryModel[],
+): ResolvedMemoryModel | null {
+  const ref = rawRef?.trim();
+  if (!ref) return null;
+  return candidates.find((candidate) => candidate?.ref === ref) ?? null;
+}
+
+function resolveSelectedChatMemoryModel(
+  candidates: readonly ResolvedMemoryModel[],
+): ResolvedMemoryModel | null {
+  const selectedRef = getSetting(SettingKey.SelectedModel)?.trim();
+  if (!selectedRef) return null;
+  return candidates.find((candidate) => candidate?.ref === selectedRef) ?? null;
 }
 
 export async function upsertCustomProvider(input: CustomProviderInput): Promise<ProviderInfo> {

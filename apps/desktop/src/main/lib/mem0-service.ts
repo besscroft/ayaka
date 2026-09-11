@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { app } from "electron";
 import { Memory } from "mem0ai/oss";
 import { join } from "node:path";
 import type { MemoryRecord } from "../../shared/types";
-import { getApiKey, getSetting, setSetting } from "./db";
+import { getSetting, setSetting } from "./db";
+import { resolveMemoryConfiguration, type ResolvedMemoryConfiguration } from "./providers";
 
 const MEMORY_USER_ID_SETTING = "memory.installation-user-id";
 
@@ -15,11 +16,16 @@ export interface Mem0SearchHit {
 }
 
 let memoryInstance: Memory | null = null;
+let memoryConfigurationSignature: string | null = null;
 
 export async function getMemory(): Promise<Memory | null> {
-  if (memoryInstance) return memoryInstance;
-  const apiKey = getApiKey("openai");
-  if (!apiKey) return null;
+  const configuration = resolveMemoryConfiguration();
+  if (!configuration.llm || !configuration.embedding) {
+    resetMemoryInstance();
+    return null;
+  }
+  const signature = memoryConfigurationSignatureFor(configuration);
+  if (memoryInstance && memoryConfigurationSignature === signature) return memoryInstance;
 
   const historyDbPath = join(
     process.env.AYAKA_USER_DATA_DIR || app.getPath("userData"),
@@ -27,15 +33,34 @@ export async function getMemory(): Promise<Memory | null> {
     "mem0-history.db",
   );
   memoryInstance = new Memory({
-    llm: { provider: "openai", config: { apiKey, model: "gpt-5-mini" } },
-    embedder: { provider: "openai", config: { apiKey, model: "text-embedding-3-small" } },
+    llm: {
+      provider: "openai",
+      config: {
+        apiKey: configuration.llm.apiKey,
+        baseURL: configuration.llm.baseUrl,
+        model: configuration.llm.modelId,
+      },
+    },
+    embedder: {
+      provider: "openai",
+      config: {
+        apiKey: configuration.embedding.apiKey,
+        baseURL: configuration.embedding.baseUrl,
+        model: configuration.embedding.modelId,
+      },
+    },
     vectorStore: {
       provider: "memory",
-      config: { collectionName: "ayaka-memories", dimension: 1536 },
+      config: { collectionName: "ayaka-memories" },
     },
     historyDbPath,
   });
+  memoryConfigurationSignature = signature;
   return memoryInstance;
+}
+
+function memoryConfigurationSignatureFor(configuration: ResolvedMemoryConfiguration): string {
+  return createHash("sha256").update(JSON.stringify(configuration)).digest("hex");
 }
 
 export function getMemoryUserId(): string {
@@ -109,4 +134,5 @@ export async function resetMem0Index(): Promise<boolean> {
 
 export function resetMemoryInstance(): void {
   memoryInstance = null;
+  memoryConfigurationSignature = null;
 }

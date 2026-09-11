@@ -15,6 +15,8 @@ import "./main/lib/runtime-manager.test.ts";
 import "./main/lib/mcp-lifecycle-manager.test.ts";
 import "./main/lib/media-generation.test.ts";
 import "./main/lib/memory-orchestrator.test.ts";
+import "./main/lib/mem0-service.test.ts";
+import "./main/lib/agent-learning.test.ts";
 import "./main/lib/openai-compatible-model.test.ts";
 import "./main/lib/opencode-free-catalog.test.ts";
 import "./main/lib/providers.test.ts";

@@ -8,6 +8,8 @@ import {
   updateAyakaLearningState,
 } from "./db";
 import { memoryOrchestrator } from "./memory-orchestrator";
+import { hasUsableMemoryConfiguration } from "./providers";
+import { resetMemoryInstance } from "./mem0-service";
 
 const LEARNING_DELAY_MS = 1_200;
 const WORKER_INTERVAL_MS = 60_000;
@@ -31,13 +33,7 @@ export function queueAgentLearning(conversationId: string): void {
 
 export function startMemoryWorker(): void {
   if (intervalTimer) return;
-  void queueMemoryJob({
-    kind: "rehydrate",
-    agentId: DEFAULT_AGENT_ID,
-    idempotencyKey: "rehydrate:startup",
-    payload: { reason: "startup" },
-    scheduledAt: Date.now() + 5_000,
-  });
+  queueMemoryRehydrateIfAvailable("startup");
   void queueMemoryJob({
     kind: "consolidate",
     agentId: DEFAULT_AGENT_ID,
@@ -54,6 +50,23 @@ export function startMemoryWorker(): void {
   });
   scheduleMemoryWorker(100);
   intervalTimer = setInterval(() => scheduleMemoryWorker(0), WORKER_INTERVAL_MS);
+}
+
+export function notifyMemoryConfigurationChanged(): void {
+  resetMemoryInstance();
+  queueMemoryRehydrateIfAvailable("configuration-changed");
+}
+
+function queueMemoryRehydrateIfAvailable(reason: string): void {
+  if (!hasUsableMemoryConfiguration()) return;
+  void queueMemoryJob({
+    kind: "rehydrate",
+    agentId: DEFAULT_AGENT_ID,
+    idempotencyKey: "rehydrate:startup",
+    payload: { reason },
+    scheduledAt: Date.now() + (reason === "startup" ? 5_000 : 0),
+  });
+  scheduleMemoryWorker(reason === "startup" ? 100 : 0);
 }
 
 export function clearMemoryWorker(): void {
@@ -73,8 +86,12 @@ export async function runMemoryWorkerOnce(): Promise<boolean> {
     if (!job) return false;
     hadJob = true;
     try {
-      await runJob(job);
-      await finishMemoryJob(job.id, "succeeded");
+      if ((job.kind === "sync" || job.kind === "rehydrate") && !hasUsableMemoryConfiguration()) {
+        await finishMemoryJob(job.id, "cancelled");
+      } else {
+        await runJob(job);
+        await finishMemoryJob(job.id, "succeeded");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await finishMemoryJob(job.id, "failed", message);

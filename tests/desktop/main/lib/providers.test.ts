@@ -912,10 +912,140 @@ void describe("provider helpers", () => {
       "legacy-gpt-key",
     );
   });
+
+  void it("automatically selects the current chat model and a same-provider embedding model", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "memory-provider",
+      label: "Memory Provider",
+      baseUrl: "https://memory.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "memory-provider",
+      id: "chat-model",
+      capabilities,
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "memory-provider",
+      id: "embedding-model",
+      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+    });
+    await providerHelpers.saveModelApiKey("memory-provider", "chat-model", "memory-chat-key");
+    await providerHelpers.saveModelApiKey(
+      "memory-provider",
+      "embedding-model",
+      "memory-embedding-key",
+    );
+    settings.set(SettingKey.SelectedModel, "memory-provider/chat-model");
+
+    const resolved = providerHelpers.resolveMemoryConfiguration();
+    assert.deepEqual(resolved.llm, {
+      ref: "memory-provider/chat-model",
+      providerId: "memory-provider",
+      modelId: "chat-model",
+      baseUrl: "https://memory.example/v1",
+      apiKey: "memory-chat-key",
+    });
+    assert.deepEqual(resolved.embedding, {
+      ref: "memory-provider/embedding-model",
+      providerId: "memory-provider",
+      modelId: "embedding-model",
+      baseUrl: "https://memory.example/v1",
+      apiKey: "memory-embedding-key",
+    });
+    assert.equal(providerHelpers.hasUsableMemoryConfiguration(), true);
+  });
+
+  void it("honors independent manual memory model selections and falls back across providers", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "memory-chat",
+      label: "Memory Chat",
+      baseUrl: "https://chat.example/v1",
+    });
+    await providerHelpers.upsertCustomProvider({
+      id: "memory-embedding",
+      label: "Memory Embedding",
+      baseUrl: "https://embedding.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "memory-chat",
+      id: "chat-model",
+      capabilities,
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "memory-chat",
+      id: "chat-embedding",
+      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "memory-embedding",
+      id: "embedding-model",
+      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+    });
+    await providerHelpers.saveProviderApiKey("memory-chat", "chat-key");
+    await providerHelpers.saveProviderApiKey("memory-embedding", "embedding-key");
+    settings.set(SettingKey.SelectedModel, "memory-chat/chat-model");
+    settings.set(SettingKey.MemoryLlmModel, "memory-chat/chat-model");
+    settings.set(SettingKey.MemoryEmbeddingModel, "memory-embedding/embedding-model");
+
+    const manuallyResolved = providerHelpers.resolveMemoryConfiguration();
+    assert.equal(manuallyResolved.llm?.ref, "memory-chat/chat-model");
+    assert.equal(manuallyResolved.embedding?.ref, "memory-embedding/embedding-model");
+    assert.equal(manuallyResolved.embedding?.apiKey, "embedding-key");
+
+    settings.set(SettingKey.MemoryEmbeddingModel, "missing/stale-model");
+    const fallbackResolved = providerHelpers.resolveMemoryConfiguration();
+    assert.equal(fallbackResolved.embedding?.ref, "memory-chat/chat-embedding");
+  });
+
+  void it("rejects unsupported custom protocols, disabled models, and missing credentials", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "responses-memory",
+      label: "Responses Memory",
+      baseUrl: "https://responses.example/v1",
+      apiFormat: "responses",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "responses-memory",
+      id: "chat-model",
+      capabilities,
+    });
+    await providerHelpers.upsertCustomProvider({
+      id: "disabled-memory",
+      label: "Disabled Memory",
+      baseUrl: "https://disabled.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "disabled-memory",
+      id: "chat-model",
+      enabled: false,
+      capabilities,
+    });
+    await providerHelpers.upsertCustomProvider({
+      id: "missing-memory",
+      label: "Missing Memory",
+      baseUrl: "https://missing.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "missing-memory",
+      id: "embedding-model",
+      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+    });
+
+    const resolved = providerHelpers.resolveMemoryConfiguration();
+    assert.equal(resolved.llm, null);
+    assert.equal(resolved.embedding, null);
+    assert.equal(providerHelpers.hasUsableMemoryConfiguration(), false);
+  });
 });
 
 function emptyCatalog(): ModelCatalogSettings {
   return { providers: [], models: [], modelStates: [] };
+}
+
+function memoryCapabilities(
+  overrides: Partial<import("@shared/types").ModelCapabilities> = {},
+): import("@shared/types").ModelCapabilities {
+  return { ...capabilities, ...overrides };
 }
 
 function pickMediaCapabilities(capabilities: import("@shared/types").ModelCapabilities): {

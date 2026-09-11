@@ -42,6 +42,8 @@ const APP_SETTING_KEYS: string[] = [
   SettingKey.ModelMaxTokens,
   SettingKey.ModelTopP,
   SettingKey.ChatReasoningLevel,
+  SettingKey.MemoryLlmModel,
+  SettingKey.MemoryEmbeddingModel,
 ];
 
 const ALL_KEYS = [...APP_SETTING_KEYS, SettingKey.ActiveConversationId];
@@ -169,6 +171,8 @@ export function parseSettings(map: Record<string, string | null>): AppSettings {
     ),
     modelTopP: parseNumber(map[SettingKey.ModelTopP], DEFAULT_SETTINGS.modelTopP, 0, 1),
     chatReasoningLevel,
+    memoryLlmModel: map[SettingKey.MemoryLlmModel] || null,
+    memoryEmbeddingModel: map[SettingKey.MemoryEmbeddingModel] || null,
   };
 }
 
@@ -262,6 +266,12 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
       writes.push(api.settings.set(SettingKey.ModelTopP, String(patch.modelTopP)));
     if (patch.chatReasoningLevel !== undefined)
       writes.push(api.settings.set(SettingKey.ChatReasoningLevel, patch.chatReasoningLevel));
+    if (patch.memoryLlmModel !== undefined)
+      writes.push(api.settings.set(SettingKey.MemoryLlmModel, patch.memoryLlmModel ?? ""));
+    if (patch.memoryEmbeddingModel !== undefined)
+      writes.push(
+        api.settings.set(SettingKey.MemoryEmbeddingModel, patch.memoryEmbeddingModel ?? ""),
+      );
     await Promise.all(writes);
   }, []);
 

@@ -280,7 +280,7 @@ export function SettingsDialog({
                   resetDone={resetDoneScope === "appearance"}
                 />
               )}
-              {tab === "general" && <GeneralSettings />}
+              {tab === "general" && <GeneralSettings settings={settings} update={update} />}
               {tab === "model" && <ModelTab settings={settings} update={update} />}
               {tab === "workspace" && <WorkspaceTab />}
               {tab === "runtime" && <RuntimeSettings />}
@@ -856,7 +856,13 @@ function WorkspaceTab(): React.JSX.Element {
   );
 }
 
-function GeneralSettings(): React.JSX.Element {
+function GeneralSettings({
+  settings,
+  update,
+}: {
+  settings: import("@shared/types").AppSettings;
+  update: (patch: Partial<import("@shared/types").AppSettings>) => Promise<void>;
+}): React.JSX.Element {
   const { t } = useT();
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [mediaSettings, setMediaSettings] = useState<MediaGenerationSettings>(() =>
@@ -900,6 +906,52 @@ function GeneralSettings(): React.JSX.Element {
       })),
     ),
   ];
+
+  const memoryModelOptions = (
+    role: "llm" | "embedding",
+    selectedRef: string | null,
+  ): Array<{ value: string; label: string; disabled?: boolean }> => {
+    const candidates = providers.flatMap((provider) => {
+      const compatible =
+        (provider.kind === "openai" || provider.kind === "openai-compatible") &&
+        provider.authKind !== "none" &&
+        !!provider.baseUrl &&
+        (provider.source !== "custom" || provider.apiFormat === "chat-completions");
+      if (!compatible) return [];
+      return provider.models
+        .filter(
+          (model) =>
+            model.hasApiKey === true &&
+            model.enabled &&
+            (role === "llm" ? model.capabilities.textGeneration : model.capabilities.embedding),
+        )
+        .map((model) => ({
+          value: `${provider.id}/${model.id}`,
+          label: `${provider.label} / ${model.label ?? model.id}`,
+        }));
+    });
+    const options: Array<{ value: string; label: string; disabled?: boolean }> = [
+      { value: "", label: t("settings.general.auto") },
+      ...candidates,
+    ];
+    if (selectedRef && !candidates.some((option) => option.value === selectedRef)) {
+      options.push({
+        value: selectedRef,
+        label: `${t("settings.general.memory.unavailableSelection")} (${selectedRef})`,
+        disabled: true,
+      });
+    }
+    return options;
+  };
+
+  const memoryLlmOptions = memoryModelOptions("llm", settings.memoryLlmModel);
+  const memoryEmbeddingOptions = memoryModelOptions("embedding", settings.memoryEmbeddingModel);
+  const hasMemoryLlmCandidate = memoryLlmOptions.some(
+    (option) => option.value !== "" && option.disabled !== true,
+  );
+  const hasMemoryEmbeddingCandidate = memoryEmbeddingOptions.some(
+    (option) => option.value !== "" && option.disabled !== true,
+  );
 
   const updateKind = (kind: MediaGenerationKind, modelRef: string): void => {
     void save({
@@ -992,6 +1044,41 @@ function GeneralSettings(): React.JSX.Element {
               />
             }
           />
+        </SettingSection>
+        <SettingSection
+          title={t("settings.general.memory.title")}
+          desc={t("settings.general.memory.desc")}
+          icon={<IconCpu className="size-3.5" />}
+        >
+          <SettingItem
+            title={t("settings.general.memory.llm")}
+            desc={t("settings.general.memory.llmDesc")}
+            control={
+              <SelectField
+                className="min-w-64"
+                value={settings.memoryLlmModel ?? ""}
+                options={memoryLlmOptions}
+                onChange={(value) => void update({ memoryLlmModel: value || null })}
+                ariaLabel={t("settings.general.memory.llm")}
+              />
+            }
+          />
+          <SettingItem
+            title={t("settings.general.memory.embedding")}
+            desc={t("settings.general.memory.embeddingDesc")}
+            control={
+              <SelectField
+                className="min-w-64"
+                value={settings.memoryEmbeddingModel ?? ""}
+                options={memoryEmbeddingOptions}
+                onChange={(value) => void update({ memoryEmbeddingModel: value || null })}
+                ariaLabel={t("settings.general.memory.embedding")}
+              />
+            }
+          />
+          {(!hasMemoryLlmCandidate || !hasMemoryEmbeddingCandidate) && (
+            <p className="text-xs text-foreground/50">{t("settings.general.memory.unavailable")}</p>
+          )}
         </SettingSection>
       </div>
     </section>
