@@ -2668,6 +2668,8 @@ export const SettingKey = {
   // ——— 其它 ———
   /** 当前会话 ID */
   ActiveConversationId: "active_conversation_id",
+  /** Per-conversation workspace side panel visibility and width JSON. */
+  WorkspacePanelLayouts: "workspace_panel_layouts",
   /** 当前智能体 ID */
   ActiveAgentId: "active_agent_id",
   WorkspaceParentDirectory: "workspace_parent_directory",

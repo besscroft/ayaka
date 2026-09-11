@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { SettingKey } from "@shared/types";
 import { useT } from "../lib/i18n";
+import { api } from "../lib/api";
 import {
   AgentStatusContent,
   resolveAgentPanelStatus,
@@ -16,7 +18,118 @@ export type WorkspaceSidePanelTab = "runtime" | "generated-app" | "browser";
 
 const OPEN_WORKSPACE_PANEL_EVENT = "ayaka:open-workspace-panel";
 const OPEN_GENERATED_APP_EVENT = "ayaka:open-generated-app";
-const WIDTH_BY_CONVERSATION = new Map<string, number>();
+const DEFAULT_WORKSPACE_PANEL_WIDTH = 460;
+const MIN_WORKSPACE_PANEL_WIDTH = 320;
+const MAX_WORKSPACE_PANEL_WIDTH = 760;
+type WorkspacePanelLayout = { open: boolean; width: number };
+const WORKSPACE_PANEL_LAYOUTS = new Map<string, WorkspacePanelLayout>();
+const WORKSPACE_PANEL_LAYOUT_OVERRIDES = new Map<string, Partial<WorkspacePanelLayout>>();
+let workspacePanelLayoutsLoaded = false;
+let workspacePanelLayoutsLoadPromise: Promise<void> | null = null;
+let workspacePanelLayoutsSavePromise = Promise.resolve();
+
+function normalizeWorkspacePanelWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_WORKSPACE_PANEL_WIDTH;
+  }
+  return Math.min(MAX_WORKSPACE_PANEL_WIDTH, Math.max(MIN_WORKSPACE_PANEL_WIDTH, value));
+}
+
+function getWorkspacePanelLayout(conversationId: string): WorkspacePanelLayout {
+  return (
+    WORKSPACE_PANEL_LAYOUTS.get(conversationId) ?? {
+      open: false,
+      width: DEFAULT_WORKSPACE_PANEL_WIDTH,
+    }
+  );
+}
+
+function loadWorkspacePanelLayouts(): Promise<void> {
+  if (workspacePanelLayoutsLoaded) return Promise.resolve();
+  if (workspacePanelLayoutsLoadPromise) return workspacePanelLayoutsLoadPromise;
+
+  workspacePanelLayoutsLoadPromise = api.settings
+    .get(SettingKey.WorkspacePanelLayouts)
+    .then((raw) => {
+      if (raw) {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            for (const [conversationId, value] of Object.entries(parsed)) {
+              const layout = value as Record<string, unknown>;
+              if (
+                value &&
+                typeof value === "object" &&
+                !Array.isArray(value) &&
+                typeof layout.open === "boolean"
+              ) {
+                WORKSPACE_PANEL_LAYOUTS.set(conversationId, {
+                  open: layout.open,
+                  width: normalizeWorkspacePanelWidth(layout.width),
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("[workspace-panel] failed to parse saved layouts:", error);
+        }
+      }
+      for (const [conversationId, patch] of WORKSPACE_PANEL_LAYOUT_OVERRIDES) {
+        const current = getWorkspacePanelLayout(conversationId);
+        WORKSPACE_PANEL_LAYOUTS.set(conversationId, {
+          ...current,
+          ...patch,
+          width: normalizeWorkspacePanelWidth(patch.width ?? current.width),
+        });
+      }
+      WORKSPACE_PANEL_LAYOUT_OVERRIDES.clear();
+      workspacePanelLayoutsLoaded = true;
+    })
+    .catch((error) => {
+      workspacePanelLayoutsLoaded = true;
+      console.warn("[workspace-panel] failed to load saved layouts:", error);
+    })
+    .finally(() => {
+      workspacePanelLayoutsLoadPromise = null;
+    });
+
+  return workspacePanelLayoutsLoadPromise;
+}
+
+function updateWorkspacePanelLayout(
+  conversationId: string,
+  patch: Partial<WorkspacePanelLayout>,
+): void {
+  const current = getWorkspacePanelLayout(conversationId);
+  WORKSPACE_PANEL_LAYOUTS.set(conversationId, {
+    ...current,
+    ...patch,
+    width: normalizeWorkspacePanelWidth(patch.width ?? current.width),
+  });
+  if (!workspacePanelLayoutsLoaded) {
+    const override = WORKSPACE_PANEL_LAYOUT_OVERRIDES.get(conversationId) ?? {};
+    WORKSPACE_PANEL_LAYOUT_OVERRIDES.set(conversationId, {
+      ...override,
+      ...patch,
+      ...(patch.width === undefined ? {} : { width: normalizeWorkspacePanelWidth(patch.width) }),
+    });
+  }
+}
+
+function persistWorkspacePanelLayouts(): void {
+  workspacePanelLayoutsSavePromise = workspacePanelLayoutsSavePromise
+    .then(async () => {
+      await loadWorkspacePanelLayouts();
+      await api.settings.set(
+        SettingKey.WorkspacePanelLayouts,
+        JSON.stringify(Object.fromEntries(WORKSPACE_PANEL_LAYOUTS)),
+      );
+    })
+    .catch((error) => {
+      console.warn("[workspace-panel] failed to save layouts:", error);
+    });
+}
+
 const WORKSPACE_PANEL_TRANSITION = {
   type: "spring",
   stiffness: 320,
@@ -65,7 +178,8 @@ export function WorkspaceSidePanel({
 }: WorkspaceSidePanelProps): React.JSX.Element {
   const { t } = useT();
   const reduceMotion = useReducedMotion();
-  const [open, setOpen] = useState(false);
+  const initialLayout = getWorkspacePanelLayout(conversationId);
+  const [open, setOpen] = useState(initialLayout.open);
   const [isResizing, setIsResizing] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceSidePanelTab>("runtime");
   const [requestedArtifactId, setRequestedArtifactId] = useState<string | null>(null);
@@ -74,7 +188,7 @@ export function WorkspaceSidePanel({
     runningPreviews: 0,
     failedPreviews: 0,
   });
-  const [width, setWidth] = useState(() => WIDTH_BY_CONVERSATION.get(conversationId) ?? 460);
+  const [width, setWidth] = useState(initialLayout.width);
   const dragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const tabIds = {
@@ -89,10 +203,18 @@ export function WorkspaceSidePanel({
   };
 
   useEffect(() => {
-    setWidth(WIDTH_BY_CONVERSATION.get(conversationId) ?? 460);
-    setOpen(false);
+    let cancelled = false;
+    void loadWorkspacePanelLayouts().then(() => {
+      if (cancelled) return;
+      const layout = getWorkspacePanelLayout(conversationId);
+      setWidth(layout.width);
+      setOpen(layout.open);
+    });
     setActiveTab("runtime");
     setRequestedArtifactId(null);
+    return () => {
+      cancelled = true;
+    };
   }, [conversationId]);
 
   useEffect(() => {
@@ -103,6 +225,8 @@ export function WorkspaceSidePanel({
       setActiveTab(tab);
       if (detail?.artifactId) setRequestedArtifactId(detail.artifactId);
       setOpen(true);
+      updateWorkspacePanelLayout(conversationId, { open: true });
+      persistWorkspacePanelLayouts();
     };
     window.addEventListener(OPEN_WORKSPACE_PANEL_EVENT, handle);
     window.addEventListener(OPEN_GENERATED_APP_EVENT, handle);
@@ -110,18 +234,22 @@ export function WorkspaceSidePanel({
       window.removeEventListener(OPEN_WORKSPACE_PANEL_EVENT, handle);
       window.removeEventListener(OPEN_GENERATED_APP_EVENT, handle);
     };
-  }, []);
+  }, [conversationId]);
 
   useEffect(() => {
     const handle = (event: PointerEvent): void => {
       const drag = dragRef.current;
       if (!drag) return;
-      const nextWidth = Math.min(760, Math.max(320, drag.startWidth + drag.startX - event.clientX));
+      const nextWidth = Math.min(
+        MAX_WORKSPACE_PANEL_WIDTH,
+        Math.max(MIN_WORKSPACE_PANEL_WIDTH, drag.startWidth + drag.startX - event.clientX),
+      );
       setWidth(nextWidth);
-      WIDTH_BY_CONVERSATION.set(conversationId, nextWidth);
+      updateWorkspacePanelLayout(conversationId, { width: nextWidth });
     };
     const stop = (): void => {
       const drag = dragRef.current;
+      if (drag) persistWorkspacePanelLayouts();
       if (drag && resizeHandleRef.current?.hasPointerCapture(drag.pointerId)) {
         resizeHandleRef.current.releasePointerCapture(drag.pointerId);
       }
@@ -192,6 +320,7 @@ export function WorkspaceSidePanel({
             startX: event.clientX,
             startWidth: width,
           };
+          updateWorkspacePanelLayout(conversationId, { width });
           document.body.style.cursor = "col-resize";
           document.body.style.userSelect = "none";
         }}
@@ -266,7 +395,11 @@ export function WorkspaceSidePanel({
             size="icon"
             aria-label={t("workspacePanel.close")}
             title={t("workspacePanel.close")}
-            onPress={() => setOpen(false)}
+            onPress={() => {
+              setOpen(false);
+              updateWorkspacePanelLayout(conversationId, { open: false });
+              persistWorkspacePanelLayouts();
+            }}
           >
             <IconPanelRightClose className="size-4" />
           </Button>
@@ -311,6 +444,8 @@ export function WorkspaceSidePanel({
                 if (artifactId) setRequestedArtifactId(artifactId);
                 setActiveTab("generated-app");
                 setOpen(true);
+                updateWorkspacePanelLayout(conversationId, { open: true });
+                persistWorkspacePanelLayouts();
               }}
               onSummaryChange={handleGeneratedSummary}
             />
