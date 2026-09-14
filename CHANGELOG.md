@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.1.41]
+
+### 中文
+
+#### 新增
+
+- 新增对话能力开关，支持按会话启用或禁用记忆与联网搜索，并在工具调用和代理学习流程中同步生效。
+
+#### 变更
+
+- 重构聊天输入区和工具栏布局，将工具与权限选择移至底部工具栏，简化工具选择器显示并优化间距。
+- 移除新建对话空状态中的自动建议生成与展示，精简空状态交互。
+- 优化上下文详情弹窗，使用独立浮层和自动视口定位，改善悬停交互并避免容器或窄窗口裁剪。
+- 优化聊天头部工作区按钮为纯图标按钮，改善空间利用与可访问性。
+
+#### 修复
+
+- 修复模型和推理选择器在顶部展开时的菜单对齐问题。
+- 修复聊天设计文档的中文乱码问题。
+
+### English
+
+#### Added
+
+- Added per-conversation capability switches for Memory and Web search, with disabled capabilities respected by tool execution and agent-learning flows.
+
+#### Changed
+
+- Reworked the chat composer and toolbar layout by moving tool and permission selectors into the bottom toolbar, simplifying the tool-selector presentation, and refining spacing.
+- Removed automatically generated starter suggestions from the empty new-conversation state to simplify the interaction.
+- Improved the context-details popover with a separate layer and automatic viewport-aware positioning, preventing clipping and making hover interactions more reliable.
+- Updated the workspace button in the chat header to an icon-only control for better space usage and accessibility.
+
+#### Fixed
+
+- Fixed menu alignment for model and reasoning selectors when their menus open above the trigger.
+- Fixed garbled Chinese text in the chat design documentation.
+
 ## [0.1.40]
 
 ### 中文
