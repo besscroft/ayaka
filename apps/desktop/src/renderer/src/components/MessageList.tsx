@@ -75,8 +75,6 @@ interface MessageListProps {
   status: ConversationStatusKind;
   error?: Error;
   errorDetail?: string | null;
-  /** 后备建议（empty 状态） */
-  emptySuggestions?: string[];
   followupSuggestions?: string[];
   followupLoading?: boolean;
   onRetry?: () => void;
@@ -109,7 +107,6 @@ export function MessageList({
   status,
   error,
   errorDetail,
-  emptySuggestions,
   followupSuggestions,
   followupLoading = false,
   onRetry,
@@ -171,21 +168,7 @@ export function MessageList({
     return (
       <Conversation>
         <ConversationContent>
-          {emptySuggestions && emptySuggestions.length > 0 && onSuggestion ? (
-            <ConversationEmptyState title={t("msg.empty.title")} description={t("msg.empty.desc")}>
-              <PromptSuggestions
-                title={t("chat.suggestions.title")}
-                suggestions={emptySuggestions}
-                onSelect={onSuggestion}
-                className="mt-4 w-full"
-              />
-            </ConversationEmptyState>
-          ) : (
-            <ConversationEmptyState
-              title={t("msg.empty.title")}
-              description={t("msg.empty.desc")}
-            />
-          )}
+          <ConversationEmptyState title={t("msg.empty.title")} description={t("msg.empty.desc")} />
         </ConversationContent>
       </Conversation>
     );
