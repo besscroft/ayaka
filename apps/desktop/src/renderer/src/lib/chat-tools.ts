@@ -396,16 +396,20 @@ export function getActiveChatToolIds(
   descriptors: ChatToolDescriptor[],
 ): ChatToolReference[] {
   const normalized = normalizeChatToolSelection(selection);
+  const disabledIds = new Set(normalized.disabledToolIds ?? []);
   if (normalized.mode === "off") return [];
   if (normalized.mode === "auto") {
     return descriptors
       .filter((descriptor) => descriptor.available && descriptor.defaultAuto)
-      .map((descriptor) => descriptor.id);
+      .map((descriptor) => descriptor.id)
+      .filter((id) => !disabledIds.has(id));
   }
   const availableIds = new Set(
     descriptors.filter((descriptor) => descriptor.available).map((descriptor) => descriptor.id),
   );
-  return normalized.selectedToolIds.filter((id) => availableIds.has(id));
+  return normalized.selectedToolIds
+    .filter((id) => availableIds.has(id))
+    .filter((id) => !disabledIds.has(id));
 }
 
 function createtoolChatToolDescriptors(

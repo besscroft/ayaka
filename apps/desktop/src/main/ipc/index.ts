@@ -751,8 +751,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   });
   ipcMain.handle("agents:runtimeSnapshot", () => runtimeSnapshot());
   ipcMain.handle("agents:queueLearning", (_e, conversationId: string) => {
-    queueAgentLearning(conversationId);
-    return true;
+    return queueAgentLearning(conversationId);
   });
   ipcMain.handle("agents:save", async (_e, agent: AgentProfile) => {
     await saveAgent(agent);

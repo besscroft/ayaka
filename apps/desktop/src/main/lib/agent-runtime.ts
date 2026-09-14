@@ -20,6 +20,7 @@ import type {
   UIMessageStreamOptions,
 } from "ai";
 import {
+  CHAT_CAPABILITY_TOOL_IDS,
   CHAT_TOOL_IDS,
   DEFAULT_AGENT_HANDOFF_CONFIG,
   DEFAULT_AGENT_ID,
@@ -143,7 +144,11 @@ export interface RunAgentChatOptions {
   toolSelection?: ChatToolSelectionRequest;
   explicitSkillIds?: string[];
   permissionMode?: ChatPermissionMode;
-  buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
+  buildAgentSystemPrompt: (
+    agentId?: string | null,
+    conversationId?: string,
+    options?: { includeMemory?: boolean },
+  ) => Promise<string>;
   resolveModel?: (modelRef: string) => ResolvedChatModel;
   abortSignal?: AbortSignal;
   disableCronTools?: boolean;
@@ -174,7 +179,11 @@ interface RuntimeContext {
   toolSelection?: ChatToolSelectionRequest;
   explicitSkillIds: string[];
   permissionMode: ChatPermissionMode;
-  buildAgentSystemPrompt: (agentId?: string | null, conversationId?: string) => Promise<string>;
+  buildAgentSystemPrompt: (
+    agentId?: string | null,
+    conversationId?: string,
+    options?: { includeMemory?: boolean },
+  ) => Promise<string>;
   resolveModel: (modelRef: string) => ResolvedChatModel;
   finalAgentId: string;
   sandbox?: SandboxContext;
@@ -716,23 +725,26 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     return base;
   }
 
-  // The root agent (Ayaka) always has the memory tools available, independent of
-  // the user's chat tool selection. They remain hidden from the chat page UI.
-  const memoryHostTools = createMemoryHostTools({
-    model: context.modelContext,
-    conversationId: context.conversationId,
-    agentId: DEFAULT_AGENT_ID,
-  });
+  const memoryDisabled = !isMemoryCapabilityEnabled(context.toolSelection);
+  const memoryHostTools = memoryDisabled
+    ? {}
+    : createMemoryHostTools({
+        model: context.modelContext,
+        conversationId: context.conversationId,
+        agentId: DEFAULT_AGENT_ID,
+      });
   const silentMemoryRuntime = mergeSilentRootMemoryTools(base, memoryHostTools);
   const tools = silentMemoryRuntime.tools;
   const activeTools = new Set<string>(silentMemoryRuntime.activeTools);
   const builtinToolNames = new Set<string>(silentMemoryRuntime.builtinToolNames ?? []);
-  addRootMemoryTools(tools, activeTools, {
-    actorAgentId: DEFAULT_AGENT_ID,
-    runId: context.runId,
-    conversationId: context.conversationId,
-  });
-  for (const toolName of ROOT_MEMORY_TOOL_NAMES) builtinToolNames.add(toolName);
+  if (!memoryDisabled) {
+    addRootMemoryTools(tools, activeTools, {
+      actorAgentId: DEFAULT_AGENT_ID,
+      runId: context.runId,
+      conversationId: context.conversationId,
+    });
+    for (const toolName of ROOT_MEMORY_TOOL_NAMES) builtinToolNames.add(toolName);
+  }
   assignTool(tools, MEDIA_GENERATION_TOOL_NAME, createMediaGenerationTool(context));
   activeTools.add(MEDIA_GENERATION_TOOL_NAME);
   builtinToolNames.add(MEDIA_GENERATION_TOOL_NAME);
@@ -745,8 +757,6 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   builtinToolNames.add("agent_update");
 
   // The remaining orchestration tools follow the user's selection as before.
-  // When the user turns chat tools off, only the silently-enabled memory tools
-  // above remain available to the root agent.
   const workspaceCommandSelected = isWorkspaceCommandSelected(context);
   if (workspaceCommandSelected) {
     assignTool(tools, WORKSPACE_COMMAND_TOOL_ID, createWorkspaceCommandTool(context));
@@ -826,6 +836,11 @@ function isWorkspaceCommandSelected(context: RuntimeContext): boolean {
     selection.mode === "auto" ||
     (selection.mode === "manual" && selection.selectedToolIds.includes(WORKSPACE_COMMAND_TOOL_ID))
   );
+}
+
+function isMemoryCapabilityEnabled(selection: ChatToolSelectionRequest | undefined): boolean {
+  const disabledToolIds = new Set(selection?.disabledToolIds ?? []);
+  return !CHAT_CAPABILITY_TOOL_IDS.memory.some((id) => disabledToolIds.has(id));
 }
 
 function latestUserText(messages: UIMessage[]): string | undefined {
@@ -1382,11 +1397,27 @@ function buildSafeChildToolRuntime(
   const allowed = selectedBaseToolIds(context.toolSelection, policy).filter((id) => id !== "cron");
   const selection: ChatToolSelectionRequest = model.capabilities.toolCalling
     ? inheritedSelection.mode === "auto"
-      ? { mode: "auto", selectedToolIds: [] }
-      : { mode: allowed.length ? "manual" : "off", selectedToolIds: allowed }
+      ? {
+          mode: "auto",
+          selectedToolIds: [],
+          disabledToolIds: inheritedSelection.disabledToolIds,
+        }
+      : {
+          mode: allowed.length ? "manual" : "off",
+          selectedToolIds: allowed,
+          disabledToolIds: inheritedSelection.disabledToolIds,
+        }
     : inheritedSelection.mode === "auto"
-      ? { mode: "auto", selectedToolIds: [] }
-      : { mode: "off", selectedToolIds: [] };
+      ? {
+          mode: "auto",
+          selectedToolIds: [],
+          disabledToolIds: inheritedSelection.disabledToolIds,
+        }
+      : {
+          mode: "off",
+          selectedToolIds: [],
+          disabledToolIds: inheritedSelection.disabledToolIds,
+        };
   const base = buildChatToolRuntime({
     selection,
     model,
@@ -2200,7 +2231,11 @@ async function createRootInstructions(
       .filter(Boolean)
       .join(" ");
   });
-  const basePrompt = await context.buildAgentSystemPrompt(DEFAULT_AGENT_ID, context.conversationId);
+  const basePrompt = await context.buildAgentSystemPrompt(
+    DEFAULT_AGENT_ID,
+    context.conversationId,
+    { includeMemory: isMemoryCapabilityEnabled(context.toolSelection) },
+  );
   return [
     basePrompt,
     `You are ${context.rootAgent.name}, the root orchestrator. Every chat request enters through you, regardless of provider.`,
@@ -2235,7 +2270,9 @@ async function createChildInstructions(
   toolRuntime: ChatToolRuntimeConfig,
 ): Promise<string> {
   const handoff = readHandoffConfig(child.handoff_config_json);
-  const basePrompt = await context.buildAgentSystemPrompt(child.id, context.conversationId);
+  const basePrompt = await context.buildAgentSystemPrompt(child.id, context.conversationId, {
+    includeMemory: isMemoryCapabilityEnabled(context.toolSelection),
+  });
   return [
     basePrompt,
     `You are a child agent under ${context.rootAgent.name}. Stay inside your specialty and be concise.`,
@@ -2340,9 +2377,14 @@ function applyAgentToolPolicy(
     return {
       mode: "manual",
       selectedToolIds: selection.selectedToolIds.filter((id) => policy.allowedToolIds.includes(id)),
+      disabledToolIds: selection.disabledToolIds,
     };
   }
-  return { mode: "manual", selectedToolIds: policy.allowedToolIds };
+  return {
+    mode: "manual",
+    selectedToolIds: policy.allowedToolIds,
+    disabledToolIds: selection.disabledToolIds,
+  };
 }
 
 function selectedBaseToolIds(
@@ -2350,11 +2392,12 @@ function selectedBaseToolIds(
   policy: AgentToolPolicy,
 ): ChatToolReference[] {
   const selection = normalizeChatToolSelection(applyAgentToolPolicy(rawSelection, policy));
+  const disabledToolIds = new Set(selection.disabledToolIds ?? []);
   if (selection.mode === "off") return [];
   if (selection.mode === "manual") {
-    return selection.selectedToolIds.filter(
-      (id): id is ChatToolReference => isBaseChatTool(id) || isSkillToolReference(id),
-    );
+    return selection.selectedToolIds
+      .filter((id): id is ChatToolReference => isBaseChatTool(id) || isSkillToolReference(id))
+      .filter((id) => !disabledToolIds.has(id));
   }
   return [
     "web_search",
@@ -2371,16 +2414,21 @@ function selectedBaseToolIds(
     "current_time",
     "runtime_snapshot",
     "model_capabilities",
-  ];
+  ].filter((id): id is ChatToolId => !disabledToolIds.has(id));
 }
 
 function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy): ChatToolId[] {
   const selection = normalizeChatToolSelection(applyAgentToolPolicy(context.toolSelection, policy));
+  const disabledToolIds = new Set(selection.disabledToolIds ?? []);
   if (readRuntimeConfig(context.rootAgent.runtime_config_json).sandboxPolicy === "disabled") {
     return [];
   }
   if (selection.mode === "off") return [];
-  if (selection.mode === "manual") return selection.selectedToolIds.filter(isSandboxToolId);
+  if (selection.mode === "manual") {
+    return selection.selectedToolIds
+      .filter(isSandboxToolId)
+      .filter((id) => !disabledToolIds.has(id));
+  }
   return [
     "sandbox_list_files",
     "sandbox_read_file",
@@ -2389,7 +2437,7 @@ function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy
     "sandbox_list_artifacts",
     "sandbox_publish_artifact",
     "sandbox_start_preview",
-  ];
+  ].filter((id): id is ChatToolId => !disabledToolIds.has(id));
 }
 
 function readToolPolicy(raw: string): AgentToolPolicy {

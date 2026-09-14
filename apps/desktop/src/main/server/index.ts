@@ -41,7 +41,11 @@ interface CreateAppOptions {
   resolveConfiguredVisionModelRef?: typeof resolveConfiguredVisionModelRef;
   resolveMediaModel?: typeof import("../lib/providers").resolveMediaModel;
   writeMediaAsset?: typeof import("../lib/media-assets").writeMediaAsset;
-  buildAgentSystemPrompt?: (agentId?: string | null, conversationId?: string) => Promise<string>;
+  buildAgentSystemPrompt?: (
+    agentId?: string | null,
+    conversationId?: string,
+    options?: { includeMemory?: boolean },
+  ) => Promise<string>;
   runAgentChat?: typeof import("../lib/agent-runtime").runAgentChat;
 }
 
@@ -226,8 +230,8 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         permissionMode: parsedPermissionMode.value,
         disableCronTools: body.cronRun === true,
         origin: body.cronRun === true ? "automation" : "chat",
-        buildAgentSystemPrompt: async (agentId, conversationId) =>
-          body.system ?? (await buildAgentSystemPrompt(agentId, conversationId)),
+        buildAgentSystemPrompt: async (agentId, conversationId, promptOptions) =>
+          body.system ?? (await buildAgentSystemPrompt(agentId, conversationId, promptOptions)),
         resolveModel,
         abortSignal: c.req.raw.signal,
       } satisfies Omit<Parameters<typeof runAgentChat>[0], "mode" | "recovery" | "runId">;

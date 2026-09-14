@@ -1735,6 +1735,24 @@ export const CHAT_TOOL_IDS = [
 
 export type ChatToolId = (typeof CHAT_TOOL_IDS)[number];
 
+/** Tool groups controlled by the compact conversation capability switches. */
+export const CHAT_CAPABILITY_TOOL_IDS = {
+  memory: ["memory_search", "memory_save", "memory_update", "memory_delete"],
+  web: [
+    "web_search",
+    "web_open",
+    "browser_tabs",
+    "browser_navigate",
+    "browser_snapshot",
+    "browser_click",
+    "browser_type",
+    "browser_press_key",
+    "browser_scroll",
+    "browser_wait",
+    "browser_screenshot",
+  ],
+} as const satisfies Record<string, readonly ChatToolId[]>;
+
 export const SILENT_ROOT_MEMORY_TOOL_IDS = [
   "memory_search",
   "memory_save",
@@ -1751,6 +1769,8 @@ export type ChatToolMode = "off" | "auto" | "manual";
 export interface ChatToolSelectionRequest {
   mode: ChatToolMode;
   selectedToolIds: ChatToolReference[];
+  /** Tool ids disabled by the conversation-level capability switches. */
+  disabledToolIds?: ChatToolReference[];
 }
 
 export interface ChatToolsSetting {
@@ -1892,6 +1912,7 @@ export interface ChatToolDescriptor {
 export const DEFAULT_CHAT_TOOL_SELECTION: ChatToolSelectionRequest = {
   mode: "auto",
   selectedToolIds: [],
+  disabledToolIds: [],
 };
 
 export const DEFAULT_AGENT_TOOL_POLICY: AgentToolPolicy = {
@@ -2130,9 +2151,13 @@ export function normalizeChatToolSelection(raw: unknown): ChatToolSelectionReque
   const ids = Array.isArray(value.selectedToolIds)
     ? value.selectedToolIds.filter(isChatToolReference)
     : [];
+  const disabledIds = Array.isArray(value.disabledToolIds)
+    ? value.disabledToolIds.filter(isChatToolReference)
+    : [];
   return {
     mode: isChatToolMode(value.mode) ? value.mode : DEFAULT_CHAT_TOOL_SELECTION.mode,
     selectedToolIds: [...new Set(ids)],
+    disabledToolIds: [...new Set(disabledIds)],
   };
 }
 

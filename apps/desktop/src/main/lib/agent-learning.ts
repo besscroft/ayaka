@@ -1,7 +1,14 @@
-import { DEFAULT_AGENT_ID, type MemoryJob } from "../../shared/types";
+import {
+  CHAT_CAPABILITY_TOOL_IDS,
+  DEFAULT_AGENT_ID,
+  getChatToolSelectionForConversation,
+  SettingKey,
+  type MemoryJob,
+} from "../../shared/types";
 import {
   claimNextMemoryJob,
   finishMemoryJob,
+  getSetting,
   insertRuntimeEvent,
   listMessages,
   queueMemoryJob,
@@ -19,7 +26,8 @@ let workerTimer: NodeJS.Timeout | null = null;
 let intervalTimer: NodeJS.Timeout | null = null;
 let workerActive = false;
 
-export function queueAgentLearning(conversationId: string): void {
+export function queueAgentLearning(conversationId: string): boolean {
+  if (!isConversationMemoryEnabled(conversationId)) return false;
   void queueMemoryJob({
     kind: "learn",
     conversationId,
@@ -29,6 +37,7 @@ export function queueAgentLearning(conversationId: string): void {
     scheduledAt: Date.now() + LEARNING_DELAY_MS,
   });
   scheduleMemoryWorker(LEARNING_DELAY_MS);
+  return true;
 }
 
 export function startMemoryWorker(): void {
@@ -139,6 +148,7 @@ async function runJob(job: MemoryJob): Promise<void> {
 
 async function runLearningJob(job: MemoryJob): Promise<void> {
   if (!job.conversation_id) return;
+  if (!isConversationMemoryEnabled(job.conversation_id)) return;
   const started = Date.now();
   updateAyakaLearningState({ status: "learning" });
   try {
@@ -170,6 +180,15 @@ async function runLearningJob(job: MemoryJob): Promise<void> {
     updateAyakaLearningState({ status: "failed", lastLearningAt: Date.now(), lastError: message });
     throw error;
   }
+}
+
+function isConversationMemoryEnabled(conversationId: string): boolean {
+  const selection = getChatToolSelectionForConversation(
+    getSetting(SettingKey.ChatTools),
+    conversationId,
+  );
+  const disabledToolIds = new Set(selection.disabledToolIds ?? []);
+  return !CHAT_CAPABILITY_TOOL_IDS.memory.some((id) => disabledToolIds.has(id));
 }
 
 function scheduleMemoryWorker(delayMs: number): void {

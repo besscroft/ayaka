@@ -3718,14 +3718,21 @@ export function updateAyakaLearningState(input: {
 export async function buildAgentSystemPrompt(
   agentId?: string | null,
   conversationId?: string,
+  options?: { includeMemory?: boolean },
 ): Promise<string> {
   const agent = getAgent(agentId || DEFAULT_AGENT_ID) ?? getAgent(DEFAULT_AGENT_ID);
   if (!agent) return "You are Ayaka, a capable local AI assistant and orchestrator.";
 
   // 从文件层加载有界冻结快照；首次启动时从 agent.instructions 初始化
-  const { prepareInnerContext } = await import("./agent-inner-context");
-  const innerContext = await prepareInnerContext({ agent, conversationId: conversationId ?? null });
-  const fileBlock = innerContext.promptBlock;
+  let fileBlock = "";
+  if (options?.includeMemory !== false) {
+    const { prepareInnerContext } = await import("./agent-inner-context");
+    const innerContext = await prepareInnerContext({
+      agent,
+      conversationId: conversationId ?? null,
+    });
+    fileBlock = innerContext.promptBlock;
+  }
   // 可选：语义搜索补充最近 3 条相关记忆
   return [
     `You are ${agent.name}.`,

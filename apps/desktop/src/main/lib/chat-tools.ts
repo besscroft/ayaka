@@ -664,6 +664,7 @@ export function buildChatToolRuntime({
   const selection = normalizeChatToolSelection(rawSelection);
   const descriptors = createChatToolDescriptors(model, userText);
   const descriptorById = new Map(descriptors.map((descriptor) => [descriptor.id, descriptor]));
+  const disabledToolIds = new Set(selection.disabledToolIds ?? []);
   const explicitSkillReferences = [...new Set(explicitSkillIds.map(skillToolReference))];
   const manuallySelectedSkillReferences =
     selection.mode === "manual" ? selection.selectedToolIds.filter(isSkillToolReference) : [];
@@ -678,7 +679,7 @@ export function buildChatToolRuntime({
       : [];
   const selectedSkillReferences = [
     ...new Set([...manuallySelectedSkillReferences, ...explicitSkillReferences]),
-  ];
+  ].filter((reference) => !disabledToolIds.has(reference));
   const selectedSkillInstructions = getSelectedSkillInstructions(selectedSkillReferences, true);
   const autoSkillInstructions =
     selection.mode === "auto" && !model.capabilities.toolCalling
@@ -687,11 +688,12 @@ export function buildChatToolRuntime({
   const skillInstructions = [selectedSkillInstructions, autoSkillInstructions]
     .filter(Boolean)
     .join("\n\n");
-
   if (selection.mode === "off" || !model.capabilities.toolCalling) {
     const nonSkillSelection =
       selection.mode === "manual"
-        ? selection.selectedToolIds.filter((id) => !isSkillToolReference(id))
+        ? selection.selectedToolIds.filter(
+            (id) => !isSkillToolReference(id) && !disabledToolIds.has(id),
+          )
         : [];
     if (nonSkillSelection.length > 0) {
       throw new ChatToolSelectionError("Selected model does not support chat tools.");
@@ -705,13 +707,14 @@ export function buildChatToolRuntime({
           .filter((descriptor) => descriptor.defaultAuto && descriptor.available)
           .map((descriptor) => descriptor.id)
       : selection.selectedToolIds;
+  const enabledSelectedIds = selectedIds.filter((id) => !disabledToolIds.has(id));
 
-  const unknown = selectedIds.filter((id) => !descriptorById.has(id));
+  const unknown = enabledSelectedIds.filter((id) => !descriptorById.has(id));
   if (unknown.length > 0) {
     throw new ChatToolSelectionError("Unknown chat tool: " + unknown[0]);
   }
 
-  const unavailable = selectedIds
+  const unavailable = enabledSelectedIds
     .map((id) => descriptorById.get(id))
     .filter(
       (descriptor): descriptor is ChatToolDescriptor => !!descriptor && !descriptor.available,
@@ -730,7 +733,7 @@ export function buildChatToolRuntime({
   const hostTools = createHostTools({ model, descriptors, conversationId, agentId });
   const approvalToolNames: string[] = [];
 
-  for (const id of selectedIds.filter(isChatToolId)) {
+  for (const id of enabledSelectedIds.filter(isChatToolId)) {
     const nativeTool = model.nativeTools.find((item) => item.id === id);
     if (nativeTool) {
       assignTool(toolSet, nativeTool.toolName, nativeTool.tool);
@@ -758,7 +761,7 @@ export function buildChatToolRuntime({
 
   const dynamicRuntimes = [
     createMcpToolSet({
-      references: selectedIds.filter(isToolRecordReference),
+      references: enabledSelectedIds.filter(isToolRecordReference),
       model,
       conversationId,
       agentId,
@@ -766,7 +769,7 @@ export function buildChatToolRuntime({
     createSkillToolSet({
       references: [
         ...new Set([
-          ...selectedIds.filter(isSkillToolReference),
+          ...enabledSelectedIds.filter(isSkillToolReference),
           ...selectedSkillReferences,
           ...autoSkillReferences,
         ]),

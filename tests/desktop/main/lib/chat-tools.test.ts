@@ -687,6 +687,22 @@ void describe("chat tool runtime", () => {
     assert.equal(runtime.tools?.runtime_snapshot, undefined);
   });
 
+  void it("filters conversation-disabled capability tools in every selection mode", () => {
+    const runtime = chatTools.buildChatToolRuntime({
+      selection: {
+        mode: "manual",
+        selectedToolIds: ["web_search", "web_open", "memory_search", "current_time"],
+        disabledToolIds: ["web_search", "web_open", "memory_search"],
+      },
+      model: modelContext("openai-compatible"),
+    });
+
+    assert.deepEqual(runtime.activeTools, ["current_time"]);
+    assert.equal(runtime.tools?.web_search, undefined);
+    assert.equal(runtime.tools?.web_open, undefined);
+    assert.equal(runtime.tools?.memory_search, undefined);
+  });
+
   void it("rejects web search when the model cannot call tools", () => {
     assert.throws(
       () =>

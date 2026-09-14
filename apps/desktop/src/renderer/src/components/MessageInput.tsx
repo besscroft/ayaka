@@ -20,6 +20,7 @@ import { ModelSelector } from "./ModelSelector";
 import { ReasoningSelector } from "./ReasoningSelector";
 import { ToolSelector } from "./ToolSelector";
 import { ChatPermissionSelector } from "./ChatPermissionSelector";
+import { CapabilitySelector } from "./CapabilitySelector";
 import {
   AttachmentChip,
   ContextPopover,
@@ -499,6 +500,11 @@ export function MessageInput({
 
               <div className="relative mt-1 flex min-h-11 flex-wrap items-center gap-2 px-0 pt-0">
                 <div className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                  <CapabilitySelector
+                    value={toolSelection}
+                    onChange={onToolSelectionChange}
+                    disabled={isRunActive}
+                  />
                   <button
                     type="button"
                     data-icon-only="true"

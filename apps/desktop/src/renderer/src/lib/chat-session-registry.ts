@@ -208,6 +208,7 @@ export class ChatSessionRegistry {
       entry.requestConfig.toolSelection = {
         ...update.toolSelection,
         selectedToolIds: [...update.toolSelection.selectedToolIds],
+        disabledToolIds: [...(update.toolSelection.disabledToolIds ?? [])],
       };
     }
     if (update.permissionMode !== undefined)
