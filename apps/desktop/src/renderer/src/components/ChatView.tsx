@@ -1471,12 +1471,12 @@ function ChatHeader({ status, workspace, agentStatus }: ChatHeaderProps): React.
           <Button
             variant="tertiary"
             size="sm"
-            className="ml-1 max-w-64 truncate text-xs"
+            className="ml-1"
+            isIconOnly
             onPress={() => void api.workspace.open(workspace.conversationId)}
             aria-label={t("workspace.open")}
           >
-            <IconFolderOpen data-icon="inline-start" />
-            {workspace.relativePath}
+            <IconFolderOpen aria-hidden="true" />
           </Button>
         ) : (
           <span className="text-xs text-muted-foreground">{t("workspace.notCreated")}</span>
