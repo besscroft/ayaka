@@ -95,7 +95,7 @@ export function ModelSelector({
     return `${p?.label ?? pid} / ${m?.label ?? mid}`;
   };
 
-  const menuPlacement = placement === "top" ? "bottom-full mb-2 left-0" : "top-full mt-2 right-0";
+  const menuPlacement = placement === "top" ? "bottom-full mb-2 right-0" : "top-full mt-2 right-0";
 
   return (
     <div ref={ref} data-slot="model-selector" className="relative min-w-0">

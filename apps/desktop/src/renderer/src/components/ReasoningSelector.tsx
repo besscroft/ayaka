@@ -59,7 +59,7 @@ export function ReasoningSelector({
     setOpen(false);
   };
 
-  const menuPlacement = placement === "top" ? "bottom-full mb-2 left-0" : "top-full mt-2 right-0";
+  const menuPlacement = placement === "top" ? "bottom-full mb-2 right-0" : "top-full mt-2 right-0";
   const providerOverride = hasProviderReasoningOverride(model?.providerOptions);
 
   const handleListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {

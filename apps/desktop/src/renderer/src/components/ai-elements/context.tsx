@@ -329,7 +329,9 @@ export function ContextPopover({
 
       const triggerRect = trigger.getBoundingClientRect();
       const detailsRect = details.getBoundingClientRect();
-      const viewportMargin = 8;
+      // Leave room for the panel border/shadow so narrow windows do not clip
+      // the popover at either viewport edge.
+      const viewportMargin = 24;
       const gap = 8;
       const maxLeft = Math.max(
         viewportMargin,
@@ -403,7 +405,7 @@ export function ContextPopover({
       onMouseEnter={trigger === "hover" ? clearCloseTimer : undefined}
       onMouseLeave={trigger === "hover" ? scheduleClose : undefined}
       className={cn(
-        "fixed z-50 w-[300px] max-w-[calc(100vw-1rem)] max-h-[calc(100vh-1rem)] overflow-y-auto",
+        "fixed z-50 w-[300px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-3rem)] overflow-y-auto",
         "rounded-lg border border-border bg-background/95 p-2 shadow-lg",
         "animate-in fade-in-0 zoom-in-95",
         popoverPosition?.placement === "bottom" ? "slide-in-from-top-2" : "slide-in-from-bottom-2",
