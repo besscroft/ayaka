@@ -357,12 +357,14 @@ export function MessageInput({
   };
 
   return (
-    <div className="shrink-0 bg-background/70 px-3 pb-3 pt-2 backdrop-blur-xl sm:px-4">
+    <div
+      className="shrink-0 bg-background/70 px-3 pb-2 pt-1 backdrop-blur-xl sm:px-4"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="mx-auto w-full max-w-[min(1400px,100%)]">
         <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
           className={cn(
             "select-none rounded-lg border bg-background/95 shadow-lg transition-all duration-200",
             "focus-within:border-accent/45 focus-within:ring-4 focus-within:ring-accent/10",
@@ -373,7 +375,7 @@ export function MessageInput({
                 : "border-warning/35",
           )}
         >
-          <div className="px-4 pb-2 pt-4">
+          <div className="px-2 pb-1 pt-2">
             <PromptInput
               value={input}
               status={isLoading ? "streaming" : "ready"}
@@ -421,7 +423,7 @@ export function MessageInput({
                     ? `skill-mention-option-${skillMenuIndex}`
                     : undefined
                 }
-                className="select-text"
+                className="min-h-16 px-1 py-0 select-text sm:min-h-20"
               />
 
               {skillMenuOpen ? (
@@ -495,8 +497,8 @@ export function MessageInput({
                 </div>
               ) : null}
 
-              <div className="relative flex min-h-11 items-start gap-2 px-3 pt-2">
-                <div className="inline-flex w-fit min-w-0 max-w-[calc(100%-2.75rem)] flex-wrap items-center gap-1.5">
+              <div className="relative mt-1 flex min-h-11 flex-wrap items-center gap-2 px-0 pt-0">
+                <div className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     data-icon-only="true"
@@ -518,27 +520,9 @@ export function MessageInput({
                     className="hidden"
                     aria-hidden
                   />
+                </div>
 
-                  <span
-                    data-slot="prompt-input-separator"
-                    className="mx-1 h-4 w-px shrink-0 bg-border"
-                  />
-
-                  <ToolSelector
-                    value={toolSelection}
-                    onChange={onToolSelectionChange}
-                    selectedModel={selectedModel}
-                    providers={providers}
-                    disabled={isRunActive}
-                  />
-                  <ChatPermissionSelector
-                    value={permissionMode}
-                    inherited={permissionInherited}
-                    onChange={onPermissionChange}
-                    onReset={onPermissionReset}
-                    disabled={isRunActive}
-                    compact
-                  />
+                <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
                   <ModelSelector
                     value={selectedModel}
                     onChange={onModelChange}
@@ -552,30 +536,26 @@ export function MessageInput({
                     model={selectedReasoningModel}
                     disabled={isRunActive}
                   />
-                  {contextMetrics ? (
-                    <ContextPopover metrics={contextMetrics} trigger="hover" className="ml-1" />
+                  <PromptInputSubmit
+                    status="ready"
+                    disabled={!canSend}
+                    aria-label={t("input.send")}
+                    className="size-8"
+                  />
+                  {isRunActive && onStop ? (
+                    <button
+                      type="button"
+                      data-icon-only="true"
+                      data-icon-tone="danger"
+                      onClick={onStop}
+                      aria-label={t("input.stop")}
+                      data-slot="prompt-input-stop"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground/80 transition hover:bg-accent"
+                    >
+                      <span className="size-3 rounded-[2px] bg-current" aria-hidden />
+                    </button>
                   ) : null}
                 </div>
-
-                <PromptInputSubmit
-                  status="ready"
-                  disabled={!canSend}
-                  aria-label={t("input.send")}
-                  className="ml-auto size-8"
-                />
-                {isRunActive && onStop ? (
-                  <button
-                    type="button"
-                    data-icon-only="true"
-                    data-icon-tone="danger"
-                    onClick={onStop}
-                    aria-label={t("input.stop")}
-                    data-slot="prompt-input-stop"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground/80 transition hover:bg-accent"
-                  >
-                    <span className="size-3 rounded-[2px] bg-current" aria-hidden />
-                  </button>
-                ) : null}
               </div>
 
               {isDragging ? (
@@ -597,6 +577,29 @@ export function MessageInput({
               </p>
             ) : null}
           </div>
+        </div>
+        <div
+          data-slot="composer-toolbar"
+          className="flex flex-wrap items-center justify-between gap-2 px-1 pt-1"
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <ToolSelector
+              value={toolSelection}
+              onChange={onToolSelectionChange}
+              selectedModel={selectedModel}
+              providers={providers}
+              disabled={isRunActive}
+            />
+            <ChatPermissionSelector
+              value={permissionMode}
+              inherited={permissionInherited}
+              onChange={onPermissionChange}
+              onReset={onPermissionReset}
+              disabled={isRunActive}
+              compact
+            />
+          </div>
+          {contextMetrics ? <ContextPopover metrics={contextMetrics} trigger="hover" /> : null}
         </div>
       </div>
     </div>

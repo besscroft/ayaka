@@ -179,11 +179,6 @@ export function ToolSelector({
               )}
             >
               <IconWrench className="size-4" />
-              {activeToolIds.length > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-accent-foreground">
-                  {activeToolIds.length}
-                </span>
-              ) : null}
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
@@ -202,9 +197,6 @@ export function ToolSelector({
               <PopoverHeading className="text-sm font-semibold text-foreground">
                 {t("chatTools.selector.title")}
               </PopoverHeading>
-              <p className="mt-0.5 max-w-[30rem] text-xs leading-relaxed text-foreground/55">
-                {t("chatTools.selector.description")}
-              </p>
             </div>
             <Chip size="sm" variant="secondary" className="shrink-0">
               <Chip.Label>{summary}</Chip.Label>
