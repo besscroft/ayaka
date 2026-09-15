@@ -96,6 +96,7 @@ import type { RevisionRef } from "../lib/chat-persistence";
 interface ChatViewProps {
   conversationId: string;
   serverInfo: LocalServerInfo;
+  isNewConversation?: boolean;
 }
 
 type AutoTitleStatus = "running" | "completed";
@@ -138,7 +139,11 @@ function getContextWindowForModel(
   return DEFAULT_CONTEXT_WINDOW;
 }
 
-export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.JSX.Element {
+export function ChatView({
+  conversationId,
+  serverInfo,
+  isNewConversation = false,
+}: ChatViewProps): React.JSX.Element {
   const { t, locale } = useT();
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [reasoningLevel, setReasoningLevel] = useState<ChatReasoningLevel>(
@@ -194,6 +199,10 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
   const explicitEmptyMessagesRef = useRef(false);
   const manualMessageMutationRef = useRef(false);
   const hydrationAppliedRef = useRef<string | null>(null);
+  // This captures the creation context for this mounted conversation. The
+  // parent may clear its marker after the first message is persisted, but the
+  // session already has an authoritative in-memory snapshot by then.
+  const freshConversationRef = useRef(isNewConversation);
   const hydrationStateRef = useRef<"loading" | "ready" | "error">("loading");
   const revisionRef = useRef<RevisionRef>({ current: 0, persisted: new Map() });
   const persistenceDirtyRef = useRef(false);
@@ -481,59 +490,70 @@ export function ChatView({ conversationId, serverInfo }: ChatViewProps): React.J
     // 不重置 titledRef：保留跨会话记录，避免重复生成（切换回到旧对话也不重生成）。
 
     let cancelled = false;
-    let loadedConversationTitle: string | null = null;
-    void api.conversations
-      .get(conversationId)
-      .then((conversation) => {
-        if (cancelled) return null;
-        if (!conversation) {
-          latestMessagesRef.current = [];
-          lastNonEmptyMessagesRef.current = [];
-          explicitEmptyMessagesRef.current = true;
-          setInitialMessages([]);
-          setIsPersistedConversation(false);
+    if (freshConversationRef.current) {
+      const messages = alreadyHydrated ? session.chat.messages : [];
+      latestMessagesRef.current = messages;
+      lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
+      explicitEmptyMessagesRef.current = messages.length === 0;
+      session.hydrated = true;
+      setInitialMessages(messages);
+      setHydrationState("ready");
+      hydrationStateRef.current = "ready";
+    } else {
+      let loadedConversationTitle: string | null = null;
+      void api.conversations
+        .get(conversationId)
+        .then((conversation) => {
+          if (cancelled) return null;
+          if (!conversation) {
+            latestMessagesRef.current = [];
+            lastNonEmptyMessagesRef.current = [];
+            explicitEmptyMessagesRef.current = true;
+            setInitialMessages([]);
+            setIsPersistedConversation(false);
+            session.hydrated = true;
+            setHydrationState("ready");
+            hydrationStateRef.current = "ready";
+            return null;
+          }
+          loadedConversationTitle = conversation.title;
+          setIsPersistedConversation(true);
+          void api.workspace.get(conversationId).then((nextWorkspace) => {
+            if (!cancelled) setWorkspace(nextWorkspace);
+          });
+          return api.messages.list(conversationId);
+        })
+        .then((snapshot) => {
+          if (!snapshot) return;
+          if (cancelled) return;
+          const rows = snapshot.messages;
+          const hydratedMessages = rows.map(hydrateStoredMessage);
+          const messages = hydratedMessages.filter(isNonEmptyUIMessage);
+          createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
+          revisionRef.current.current = snapshot.revision;
+          revisionRef.current.persisted = new Map(
+            messages.map((message) => [message.id, { message, content: JSON.stringify(message) }]),
+          );
+          latestMessagesRef.current = messages;
+          lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
+          explicitEmptyMessagesRef.current = messages.length === 0;
           session.hydrated = true;
+          setInitialMessages(messages);
           setHydrationState("ready");
           hydrationStateRef.current = "ready";
-          return null;
-        }
-        loadedConversationTitle = conversation.title;
-        setIsPersistedConversation(true);
-        void api.workspace.get(conversationId).then((nextWorkspace) => {
-          if (!cancelled) setWorkspace(nextWorkspace);
+          // 如果历史中已经有标题（DB 已有），标记为已生成，避免再次触发。
+          if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
+            titleStateRef.current.set(conversationId, "completed");
+          }
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("[chat] failed to load message history:", error);
+          setChatError(getChatErrorMessage(error, locale));
+          setHydrationState("error");
+          hydrationStateRef.current = "error";
         });
-        return api.messages.list(conversationId);
-      })
-      .then((snapshot) => {
-        if (!snapshot) return;
-        if (cancelled) return;
-        const rows = snapshot.messages;
-        const hydratedMessages = rows.map(hydrateStoredMessage);
-        const messages = hydratedMessages.filter(isNonEmptyUIMessage);
-        createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
-        revisionRef.current.current = snapshot.revision;
-        revisionRef.current.persisted = new Map(
-          messages.map((message) => [message.id, { message, content: JSON.stringify(message) }]),
-        );
-        latestMessagesRef.current = messages;
-        lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
-        explicitEmptyMessagesRef.current = messages.length === 0;
-        session.hydrated = true;
-        setInitialMessages(messages);
-        setHydrationState("ready");
-        hydrationStateRef.current = "ready";
-        // 如果历史中已经有标题（DB 已有），标记为已生成，避免再次触发。
-        if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
-          titleStateRef.current.set(conversationId, "completed");
-        }
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("[chat] failed to load message history:", error);
-        setChatError(getChatErrorMessage(error, locale));
-        setHydrationState("error");
-        hydrationStateRef.current = "error";
-      });
+    }
 
     void Promise.all([
       api.settings.get(SettingKey.ChatTools),

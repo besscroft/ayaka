@@ -48,6 +48,7 @@ function AppContent(): React.JSX.Element {
   const { resolvedLanguage, settings } = useSettings();
   const isZzzSkin = settings.skin === "zzz";
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [newConversationId, setNewConversationId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AppView>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>("appearance");
@@ -59,6 +60,7 @@ function AppContent(): React.JSX.Element {
   const createNewConversation = useCallback(async (): Promise<void> => {
     const id = crypto.randomUUID();
     setActiveId(id);
+    setNewConversationId(id);
     setActiveView("chat");
     await api.settings.set(SettingKey.ActiveConversationId, id);
   }, [t]);
@@ -140,6 +142,7 @@ function AppContent(): React.JSX.Element {
 
   const handleSelect = useCallback((id: string): void => {
     setActiveId(id);
+    setNewConversationId(null);
     void api.settings.set(SettingKey.ActiveConversationId, id);
   }, []);
 
@@ -174,12 +177,23 @@ function AppContent(): React.JSX.Element {
         ?.conversationId;
       if (!conversationId) return;
       setActiveId(conversationId);
+      setNewConversationId(null);
       setActiveView("chat");
       void api.settings.set(SettingKey.ActiveConversationId, conversationId);
     };
     window.addEventListener("ayaka:open-conversation", handleOpenConversation);
     return () => window.removeEventListener("ayaka:open-conversation", handleOpenConversation);
   }, []);
+
+  useEffect(() => {
+    const handleConversationCreated = (event: Event): void => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      if (id && id === newConversationId) setNewConversationId(null);
+    };
+    window.addEventListener("ayaka:conversation-created", handleConversationCreated);
+    return () =>
+      window.removeEventListener("ayaka:conversation-created", handleConversationCreated);
+  }, [newConversationId]);
 
   return (
     <>
@@ -200,7 +214,12 @@ function AppContent(): React.JSX.Element {
           aria-hidden={activeView !== "chat"}
         >
           {activeId && serverInfo !== null ? (
-            <ChatView key={activeId} conversationId={activeId} serverInfo={serverInfo} />
+            <ChatView
+              key={activeId}
+              conversationId={activeId}
+              serverInfo={serverInfo}
+              isNewConversation={newConversationId === activeId}
+            />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-foreground/40">
               {t("chat.initializing")}
