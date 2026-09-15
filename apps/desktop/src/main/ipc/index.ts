@@ -17,7 +17,9 @@ import {
   saveMessagesBatch,
   applyMessagesPatch,
   getSetting,
+  getSettings,
   setSetting,
+  setSettings,
   listApiKeyProviders,
   setApiKey,
   deleteApiKey,
@@ -31,6 +33,7 @@ import {
   deleteAgent,
   saveAgent,
   runtimeSnapshot,
+  listRunningConversationIds,
   listMemories,
   deleteMemory,
   getMemoryById,
@@ -111,6 +114,7 @@ import type {
   McpInputRequest,
   TrayMenuLabels,
   ErrorLogInput,
+  SettingEntry,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID, SettingKey } from "../../shared/types";
@@ -211,6 +215,7 @@ import {
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
 import {
+  getConversationHydrationInfo,
   getConversationWorkspaceInfo,
   getWorkspaceParentState,
   listWorkspaceOrphans,
@@ -286,6 +291,27 @@ import {
 
 export interface IpcHandlerOptions {
   onTrayLabelsChanged?: (labels: TrayMenuLabels) => void;
+}
+
+function normalizeSettingKeys(input: unknown): string[] {
+  if (!Array.isArray(input) || input.some((key) => typeof key !== "string")) {
+    throw new Error("Invalid settings keys.");
+  }
+  return [...new Set(input)];
+}
+
+function normalizeSettingEntries(input: unknown): SettingEntry[] {
+  if (!Array.isArray(input)) throw new Error("Invalid settings batch.");
+  const uniqueEntries = new Map<string, string>();
+  for (const entry of input) {
+    if (!entry || typeof entry !== "object") throw new Error("Invalid settings batch.");
+    const candidate = entry as Partial<SettingEntry>;
+    if (typeof candidate.key !== "string" || typeof candidate.value !== "string") {
+      throw new Error("Invalid settings batch.");
+    }
+    uniqueEntries.set(candidate.key, candidate.value);
+  }
+  return [...uniqueEntries].map(([key, value]) => ({ key, value }));
 }
 
 export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
@@ -386,6 +412,8 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   ipcMain.handle("conversations:list", () => listConversations());
 
   ipcMain.handle("conversations:get", (_e, id: string) => getConversation(id));
+
+  ipcMain.handle("conversations:hydrate", (_e, id: string) => getConversationHydrationInfo(id));
 
   ipcMain.handle("conversations:create", (_e, id: string, title?: string) =>
     createConversation(id, title),
@@ -663,10 +691,24 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     return true;
   });
 
-  ipcMain.handle("settings:getAll", (_e, keys: string[]) => {
-    const result: Record<string, string | null> = {};
-    for (const k of keys) result[k] = getSetting(k);
-    return result;
+  ipcMain.handle("settings:getAll", (_e, keys: string[]) =>
+    getSettings(normalizeSettingKeys(keys)),
+  );
+
+  ipcMain.handle("settings:setAll", async (_e, entries: SettingEntry[]) => {
+    const normalizedEntries = normalizeSettingEntries(entries);
+    await setSettings(normalizedEntries);
+    if (
+      normalizedEntries.some(
+        ({ key }) =>
+          key === SettingKey.SelectedModel ||
+          key === SettingKey.MemoryLlmModel ||
+          key === SettingKey.MemoryEmbeddingModel,
+      )
+    ) {
+      notifyMemoryConfigurationChanged();
+    }
+    return true;
   });
 
   // ---------- API Key ----------
@@ -750,6 +792,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     return true;
   });
   ipcMain.handle("agents:runtimeSnapshot", () => runtimeSnapshot());
+  ipcMain.handle("agents:runningConversationIds", () => listRunningConversationIds());
   ipcMain.handle("agents:queueLearning", (_e, conversationId: string) => {
     return queueAgentLearning(conversationId);
   });

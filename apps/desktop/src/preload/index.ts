@@ -10,6 +10,7 @@ import type {
   SandboxPreview,
   BrowserCaptureResult,
   BrowserSessionUpdate,
+  SettingEntry,
 } from "../shared/types";
 
 /**
@@ -124,6 +125,7 @@ const api = {
     list: () => ipcRenderer.invoke("conversations:list"),
     listDeleted: () => ipcRenderer.invoke("conversations:listDeleted"),
     get: (id: string) => ipcRenderer.invoke("conversations:get", id),
+    hydrate: (id: string) => ipcRenderer.invoke("conversations:hydrate", id),
     create: (id: string, title?: string) => ipcRenderer.invoke("conversations:create", id, title),
     delete: (id: string) => ipcRenderer.invoke("conversations:delete", id),
     restore: (id: string) => ipcRenderer.invoke("conversations:restore", id),
@@ -285,6 +287,7 @@ const api = {
     get: (key: string) => ipcRenderer.invoke("settings:get", key),
     set: (key: string, value: string) => ipcRenderer.invoke("settings:set", key, value),
     getAll: (keys: string[]) => ipcRenderer.invoke("settings:getAll", keys),
+    setAll: (entries: SettingEntry[]) => ipcRenderer.invoke("settings:setAll", entries),
   },
   logs: {
     export: (): Promise<ErrorLogExportResult> => ipcRenderer.invoke("logs:export"),
@@ -332,6 +335,7 @@ const api = {
     queueLearning: (conversationId: string) =>
       ipcRenderer.invoke("agents:queueLearning", conversationId),
     runtimeSnapshot: () => ipcRenderer.invoke("agents:runtimeSnapshot"),
+    runningConversationIds: () => ipcRenderer.invoke("agents:runningConversationIds"),
     save: (agent: unknown) => ipcRenderer.invoke("agents:save", agent),
     memoryFiles: {
       list: (agentId?: string) => ipcRenderer.invoke("agents:memoryFiles:list", agentId),

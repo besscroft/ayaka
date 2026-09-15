@@ -273,12 +273,11 @@ interface MessageRenderItem {
 }
 
 export function getMessageRenderItems(
-  messages: readonly UIMessage[],
+  _messages: readonly UIMessage[],
   virtualItems: readonly MessageRenderItem[],
 ): MessageRenderItem[] {
-  return virtualItems.length > 0
-    ? virtualItems.map((item) => ({ index: item.index, start: item.start }))
-    : messages.map((_, index) => ({ index, start: index * ESTIMATED_MESSAGE_SIZE }));
+  if (virtualItems.length === 0) return [];
+  return virtualItems.map((item) => ({ index: item.index, start: item.start }));
 }
 
 export function shouldInitializeConversationScroll({

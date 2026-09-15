@@ -34,6 +34,13 @@ export interface MessageSnapshot {
   revision: number;
 }
 
+/** All data needed to render a persisted conversation header and history. */
+export interface ConversationHydration {
+  conversation: Conversation;
+  messages: MessageSnapshot;
+  workspace: WorkspaceInfo | null;
+}
+
 export interface MessagePatch {
   conversationId: string;
   baseRevision: number;
@@ -2708,6 +2715,11 @@ export const SettingKey = {
 } as const;
 
 export type SettingKeyType = (typeof SettingKey)[keyof typeof SettingKey];
+
+export interface SettingEntry {
+  key: string;
+  value: string;
+}
 
 export type WorkspaceStatus = "active" | "orphaned";
 

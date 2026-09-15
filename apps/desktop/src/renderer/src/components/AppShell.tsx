@@ -5,7 +5,6 @@ import { Button } from "./ui";
 import { api } from "../lib/api";
 import { notify } from "../lib/toast";
 import { useT, type TranslationKey } from "../lib/i18n";
-import { getRunningConversationIds } from "../lib/agent-runtime-status";
 import {
   IconMessage,
   IconPlus,
@@ -78,17 +77,16 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [activeConversationId]);
-
-  useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
     const refreshRuntime = (): void => {
+      if (inFlight) return;
+      inFlight = true;
       void api.agents
-        .runtimeSnapshot()
-        .then((snapshot) => {
+        .runningConversationIds()
+        .then((conversationIds) => {
           if (cancelled) return;
-          const next = getRunningConversationIds(snapshot.runtimeRuns);
+          const next = new Set(conversationIds);
           setRunningConversationIds((current) => {
             if (current.size === next.size && [...next].every((id) => current.has(id))) {
               return current;
@@ -98,6 +96,9 @@ export function AppShell({
         })
         .catch((error) => {
           if (!cancelled) console.error("[app-shell] failed to refresh runtime state:", error);
+        })
+        .finally(() => {
+          inFlight = false;
         });
     };
 
@@ -132,6 +133,27 @@ export function AppShell({
     };
     window.addEventListener("ayaka:conversation-created", handleCreated);
     return () => window.removeEventListener("ayaka:conversation-created", handleCreated);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<{ id?: string; title?: string; updatedAt?: number }>).detail;
+      if (!detail?.id || !Number.isFinite(detail.updatedAt)) return;
+      setConversations((current) => {
+        const updated = current.map((conversation) =>
+          conversation.id === detail.id
+            ? {
+                ...conversation,
+                ...(detail.title ? { title: detail.title } : {}),
+                updated_at: detail.updatedAt as number,
+              }
+            : conversation,
+        );
+        return updated.toSorted((left, right) => right.updated_at - left.updated_at);
+      });
+    };
+    window.addEventListener("ayaka:conversation-touched", handler);
+    return () => window.removeEventListener("ayaka:conversation-touched", handler);
   }, []);
 
   const confirmDeleteConversation = (): void => {

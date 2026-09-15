@@ -22,6 +22,7 @@ import {
   type ReduceMotion,
   type DiffMark,
   type ChatReasoningLevel,
+  type SettingEntry,
 } from "@shared/types";
 import { applyTheme } from "./theme";
 import { SKIN_DEFINITIONS } from "../skins/registry";
@@ -236,43 +237,44 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
   }, [settings.language, systemLocale]);
 
   const persist = useCallback(async (patch: Partial<AppSettings>): Promise<void> => {
-    const writes: Promise<unknown>[] = [];
-    if (patch.skin !== undefined) writes.push(api.settings.set(SettingKey.Skin, patch.skin));
+    const writes: SettingEntry[] = [];
+    if (patch.skin !== undefined) writes.push({ key: SettingKey.Skin, value: patch.skin });
     if (patch.fontFamily !== undefined)
-      writes.push(api.settings.set(SettingKey.FontFamily, patch.fontFamily));
+      writes.push({ key: SettingKey.FontFamily, value: patch.fontFamily });
     if (patch.monoFontFamily !== undefined)
-      writes.push(api.settings.set(SettingKey.MonoFontFamily, patch.monoFontFamily));
+      writes.push({ key: SettingKey.MonoFontFamily, value: patch.monoFontFamily });
     if (patch.usePointerCursor !== undefined)
-      writes.push(api.settings.set(SettingKey.UsePointerCursor, String(patch.usePointerCursor)));
+      writes.push({ key: SettingKey.UsePointerCursor, value: String(patch.usePointerCursor) });
     if (patch.reduceMotion !== undefined)
-      writes.push(api.settings.set(SettingKey.ReduceMotion, patch.reduceMotion));
+      writes.push({ key: SettingKey.ReduceMotion, value: patch.reduceMotion });
     if (patch.fontSize !== undefined)
-      writes.push(api.settings.set(SettingKey.FontSize, patch.fontSize));
+      writes.push({ key: SettingKey.FontSize, value: patch.fontSize });
     if (patch.codeFontSizePx !== undefined)
-      writes.push(api.settings.set(SettingKey.CodeFontSizePx, String(patch.codeFontSizePx)));
+      writes.push({ key: SettingKey.CodeFontSizePx, value: String(patch.codeFontSizePx) });
     if (patch.diffMark !== undefined)
-      writes.push(api.settings.set(SettingKey.DiffMark, patch.diffMark));
+      writes.push({ key: SettingKey.DiffMark, value: patch.diffMark });
     if (patch.density !== undefined)
-      writes.push(api.settings.set(SettingKey.LayoutDensity, patch.density));
+      writes.push({ key: SettingKey.LayoutDensity, value: patch.density });
     if (patch.language !== undefined)
-      writes.push(api.settings.set(SettingKey.Language, patch.language));
+      writes.push({ key: SettingKey.Language, value: patch.language });
     if (patch.selectedModel !== undefined)
-      writes.push(api.settings.set(SettingKey.SelectedModel, patch.selectedModel ?? ""));
+      writes.push({ key: SettingKey.SelectedModel, value: patch.selectedModel ?? "" });
     if (patch.modelTemperature !== undefined)
-      writes.push(api.settings.set(SettingKey.ModelTemperature, String(patch.modelTemperature)));
+      writes.push({ key: SettingKey.ModelTemperature, value: String(patch.modelTemperature) });
     if (patch.modelMaxTokens !== undefined)
-      writes.push(api.settings.set(SettingKey.ModelMaxTokens, String(patch.modelMaxTokens)));
+      writes.push({ key: SettingKey.ModelMaxTokens, value: String(patch.modelMaxTokens) });
     if (patch.modelTopP !== undefined)
-      writes.push(api.settings.set(SettingKey.ModelTopP, String(patch.modelTopP)));
+      writes.push({ key: SettingKey.ModelTopP, value: String(patch.modelTopP) });
     if (patch.chatReasoningLevel !== undefined)
-      writes.push(api.settings.set(SettingKey.ChatReasoningLevel, patch.chatReasoningLevel));
+      writes.push({ key: SettingKey.ChatReasoningLevel, value: patch.chatReasoningLevel });
     if (patch.memoryLlmModel !== undefined)
-      writes.push(api.settings.set(SettingKey.MemoryLlmModel, patch.memoryLlmModel ?? ""));
+      writes.push({ key: SettingKey.MemoryLlmModel, value: patch.memoryLlmModel ?? "" });
     if (patch.memoryEmbeddingModel !== undefined)
-      writes.push(
-        api.settings.set(SettingKey.MemoryEmbeddingModel, patch.memoryEmbeddingModel ?? ""),
-      );
-    await Promise.all(writes);
+      writes.push({
+        key: SettingKey.MemoryEmbeddingModel,
+        value: patch.memoryEmbeddingModel ?? "",
+      });
+    await api.settings.setAll(writes);
   }, []);
 
   const update = useCallback(

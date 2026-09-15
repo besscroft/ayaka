@@ -42,6 +42,8 @@ import type {
   MessagePatchResult,
   MessageRow,
   MessageSnapshot,
+  ConversationHydration,
+  SettingEntry,
   ToolDiscoveryResult,
   ToolServer,
   ToolServerInput,
@@ -113,6 +115,7 @@ export interface AyakaApi {
     list: () => Promise<Conversation[]>;
     listDeleted: () => Promise<Conversation[]>;
     get: (id: string) => Promise<Conversation | null>;
+    hydrate: (id: string) => Promise<ConversationHydration | null>;
     create: (id: string, title?: string) => Promise<Conversation>;
     delete: (id: string) => Promise<boolean>;
     restore: (id: string) => Promise<boolean>;
@@ -263,6 +266,7 @@ export interface AyakaApi {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<boolean>;
     getAll: (keys: string[]) => Promise<Record<string, string | null>>;
+    setAll: (entries: SettingEntry[]) => Promise<boolean>;
   };
   logs: {
     export: () => Promise<ErrorLogExportResult>;
@@ -319,6 +323,7 @@ export interface AyakaApi {
         | "contextCheckpoints"
       >
     >;
+    runningConversationIds: () => Promise<string[]>;
     save: (agent: AgentProfile) => Promise<boolean>;
     memoryFiles: {
       list: (agentId?: string) => Promise<Record<MemoryFileKind, AgentMemoryFileSnapshot>>;

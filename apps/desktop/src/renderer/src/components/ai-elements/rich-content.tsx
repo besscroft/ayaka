@@ -2,6 +2,7 @@ import {
   Fragment,
   createElement,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type HTMLAttributes,
@@ -35,6 +36,8 @@ export interface RichContentSkillMention {
   id: string;
   name: string;
 }
+
+const EMPTY_SKILL_MENTIONS: readonly RichContentSkillMention[] = [];
 
 const BLOCKED_HTML_TAGS = new Set([
   "script",
@@ -105,12 +108,15 @@ const VOID_HTML_TAGS = new Set(["br", "hr", "img", "source"]);
 
 export function RichContent({
   value,
-  skillMentions = [],
+  skillMentions = EMPTY_SKILL_MENTIONS,
   className,
   ...rest
 }: RichContentProps): React.JSX.Element {
-  const blocks = parseRichContentBlocks(value);
-  const skillMentionById = new Map(skillMentions.map((skill) => [skill.id, skill]));
+  const blocks = useMemo(() => parseRichContentBlocks(value), [value]);
+  const skillMentionById = useMemo(
+    () => new Map(skillMentions.map((skill) => [skill.id, skill])),
+    [skillMentions],
+  );
 
   return (
     <div

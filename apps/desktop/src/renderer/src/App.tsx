@@ -215,7 +215,6 @@ function AppContent(): React.JSX.Element {
         >
           {activeId && serverInfo !== null ? (
             <ChatView
-              key={activeId}
               conversationId={activeId}
               serverInfo={serverInfo}
               isNewConversation={newConversationId === activeId}

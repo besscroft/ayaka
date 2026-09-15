@@ -68,6 +68,7 @@ import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
 import { getConversationWorkspaceForHeader } from "../lib/conversation-workspace";
 import { getEnabledSkillMentions, getSkillMentions } from "../lib/chat-tools";
+import { scheduleAfterPaint } from "../lib/schedule-after-paint";
 import { sanitizeBrowserScreenshotMessage } from "@shared/browser-message";
 import { ConversationStatus, type ConversationStatusKind, type FilePartLike } from "./ai-elements";
 import {
@@ -85,6 +86,7 @@ import {
   type ChatPermissionMode,
   type ChatReasoningLevel,
   type ChatToolSelectionRequest,
+  type ConversationHydration,
   type AgentProfile,
   type LocalServerInfo,
   type McpInputRequest,
@@ -145,14 +147,18 @@ export function ChatView({
   isNewConversation = false,
 }: ChatViewProps): React.JSX.Element {
   const { t, locale } = useT();
+  const session = chatSessionRegistry.getOrCreate({ conversationId, serverInfo });
+  const hasCachedSession = session.hydrated && !isNewConversation;
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [reasoningLevel, setReasoningLevel] = useState<ChatReasoningLevel>(
     DEFAULT_SETTINGS.chatReasoningLevel,
   );
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [isPersistedConversation, setIsPersistedConversation] = useState(false);
+  const [isPersistedConversation, setIsPersistedConversation] = useState(hasCachedSession);
   const [workspace, setWorkspace] = useState<import("@shared/types").WorkspaceInfo | null>(null);
-  const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "error">("loading");
+  const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "error">(
+    hasCachedSession ? "ready" : "loading",
+  );
   const [hydrationRetry, setHydrationRetry] = useState(0);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatErrorRetryable, setChatErrorRetryable] = useState(false);
@@ -200,10 +206,17 @@ export function ChatView({
   const explicitEmptyMessagesRef = useRef(false);
   const manualMessageMutationRef = useRef(false);
   const hydrationAppliedRef = useRef<string | null>(null);
-  // This captures the creation context for this mounted conversation. The
-  // parent may clear its marker after the first message is persisted, but the
-  // session already has an authoritative in-memory snapshot by then.
-  const freshConversationRef = useRef(isNewConversation);
+  const hydrationRequestRef = useRef<{
+    conversationId: string;
+    retry: number;
+    promise: Promise<ConversationHydration | null>;
+  } | null>(null);
+  const hydrationTimingRef = useRef<{
+    conversationId: string;
+    startedAt: number;
+    responseLogged: boolean;
+    frameLogged: boolean;
+  } | null>(null);
   const hydrationStateRef = useRef<"loading" | "ready" | "error">("loading");
   const revisionRef = useRef<RevisionRef>({ current: 0, persisted: new Map() });
   const persistenceDirtyRef = useRef(false);
@@ -214,7 +227,6 @@ export function ChatView({
   const followupRequestRef = useRef<string | null>(null);
   const followupAbortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef(createIncrementalTokenCache());
-  const session = chatSessionRegistry.getOrCreate({ conversationId, serverInfo });
   const runIdRef = session.runIdRef;
   const runModeRef = session.runModeRef;
   const reconciliationRef = session.reconciliationRef;
@@ -234,6 +246,11 @@ export function ChatView({
             revisionRef.current,
           );
           await api.conversations.touch(conversationId);
+          window.dispatchEvent(
+            new CustomEvent("ayaka:conversation-touched", {
+              detail: { id: conversationId, updatedAt: Date.now() },
+            }),
+          );
           persistenceDirtyRef.current = false;
         },
         (error) => console.error("[chat] failed to persist streaming snapshot:", error),
@@ -242,6 +259,24 @@ export function ChatView({
     [conversationId],
   );
   const [followupLoading, setFollowupLoading] = useState(false);
+
+  // Start history IPC before non-critical ChatView initialization. The
+  // hydration effect below reuses this promise instead of invoking it twice.
+  useEffect(() => {
+    if (session.hydrated || isNewConversation) return;
+    const existing = hydrationRequestRef.current;
+    if (existing?.conversationId === conversationId && existing.retry === hydrationRetry) return;
+
+    const startedAt = performance.now();
+    const promise = api.conversations.hydrate(conversationId);
+    hydrationRequestRef.current = { conversationId, retry: hydrationRetry, promise };
+    hydrationTimingRef.current = {
+      conversationId,
+      startedAt,
+      responseLogged: false,
+      frameLogged: false,
+    };
+  }, [conversationId, hydrationRetry, isNewConversation, session]);
 
   /**
    * 上报一次聊天错误：写入 chatError、记录 console、统一弹 toast，并按需持久化。
@@ -344,37 +379,31 @@ export function ChatView({
   }, []);
 
   useEffect(() => {
-    void api.settings.get(SettingKey.SelectedModel).then((model) => {
-      if (model) setSelectedModel(model);
-    });
-    void api.settings.get(SettingKey.ChatReasoningLevel).then((level) => {
-      if (isChatReasoningLevel(level) && reasoningModelKeyRef.current === null) {
-        setReasoningLevel(level);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
+    if (hydrationState !== "ready") return;
     let cancelled = false;
-    void api.providers.list().then((providerList: ProviderInfo[]) => {
-      if (cancelled) return;
-      setProviders(providerList);
-      setModelContextWindows(
-        new Map(
-          providerList.flatMap((provider) =>
-            provider.models.map(
-              (model) => [`${provider.id}/${model.id}`, model.contextWindow] as const,
+    const cancelScheduled = scheduleAfterPaint(() => {
+      void api.providers.list().then((providerList: ProviderInfo[]) => {
+        if (cancelled) return;
+        setProviders(providerList);
+        setModelContextWindows(
+          new Map(
+            providerList.flatMap((provider) =>
+              provider.models.map(
+                (model) => [`${provider.id}/${model.id}`, model.contextWindow] as const,
+              ),
             ),
           ),
-        ),
-      );
+        );
+      });
     });
     return () => {
       cancelled = true;
+      cancelScheduled();
     };
-  }, [selectedModel]);
+  }, [hydrationState]);
 
   useEffect(() => {
+    if (hydrationState !== "ready") return;
     let cancelled = false;
     const refreshToolsSnapshot = (): void => {
       void api.tools.snapshot().then(
@@ -384,19 +413,22 @@ export function ChatView({
         () => undefined,
       );
     };
-    void Promise.allSettled([api.agents.list(), api.tools.snapshot()]).then(
-      ([agentsResult, toolsResult]) => {
-        if (cancelled) return;
-        if (agentsResult.status === "fulfilled") setAgentProfiles(agentsResult.value);
-        if (toolsResult.status === "fulfilled") setToolsSnapshot(toolsResult.value);
-      },
-    );
+    const cancelScheduled = scheduleAfterPaint(() => {
+      void Promise.allSettled([api.agents.list(), api.tools.snapshot()]).then(
+        ([agentsResult, toolsResult]) => {
+          if (cancelled) return;
+          if (agentsResult.status === "fulfilled") setAgentProfiles(agentsResult.value);
+          if (toolsResult.status === "fulfilled") setToolsSnapshot(toolsResult.value);
+        },
+      );
+    });
     const offSkills = api.tools.skills.onChanged(refreshToolsSnapshot);
     return () => {
       cancelled = true;
+      cancelScheduled();
       offSkills();
     };
-  }, []);
+  }, [hydrationState]);
 
   useEffect(() => {
     selectedModelRef.current = selectedModel;
@@ -450,9 +482,15 @@ export function ChatView({
 
   useEffect(() => {
     const alreadyHydrated = session.hydrated;
-    setHydrationState("loading");
-    hydrationStateRef.current = "loading";
-    setIsPersistedConversation(false);
+    const canUseCachedSession = alreadyHydrated && !isNewConversation;
+    const cachedMessages = canUseCachedSession ? session.chat.messages : undefined;
+    if (canUseCachedSession) {
+      hydrationStateRef.current = "ready";
+    } else {
+      setHydrationState("loading");
+      hydrationStateRef.current = "loading";
+    }
+    setIsPersistedConversation(canUseCachedSession);
     setWorkspace(null);
     setChatError(alreadyHydrated ? session.errorMessage : null);
     setChatErrorRetryable(alreadyHydrated ? session.errorRetryable : false);
@@ -483,16 +521,44 @@ export function ChatView({
     }
     hydrationAppliedRef.current = null;
     if (alreadyHydrated) {
-      const cachedMessages = session.chat.messages;
-      setInitialMessages(cachedMessages);
-      latestMessagesRef.current = cachedMessages;
-      lastNonEmptyMessagesRef.current = cachedMessages.length > 0 ? cachedMessages : [];
-      explicitEmptyMessagesRef.current = cachedMessages.length === 0;
+      setInitialMessages(cachedMessages ?? session.chat.messages);
+      latestMessagesRef.current = session.chat.messages;
+      lastNonEmptyMessagesRef.current =
+        session.chat.messages.length > 0 ? session.chat.messages : [];
+      explicitEmptyMessagesRef.current = session.chat.messages.length === 0;
     }
     // 不重置 titledRef：保留跨会话记录，避免重复生成（切换回到旧对话也不重生成）。
 
     let cancelled = false;
-    if (freshConversationRef.current) {
+    const applyHydration = (hydration: ConversationHydration): void => {
+      const rows = hydration.messages.messages;
+      const hydratedMessages = rows.map(hydrateStoredMessage);
+      const messages = hydratedMessages.filter(isNonEmptyUIMessage);
+      createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
+      revisionRef.current.current = hydration.messages.revision;
+      revisionRef.current.persisted = new Map(
+        messages.map((message) => [message.id, { message, content: JSON.stringify(message) }]),
+      );
+      latestMessagesRef.current = messages;
+      lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
+      explicitEmptyMessagesRef.current = messages.length === 0;
+      session.hydrated = true;
+      setIsPersistedConversation(true);
+      setWorkspace(hydration.workspace);
+      setInitialMessages(messages);
+      setHydrationState("ready");
+      hydrationStateRef.current = "ready";
+      // 如果历史中已经有标题（DB 已有），标记为已生成，避免再次触发。
+      if (hasMeaningfulConversationTitle(hydration.conversation.title)) {
+        titleStateRef.current.set(conversationId, "completed");
+      }
+    };
+
+    if (canUseCachedSession) {
+      setHydrationState("ready");
+      hydrationStateRef.current = "ready";
+    }
+    if (isNewConversation) {
       const messages = alreadyHydrated ? session.chat.messages : [];
       latestMessagesRef.current = messages;
       lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
@@ -502,12 +568,38 @@ export function ChatView({
       setHydrationState("ready");
       hydrationStateRef.current = "ready";
     } else {
-      let loadedConversationTitle: string | null = null;
-      void api.conversations
-        .get(conversationId)
-        .then((conversation) => {
-          if (cancelled) return null;
-          if (!conversation) {
+      const request = hydrationRequestRef.current;
+      const hydrationPromise =
+        request?.conversationId === conversationId && request.retry === hydrationRetry
+          ? request.promise
+          : (() => {
+              const startedAt = performance.now();
+              const promise = api.conversations.hydrate(conversationId);
+              hydrationTimingRef.current = {
+                conversationId,
+                startedAt,
+                responseLogged: false,
+                frameLogged: false,
+              };
+              return promise;
+            })();
+      void hydrationPromise
+        .then((hydration) => {
+          if (cancelled) return;
+          const timing = hydrationTimingRef.current;
+          if (
+            import.meta.env.DEV &&
+            timing?.conversationId === conversationId &&
+            !timing.responseLogged
+          ) {
+            timing.responseLogged = true;
+            console.debug("[perf] conversation hydration", {
+              conversationId,
+              elapsedMs: Math.round(performance.now() - timing.startedAt),
+            });
+          }
+          if (!hydration) {
+            if (canUseCachedSession) return;
             latestMessagesRef.current = [];
             lastNonEmptyMessagesRef.current = [];
             explicitEmptyMessagesRef.current = true;
@@ -516,40 +608,29 @@ export function ChatView({
             session.hydrated = true;
             setHydrationState("ready");
             hydrationStateRef.current = "ready";
-            return null;
+            return;
           }
-          loadedConversationTitle = conversation.title;
-          setIsPersistedConversation(true);
-          void api.workspace.get(conversationId).then((nextWorkspace) => {
-            if (!cancelled) setWorkspace(nextWorkspace);
-          });
-          return api.messages.list(conversationId);
-        })
-        .then((snapshot) => {
-          if (!snapshot) return;
-          if (cancelled) return;
-          const rows = snapshot.messages;
-          const hydratedMessages = rows.map(hydrateStoredMessage);
-          const messages = hydratedMessages.filter(isNonEmptyUIMessage);
-          createdAtRef.current = new Map(rows.map((row) => [row.id, row.created_at]));
-          revisionRef.current.current = snapshot.revision;
-          revisionRef.current.persisted = new Map(
-            messages.map((message) => [message.id, { message, content: JSON.stringify(message) }]),
-          );
-          latestMessagesRef.current = messages;
-          lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
-          explicitEmptyMessagesRef.current = messages.length === 0;
-          session.hydrated = true;
-          setInitialMessages(messages);
-          setHydrationState("ready");
-          hydrationStateRef.current = "ready";
-          // 如果历史中已经有标题（DB 已有），标记为已生成，避免再次触发。
-          if (hasMeaningfulConversationTitle(loadedConversationTitle)) {
-            titleStateRef.current.set(conversationId, "completed");
+          if (
+            canUseCachedSession &&
+            (session.chat.status !== "ready" ||
+              persistenceDirtyRef.current ||
+              session.chat.messages !== cachedMessages)
+          ) {
+            setIsPersistedConversation(true);
+            setWorkspace(hydration.workspace);
+            if (hasMeaningfulConversationTitle(hydration.conversation.title)) {
+              titleStateRef.current.set(conversationId, "completed");
+            }
+            return;
           }
+          applyHydration(hydration);
         })
         .catch((error) => {
           if (cancelled) return;
+          if (canUseCachedSession) {
+            console.warn("[chat] failed to refresh cached message history:", error);
+            return;
+          }
           console.error("[chat] failed to load message history:", error);
           setChatError(getChatErrorMessage(error, locale));
           setHydrationState("error");
@@ -557,16 +638,33 @@ export function ChatView({
         });
     }
 
-    void Promise.all([
-      api.settings.get(SettingKey.ChatTools),
-      api.settings.get(SettingKey.ChatPermissions),
-    ]).then(([toolSetting, permissionSetting]) => {
-      if (cancelled) return;
-      setToolSelection(getChatToolSelectionForConversation(toolSetting, conversationId));
-      const permission = getChatPermissionForConversation(permissionSetting, conversationId);
-      setPermissionMode(permission.mode);
-      setPermissionSource(permission.source);
-    });
+    void api.settings
+      .getAll([
+        SettingKey.SelectedModel,
+        SettingKey.ChatReasoningLevel,
+        SettingKey.ChatTools,
+        SettingKey.ChatPermissions,
+      ])
+      .then((settings) => {
+        if (cancelled) return;
+        setSelectedModel(settings[SettingKey.SelectedModel] || null);
+        const level = settings[SettingKey.ChatReasoningLevel];
+        if (isChatReasoningLevel(level) && reasoningModelKeyRef.current === null) {
+          setReasoningLevel(level);
+        }
+        setToolSelection(
+          getChatToolSelectionForConversation(settings[SettingKey.ChatTools], conversationId),
+        );
+        const permission = getChatPermissionForConversation(
+          settings[SettingKey.ChatPermissions],
+          conversationId,
+        );
+        setPermissionMode(permission.mode);
+        setPermissionSource(permission.source);
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn("[chat] failed to load chat settings:", error);
+      });
     return () => {
       cancelled = true;
       cancelFollowupSuggestions();
@@ -575,25 +673,53 @@ export function ChatView({
     cancelFollowupSuggestions,
     conversationId,
     hydrationRetry,
+    isNewConversation,
     locale,
-    persistenceQueue,
     session,
   ]);
 
   useEffect(() => {
+    const timing = hydrationTimingRef.current;
+    if (
+      !import.meta.env.DEV ||
+      hydrationState !== "ready" ||
+      timing?.conversationId !== conversationId ||
+      timing.frameLogged
+    ) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const current = hydrationTimingRef.current;
+      if (current?.conversationId !== conversationId || current.frameLogged) return;
+      current.frameLogged = true;
+      console.debug("[perf] conversation first frame", {
+        conversationId,
+        elapsedMs: Math.round(performance.now() - current.startedAt),
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [conversationId, hydrationState, initialMessages.length]);
+
+  useEffect(() => {
+    if (hydrationState !== "ready") return;
     let cancelled = false;
-    void api.sandboxArtifacts.list(conversationId).then((items) => {
-      if (
-        !cancelled &&
-        items.some((item) => item.kind === "html" || item.kind === "svg" || item.kind === "static")
-      ) {
-        openWorkspaceSidePanel("generated-app");
-      }
+    const cancelScheduled = scheduleAfterPaint(() => {
+      void api.sandboxArtifacts.list(conversationId).then((items) => {
+        if (
+          !cancelled &&
+          items.some(
+            (item) => item.kind === "html" || item.kind === "svg" || item.kind === "static",
+          )
+        ) {
+          openWorkspaceSidePanel("generated-app");
+        }
+      });
     });
     return () => {
       cancelled = true;
+      cancelScheduled();
     };
-  }, [conversationId]);
+  }, [conversationId, hydrationState]);
 
   const chat = useChat({ chat: session.chat, experimental_throttle: 50 });
   chatRef.current = chat;
@@ -903,62 +1029,74 @@ export function ChatView({
   );
 
   useEffect(() => {
+    if (hydrationState !== "ready") return;
     let cancelled = false;
+    let inFlight = false;
     const load = (): void => {
-      void api.agents.runtimeSnapshot().then((snapshot) => {
-        if (!cancelled) {
-          setRuntimeSnapshot(snapshot);
-          const activeRun = snapshot.runtimeRuns
-            .filter(
-              (item) =>
-                item.conversation_id === conversationId &&
-                ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
-            )
-            .sort((a, b) => b.started_at - a.started_at)[0];
-          if (activeRun) {
-            runIdRef.current = activeRun.id;
-            runModeRef.current = "resume";
-          }
-
-          const trackedRunId = runIdRef.current;
-          const trackedRun = trackedRunId
-            ? snapshot.runtimeRuns.find(
-                (item) => item.id === trackedRunId && item.conversation_id === conversationId,
+      if (inFlight) return;
+      inFlight = true;
+      void api.agents
+        .runtimeSnapshot()
+        .then((snapshot) => {
+          if (!cancelled) {
+            setRuntimeSnapshot(snapshot);
+            const activeRun = snapshot.runtimeRuns
+              .filter(
+                (item) =>
+                  item.conversation_id === conversationId &&
+                  ["queued", "running", "waiting_approval", "waiting_handoff"].includes(
+                    item.status,
+                  ),
               )
-            : undefined;
-          const isExternalRun = runModeRef.current === "resume" && !isChatLoadingRef.current;
-          if (activeRun) {
-            setExternalReconciliationPending(false);
-            void refreshPersistedMessages();
-          }
-          const shouldReconcile =
-            trackedRun &&
-            shouldReconcileCompletedRun({
-              trackedRunId,
-              runId: trackedRun.id,
-              conversationId,
-              runConversationId: trackedRun.conversation_id,
-              isChatLoading: isChatLoadingRef.current,
-              isExternalRun,
-              status: trackedRun.status,
-            });
-          if (shouldReconcile && trackedRun) {
-            if (isExternalRun) {
-              setExternalReconciliationPending(true);
-              void refreshPersistedMessages().then((hasAssistant) => {
-                if (hasAssistant) setExternalReconciliationPending(false);
+              .sort((a, b) => b.started_at - a.started_at)[0];
+            if (activeRun) {
+              runIdRef.current = activeRun.id;
+              runModeRef.current = "resume";
+            }
+
+            const trackedRunId = runIdRef.current;
+            const trackedRun = trackedRunId
+              ? snapshot.runtimeRuns.find(
+                  (item) => item.id === trackedRunId && item.conversation_id === conversationId,
+                )
+              : undefined;
+            const isExternalRun = runModeRef.current === "resume" && !isChatLoadingRef.current;
+            if (activeRun) {
+              setExternalReconciliationPending(false);
+              void refreshPersistedMessages();
+            }
+            const shouldReconcile =
+              trackedRun &&
+              shouldReconcileCompletedRun({
+                trackedRunId,
+                runId: trackedRun.id,
+                conversationId,
+                runConversationId: trackedRun.conversation_id,
+                isChatLoading: isChatLoadingRef.current,
+                isExternalRun,
+                status: trackedRun.status,
               });
-            } else {
-              reconcileCompletedRun(trackedRun.id);
+            if (shouldReconcile && trackedRun) {
+              if (isExternalRun) {
+                setExternalReconciliationPending(true);
+                void refreshPersistedMessages().then((hasAssistant) => {
+                  if (hasAssistant) setExternalReconciliationPending(false);
+                });
+              } else {
+                reconcileCompletedRun(trackedRun.id);
+              }
             }
           }
-        }
-      });
+        })
+        .finally(() => {
+          inFlight = false;
+        });
     };
-    load();
+    const cancelScheduled = scheduleAfterPaint(load);
     if (!shouldPollRuntime) {
       return () => {
         cancelled = true;
+        cancelScheduled();
         if (reconciliationRef.current.timer !== null) {
           window.clearTimeout(reconciliationRef.current.timer);
           reconciliationRef.current.timer = null;
@@ -968,6 +1106,7 @@ export function ChatView({
     const id = window.setInterval(load, 1_200);
     return () => {
       cancelled = true;
+      cancelScheduled();
       window.clearInterval(id);
       if (reconciliationRef.current.timer !== null) {
         window.clearTimeout(reconciliationRef.current.timer);
@@ -977,6 +1116,7 @@ export function ChatView({
   }, [
     conversationId,
     externalReconciliationPending,
+    hydrationState,
     reconcileCompletedRun,
     refreshPersistedMessages,
     shouldPollRuntime,

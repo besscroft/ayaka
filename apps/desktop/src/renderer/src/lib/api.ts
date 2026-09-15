@@ -4,6 +4,7 @@ import type {
   AgentProfile,
   ErrorLogExportResult,
   Conversation,
+  ConversationHydration,
   ArtifactInstallation,
   CatalogInstallInput,
   CatalogItemDetail,
@@ -40,6 +41,7 @@ import type {
   MessagePatchResult,
   MessageRow,
   MessageSnapshot,
+  SettingEntry,
   ToolDiscoveryResult,
   ToolServer,
   ToolServerInput,
@@ -128,6 +130,8 @@ export const api = {
     list: (): Promise<Conversation[]> => assertApi().conversations.list(),
     listDeleted: (): Promise<Conversation[]> => assertApi().conversations.listDeleted(),
     get: (id: string): Promise<Conversation | null> => assertApi().conversations.get(id),
+    hydrate: (id: string): Promise<ConversationHydration | null> =>
+      assertApi().conversations.hydrate(id),
     create: (id: string, title?: string): Promise<Conversation> =>
       assertApi().conversations.create(id, title),
     delete: (id: string): Promise<boolean> => assertApi().conversations.delete(id),
@@ -311,6 +315,7 @@ export const api = {
     set: (key: string, value: string): Promise<boolean> => assertApi().settings.set(key, value),
     getAll: (keys: string[]): Promise<Record<string, string | null>> =>
       assertApi().settings.getAll(keys),
+    setAll: (entries: SettingEntry[]): Promise<boolean> => assertApi().settings.setAll(entries),
   },
   logs: {
     export: (): Promise<ErrorLogExportResult> => assertApi().logs.export(),
@@ -371,6 +376,7 @@ export const api = {
         | "contextCheckpoints"
       >
     > => assertApi().agents.runtimeSnapshot(),
+    runningConversationIds: (): Promise<string[]> => assertApi().agents.runningConversationIds(),
     save: (agent: AgentProfile): Promise<boolean> => assertApi().agents.save(agent),
     memoryFiles: {
       list: (agentId?: string): Promise<Record<MemoryFileKind, AgentMemoryFileSnapshot>> =>

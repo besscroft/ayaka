@@ -7,6 +7,7 @@ import {
   createConversationWorkspace,
   createConversation,
   getConversation,
+  getConversationHydrationSnapshot,
   getConversationWorkspace,
   getSetting,
   listMessages,
@@ -21,6 +22,7 @@ import type {
   WorkspaceMediaSaveInput,
   WorkspaceMediaSaveResult,
   WorkspaceOrphan,
+  ConversationHydration,
 } from "../../shared/types";
 import { inferAttachmentMediaType } from "../../shared/media-type";
 import { readScreenshotPath } from "../../shared/browser-message";
@@ -166,6 +168,16 @@ export async function getConversationWorkspaceInfo(
 ): Promise<WorkspaceInfo | null> {
   const row = getConversationWorkspace(conversationId);
   return row ? toWorkspaceInfo(row) : null;
+}
+
+export function getConversationHydrationInfo(conversationId: string): ConversationHydration | null {
+  const snapshot = getConversationHydrationSnapshot(conversationId);
+  if (!snapshot) return null;
+  return {
+    conversation: snapshot.conversation,
+    messages: snapshot.messages,
+    workspace: snapshot.workspace ? toWorkspaceInfo(snapshot.workspace) : null,
+  };
 }
 
 export async function selectWorkspaceParent(): Promise<boolean> {

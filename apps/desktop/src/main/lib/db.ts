@@ -158,6 +158,7 @@ import {
   type RuntimeKind,
   type RuntimeExecutableCommand,
   type RuntimePlatform,
+  type SettingEntry,
   type RuntimeArchitecture,
   type McpLifecycleDesiredState,
   type McpLifecycleState,
@@ -423,6 +424,37 @@ export function listDeletedConversations(): Conversation[] {
 
 export function getConversation(id: string): Conversation | null {
   return getDb().select().from(conversations).where(eq(conversations.id, id)).get() ?? null;
+}
+
+export function getConversationHydrationSnapshot(id: string): {
+  conversation: Conversation;
+  messages: MessageSnapshot;
+  workspace: ConversationWorkspace | null;
+} | null {
+  return getDb().transaction((tx) => {
+    const conversation = tx.select().from(conversations).where(eq(conversations.id, id)).get();
+    if (!conversation) return null;
+
+    const messageRows = tx
+      .select()
+      .from(messages)
+      .where(eq(messages.conversation_id, id))
+      .orderBy(messages.created_at)
+      .all()
+      .map(dbMessageToShared);
+    const workspace =
+      tx
+        .select()
+        .from(conversationWorkspaces)
+        .where(eq(conversationWorkspaces.conversation_id, id))
+        .get() ?? null;
+
+    return {
+      conversation,
+      messages: { messages: messageRows, revision: conversation.message_revision },
+      workspace,
+    };
+  });
 }
 
 export function listBrowserTabs(conversationId: string): DbBrowserTab[] {
@@ -781,6 +813,17 @@ export function getSetting(key: string): string | null {
   return getDb().select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
 }
 
+export function getSettings(keys: string[]): Record<string, string | null> {
+  if (keys.length === 0) return {};
+  const rows = getDb()
+    .select({ key: settings.key, value: settings.value })
+    .from(settings)
+    .where(inArray(settings.key, [...new Set(keys)]))
+    .all();
+  const values = new Map(rows.map((row) => [row.key, row.value] as const));
+  return Object.fromEntries(keys.map((key) => [key, values.get(key) ?? null]));
+}
+
 export async function setSetting(key: string, value: string): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("setSetting", [key, value]);
   getDb()
@@ -788,6 +831,23 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .values({ key, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } })
     .run();
+}
+
+export async function setSettings(entries: SettingEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  if (shouldRouteWrites()) return writeDb<void>("setSettings", [entries]);
+
+  getDb().transaction((tx) => {
+    for (const entry of entries) {
+      if (!entry || typeof entry.key !== "string" || typeof entry.value !== "string") {
+        throw new Error("Invalid settings batch.");
+      }
+      tx.insert(settings)
+        .values(entry)
+        .onConflictDoUpdate({ target: settings.key, set: { value: entry.value } })
+        .run();
+    }
+  });
 }
 
 export async function setApiKey(provider: string, apiKey: string): Promise<void> {
@@ -1128,6 +1188,20 @@ export function listRuntimeRuns(limit = 50): RuntimeRun[] {
     .limit(limit)
     .all()
     .map(toRuntimeRun);
+}
+
+export function listRunningConversationIds(): string[] {
+  return getDb()
+    .select({ conversationId: runtimeRuns.conversation_id })
+    .from(runtimeRuns)
+    .where(
+      and(
+        inArray(runtimeRuns.status, ["queued", "running", "waiting_approval", "waiting_handoff"]),
+        isNotNull(runtimeRuns.conversation_id),
+      ),
+    )
+    .all()
+    .flatMap(({ conversationId }) => (conversationId ? [conversationId] : []));
 }
 
 export function getRuntimeRun(id: string): RuntimeRun | null {
