@@ -63,7 +63,8 @@ export function GeneratedAppPane({
         api.sandboxPreviews.list(conversationId),
       ]);
       const previewable = nextArtifacts.filter(
-        (artifact) => artifact.kind === "html" || artifact.kind === "static",
+        (artifact) =>
+          artifact.kind === "html" || artifact.kind === "svg" || artifact.kind === "static",
       );
       setArtifacts(previewable);
       setPreviews(nextPreviews);
@@ -108,7 +109,7 @@ export function GeneratedAppPane({
       } else {
         void load();
       }
-      if (artifact.kind === "html" || artifact.kind === "static") {
+      if (artifact.kind === "html" || artifact.kind === "svg" || artifact.kind === "static") {
         setSelectedId(artifact.id);
         if (!wasKnown) onRequestOpen?.(artifact.id);
       }
@@ -161,7 +162,7 @@ export function GeneratedAppPane({
         .catch((reason) =>
           setSourceError(reason instanceof Error ? reason.message : String(reason)),
         );
-    } else if (selected.kind === "static") {
+    } else if (selected.kind === "svg" || selected.kind === "static") {
       void api.sandboxArtifacts
         .resourceUrl({ conversationId, artifactId: selected.id })
         .then(setResourceUrl)
@@ -347,6 +348,20 @@ export function GeneratedAppPane({
                     className="size-full border-0"
                     sandbox="allow-scripts"
                     src={resourceUrl}
+                  />
+                ) : null}
+              </div>
+            ) : previewMode === "svg" ? (
+              <div
+                ref={hostRef}
+                className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-white p-4"
+              >
+                {resourceUrl ? (
+                  <img
+                    key={`${resourceUrl}:${refreshNonce}`}
+                    src={resourceUrl}
+                    alt={selected.path}
+                    className="max-h-full max-w-full object-contain"
                   />
                 ) : null}
               </div>

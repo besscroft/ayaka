@@ -68,7 +68,7 @@ export interface SandboxArtifactResult {
   authorized?: boolean;
 }
 
-export type GeneratedAppPreviewMode = "none" | "source" | "html" | "static" | "localhost";
+export type GeneratedAppPreviewMode = "none" | "source" | "html" | "svg" | "static" | "localhost";
 
 export function getGeneratedAppPreviewMode(input: {
   kind?: string;
@@ -77,7 +77,7 @@ export function getGeneratedAppPreviewMode(input: {
   sizeBytes?: number;
   maxHtmlBytes?: number;
 }): GeneratedAppPreviewMode {
-  if (input.kind !== "html" && input.kind !== "static") return "none";
+  if (input.kind !== "html" && input.kind !== "svg" && input.kind !== "static") return "none";
   if (
     input.sourceMode ||
     (input.kind === "html" &&
@@ -87,7 +87,7 @@ export function getGeneratedAppPreviewMode(input: {
     return "source";
   }
   if (input.previewStatus === "running") return "localhost";
-  return input.kind === "html" ? "html" : "static";
+  return input.kind === "html" ? "html" : input.kind === "svg" ? "svg" : "static";
 }
 
 export function protectGeneratedHtml(text: string): string {

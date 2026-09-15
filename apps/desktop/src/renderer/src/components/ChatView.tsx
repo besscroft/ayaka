@@ -583,7 +583,10 @@ export function ChatView({
   useEffect(() => {
     let cancelled = false;
     void api.sandboxArtifacts.list(conversationId).then((items) => {
-      if (!cancelled && items.some((item) => item.kind === "html" || item.kind === "static")) {
+      if (
+        !cancelled &&
+        items.some((item) => item.kind === "html" || item.kind === "svg" || item.kind === "static")
+      ) {
         openWorkspaceSidePanel("generated-app");
       }
     });

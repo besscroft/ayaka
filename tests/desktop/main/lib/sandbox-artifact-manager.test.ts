@@ -90,6 +90,36 @@ void describe("sandbox artifact manager", () => {
     assert.equal(artifact.path, "index.html");
   });
 
+  void it("publishes standalone SVG artifacts and serves their resource URL", async () => {
+    const session = await makeSession("svg");
+    await mkdir(session.root_path, { recursive: true });
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle r="5" /></svg>';
+    await writeFile(path.join(session.root_path, "diagram.svg"), svg);
+
+    const artifact = await artifacts.publishSandboxArtifact(session, {
+      path: "diagram.svg",
+    });
+
+    assert.equal(artifact.kind, "svg");
+    assert.equal(artifact.path, "diagram.svg");
+    assert.equal(artifact.entry_path, "diagram.svg");
+    assert.equal(artifact.mime_type, "image/svg+xml");
+    assert.equal(artifact.authorized, true);
+    assert.equal(
+      artifacts.getSandboxArtifactResourceUrl(session.conversation_id!, artifact.id),
+      `ayaka-artifact://${artifact.id}/diagram.svg`,
+    );
+
+    const resource = await artifacts.readSandboxArtifactResource(artifact.id, "diagram.svg");
+    assert.equal(resource.mimeType, "image/svg+xml");
+    assert.equal(resource.body.toString("utf8"), svg);
+    await assert.rejects(
+      () => artifacts.readSandboxArtifactResource(artifact.id, "other.svg"),
+      /does not match the artifact entry/,
+    );
+  });
+
   void it("rejects traversal, symlink escape, snapshots, and oversized HTML", async () => {
     const session = await makeSession("reject");
     await mkdir(session.root_path, { recursive: true });

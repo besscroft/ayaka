@@ -114,23 +114,25 @@ the MCP definition. This keeps configuration, executable selection, and process 
 while allowing the existing MCP ToolSet, approval policy, OAuth, and runtime event records to remain
 the single Agent integration path.
 
-## Generated HTML and application previews
+## Generated HTML, SVG, and application previews
 
 Sandbox files remain the Agent's source of truth. `sandbox_publish_artifact` scans a sandbox-relative
-HTML file or directory containing `index.html`, stores only metadata (relative path, entry point,
+HTML/SVG file or directory containing `index.html`, stores only metadata (relative path, entry point,
 size, hash, MIME type, and status) in `sandbox_artifacts`, and leaves HTML/CSS/JS/assets on the
 sandbox filesystem. A publish of the same path updates that metadata in place; snapshots remain the
 only history mechanism. Reads reject absolute paths, traversal, symlink escape, and `.snapshots`.
-Single-file HTML is executable only up to 256 KiB. Static applications are capped at 20 MiB, 1,000
-files, and 2 MiB per resource.
+Single-file HTML is executable only up to 256 KiB. Single-file SVG artifacts are capped at 2 MiB and
+rendered as non-executable images. Static applications are capped at 20 MiB, 1,000 files, and 2 MiB
+per resource.
 
 The renderer never receives a sandbox root or a host path. HTML is loaded through a sandboxed
-`iframe` with `allow-scripts` only and a restrictive CSP that disables network access. Static
-resources use the privileged `ayaka-artifact://<artifactId>/<relative-path>` protocol; the main
-process resolves the artifact ID, re-validates the sandbox path, restricts MIME types and size, and
-returns a CSP-protected response. Published HTML and static artifacts are immediately available for
-preview; source reads and protocol resources still re-check conversation ownership, sandbox paths,
-MIME types, and size limits in the main process.
+`iframe` with `allow-scripts` only and a restrictive CSP that disables network access. Standalone
+SVG artifacts render through an image element, while static resources use the privileged
+`ayaka-artifact://<artifactId>/<relative-path>` protocol; the main process resolves the artifact ID,
+re-validates the sandbox path, restricts MIME types and size, and returns a CSP-protected response.
+Published HTML, SVG, and static artifacts are immediately available for preview; source reads and
+protocol resources still re-check conversation ownership, sandbox paths, MIME types, and size limits
+in the main process.
 
 Long-running Vite/React or static-server processes are separate from `sandbox_run_command` and are
 managed by `sandbox-preview-manager.ts`. `sandbox_start_preview` accepts only structured

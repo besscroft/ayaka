@@ -1627,12 +1627,16 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
       "sandbox_publish_artifact",
       tool({
         description:
-          "Publish a sandbox HTML file or static directory as a previewable artifact. Paths are sandbox-relative. Always call this after writing HTML or a static app; chat Markdown alone does not create an interactive preview.",
-        inputSchema: jsonSchema<{ path: string; kind?: "html" | "static"; entryPath?: string }>({
+          "Publish a sandbox HTML/SVG file or static directory as a previewable artifact. Paths are sandbox-relative. Always call this after writing HTML, SVG, or a static app; chat Markdown alone does not create an interactive preview.",
+        inputSchema: jsonSchema<{
+          path: string;
+          kind?: "html" | "svg" | "static";
+          entryPath?: string;
+        }>({
           type: "object",
           properties: {
             path: { type: "string" },
-            kind: { type: "string", enum: ["html", "static"] },
+            kind: { type: "string", enum: ["html", "svg", "static"] },
             entryPath: { type: "string" },
           },
           required: ["path"],
@@ -2317,9 +2321,10 @@ function createSandboxIsolationNote(context: RuntimeContext): string | undefined
     "- Use sandbox_write_file to create or update static preview files directly; path and content are sandbox-relative and UTF-8.",
     "- Use sandbox_run_command only for one structured executable command: command is the executable name, args is string argv, and cwd is sandbox-relative. Never use shell syntax, pipes, or redirection.",
     "- Do not use workspace_run_command for sandbox files; the workspace and sandbox have different roots.",
-    "Generated HTML and small-app previews:",
+    "Generated HTML, SVG, and small-app previews:",
     "- Do not place generated HTML only in the chat response and expect it to render as an app.",
     "- After writing a standalone .html file, call sandbox_publish_artifact with kind html.",
+    "- After writing a standalone .svg file, call sandbox_publish_artifact with kind svg.",
     "- After writing a multi-file static app, call sandbox_publish_artifact for its directory with entryPath index.html.",
     "- For Vite or React apps, publish the project first, then use sandbox_start_preview with structured executable and args.",
     "- Use sandbox_start_preview only for long-running localhost services; standalone HTML does not need a server.",

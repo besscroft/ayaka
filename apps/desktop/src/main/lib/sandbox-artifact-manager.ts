@@ -29,17 +29,17 @@ const authorizedArtifactIds = new Set<string>();
 
 export interface PublishArtifactInput {
   path: string;
-  kind?: "html" | "static";
+  kind?: "html" | "svg" | "static";
   entryPath?: string;
 }
 
 interface ArtifactScan {
-  kind: "html" | "static";
+  kind: "html" | "svg" | "static";
   path: string;
   entryPath: string;
   sizeBytes: number;
   sha256: string;
-  mimeType: "text/html";
+  mimeType: "text/html" | "image/svg+xml";
 }
 
 export function onSandboxArtifactUpdated(
@@ -51,7 +51,9 @@ export function onSandboxArtifactUpdated(
 
 export function isSandboxArtifactAuthorized(id: string): boolean {
   const artifact = getSandboxArtifact(id);
-  if (artifact?.kind === "html" || artifact?.kind === "static") return true;
+  if (artifact?.kind === "html" || artifact?.kind === "svg" || artifact?.kind === "static") {
+    return true;
+  }
   return authorizedArtifactIds.has(id);
 }
 
@@ -163,8 +165,10 @@ export async function readSandboxArtifactHtml(
 
 export function getSandboxArtifactResourceUrl(conversationId: string, artifactId: string): string {
   const artifact = getOwnedArtifact(conversationId, artifactId);
-  if (artifact.kind !== "static") throw new Error("Only static artifacts have resource URLs.");
-  if (!artifact.entry_path) throw new Error("Static artifact entry is missing.");
+  if (artifact.kind !== "static" && artifact.kind !== "svg") {
+    throw new Error("Only static or SVG artifacts have resource URLs.");
+  }
+  if (!artifact.entry_path) throw new Error("Artifact entry is missing.");
   const entryPath = normalizeRelativePath(artifact.entry_path);
   const encodedPath = entryPath.split("/").map(encodeURIComponent).join("/");
   return `ayaka-artifact://${encodeURIComponent(artifact.id)}/${encodedPath}`;
@@ -175,14 +179,19 @@ export async function readSandboxArtifactResource(
   relativePath: string,
 ): Promise<{ body: Buffer; mimeType: string; sizeBytes: number }> {
   const artifact = getSandboxArtifact(artifactId);
-  if (!artifact || artifact.kind !== "static") throw new Error("Static artifact not found.");
+  if (!artifact || (artifact.kind !== "static" && artifact.kind !== "svg")) {
+    throw new Error("Static or SVG artifact not found.");
+  }
   const session = getSandboxSession(artifact.session_id);
   if (!session) throw new Error("Sandbox session not found.");
   const normalized = normalizeRelativePath(relativePath);
-  const filePath = resolveSandboxPath(
-    session.root_path,
-    path.posix.join(artifact.path, normalized),
-  );
+  const filePath =
+    artifact.kind === "svg"
+      ? resolveSandboxPath(session.root_path, artifact.path)
+      : resolveSandboxPath(session.root_path, path.posix.join(artifact.path, normalized));
+  if (artifact.kind === "svg" && normalized !== normalizeRelativePath(artifact.entry_path ?? "")) {
+    throw new Error("SVG resource path does not match the artifact entry.");
+  }
   const fileStat = await lstat(filePath);
   if (!fileStat.isFile()) throw new Error("Static resource is not a file.");
   if (fileStat.size > MAX_STATIC_RESOURCE_BYTES) {
@@ -262,9 +271,27 @@ async function scanArtifact(
   const relativePath = toRelative(session.root_path, filePath);
   const requestedKind = input.kind;
   if (fileStat.isFile()) {
-    if (!/\.html?$/i.test(filePath)) throw new Error("Only HTML files can be published.");
+    const extension = path.extname(filePath).toLowerCase();
+    if (extension === ".svg") {
+      if (requestedKind && requestedKind !== "svg") {
+        throw new Error("An SVG file artifact must use the svg kind.");
+      }
+      const content = await readFile(filePath);
+      if (content.byteLength > MAX_STATIC_RESOURCE_BYTES) {
+        throw new Error("SVG artifact exceeds the 2 MB limit.");
+      }
+      return {
+        kind: "svg",
+        path: relativePath,
+        entryPath: relativePath,
+        sizeBytes: content.byteLength,
+        sha256: hashBytes(content),
+        mimeType: "image/svg+xml",
+      };
+    }
+    if (!/\.html?$/i.test(filePath)) throw new Error("Only HTML or SVG files can be published.");
     if (requestedKind && requestedKind !== "html") {
-      throw new Error("A file artifact must use the html kind.");
+      throw new Error("An HTML file artifact must use the html kind.");
     }
     const content = await readFile(filePath);
     return {

@@ -1064,7 +1064,9 @@ export const sandboxArtifacts = sqliteTable(
     session_id: text("session_id")
       .notNull()
       .references(() => sandboxSessions.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["file", "directory", "html", "static", "preview"] }).notNull(),
+    kind: text("kind", {
+      enum: ["file", "directory", "html", "svg", "static", "preview"],
+    }).notNull(),
     path: text("path").notNull(),
     url: text("url"),
     size_bytes: integer("size_bytes"),

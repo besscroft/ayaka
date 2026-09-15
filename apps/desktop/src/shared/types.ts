@@ -879,7 +879,7 @@ export interface SandboxArtifactUpdate extends SandboxArtifact {
   conversationId: string;
 }
 
-export type SandboxArtifactKind = "file" | "directory" | "html" | "static" | "preview";
+export type SandboxArtifactKind = "file" | "directory" | "html" | "svg" | "static" | "preview";
 export type SandboxArtifactStatus = "candidate" | "ready" | "running" | "stopped" | "failed";
 
 export type SandboxPreviewStatus = "starting" | "running" | "stopped" | "failed";
