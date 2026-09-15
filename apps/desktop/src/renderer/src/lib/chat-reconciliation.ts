@@ -19,6 +19,7 @@ export function shouldReconcileCompletedRun({
   conversationId,
   runConversationId,
   isChatLoading,
+  isExternalRun = false,
   status,
 }: {
   trackedRunId: string | null;
@@ -26,10 +27,11 @@ export function shouldReconcileCompletedRun({
   conversationId: string;
   runConversationId: string | null;
   isChatLoading: boolean;
+  isExternalRun?: boolean;
   status: RunStatus;
 }): boolean {
   return (
-    isChatLoading &&
+    (isChatLoading || isExternalRun) &&
     trackedRunId === runId &&
     runConversationId === conversationId &&
     isTerminalRunStatus(status)

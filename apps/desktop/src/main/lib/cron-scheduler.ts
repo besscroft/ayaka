@@ -23,6 +23,8 @@ import {
 } from "./cron-store";
 import { isTransientCronError } from "./cron-schedule";
 
+const AUTOMATION_MESSAGE_SNAPSHOT_INTERVAL_MS = 500;
+
 export interface CronSchedulerOptions {
   maxConcurrency?: number;
   pollIntervalMs?: number;
@@ -172,13 +174,29 @@ async function executeCronAgentTurn(
     abortSignal: signal,
   });
   let assistant: UIMessage | undefined;
+  let lastPersistedAssistantAt = 0;
+  let assistantPersistence = Promise.resolve();
   for await (const message of readUIMessageStream<UIMessage>({
     stream,
     terminateOnError: true,
   })) {
+    if (message.role !== "assistant") continue;
     assistant = message;
+    const now = Date.now();
+    if (
+      message.parts.length > 0 &&
+      now - lastPersistedAssistantAt >= AUTOMATION_MESSAGE_SNAPSHOT_INTERVAL_MS
+    ) {
+      lastPersistedAssistantAt = now;
+      assistantPersistence = assistantPersistence
+        .then(() => persistCronMessages(job.conversationId, [message]))
+        .catch((error) => {
+          console.error("[cron] failed to persist automation stream snapshot:", error);
+        });
+    }
   }
   if (!assistant) throw new Error("Automation completed without an assistant response.");
+  await assistantPersistence;
   await persistCronMessages(job.conversationId, [assistant]);
   const output = assistant.parts
     .filter(

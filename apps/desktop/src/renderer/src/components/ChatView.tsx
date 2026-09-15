@@ -157,6 +157,7 @@ export function ChatView({
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatErrorRetryable, setChatErrorRetryable] = useState(false);
   const [isStopped, setIsStopped] = useState(false);
+  const [externalReconciliationPending, setExternalReconciliationPending] = useState(false);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [toolsSnapshot, setToolsSnapshot] = useState<ToolsSnapshot | null>(null);
@@ -456,6 +457,7 @@ export function ChatView({
     setChatError(alreadyHydrated ? session.errorMessage : null);
     setChatErrorRetryable(alreadyHydrated ? session.errorRetryable : false);
     setIsStopped(alreadyHydrated ? session.isStopped : false);
+    setExternalReconciliationPending(false);
     if (!alreadyHydrated) {
       chatFailureRef.current = false;
       errorReportedRef.current = false;
@@ -795,7 +797,7 @@ export function ChatView({
       ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
   );
   const isAgentRunActive = isChatLoading || hasActivePersistedRun;
-  const shouldPollRuntime = isLoading || hasActivePersistedRun;
+  const shouldPollRuntime = isLoading || hasActivePersistedRun || externalReconciliationPending;
 
   const { setMessages: setChatMessages, stop: stopChat } = chat;
   const reconcileCompletedRun = useCallback(
@@ -836,6 +838,31 @@ export function ChatView({
     },
     [conversationId, setChatMessages, stopChat],
   );
+
+  const refreshPersistedMessages = useCallback((): Promise<boolean> => {
+    if (hydrationStateRef.current !== "ready") return Promise.resolve(false);
+    return api.messages
+      .list(conversationId)
+      .then((snapshot) => {
+        const persistedMessages = snapshot.messages
+          .map(hydrateStoredMessage)
+          .filter(isNonEmptyUIMessage);
+        const hasAssistant = persistedMessages.some(
+          (message) => message.role === "assistant" && message.parts.length > 0,
+        );
+        const reconciled = mergeChatMessages(latestMessagesRef.current, persistedMessages);
+        if (!reconciled || reconciled === latestMessagesRef.current) return hasAssistant;
+        latestMessagesRef.current = reconciled;
+        if (reconciled.length > 0) lastNonEmptyMessagesRef.current = reconciled;
+        explicitEmptyMessagesRef.current = reconciled.length === 0;
+        setChatMessages(reconciled);
+        return hasAssistant;
+      })
+      .catch((error) => {
+        console.error("[chat] failed to refresh persisted messages:", error);
+        return false;
+      });
+  }, [conversationId, setChatMessages]);
 
   useEffect(() => {
     if (hydrationState !== "ready" || !isChatLoading) return;
@@ -896,7 +923,12 @@ export function ChatView({
                 (item) => item.id === trackedRunId && item.conversation_id === conversationId,
               )
             : undefined;
-          if (
+          const isExternalRun = runModeRef.current === "resume" && !isChatLoadingRef.current;
+          if (activeRun) {
+            setExternalReconciliationPending(false);
+            void refreshPersistedMessages();
+          }
+          const shouldReconcile =
             trackedRun &&
             shouldReconcileCompletedRun({
               trackedRunId,
@@ -904,10 +936,18 @@ export function ChatView({
               conversationId,
               runConversationId: trackedRun.conversation_id,
               isChatLoading: isChatLoadingRef.current,
+              isExternalRun,
               status: trackedRun.status,
-            })
-          ) {
-            reconcileCompletedRun(trackedRun.id);
+            });
+          if (shouldReconcile && trackedRun) {
+            if (isExternalRun) {
+              setExternalReconciliationPending(true);
+              void refreshPersistedMessages().then((hasAssistant) => {
+                if (hasAssistant) setExternalReconciliationPending(false);
+              });
+            } else {
+              reconcileCompletedRun(trackedRun.id);
+            }
           }
         }
       });
@@ -931,7 +971,13 @@ export function ChatView({
         reconciliationRef.current.timer = null;
       }
     };
-  }, [conversationId, reconcileCompletedRun, shouldPollRuntime]);
+  }, [
+    conversationId,
+    externalReconciliationPending,
+    reconcileCompletedRun,
+    refreshPersistedMessages,
+    shouldPollRuntime,
+  ]);
 
   /* ---------- 状态徽章 ---------- */
   const statusKind: ConversationStatusKind = chat.error
