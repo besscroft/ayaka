@@ -47,13 +47,13 @@ import {
   skillToolReference,
 } from "./skill-runtime";
 import {
-  createCronJob,
   deleteCronJob,
   getCronJob,
   listCronJobs,
   setCronJobPaused,
   updateCronJob,
 } from "./cron-store";
+import { createCronJobWithWorkspace } from "./automation-workspace";
 import { getCronScheduler } from "./cron-scheduler";
 import type { CronJobInput } from "../../shared/types";
 import { readWebPage } from "./web-page-reader";
@@ -1735,7 +1735,7 @@ async function executeCronTool(input: CronToolInput): Promise<unknown> {
     case "get":
       return getCronJob(requireCronId(input));
     case "create":
-      return await createCronJob(requireCronCreateJob(input));
+      return await createCronJobWithWorkspace(requireCronCreateJob(input));
     case "update":
       if (!input.job) throw new Error("job is required for cron.update");
       return await updateCronJob(requireCronId(input), input.job);

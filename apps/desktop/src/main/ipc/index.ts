@@ -189,7 +189,6 @@ import {
 import { redactWorkspaceCommandInput } from "../lib/workspace-command";
 import { generateSkillDraft } from "../lib/skill-drafts";
 import {
-  createCronJob,
   deleteCronJob,
   getCronJob,
   listCronJobs,
@@ -197,6 +196,7 @@ import {
   setCronJobPaused,
   updateCronJob,
 } from "../lib/cron-store";
+import { createCronJobWithWorkspace } from "../lib/automation-workspace";
 import { getCronScheduler } from "../lib/cron-scheduler";
 import {
   getCatalogSnapshot,
@@ -610,7 +610,7 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   ipcMain.handle("cron:list", () => listCronJobs());
   ipcMain.handle("cron:get", (_e, id: string) => getCronJob(id));
-  ipcMain.handle("cron:create", (_e, input: CronJobInput) => createCronJob(input));
+  ipcMain.handle("cron:create", (_e, input: CronJobInput) => createCronJobWithWorkspace(input));
   ipcMain.handle("cron:update", (_e, id: string, patch: Partial<CronJobInput>) =>
     updateCronJob(id, patch),
   );

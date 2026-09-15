@@ -13,6 +13,7 @@ import {
 import { applyMessagesPatch, buildAgentSystemPrompt, getMessagesSnapshot, getSetting } from "./db";
 import { runAgentChat } from "./agent-runtime";
 import { resolveModel } from "./providers";
+import { ensureAutomationWorkspace } from "./automation-workspace";
 import {
   claimCronJobNow,
   claimDueCronJobs,
@@ -129,6 +130,7 @@ async function executeCronAgentTurn(
   _run: CronRun,
   signal: AbortSignal,
 ): Promise<{ output: string; runtimeRunId: string }> {
+  await ensureAutomationWorkspace(job);
   const modelRef = job.payload.modelRef ?? getSetting(SettingKey.SelectedModel);
   if (!modelRef) throw new Error("Automation has no model configured.");
   const snapshot = getMessagesSnapshot(job.conversationId);
