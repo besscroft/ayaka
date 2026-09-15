@@ -473,17 +473,17 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   sandbox_write_file: {
     id: "sandbox_write_file",
     label: "Write sandbox file",
-    description: "Write or overwrite a file inside the current sandbox session.",
+    description: "Write or overwrite a UTF-8 file inside the current sandbox session.",
     kind: "host",
     category: "sandbox",
-    defaultAuto: false,
+    defaultAuto: true,
     requiresApproval: false,
   },
   sandbox_run_command: {
     id: "sandbox_run_command",
     label: "Run sandbox command",
     description:
-      "Run a structured command in the current sandbox session; use it to create files for sandbox previews.",
+      "Run one structured command in the current sandbox session with a command name and string args. Do not use shell syntax or redirection.",
     kind: "host",
     category: "sandbox",
     defaultAuto: true,

@@ -103,6 +103,23 @@ void describe("sandbox agents", () => {
     );
   });
 
+  void it("reports command_not_found when a local command cannot be started", async () => {
+    const session = makeSession("missing-command");
+    await mkdir(session.root_path, { recursive: true });
+
+    await assert.rejects(
+      () =>
+        sandbox.runSandboxCommand(session, {
+          command: path.join(session.root_path, "definitely-missing-command"),
+        }),
+      (error: unknown) => {
+        assert.equal((error as { code?: unknown }).code, "command_not_found");
+        assert.match((error as Error).message, /Command not found/);
+        return true;
+      },
+    );
+  });
+
   void it("times out long-running commands", async () => {
     const session = makeSession("command-timeout");
     await mkdir(session.root_path, { recursive: true });

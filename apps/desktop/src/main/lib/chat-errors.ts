@@ -57,6 +57,7 @@ const SAFE_MESSAGES: Record<ChatErrorCode, string> = {
     "The model service limit was reached. For free models, this can be a free quota or IP limit. Wait and try again.",
   timeout: "The model request timed out while contacting the model service. Try again later.",
   provider: "The model provider could not complete the request. Try again shortly.",
+  command_not_found: "Command not found. Use an installed executable and try again.",
   runtime: "The local agent runtime could not complete the request. Try again.",
   run_conflict: "This conversation is already running another request.",
   run_not_found: "The previous chat run is no longer available. Start the message again.",
@@ -94,8 +95,14 @@ export function classifyChatError(
   if (explicitCode === "vision_model_unavailable") {
     return createClassification(explicitCode, phase, diagnostic, 400);
   }
+  if (explicitCode === "command_not_found") {
+    return createClassification(explicitCode, phase, diagnostic, 400);
+  }
 
   const lower = diagnostic.toLowerCase();
+  if (lower.includes("command not found") || /\bspawn\s+[\s\S]*\benoent\b/.test(lower)) {
+    return createClassification("command_not_found", phase, diagnostic, 400);
+  }
   if (status === 401 || status === 403 || lower.includes("unauthorized")) {
     return createClassification("unauthorized", phase, diagnostic, 401);
   }
@@ -276,9 +283,10 @@ function findNestedErrorValue<T>(
 }
 
 function readCode(error: unknown): ChatErrorCode | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const value = (error as ErrorShape).code;
-  return typeof value === "string" && isChatErrorCode(value) ? value : undefined;
+  return findNestedErrorValue(error, (value) => {
+    const code = value.code;
+    return typeof code === "string" && isChatErrorCode(code) ? code : undefined;
+  });
 }
 
 function isChatErrorCode(value: string): value is ChatErrorCode {

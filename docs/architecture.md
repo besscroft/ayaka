@@ -26,8 +26,9 @@ process/stdin lifecycle cannot race. A cancelled run never starts a queued side 
 
 `workspace_run_command` is a root-Agent-only built-in tool for commands whose files belong in the
 conversation workspace. It is included by the chat tool selector's automatic mode and can also be
-selected manually. Generated preview files use the separate `sandbox_run_command` tool instead. Its
-input is structured JSON rather than a shell string:
+selected manually. Generated preview files use the separate `sandbox_write_file` tool by default;
+`sandbox_run_command` remains available for running an executable inside the sandbox. Both tools use
+structured JSON rather than a shell string:
 
 ```json
 {
@@ -60,7 +61,8 @@ Runtime steps and events retain `tool_id`, risk, approval decision, relative cwd
 code/signal, duration, byte counts, and truncation flags. They never persist complete command
 output or environment values; command inputs, outputs, and audit summaries are redacted before
 display or persistence. The existing `sandbox_run_command` remains a separate Docker/local
-sandbox protocol. It executes with a sandbox-relative `cwd`, and its output files can be passed
+sandbox protocol. Its input uses `command` for the executable name (not `executable`) and `args`
+for string argv. It executes with a sandbox-relative `cwd`, and its output files can be passed
 directly to `sandbox_publish_artifact`; automatic mode exposes it for this purpose. The workspace
 command and sandbox command must not be mixed when producing a preview artifact.
 

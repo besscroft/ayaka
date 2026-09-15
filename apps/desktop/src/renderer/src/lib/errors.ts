@@ -32,6 +32,7 @@ const CHAT_CODES = new Set<ChatErrorCode>([
   "rate_limited",
   "timeout",
   "provider",
+  "command_not_found",
   "runtime",
   "run_conflict",
   "run_not_found",
@@ -228,6 +229,8 @@ function messageForChatCode(code: ChatErrorCode, locale: ErrorLocale): string {
       return text(locale, "error.chat.timeout");
     case "provider":
       return text(locale, "error.chat.provider");
+    case "command_not_found":
+      return text(locale, "error.chat.commandNotFound");
     case "runtime":
     case "run_conflict":
     case "run_not_found":
@@ -252,7 +255,9 @@ function classifyUnstructuredChatError(error: unknown, locale: ErrorLocale): Cha
   const status = getStatusCode(error);
   let code: ChatErrorCode = "unknown";
 
-  if (
+  if (lower.includes("command not found") || /\bspawn\s+[\s\S]*\benoent\b/.test(lower)) {
+    code = "command_not_found";
+  } else if (
     lower.includes("failed to fetch") ||
     lower.includes("load failed") ||
     lower === "typeerror" ||

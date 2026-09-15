@@ -47,6 +47,15 @@ export interface SandboxRunCommandInput {
   timeoutMs?: number;
 }
 
+export class SandboxCommandNotFoundError extends Error {
+  readonly code = "command_not_found" as const;
+
+  constructor(command: string, cause?: unknown) {
+    super(`Command not found: ${command}`, cause === undefined ? undefined : { cause });
+    this.name = "SandboxCommandNotFoundError";
+  }
+}
+
 export async function getOrCreateSandboxSession(input: {
   conversationId?: string | null;
   runId?: string | null;
@@ -316,7 +325,11 @@ function collectSandboxCommand(
     });
     child.on("error", (error) => {
       clearTimeout(timeout);
-      reject(error);
+      reject(
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+          ? new SandboxCommandNotFoundError(meta.command, error)
+          : error,
+      );
     });
     child.on("close", (exitCode, signal) => {
       clearTimeout(timeout);

@@ -267,6 +267,7 @@ void describe("runtime architecture", () => {
     assert.equal(runtime.toolChoice, "auto");
     assert.ok(runtime.activeTools?.includes("web_open"));
     assert.ok(runtime.activeTools?.includes("runtime_snapshot"));
+    assert.ok(runtime.activeTools?.includes("sandbox_write_file"));
     assert.ok(runtime.activeTools?.includes("sandbox_run_command"));
     assert.ok(runtime.activeTools?.includes("cron"));
     assert.equal(runtime.activeTools?.includes("browser_screenshot"), false);

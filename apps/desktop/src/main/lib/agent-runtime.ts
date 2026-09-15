@@ -887,7 +887,7 @@ function createWorkspaceCommandNote(
   return [
     "Workspace command execution:",
     "- Use workspace_run_command only when the user explicitly needs a local command run.",
-    "- Do not use workspace_run_command to create files for sandbox previews; use sandbox_run_command instead.",
+    "- Do not use workspace_run_command to create files for sandbox previews; use sandbox_write_file instead.",
     "- Always provide a structured executable and string argv array; never compose a shell command string.",
     "- cwd is relative to the conversation workspace and persists for this Agent run; env applies only to this call.",
     "- On Windows, prefer the real rg executable for reading and searching files (for example, rg --files or rg -n). Do not invoke PowerShell or cmd just to read a file.",
@@ -1496,7 +1496,8 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
       tools,
       "sandbox_write_file",
       tool({
-        description: "Write or append a UTF-8 file inside the sandbox.",
+        description:
+          "Write or append a UTF-8 file inside the sandbox. Prefer this for generated files instead of shell commands.",
         inputSchema: jsonSchema<{ path: string; content: string; append?: boolean }>({
           type: "object",
           properties: {
@@ -1519,7 +1520,8 @@ function createSandboxTools(context: RuntimeContext, enabledIds: ChatToolId[]): 
       tools,
       "sandbox_run_command",
       tool({
-        description: "Run a command in the sandbox cwd with a timeout.",
+        description:
+          "Run one structured command in the sandbox cwd with a timeout. Use command for the executable name and args for argv; do not use shell syntax, pipes, or redirection.",
         inputSchema: jsonSchema<{
           command: string;
           args?: string[];
@@ -2312,7 +2314,8 @@ function createSandboxIsolationNote(context: RuntimeContext): string | undefined
       ? "- Docker was unavailable or not selected; commands are restricted to a local sandbox directory."
       : "- Docker was detected; this session records docker-capable isolation.",
     "- All file paths must be relative to the sandbox root.",
-    "- Use sandbox_run_command for commands that create or update files intended for sandbox previews; executable and args are structured, and cwd is sandbox-relative.",
+    "- Use sandbox_write_file to create or update static preview files directly; path and content are sandbox-relative and UTF-8.",
+    "- Use sandbox_run_command only for one structured executable command: command is the executable name, args is string argv, and cwd is sandbox-relative. Never use shell syntax, pipes, or redirection.",
     "- Do not use workspace_run_command for sandbox files; the workspace and sandbox have different roots.",
     "Generated HTML and small-app previews:",
     "- Do not place generated HTML only in the chat response and expect it to render as an app.",
@@ -2432,6 +2435,7 @@ function selectedSandboxToolIds(context: RuntimeContext, policy: AgentToolPolicy
   return [
     "sandbox_list_files",
     "sandbox_read_file",
+    "sandbox_write_file",
     "sandbox_run_command",
     "sandbox_snapshot",
     "sandbox_list_artifacts",

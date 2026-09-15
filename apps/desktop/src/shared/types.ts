@@ -1681,6 +1681,7 @@ export type ChatErrorCode =
   | "rate_limited"
   | "timeout"
   | "provider"
+  | "command_not_found"
   | "runtime"
   | "run_conflict"
   | "run_not_found"

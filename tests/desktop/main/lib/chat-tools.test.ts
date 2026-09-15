@@ -406,6 +406,17 @@ void describe("chat tool runtime", () => {
     assert.equal(descriptor?.available, true);
   });
 
+  void it("exposes direct sandbox file writes as an automatic tool", () => {
+    const descriptor = chatTools
+      .createChatToolDescriptors(modelContext("openai", "web_search"))
+      .find((item) => item.id === "sandbox_write_file");
+
+    assert.equal(descriptor?.category, "sandbox");
+    assert.equal(descriptor?.defaultAuto, true);
+    assert.equal(descriptor?.requiresApproval, false);
+    assert.equal(descriptor?.available, true);
+  });
+
   void it("reflects the persisted workspace command approval setting", () => {
     dbGetToolRecord.mock.mockImplementation((id) =>
       id === "workspace_run_command" ? ({ requires_approval: 0 } as ToolRecord) : null,

@@ -40,6 +40,22 @@ void describe("chat error classification", () => {
     );
   });
 
+  void it("classifies unavailable local commands explicitly", () => {
+    const classification = classifyChatError(
+      Object.assign(new Error("Command not found: pwd"), { code: "command_not_found" }),
+    );
+    assert.equal(classification.code, "command_not_found");
+    assert.equal(classification.retryable, false);
+    assert.equal(classification.status, 400);
+
+    const wrapped = classifyChatError({
+      name: "AI_ToolExecutionError",
+      message: "Tool execution failed",
+      cause: Object.assign(new Error("Command not found: pwd"), { code: "command_not_found" }),
+    });
+    assert.equal(wrapped.code, "command_not_found");
+  });
+
   void it("preserves provider retryability through an AI SDK RetryError wrapper", () => {
     const retryError = {
       name: "AI_RetryError",

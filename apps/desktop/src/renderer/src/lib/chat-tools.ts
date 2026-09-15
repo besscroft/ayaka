@@ -29,6 +29,7 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "model_capabilities",
   "sandbox_list_files",
   "sandbox_read_file",
+  "sandbox_write_file",
   "sandbox_run_command",
   "sandbox_snapshot",
   "sandbox_list_artifacts",
@@ -213,7 +214,7 @@ const TOOL_METADATA: Record<
   },
   sandbox_write_file: {
     label: "Write sandbox file",
-    description: "Write or overwrite a file inside the current sandbox session.",
+    description: "Write or overwrite a UTF-8 file inside the current sandbox session.",
     kind: "host",
     category: "sandbox",
     requiresApproval: false,
@@ -221,7 +222,7 @@ const TOOL_METADATA: Record<
   sandbox_run_command: {
     label: "Run sandbox command",
     description:
-      "Run a structured command in the current sandbox session; use it to create files for sandbox previews.",
+      "Run one structured command in the current sandbox session with a command name and string args. Do not use shell syntax or redirection.",
     kind: "host",
     category: "sandbox",
     requiresApproval: false,

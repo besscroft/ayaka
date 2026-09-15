@@ -447,16 +447,16 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
   {
     id: "sandbox_write_file",
     title: "Write sandbox file",
-    description: "Write a file in the active sandbox.",
+    description: "Write a UTF-8 file in the active sandbox.",
     category: "sandbox",
     requiresApproval: 0,
-    defaultAuto: 0,
+    defaultAuto: 1,
   },
   {
     id: "sandbox_run_command",
     title: "Run sandbox command",
     description:
-      "Run a structured command in the active sandbox; use it to create files for sandbox previews.",
+      "Run one structured command in the active sandbox with a command name and string args. Do not use shell syntax or redirection.",
     category: "sandbox",
     requiresApproval: 0,
     defaultAuto: 1,

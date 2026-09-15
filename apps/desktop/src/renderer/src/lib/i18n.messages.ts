@@ -665,15 +665,15 @@ const entries = {
   },
   "chatTools.sandbox_restore.label": { zh: "恢复沙箱", en: "Restore sandbox" },
   "chatTools.sandbox_run_command.description": {
-    zh: "在沙箱内执行结构化命令，可直接生成用于预览的文件",
-    en: "Run a structured command in the sandbox to create files for preview",
+    zh: "在沙箱内使用 command 与 args 执行一个结构化命令；不要使用管道、重定向或 shell 语法",
+    en: "Run one structured sandbox command with command and args; do not use shell syntax, pipes, or redirection",
   },
   "chatTools.sandbox_run_command.label": { zh: "执行命令", en: "Run command" },
   "chatTools.sandbox_snapshot.description": { zh: "为沙箱创建快照", en: "Snapshot the sandbox" },
   "chatTools.sandbox_snapshot.label": { zh: "创建快照", en: "Create snapshot" },
   "chatTools.sandbox_write_file.description": {
-    zh: "把内容写入沙箱内的文件",
-    en: "Write content to a file in the sandbox",
+    zh: "直接把 UTF-8 内容写入沙箱文件，生成静态预览时优先使用",
+    en: "Write UTF-8 content directly to a sandbox file; prefer this for static previews",
   },
   "chatTools.sandbox_write_file.label": { zh: "写入文件", en: "Write file" },
   "chatTools.workspace_run_command.description": {
@@ -888,6 +888,10 @@ const entries = {
   "error.chat.runtime": {
     zh: "\u672c\u5730\u667a\u80fd\u4f53\u8fd0\u884c\u65f6\u65e0\u6cd5\u5b8c\u6210\u8bf7\u6c42\u3002\u8bf7\u91cd\u8bd5\u3002",
     en: "The local agent runtime could not complete the request. Try again.",
+  },
+  "error.chat.commandNotFound": {
+    zh: "找不到要执行的命令。请使用已安装的可执行文件，或直接使用沙箱写文件工具。",
+    en: "Command not found. Use an installed executable or the sandbox file tool.",
   },
   "error.chat.server": {
     zh: "本地聊天服务处理失败。",
@@ -2320,15 +2324,18 @@ const zhOverrides: Dict = {
   "chatTools.sandbox_read_file.label": "读取沙箱文件",
   "chatTools.sandbox_restore.description": "审批后恢复沙箱快照。",
   "chatTools.sandbox_restore.label": "恢复沙箱快照",
-  "chatTools.sandbox_run_command.description": "在沙箱中运行结构化命令，可生成用于预览的文件。",
+  "chatTools.sandbox_run_command.description":
+    "使用 command 与 args 在沙箱中运行结构化命令；不要使用管道、重定向或 shell 语法。",
   "chatTools.sandbox_run_command.label": "运行沙箱命令",
   "chatTools.sandbox_start_preview.description": "启动需要审批的长期本地预览服务。",
   "chatTools.sandbox_start_preview.label": "启动预览服务",
   "chatTools.sandbox_snapshot.description": "创建可恢复的沙箱快照。",
   "chatTools.sandbox_snapshot.label": "创建沙箱快照",
-  "chatTools.sandbox_write_file.description": "审批后写入或覆盖沙箱文件。",
+  "chatTools.sandbox_write_file.description":
+    "直接写入或覆盖 UTF-8 沙箱文件，生成静态预览时优先使用。",
   "chatTools.sandbox_write_file.label": "写入沙箱文件",
-  "chatTools.selector.description": "为本轮对话选择可用工具。自动模式只启用低风险读取工具。",
+  "chatTools.selector.description":
+    "为本轮对话选择可用工具。自动模式包含沙箱文件读写和其他低风险工具。",
   "chatTools.selector.label": "工具",
   "chatTools.selector.title": "对话工具",
   "chatTools.summary.auto": "自动工具 {count}",
