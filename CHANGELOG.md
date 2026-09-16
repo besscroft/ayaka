@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.1.42]
+
+### 中文
+
+#### 新增
+
+- 新增 SVG 沙箱工件支持，可发布、读取并在工作区预览 SVG 图像。
+- 新增自动化任务工作区管理，创建定时任务时自动初始化关联会话工作区。
+- 新增新建对话高亮与快速初始化，首次进入新会话时减少不必要的历史加载。
+- 新增沙箱命令未找到错误识别与本地化提示，帮助用户使用已安装命令或沙箱写文件工具。
+
+#### 变更
+
+- 优化聊天视图会话加载与 hydration，通过批量读取会话、消息和工作区信息及批量保存设置，减少初始化请求并改善性能。
+- 优化自动化运行消息同步，支持运行期间周期性保存助手消息快照，并在会话中及时刷新外部运行结果。
+- 优化工作区侧边面板的会话切换和自动打开逻辑，按会话恢复布局并尊重用户关闭状态。
+- 将 `sandbox_write_file` 设为默认自动工具，更新沙箱命令和文件写入工具描述，并优化沙箱文件创建流程。
+- 优化提供商与模型设置同步和 API 密钥读取缓存，减少重复解密并改善配置更新体验。
+- 优化用户消息富文本样式，确保标题、代码、表格和链接在气泡背景上保持清晰。
+
+#### 修复
+
+- 修复外部运行会话的消息同步逻辑，避免运行完成后消息延迟或缺失。
+- 修复会话加载时空消息列表的处理问题。
+
+### English
+
+#### Added
+
+- Added SVG sandbox artifacts with publishing, resource access, and workspace image previews.
+- Added automatic workspace setup for automations, initializing the associated conversation workspace when a scheduled task is created.
+- Added new-conversation highlighting and fast initialization to avoid unnecessary history loading when entering a fresh conversation.
+- Added localized command-not-found error classification and guidance to use an installed executable or the sandbox file tool.
+
+#### Changed
+
+- Improved conversation loading and hydration with batched conversation, message, and workspace reads plus batched settings writes, reducing initialization requests and improving performance.
+- Improved automation-run synchronization by periodically saving assistant-message snapshots during execution and refreshing externally produced results in the conversation.
+- Improved workspace-panel session switching and automatic opening, restoring layouts per conversation while respecting an explicit close action.
+- Made `sandbox_write_file` an automatic tool by default, refreshed sandbox command/file-writing descriptions, and improved sandbox file-creation handling.
+- Improved provider and model settings synchronization with API-key read caching, reducing repeated secret decryption and making configuration updates more responsive.
+- Improved rich-content styling inside user message bubbles so headings, code, tables, and links remain readable against the bubble background.
+
+#### Fixed
+
+- Fixed message synchronization for externally running conversations, preventing delayed or missing messages after a run completes.
+- Fixed handling of empty message lists during conversation hydration.
+
 ## [0.1.41]
 
 ### 中文
