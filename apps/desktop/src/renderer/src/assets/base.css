@@ -274,3 +274,21 @@ code {
   background-color: transparent;
   padding: 0;
 }
+
+/* Rich content inside a user bubble inherits the bubble's foreground. The
+   semantic text utilities used by headings, inline code, tables, and safe HTML
+   otherwise resolve against the page-level foreground, which can be dark on a
+   dark or saturated bubble background. */
+[data-slot="message-content"][data-from="user"] {
+  --foreground: var(--primary-foreground);
+  --muted-foreground: color-mix(in oklch, var(--primary-foreground) 72%, var(--primary) 28%);
+  --link: var(--primary-foreground);
+}
+
+[data-slot="message-content"][data-from="user"] [data-slot="rich-content"] {
+  --muted: color-mix(in oklch, var(--primary) 72%, black 28%);
+  --muted-foreground: color-mix(in oklch, var(--primary-foreground) 72%, var(--primary) 28%);
+  --border: color-mix(in oklch, var(--primary-foreground) 35%, var(--primary) 65%);
+  --code: color-mix(in oklch, var(--primary) 72%, black 28%);
+  --code-foreground: var(--primary-foreground);
+}
