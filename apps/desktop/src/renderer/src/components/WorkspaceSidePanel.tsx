@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { SettingKey } from "@shared/types";
 import { useT } from "../lib/i18n";
@@ -22,6 +22,11 @@ const DEFAULT_WORKSPACE_PANEL_WIDTH = 460;
 const MIN_WORKSPACE_PANEL_WIDTH = 320;
 const MAX_WORKSPACE_PANEL_WIDTH = 760;
 type WorkspacePanelLayout = { open: boolean; width: number };
+type WorkspacePanelOpenRequest = {
+  tab?: WorkspaceSidePanelTab;
+  artifactId?: string;
+  automatic?: boolean;
+};
 const WORKSPACE_PANEL_LAYOUTS = new Map<string, WorkspacePanelLayout>();
 const WORKSPACE_PANEL_LAYOUT_OVERRIDES = new Map<string, Partial<WorkspacePanelLayout>>();
 let workspacePanelLayoutsLoaded = false;
@@ -42,6 +47,28 @@ function getWorkspacePanelLayout(conversationId: string): WorkspacePanelLayout {
       width: DEFAULT_WORKSPACE_PANEL_WIDTH,
     }
   );
+}
+
+function applyWorkspacePanelLayout(
+  conversationId: string,
+  setOpen: (open: boolean) => void,
+  setWidth: (width: number) => void,
+): void {
+  const layout = getWorkspacePanelLayout(conversationId);
+  setOpen(layout.open);
+  setWidth(layout.width);
+}
+
+function applyWorkspacePanelLayoutOverrides(): void {
+  for (const [conversationId, patch] of WORKSPACE_PANEL_LAYOUT_OVERRIDES) {
+    const current = getWorkspacePanelLayout(conversationId);
+    WORKSPACE_PANEL_LAYOUTS.set(conversationId, {
+      ...current,
+      ...patch,
+      width: normalizeWorkspacePanelWidth(patch.width ?? current.width),
+    });
+  }
+  WORKSPACE_PANEL_LAYOUT_OVERRIDES.clear();
 }
 
 function loadWorkspacePanelLayouts(): Promise<void> {
@@ -74,18 +101,12 @@ function loadWorkspacePanelLayouts(): Promise<void> {
           console.warn("[workspace-panel] failed to parse saved layouts:", error);
         }
       }
-      for (const [conversationId, patch] of WORKSPACE_PANEL_LAYOUT_OVERRIDES) {
-        const current = getWorkspacePanelLayout(conversationId);
-        WORKSPACE_PANEL_LAYOUTS.set(conversationId, {
-          ...current,
-          ...patch,
-          width: normalizeWorkspacePanelWidth(patch.width ?? current.width),
-        });
-      }
-      WORKSPACE_PANEL_LAYOUT_OVERRIDES.clear();
+      applyWorkspacePanelLayoutOverrides();
       workspacePanelLayoutsLoaded = true;
     })
     .catch((error) => {
+      // 即使设置读取失败，也不能丢掉加载期间用户已经操作的会话布局。
+      applyWorkspacePanelLayoutOverrides();
       workspacePanelLayoutsLoaded = true;
       console.warn("[workspace-panel] failed to load saved layouts:", error);
     })
@@ -149,10 +170,14 @@ export function getWorkspaceSidePanelTransition(reduceMotion: boolean | null, is
   return reduceMotion || isResizing ? { duration: 0 } : WORKSPACE_PANEL_TRANSITION;
 }
 
-export function openWorkspaceSidePanel(tab: WorkspaceSidePanelTab, artifactId?: string): void {
+export function openWorkspaceSidePanel(
+  tab: WorkspaceSidePanelTab,
+  artifactId?: string,
+  options?: { automatic?: boolean },
+): void {
   window.dispatchEvent(
     new CustomEvent(OPEN_WORKSPACE_PANEL_EVENT, {
-      detail: { tab, artifactId },
+      detail: { tab, artifactId, automatic: options?.automatic === true },
     }),
   );
 }
@@ -202,35 +227,53 @@ export function WorkspaceSidePanel({
     browser: `${conversationId}-workspace-browser-panel`,
   };
 
+  useLayoutEffect(() => {
+    // ChatView 会复用组件实例；在绘制前切换到当前会话的内存布局，避免短暂沿用上个会话。
+    applyWorkspacePanelLayout(conversationId, setOpen, setWidth);
+    setActiveTab("runtime");
+    setRequestedArtifactId(null);
+  }, [conversationId]);
+
   useEffect(() => {
     let cancelled = false;
     void loadWorkspacePanelLayouts().then(() => {
       if (cancelled) return;
-      const layout = getWorkspacePanelLayout(conversationId);
-      setWidth(layout.width);
-      setOpen(layout.open);
+      applyWorkspacePanelLayout(conversationId, setOpen, setWidth);
     });
-    setActiveTab("runtime");
-    setRequestedArtifactId(null);
     return () => {
       cancelled = true;
     };
   }, [conversationId]);
 
   useEffect(() => {
-    const handle = (event: Event): void => {
-      const detail = (event as CustomEvent<{ tab?: WorkspaceSidePanelTab; artifactId?: string }>)
-        .detail;
-      const tab = detail?.tab ?? "generated-app";
+    let cancelled = false;
+    const openPanel = (detail: WorkspacePanelOpenRequest): void => {
+      const tab = detail.tab ?? "generated-app";
       setActiveTab(tab);
-      if (detail?.artifactId) setRequestedArtifactId(detail.artifactId);
+      if (detail.artifactId) setRequestedArtifactId(detail.artifactId);
       setOpen(true);
       updateWorkspacePanelLayout(conversationId, { open: true });
       persistWorkspacePanelLayouts();
     };
+    const handle = (event: Event): void => {
+      const detail = (event as CustomEvent<WorkspacePanelOpenRequest>).detail ?? {};
+      if (!detail.automatic) {
+        openPanel(detail);
+        return;
+      }
+
+      // 自动发现历史工件时，只对从未保存过布局的会话打开面板；用户明确折叠后必须尊重该选择。
+      void loadWorkspacePanelLayouts().then(() => {
+        if (cancelled) return;
+        const savedLayout = WORKSPACE_PANEL_LAYOUTS.get(conversationId);
+        if (savedLayout && !savedLayout.open) return;
+        openPanel(detail);
+      });
+    };
     window.addEventListener(OPEN_WORKSPACE_PANEL_EVENT, handle);
     window.addEventListener(OPEN_GENERATED_APP_EVENT, handle);
     return () => {
+      cancelled = true;
       window.removeEventListener(OPEN_WORKSPACE_PANEL_EVENT, handle);
       window.removeEventListener(OPEN_GENERATED_APP_EVENT, handle);
     };

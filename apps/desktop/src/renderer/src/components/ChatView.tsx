@@ -711,7 +711,7 @@ export function ChatView({
             (item) => item.kind === "html" || item.kind === "svg" || item.kind === "static",
           )
         ) {
-          openWorkspaceSidePanel("generated-app");
+          openWorkspaceSidePanel("generated-app", undefined, { automatic: true });
         }
       });
     });
@@ -1634,6 +1634,7 @@ export function ChatView({
       </div>
 
       <WorkspaceSidePanel
+        key={conversationId}
         conversationId={conversationId}
         snapshot={runtimeSnapshot}
         profiles={agentProfiles}
