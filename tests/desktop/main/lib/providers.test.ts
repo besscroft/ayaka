@@ -7,6 +7,8 @@ let providerHelpers: typeof import("@desktop-main/lib/providers");
 const providerKeys = new Map<string, string>();
 const modelKeys = new Map<string, string>();
 const settings = new Map<string, string>();
+let getApiKeyCalls = 0;
+let getModelApiKeyCalls = 0;
 
 mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.url).href, {
   namedExports: {
@@ -21,9 +23,14 @@ mock.module(new URL("../../../../apps/desktop/src/main/lib/db.ts", import.meta.u
         if (key.startsWith(providerId + "/")) modelKeys.delete(key);
       }
     },
-    getApiKey: (providerId: string) => providerKeys.get(providerId) ?? null,
-    getModelApiKey: (providerId: string, modelId: string) =>
-      modelKeys.get(`${providerId}/${modelId}`) ?? null,
+    getApiKey: (providerId: string) => {
+      getApiKeyCalls += 1;
+      return providerKeys.get(providerId) ?? null;
+    },
+    getModelApiKey: (providerId: string, modelId: string) => {
+      getModelApiKeyCalls += 1;
+      return modelKeys.get(`${providerId}/${modelId}`) ?? null;
+    },
     getSetting: (key: string) => settings.get(key) ?? null,
     listApiKeyProviders: () => [...providerKeys.keys()],
     listModelApiKeyRefs: () => [...modelKeys.keys()],
@@ -47,6 +54,8 @@ beforeEach(() => {
   providerKeys.clear();
   modelKeys.clear();
   settings.clear();
+  getApiKeyCalls = 0;
+  getModelApiKeyCalls = 0;
   settings.set(SettingKey.ModelCatalog, JSON.stringify(emptyCatalog()));
   settings.set(SettingKey.SelectedModel, "");
 });
@@ -63,6 +72,32 @@ const capabilities = {
 };
 
 void describe("provider helpers", () => {
+  void it("lists API key metadata without decrypting stored keys", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "metadata-provider",
+      label: "Metadata Provider",
+      baseUrl: "https://metadata.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "metadata-provider",
+      id: "model-a",
+      capabilities,
+    });
+    await providerHelpers.saveProviderApiKey("metadata-provider", "provider-key");
+    await providerHelpers.saveModelApiKey("metadata-provider", "model-a", "model-key");
+
+    getApiKeyCalls = 0;
+    getModelApiKeyCalls = 0;
+    const provider = providerHelpers
+      .listProviders()
+      .find((item) => item.id === "metadata-provider");
+
+    assert.equal(provider?.hasProviderApiKey, true);
+    assert.equal(provider?.models[0]?.hasApiKey, true);
+    assert.equal(getApiKeyCalls, 0);
+    assert.equal(getModelApiKeyCalls, 0);
+  });
+
   void it("registers the new built-in providers in the approved order", async () => {
     const providers = providerHelpers.listProviders();
     assert.deepEqual(

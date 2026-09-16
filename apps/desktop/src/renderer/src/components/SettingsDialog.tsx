@@ -1902,6 +1902,15 @@ function providerModelRef(providerId: string, modelId: string): string {
   return providerId + "/" + modelId;
 }
 
+function markProviderApiKeyConfigured(provider: ProviderInfo): ProviderInfo {
+  return {
+    ...provider,
+    hasProviderApiKey: true,
+    hasApiKey: true,
+    models: provider.models.map((model) => ({ ...model, hasApiKey: true })),
+  };
+}
+
 function stringifyJsonObject(value: Record<string, unknown> | undefined): string {
   if (!value || Object.keys(value).length === 0) return "{}";
   return JSON.stringify(value, null, 2);
@@ -1990,16 +1999,32 @@ function ProviderModelWorkbench({
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
   const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null);
 
-  const refreshCatalog = useCallback((): void => {
-    void api.providers.list().then((providerList) => {
-      setProviders(providerList);
-      setModelsLoaded(true);
-      setSelectedProviderId((current) => {
-        if (current && providerList.some((provider) => provider.id === current)) return current;
-        return providerList[0]?.id ?? null;
-      });
+  const applyProviderSnapshot = useCallback((provider: ProviderInfo): void => {
+    setProviders((current) => {
+      const index = current.findIndex((item) => item.id === provider.id);
+      if (index < 0) return [...current, provider];
+      return current.map((item, itemIndex) => (itemIndex === index ? provider : item));
     });
+    setModelsLoaded(true);
   }, []);
+
+  const refreshCatalog = useCallback(
+    (provider?: ProviderInfo): void => {
+      if (provider) {
+        applyProviderSnapshot(provider);
+        return;
+      }
+      void api.providers.list().then((providerList) => {
+        setProviders(providerList);
+        setModelsLoaded(true);
+        setSelectedProviderId((current) => {
+          if (current && providerList.some((provider) => provider.id === current)) return current;
+          return providerList[0]?.id ?? null;
+        });
+      });
+    },
+    [applyProviderSnapshot],
+  );
 
   useEffect(() => {
     refreshCatalog();
@@ -2128,14 +2153,14 @@ function ProviderModelWorkbench({
         },
         locale,
       )
-      .then(() => {
+      .then((provider) => {
         if (
           !enabled &&
           settings.selectedModel === providerModelRef(selectedProvider.id, model.id)
         ) {
           void update({ selectedModel: null });
         }
-        refreshCatalog();
+        refreshCatalog(provider);
       })
       .catch(() => undefined);
   };
@@ -2143,8 +2168,8 @@ function ProviderModelWorkbench({
   const handleSaveProvider = (): void => {
     if (!selectedProvider || !canSaveProvider) return;
 
-    const saveProviderAndApiKey = async (): Promise<void> => {
-      await api.providers.upsertCustomProvider({
+    const saveProviderAndApiKey = async (): Promise<ProviderInfo> => {
+      const provider = await api.providers.upsertCustomProvider({
         id: selectedProvider.id,
         label: providerForm.label,
         baseUrl: providerForm.baseUrl,
@@ -2154,7 +2179,9 @@ function ProviderModelWorkbench({
       if (providerApiKey.trim()) {
         await api.providers.setProviderApiKey(selectedProvider.id, providerApiKey.trim());
         setProviderApiKey("");
+        return markProviderApiKeyConfigured(provider);
       }
+      return provider;
     };
 
     void notify
@@ -2167,7 +2194,7 @@ function ProviderModelWorkbench({
         },
         locale,
       )
-      .then(refreshCatalog)
+      .then((provider) => refreshCatalog(provider))
       .catch(() => undefined);
   };
 
@@ -2185,7 +2212,7 @@ function ProviderModelWorkbench({
       )
       .then(() => {
         setProviderApiKey("");
-        refreshCatalog();
+        refreshCatalog(markProviderApiKeyConfigured(selectedProvider));
       })
       .catch(() => undefined);
   };
@@ -2232,7 +2259,7 @@ function ProviderModelWorkbench({
           }),
         );
         setSelectedProviderId(result.provider.id);
-        refreshCatalog();
+        refreshCatalog(result.provider);
       })
       .catch(() => undefined)
       .finally(() => setSyncingProviderId(null));
@@ -2275,12 +2302,12 @@ function ProviderModelWorkbench({
         },
         locale,
       )
-      .then(() => {
+      .then((provider) => {
         if (settings.selectedModel === providerModelRef(provider.id, model.id)) {
           void update({ selectedModel: null });
         }
         setModelToDelete(null);
-        refreshCatalog();
+        refreshCatalog(provider);
       })
       .catch(() => undefined);
   };
@@ -2730,7 +2757,7 @@ function ProviderModelWorkbench({
         onClose={() => setAddProviderOpen(false)}
         onSaved={(provider) => {
           setSelectedProviderId(provider.id);
-          refreshCatalog();
+          refreshCatalog(provider);
         }}
       />
 
@@ -2928,7 +2955,7 @@ function ModelOptionsDialog({
   provider: ProviderInfo | null;
   selectedModel: string | null;
   onClearSelectedModel: () => Promise<void>;
-  onSaved: () => void;
+  onSaved: (provider: ProviderInfo) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const { t, f, locale } = useT();
@@ -2984,8 +3011,8 @@ function ModelOptionsDialog({
     setJsonError(error);
     if (error || !canSave) return;
     const modelId = form.id.trim();
-    const task = (async (): Promise<void> => {
-      await api.providers.upsertCustomModel({
+    const task = (async (): Promise<ProviderInfo> => {
+      const provider = await api.providers.upsertCustomModel({
         providerId: form.providerId,
         id: modelId,
         label: form.label.trim(),
@@ -3003,6 +3030,7 @@ function ModelOptionsDialog({
       if (!form.enabled && selectedModel === providerModelRef(form.providerId, modelId)) {
         await onClearSelectedModel();
       }
+      return provider;
     })();
 
     void notify
@@ -3015,8 +3043,8 @@ function ModelOptionsDialog({
         },
         locale,
       )
-      .then(() => {
-        onSaved();
+      .then((provider) => {
+        onSaved(provider);
         onClose();
       })
       .catch(() => undefined);

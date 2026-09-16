@@ -675,6 +675,7 @@ function mergeProviderConfigs(
 export function listProviders(): ProviderInfo[] {
   const catalog = readCatalog();
   const providerKeys = new Set(listApiKeyProviders());
+  const modelKeyRefs = new Set(listModelApiKeyRefs());
   const customProviders: ProviderConfig[] = catalog.providers.map((provider) => ({
     id: provider.id,
     label: provider.label,
@@ -686,10 +687,12 @@ export function listProviders(): ProviderInfo[] {
   }));
 
   return mergeProviderConfigs(builtinProviderConfigs(), customProviders).map((provider) => {
-    const hasProviderApiKey = providerKeys.has(provider.id) && getApiKey(provider.id) !== null;
+    // Listing metadata must not decrypt secrets. A successful decryption is only
+    // needed when the provider is actually used to make a request.
+    const hasProviderApiKey = providerKeys.has(provider.id);
     const models = mergeModels(provider, catalog).map((model) => ({
       ...model,
-      hasApiKey: hasProviderApiKey || getModelApiKey(provider.id, model.id) !== null,
+      hasApiKey: hasProviderApiKey || modelKeyRefs.has(providerModelRef(provider.id, model.id)),
     }));
     return {
       ...provider,
@@ -746,20 +749,29 @@ export function getProviderConfig(providerId: string): ProviderInfo | null {
  */
 export function resolveMemoryConfiguration(): ResolvedMemoryConfiguration {
   const providers = listProviders();
+  const apiKeyCache = new Map<string, string | null>();
   const llmCandidates = providers.flatMap((provider) =>
     provider.models
       .filter(
-        (model) => isMemoryProvider(provider) && model.enabled && model.capabilities.textGeneration,
+        (model) =>
+          isMemoryProvider(provider) &&
+          model.enabled &&
+          model.hasApiKey &&
+          model.capabilities.textGeneration,
       )
-      .map((model) => resolveMemoryModel(provider, model))
+      .map((model) => resolveMemoryModel(provider, model, apiKeyCache))
       .filter(isResolvedMemoryModel),
   );
   const embeddingCandidates = providers.flatMap((provider) =>
     provider.models
       .filter(
-        (model) => isMemoryProvider(provider) && model.enabled && model.capabilities.embedding,
+        (model) =>
+          isMemoryProvider(provider) &&
+          model.enabled &&
+          model.hasApiKey &&
+          model.capabilities.embedding,
       )
-      .map((model) => resolveMemoryModel(provider, model))
+      .map((model) => resolveMemoryModel(provider, model, apiKeyCache))
       .filter(isResolvedMemoryModel),
   );
 
@@ -781,8 +793,19 @@ export function resolveMemoryConfiguration(): ResolvedMemoryConfiguration {
 }
 
 export function hasUsableMemoryConfiguration(): boolean {
-  const configuration = resolveMemoryConfiguration();
-  return configuration.llm !== null && configuration.embedding !== null;
+  // This is called from configuration-change notifications, so it must remain
+  // metadata-only. The actual API key is decrypted later by getMemory() when a
+  // memory operation really needs the client.
+  const providers = listProviders();
+  const hasCandidate = (capability: "textGeneration" | "embedding"): boolean =>
+    providers.some(
+      (provider) =>
+        isMemoryProvider(provider) &&
+        provider.models.some(
+          (model) => model.enabled && model.hasApiKey && model.capabilities[capability],
+        ),
+    );
+  return hasCandidate("textGeneration") && hasCandidate("embedding");
 }
 
 function isMemoryProvider(provider: ProviderInfo): boolean {
@@ -796,8 +819,9 @@ function isMemoryProvider(provider: ProviderInfo): boolean {
 function resolveMemoryModel(
   provider: ProviderInfo,
   model: ModelOption,
+  apiKeyCache?: Map<string, string | null>,
 ): ResolvedMemoryModel | null {
-  const apiKey = resolveProviderCredential(provider, model.id);
+  const apiKey = resolveProviderCredential(provider, model.id, apiKeyCache);
   if (!apiKey || !provider.baseUrl) return null;
   return {
     ref: providerModelRef(provider.id, model.id),
@@ -927,19 +951,48 @@ export function resolveProviderApiKeyFallback({
   return legacyRef ? getLegacyModelKey(legacyRef.slice(prefix.length)) : null;
 }
 
-function getProviderOrLegacyModelApiKey(providerId: string, modelId?: string): string | null {
-  return resolveProviderApiKeyFallback({
+function getProviderOrLegacyModelApiKey(
+  providerId: string,
+  modelId?: string,
+  apiKeyCache?: Map<string, string | null>,
+): string | null {
+  const providerCacheKey = providerId + "\u0000<provider>";
+  const cachedProviderKey = apiKeyCache?.get(providerCacheKey);
+  const providerKey =
+    cachedProviderKey !== undefined || apiKeyCache?.has(providerCacheKey)
+      ? cachedProviderKey
+      : getApiKey(providerId);
+  apiKeyCache?.set(providerCacheKey, providerKey ?? null);
+  if (providerKey) return providerKey;
+
+  if (!modelId) {
+    const legacyRefs = listModelApiKeyRefs();
+    const legacyRef = legacyRefs.find((ref) => ref.startsWith(providerId + "/"));
+    return legacyRef ? getModelApiKey(providerId, legacyRef.slice(providerId.length + 1)) : null;
+  }
+
+  const cacheKey = providerId + "\u0000" + modelId;
+  const cached = apiKeyCache?.get(cacheKey);
+  if (cached !== undefined || apiKeyCache?.has(cacheKey)) return cached ?? null;
+
+  const value = resolveProviderApiKeyFallback({
     providerId,
     modelId,
-    providerKey: getApiKey(providerId),
+    providerKey: null,
     legacyModelRefs: listModelApiKeyRefs(),
     getLegacyModelKey: (id) => getModelApiKey(providerId, id),
   });
+  apiKeyCache?.set(cacheKey, value);
+  return value;
 }
 
-function resolveProviderCredential(provider: ProviderInfo, modelId?: string): string | undefined {
+function resolveProviderCredential(
+  provider: ProviderInfo,
+  modelId?: string,
+  apiKeyCache?: Map<string, string | null>,
+): string | undefined {
   if (providerAuthKind(provider) === "none") return undefined;
-  return getProviderOrLegacyModelApiKey(provider.id, modelId) ?? undefined;
+  return getProviderOrLegacyModelApiKey(provider.id, modelId, apiKeyCache) ?? undefined;
 }
 
 function providerNeedsApiKey(provider: ProviderInfo): boolean {

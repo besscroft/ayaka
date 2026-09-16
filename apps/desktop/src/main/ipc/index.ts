@@ -1227,7 +1227,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     async (_e, providerId: string, modelId: string, enabled: boolean) => {
       await updateModelEnabled(providerId, modelId, enabled);
       notifyMemoryConfigurationChanged();
-      return true;
+      const provider = listProviders().find((item) => item.id === providerId);
+      if (!provider) throw new Error("Provider no longer exists: " + providerId);
+      return provider;
     },
   );
 
@@ -1249,7 +1251,9 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   ipcMain.handle("providers:deleteCustomModel", async (_e, providerId: string, modelId: string) => {
     await deleteCustomModel(providerId, modelId);
     notifyMemoryConfigurationChanged();
-    return true;
+    const provider = listProviders().find((item) => item.id === providerId);
+    if (!provider) throw new Error("Provider no longer exists: " + providerId);
+    return provider;
   });
 
   // ---------- Local server port ----------

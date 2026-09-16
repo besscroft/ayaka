@@ -570,13 +570,17 @@ export const api = {
       assertApi().providers.syncAvailableModels(providerId),
     upsertCustomModel: (input: CustomModelInput): Promise<ProviderInfo> =>
       assertApi().providers.upsertCustomModel(input),
-    updateModelEnabled: (providerId: string, modelId: string, enabled: boolean): Promise<boolean> =>
+    updateModelEnabled: (
+      providerId: string,
+      modelId: string,
+      enabled: boolean,
+    ): Promise<ProviderInfo> =>
       assertApi().providers.updateModelEnabled(providerId, modelId, enabled),
     setModelApiKey: (providerId: string, modelId: string, apiKey: string): Promise<boolean> =>
       assertApi().providers.setModelApiKey(providerId, modelId, apiKey),
     deleteModelApiKey: (providerId: string, modelId: string): Promise<boolean> =>
       assertApi().providers.deleteModelApiKey(providerId, modelId),
-    deleteCustomModel: (providerId: string, modelId: string): Promise<boolean> =>
+    deleteCustomModel: (providerId: string, modelId: string): Promise<ProviderInfo> =>
       assertApi().providers.deleteCustomModel(providerId, modelId),
     onCatalogUpdated: (handler: (event: { providerId: string }) => void): (() => void) =>
       assertApi().providers.onCatalogUpdated(handler),

@@ -217,6 +217,9 @@ type RuntimeStatus = RunStatus;
 let rawDb: Database.Database | null = null;
 let dbInstance: DbInstance | null = null;
 let writesThroughWorker = false;
+type DecryptedSecretCacheEntry = { ciphertext: string; value: string | null };
+const apiKeyCache = new Map<string, DecryptedSecretCacheEntry>();
+const modelApiKeyCache = new Map<string, DecryptedSecretCacheEntry>();
 
 const agentRuntimeStates = new Map<string, AgentRuntimeState>();
 const conversationAgentStates = new Map<string, ConversationAgentState>();
@@ -363,6 +366,8 @@ export async function closeDb(): Promise<void> {
   dbInstance = null;
   agentRuntimeStates.clear();
   conversationAgentStates.clear();
+  apiKeyCache.clear();
+  modelApiKeyCache.clear();
   writesThroughWorker = false;
 }
 
@@ -851,6 +856,7 @@ export async function setSettings(entries: SettingEntry[]): Promise<void> {
 }
 
 export async function setApiKey(provider: string, apiKey: string): Promise<void> {
+  apiKeyCache.delete(provider);
   if (shouldRouteWrites()) return writeDb<void>("setApiKey", [provider, apiKey]);
   const payload = encrypt(apiKey);
   getDb()
@@ -865,15 +871,25 @@ export async function setApiKey(provider: string, apiKey: string): Promise<void>
 
 export function getApiKey(provider: string): string | null {
   const row = getDb().select().from(apiKeys).where(eq(apiKeys.provider, provider)).get();
-  if (!row) return null;
-  try {
-    return decrypt(JSON.parse(row.ciphertext) as EncryptedPayload);
-  } catch {
+  if (!row) {
+    apiKeyCache.delete(provider);
     return null;
   }
+  const cached = apiKeyCache.get(provider);
+  if (cached?.ciphertext === row.ciphertext) return cached.value;
+
+  let value: string | null = null;
+  try {
+    value = decrypt(JSON.parse(row.ciphertext) as EncryptedPayload);
+  } catch {
+    value = null;
+  }
+  apiKeyCache.set(provider, { ciphertext: row.ciphertext, value });
+  return value;
 }
 
 export async function deleteApiKey(provider: string): Promise<void> {
+  apiKeyCache.delete(provider);
   if (shouldRouteWrites()) return writeDb<void>("deleteApiKey", [provider]);
   getDb().delete(apiKeys).where(eq(apiKeys.provider, provider)).run();
 }
@@ -891,6 +907,8 @@ export async function setModelApiKey(
   modelId: string,
   apiKey: string,
 ): Promise<void> {
+  const cacheKey = providerId + "\u0000" + modelId;
+  modelApiKeyCache.delete(cacheKey);
   if (shouldRouteWrites()) return writeDb<void>("setModelApiKey", [providerId, modelId, apiKey]);
   const payload = encrypt(apiKey);
   const row = {
@@ -910,20 +928,31 @@ export async function setModelApiKey(
 }
 
 export function getModelApiKey(providerId: string, modelId: string): string | null {
+  const cacheKey = providerId + "\u0000" + modelId;
   const row = getDb()
     .select()
     .from(modelApiKeys)
     .where(and(eq(modelApiKeys.provider_id, providerId), eq(modelApiKeys.model_id, modelId)))
     .get();
-  if (!row) return null;
-  try {
-    return decrypt(JSON.parse(row.ciphertext) as EncryptedPayload);
-  } catch {
+  if (!row) {
+    modelApiKeyCache.delete(cacheKey);
     return null;
   }
+  const cached = modelApiKeyCache.get(cacheKey);
+  if (cached?.ciphertext === row.ciphertext) return cached.value;
+
+  let value: string | null = null;
+  try {
+    value = decrypt(JSON.parse(row.ciphertext) as EncryptedPayload);
+  } catch {
+    value = null;
+  }
+  modelApiKeyCache.set(cacheKey, { ciphertext: row.ciphertext, value });
+  return value;
 }
 
 export async function deleteModelApiKey(providerId: string, modelId: string): Promise<void> {
+  modelApiKeyCache.delete(providerId + "\u0000" + modelId);
   if (shouldRouteWrites()) return writeDb<void>("deleteModelApiKey", [providerId, modelId]);
   getDb()
     .delete(modelApiKeys)
@@ -932,6 +961,10 @@ export async function deleteModelApiKey(providerId: string, modelId: string): Pr
 }
 
 export async function deleteModelApiKeysForProvider(providerId: string): Promise<void> {
+  const prefix = providerId + "\u0000";
+  for (const key of modelApiKeyCache.keys()) {
+    if (key.startsWith(prefix)) modelApiKeyCache.delete(key);
+  }
   if (shouldRouteWrites()) return writeDb<void>("deleteModelApiKeysForProvider", [providerId]);
   getDb().delete(modelApiKeys).where(eq(modelApiKeys.provider_id, providerId)).run();
 }

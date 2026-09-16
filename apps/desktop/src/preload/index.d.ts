@@ -483,10 +483,14 @@ export interface AyakaApi {
     testProvider: (providerId: string) => Promise<ProviderTestResult>;
     syncAvailableModels: (providerId: string) => Promise<ProviderModelSyncResult>;
     upsertCustomModel: (input: CustomModelInput) => Promise<ProviderInfo>;
-    updateModelEnabled: (providerId: string, modelId: string, enabled: boolean) => Promise<boolean>;
+    updateModelEnabled: (
+      providerId: string,
+      modelId: string,
+      enabled: boolean,
+    ) => Promise<ProviderInfo>;
     setModelApiKey: (providerId: string, modelId: string, apiKey: string) => Promise<boolean>;
     deleteModelApiKey: (providerId: string, modelId: string) => Promise<boolean>;
-    deleteCustomModel: (providerId: string, modelId: string) => Promise<boolean>;
+    deleteCustomModel: (providerId: string, modelId: string) => Promise<ProviderInfo>;
     onCatalogUpdated: (handler: (event: { providerId: string }) => void) => () => void;
   };
   // 本地 AI 服务
