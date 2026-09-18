@@ -2,7 +2,7 @@
 
 ## 状态
 
-已获得用户对总体方向的确认，等待实现前的文档审阅。
+已获得用户对总体方向的确认，Core 与桌面适配层初版已实现。
 
 ## 背景
 
@@ -157,13 +157,13 @@ Memory 只作为可选 capability：桌面端可以把现有 `mem0-service` 或�
 
 ## 风险与缓解
 
-| 风险 | 缓解 |
-|------|------|
-| `runAgentChat` 参数类型与桌面实现高度耦合 | 先定义 Core chat input/output contract，在 desktop adapter 内做一次类型转换 |
-| shared types 与 Core 互相导入形成循环 | 迁移 server transport types 到 Core，desktop 只 re-export，不让 Core 导入 desktop |
-| Core 误带入 Electron/SQLite 依赖 | 在 Core tsconfig、lint 和测试中加入禁止 import 检查 |
-| 服务器能力被误认为已完成 | 明确本次只交付可注入的 Core 和桌面 adapter，ServerRuntimeAdapter 作为下一宿主实现 |
-| 流式响应/取消语义变化 | 保留现有 Response/AbortSignal 约定，并用 Core 契约测试锁定行为 |
+| 风险                                      | 缓解                                                                              |
+| ----------------------------------------- | --------------------------------------------------------------------------------- |
+| `runAgentChat` 参数类型与桌面实现高度耦合 | 先定义 Core chat input/output contract，在 desktop adapter 内做一次类型转换       |
+| shared types 与 Core 互相导入形成循环     | 迁移 server transport types 到 Core，desktop 只 re-export，不让 Core 导入 desktop |
+| Core 误带入 Electron/SQLite 依赖          | 在 Core tsconfig、lint 和测试中加入禁止 import 检查                               |
+| 服务器能力被误认为已完成                  | 明确本次只交付可注入的 Core 和桌面 adapter，ServerRuntimeAdapter 作为下一宿主实现 |
+| 流式响应/取消语义变化                     | 保留现有 Response/AbortSignal 约定，并用 Core 契约测试锁定行为                    |
 
 ## 验收标准
 
