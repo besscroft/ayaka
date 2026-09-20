@@ -51,7 +51,9 @@ import { notify } from "../lib/toast";
 import { readChatMessageMetadata } from "../lib/chat-messages";
 import { redactBrowserInput } from "@shared/browser-message";
 import { GeneratedToolResult } from "./GeneratedToolResult";
+import { GeneratedUIMessage } from "./GeneratedUIMessage";
 import type { MentionSkill } from "../lib/chat-tools";
+import type { GeneratedUIStateChange } from "@shared/generated-ui/types";
 import {
   getToolPartName,
   getToolSummary,
@@ -89,6 +91,7 @@ interface MessageListProps {
   /** 建议被点击时 */
   onSuggestion?: (prompt: string) => void;
   onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+  onGeneratedUIStateChange?: (change: GeneratedUIStateChange) => void;
 }
 
 type MessagePart = UIMessage["parts"][number];
@@ -117,6 +120,7 @@ export function MessageList({
   onDeleteMessage,
   onSuggestion,
   onToolApprovalResponse,
+  onGeneratedUIStateChange,
 }: MessageListProps): React.JSX.Element {
   const { t } = useT();
   const callbacksRef = useRef({
@@ -187,6 +191,7 @@ export function MessageList({
           onDelete={onDeleteMessage ? stableDeleteMessage : undefined}
           onRetry={onRetryMessage ? stableRetryMessage : undefined}
           onToolApprovalResponse={onToolApprovalResponse ? stableToolApprovalResponse : undefined}
+          onGeneratedUIStateChange={onGeneratedUIStateChange}
         />
 
         {shouldShowFollowups ? (
@@ -263,6 +268,7 @@ interface VirtualMessageRowsProps {
   onDelete?: (messageId: string) => void;
   onRetry?: (messageId: string) => Promise<void> | void;
   onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+  onGeneratedUIStateChange?: (change: GeneratedUIStateChange) => void;
 }
 
 const ESTIMATED_MESSAGE_SIZE = 112;
@@ -304,6 +310,7 @@ function VirtualMessageRows({
   onDelete,
   onRetry,
   onToolApprovalResponse,
+  onGeneratedUIStateChange,
 }: VirtualMessageRowsProps): React.JSX.Element {
   const { containerRef } = useConversationScroll();
   const virtualizer = useVirtualizer({
@@ -409,6 +416,7 @@ function VirtualMessageRows({
               onDelete={onDelete}
               onRetry={onRetry}
               onToolApprovalResponse={onToolApprovalResponse}
+              onGeneratedUIStateChange={onGeneratedUIStateChange}
             />
           </div>
         );
@@ -543,6 +551,7 @@ export interface MessageItemProps {
   onDelete?: (messageId: string) => void;
   onRetry?: (messageId: string) => Promise<void> | void;
   onToolApprovalResponse?: ChatAddToolApproveResponseFunction;
+  onGeneratedUIStateChange?: (change: GeneratedUIStateChange) => void;
 }
 
 export interface SaveMessageEditOptions {
@@ -590,6 +599,7 @@ function MessageItem({
   onDelete,
   onRetry,
   onToolApprovalResponse,
+  onGeneratedUIStateChange,
 }: MessageItemProps): React.JSX.Element {
   const { t, f } = useT();
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
@@ -599,6 +609,7 @@ function MessageItem({
 
   const allParts = message.parts ?? [];
   const parts = allParts.filter((part) => !isSilentToolPart(part));
+  const generatedUISpecPartIndex = allParts.findIndex((part) => part.type === "data-spec");
   const messageStreaming = isLastMessage && isStreaming;
   const reasoningDisplays = getReasoningDisplays(allParts, messageStreaming);
   const reasoningDisplaysByPartIndex = new Map(
@@ -743,6 +754,18 @@ function MessageItem({
           const key = message.id + "-" + index;
           if (isSilentToolPart(part)) {
             return <Fragment key={key} />;
+          }
+
+          if (part.type === "data-spec") {
+            if (index !== generatedUISpecPartIndex) return <Fragment key={key} />;
+            return (
+              <GeneratedUIMessage
+                key={`${conversationId ?? "conversation"}-${message.id}-generated-ui`}
+                message={message}
+                isStreaming={messageStreaming}
+                onStateChange={onGeneratedUIStateChange}
+              />
+            );
           }
 
           if (part.type === "reasoning") {
@@ -930,7 +953,8 @@ export function areMessageItemPropsEqual(
     previous.onResend === next.onResend &&
     previous.onDelete === next.onDelete &&
     previous.onRetry === next.onRetry &&
-    previous.onToolApprovalResponse === next.onToolApprovalResponse
+    previous.onToolApprovalResponse === next.onToolApprovalResponse &&
+    previous.onGeneratedUIStateChange === next.onGeneratedUIStateChange
   );
 }
 

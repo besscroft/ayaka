@@ -56,6 +56,11 @@ import {
 } from "../../shared/types";
 import { parseSkillInvocations, stripSkillInvocations } from "../../shared/skill-invocation";
 import { redactBrowserInput } from "../../shared/browser-message";
+import {
+  GENERATED_UI_SYSTEM_RULES,
+  generatedUICatalogPrompt,
+} from "../../shared/generated-ui/catalog";
+import { pipeGeneratedUIStream } from "./generated-ui-stream";
 import { appendReactionFeedback, type ResolvedChatModel } from "./chat-agent";
 import {
   auditChatToolApprovalResponses,
@@ -461,7 +466,11 @@ async function streamRootAgentLoop({
   contextEngine?: ContextEngine;
   initialMessages: UIMessage[];
 }): Promise<Response> {
-  let modelMessages = await convertToModelMessages(initialMessages, { tools: agent.tools });
+  let modelMessages = await convertToModelMessages(initialMessages, {
+    tools: agent.tools,
+    // json-render data parts are presentation-only and never become provider input.
+    convertDataPart: () => undefined,
+  });
   let firstEpoch = true;
   let lastFinishReason: FinishReason = "stop";
   let lastText = "";
@@ -537,7 +546,7 @@ async function streamRootAgentLoop({
                 abortSignal: context.session.signal,
               }).error,
           });
-          writer.merge(uiStream);
+          writer.merge(pipeGeneratedUIStream(uiStream));
 
           const responseMessages = (await result.responseMessages) as ModelMessage[];
           modelMessages.push(
@@ -700,7 +709,10 @@ async function appendQueuedMessages(
   tools: ToolSet,
 ): Promise<ModelMessage[]> {
   if (queued.length === 0) return current;
-  const converted = await convertToModelMessages(queued, { tools });
+  const converted = await convertToModelMessages(queued, {
+    tools,
+    convertDataPart: () => undefined,
+  });
   return [...current, ...converted];
 }
 
@@ -1150,7 +1162,10 @@ function createToolLoopAgent({
               const steering = await protocol.context.session.drain("steering");
               if (steering.length > 0) {
                 protocol.context.messages.push(...steering);
-                const converted = await convertToModelMessages(steering, { tools: agentTools });
+                const converted = await convertToModelMessages(steering, {
+                  tools: agentTools,
+                  convertDataPart: () => undefined,
+                });
                 protocol.context.preparedSteering.push(...converted);
                 messages = [...messages, ...converted];
               }
@@ -2244,6 +2259,8 @@ async function createRootInstructions(
   );
   return [
     basePrompt,
+    generatedUICatalogPrompt,
+    GENERATED_UI_SYSTEM_RULES.join("\n"),
     `You are ${context.rootAgent.name}, the root orchestrator. Every chat request enters through you, regardless of provider.`,
     "You can handle any task, but prefer delegating work to a suitable child agent whenever one can do it.",
     "Decide whether to answer directly, consult a child agent, or hand off ownership to a child agent.",

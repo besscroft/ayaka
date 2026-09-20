@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { MessageList } from "./MessageList";
+import { persistGeneratedUIStateChange } from "@shared/generated-ui/message";
 import { MessageInput } from "./MessageInput";
 import { McpInputDialog } from "./McpWorkspace";
 import { IconFolderOpen } from "./icons";
@@ -45,6 +46,7 @@ import {
   toFileUIParts,
   updateFollowupSuggestions,
 } from "../lib/chat-messages";
+import type { GeneratedUIStateChange } from "@shared/generated-ui/types";
 import {
   createSnapshotPersistenceQueue,
   mergeMessagePersistenceRequests,
@@ -259,6 +261,8 @@ export function ChatView({
     [conversationId],
   );
   const [followupLoading, setFollowupLoading] = useState(false);
+  const generatedUIPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generatedUIPendingRef = useRef<UIMessage[] | null>(null);
 
   // Start history IPC before non-critical ChatView initialization. The
   // hydration effect below reuses this promise instead of invoking it twice.
@@ -330,6 +334,46 @@ export function ChatView({
       );
     },
     [persistAndTouch],
+  );
+
+  const handleGeneratedUIStateChange = useCallback(
+    (change: GeneratedUIStateChange): void => {
+      const currentMessages = latestMessagesRef.current;
+      const message = currentMessages.find((candidate) => candidate.id === change.messageId);
+      if (!message) return;
+      const updatedMessage = persistGeneratedUIStateChange(message, change);
+      if (updatedMessage === message) return;
+      const updatedMessages = currentMessages.map((candidate) =>
+        candidate.id === updatedMessage.id ? updatedMessage : candidate,
+      );
+      latestMessagesRef.current = updatedMessages;
+      lastNonEmptyMessagesRef.current = updatedMessages;
+      generatedUIPendingRef.current = updatedMessages;
+      chatRef.current?.setMessages(updatedMessages);
+      if (generatedUIPersistTimerRef.current !== null) {
+        clearTimeout(generatedUIPersistTimerRef.current);
+      }
+      generatedUIPersistTimerRef.current = setTimeout(() => {
+        generatedUIPersistTimerRef.current = null;
+        const pending = generatedUIPendingRef.current;
+        generatedUIPendingRef.current = null;
+        if (pending) persistInBackground(pending, "generated UI state");
+      }, 250);
+    },
+    [persistInBackground],
+  );
+
+  useEffect(
+    () => () => {
+      if (generatedUIPersistTimerRef.current !== null) {
+        clearTimeout(generatedUIPersistTimerRef.current);
+        generatedUIPersistTimerRef.current = null;
+      }
+      const pending = generatedUIPendingRef.current;
+      generatedUIPendingRef.current = null;
+      if (pending) persistInBackground(pending, "generated UI state cleanup");
+    },
+    [persistInBackground],
   );
 
   /** 异步生成追问建议 */
@@ -1605,6 +1649,7 @@ export function ChatView({
                 onResendMessage={handleResendMessage}
                 onDeleteMessage={handleDeleteMessage}
                 onToolApprovalResponse={chat.addToolApprovalResponse}
+                onGeneratedUIStateChange={handleGeneratedUIStateChange}
                 onSuggestion={handleSuggestion}
               />
             )}

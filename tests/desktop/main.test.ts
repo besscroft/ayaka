@@ -42,3 +42,4 @@ import "./main/lib/run-tool-scheduler.test.ts";
 import "./main/lib/workspace-command.test.ts";
 import "./main/server/index.test.ts";
 import "./main/server/core-app.test.ts";
+import "./main/lib/generated-ui.test.ts";

@@ -50,6 +50,9 @@ catalog:
   "@streamdown/math": ^1.0.2
   "@streamdown/mermaid": ^1.0.2
   streamdown: ^2.5.0
+  "@json-render/core": 0.21.0
+  "@json-render/react": 0.21.0
+  "@json-render/shadcn": 0.21.0
 overrides:
   vite: "catalog:"
   "shadcn>zod": ^3.25.76

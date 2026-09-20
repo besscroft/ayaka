@@ -562,6 +562,14 @@ const entries = {
   "generatedApp.stop": { zh: "停止", en: "Stop" },
   "generatedApp.restart": { zh: "重启", en: "Restart" },
   "generatedApp.sourceLoading": { zh: "正在读取源码…", en: "Loading source…" },
+  "generatedUI.unavailable": {
+    zh: "这段生成式界面暂时无法显示。",
+    en: "This generated interface could not be displayed.",
+  },
+  "generatedUI.unsupported": {
+    zh: "此界面包含当前版本不支持的组件。",
+    en: "This interface contains an unsupported component.",
+  },
   "generatedApp.tooLarge": {
     zh: "文件超过 256 KB，已回退为源码，不会执行。",
     en: "Files over 256 KB fall back to source and are not executed.",
