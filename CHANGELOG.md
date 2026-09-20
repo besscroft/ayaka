@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.0]
+
+### 中文
+
+#### 新增
+
+- 新增宿主无关的 `@ayaka/core` 核心后端包，提供统一的 HTTP API、请求校验、错误协议、聊天与媒体生成接口，以及可注入的运行时能力契约。
+- 新增核心后端的 Node 服务启动器，桌面端通过运行时适配器复用本地模型、Agent、媒体、存储和鉴权能力，为后续服务器或 Docker 宿主适配提供基础。
+- 新增基于 json-render 的生成式 UI，支持智能体在聊天消息中流式生成受控的交互式组件，并支持组件状态在会话中持久化。
+- 新增共享生成式 UI catalog、类型定义和安全组件封装，支持卡片、按钮、图片、头像、链接等组件，并限制为本地状态与内置交互。
+
+#### 变更
+
+- 重构桌面端本地服务，将聊天、标题、追问建议、开场建议、模型和媒体接口迁移至 `@ayaka/core`，保持现有桌面端请求协议兼容。
+- 优化聊天消息流处理，将生成式 UI 数据与普通文本分离，避免展示数据进入模型上下文，并在流式结束后同步交互状态。
+- 优化生成式 UI 的安全性与容错能力，限制 URL、组件和动作范围，并为不支持或渲染失败的组件提供降级展示。
+
+### English
+
+#### Added
+
+- Added the host-agnostic `@ayaka/core` backend package with a unified HTTP API, request validation, stable error protocol, chat and media-generation endpoints, and an injectable runtime contract.
+- Added a Node server starter for the core backend. The desktop app now supplies a runtime adapter for its local models, agents, media, storage, and authorization, establishing a foundation for server or Docker hosts.
+- Added json-render-powered generative UI, allowing agents to stream controlled interactive components inside chat messages and persist component state in conversations.
+- Added shared generative-UI catalogs, types, and safe component wrappers for cards, buttons, images, avatars, links, and related components, limited to local state and built-in interactions.
+
+#### Changed
+
+- Refactored the desktop local service to use `@ayaka/core` for chat, title, follow-up suggestions, starter suggestions, model, and media endpoints while preserving the existing desktop request contract.
+- Improved chat stream handling by keeping generative-UI data separate from ordinary text, preventing presentation data from entering model context and synchronizing interactive state after streaming completes.
+- Improved generative-UI safety and resilience by restricting URLs, components, and actions and providing fallbacks for unsupported or failed renders.
+
 ## [0.1.42]
 
 ### 中文
