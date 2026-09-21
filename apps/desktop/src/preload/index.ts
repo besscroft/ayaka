@@ -488,6 +488,8 @@ const api = {
       ipcRenderer.invoke("providers:deleteCustomProvider", providerId),
     setProviderApiKey: (providerId: string, apiKey: string) =>
       ipcRenderer.invoke("providers:setProviderApiKey", providerId, apiKey),
+    revealProviderApiKey: (providerId: string) =>
+      ipcRenderer.invoke("providers:revealProviderApiKey", providerId),
     deleteProviderApiKey: (providerId: string) =>
       ipcRenderer.invoke("providers:deleteProviderApiKey", providerId),
     testProvider: (providerId: string) => ipcRenderer.invoke("providers:testProvider", providerId),

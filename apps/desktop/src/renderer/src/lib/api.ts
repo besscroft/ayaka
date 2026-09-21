@@ -562,6 +562,8 @@ export const api = {
       assertApi().providers.deleteCustomProvider(providerId),
     setProviderApiKey: (providerId: string, apiKey: string): Promise<boolean> =>
       assertApi().providers.setProviderApiKey(providerId, apiKey),
+    revealProviderApiKey: (providerId: string): Promise<string | null> =>
+      assertApi().providers.revealProviderApiKey(providerId),
     deleteProviderApiKey: (providerId: string): Promise<boolean> =>
       assertApi().providers.deleteProviderApiKey(providerId),
     testProvider: (providerId: string): Promise<ProviderTestResult> =>

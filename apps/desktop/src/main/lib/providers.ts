@@ -938,6 +938,20 @@ export async function clearProviderApiKey(providerId: string): Promise<void> {
   await deleteApiKey(normalizedProviderId);
 }
 
+/**
+ * Reveal a provider API key only in response to an explicit user action.
+ * Provider listings intentionally remain metadata-only and never decrypt keys.
+ */
+export function revealProviderApiKey(providerId: string): string | null {
+  const normalizedProviderId = normalizeProviderId(providerId);
+  const provider = getProviderConfig(normalizedProviderId);
+  if (!provider) throw new Error("Unknown provider: " + normalizedProviderId);
+  if (providerAuthKind(provider) === "none") {
+    throw new Error("This provider does not use an API key");
+  }
+  return getApiKey(normalizedProviderId);
+}
+
 export function resolveProviderApiKeyFallback({
   providerId,
   modelId,

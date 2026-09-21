@@ -82,6 +82,7 @@ import {
   deleteCustomProvider,
   listManagedModels,
   listProviders,
+  revealProviderApiKey,
   saveProviderApiKey,
   saveModelApiKey,
   syncAvailableModels,
@@ -286,7 +287,8 @@ import {
  *  - settings:get / settings:set
  *  - apikeys:list / apikeys:set / apikeys:delete
  *  - server:port         获取本地 AI 服务端口
- *  - providers:list      获取 provider 列表（含模型、helpUrl）
+ *  - providers:list / providers:revealProviderApiKey
+ *                         获取 provider 元数据；仅用户明确操作时读取 API key
  */
 
 export interface IpcHandlerOptions {
@@ -1201,6 +1203,10 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     notifyMemoryConfigurationChanged();
     return true;
   });
+
+  ipcMain.handle("providers:revealProviderApiKey", (_e, providerId: string) =>
+    revealProviderApiKey(providerId),
+  );
 
   ipcMain.handle("providers:deleteProviderApiKey", async (_e, providerId: string) => {
     await clearProviderApiKey(providerId);

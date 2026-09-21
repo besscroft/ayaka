@@ -60,6 +60,7 @@ import {
   IconFolderOpen,
   IconImage,
   IconEye,
+  IconEyeOff,
   IconDownload,
 } from "./icons";
 import {
@@ -1902,6 +1903,8 @@ function providerModelRef(providerId: string, modelId: string): string {
   return providerId + "/" + modelId;
 }
 
+const MASKED_PROVIDER_API_KEY = "••••••••••••";
+
 function markProviderApiKeyConfigured(provider: ProviderInfo): ProviderInfo {
   return {
     ...provider,
@@ -1989,6 +1992,9 @@ function ProviderModelWorkbench({
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
   });
   const [providerApiKey, setProviderApiKey] = useState("");
+  const [providerApiKeyProviderId, setProviderApiKeyProviderId] = useState<string | null>(null);
+  const [providerApiKeyVisible, setProviderApiKeyVisible] = useState(false);
+  const [revealingProviderApiKey, setRevealingProviderApiKey] = useState(false);
   const [addProviderOpen, setAddProviderOpen] = useState(false);
   const [modelEditorState, setModelEditorState] = useState<ModelOptionsEditorState | null>(null);
   const [providerToDelete, setProviderToDelete] = useState<ProviderInfo | null>(null);
@@ -2065,9 +2071,12 @@ function ProviderModelWorkbench({
       baseUrl: selectedProvider.baseUrl ?? "",
       apiFormat: selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     });
-    setProviderApiKey("");
+    setProviderApiKeyProviderId(selectedProvider.id);
+    setProviderApiKey(selectedProvider.hasProviderApiKey ? MASKED_PROVIDER_API_KEY : "");
+    setProviderApiKeyVisible(false);
   }, [
     selectedProvider?.baseUrl,
+    selectedProvider?.hasProviderApiKey,
     selectedProvider?.id,
     selectedProvider?.label,
     selectedProvider?.apiFormat,
@@ -2106,6 +2115,23 @@ function ProviderModelWorkbench({
     canEditProvider &&
     providerForm.label.trim().length > 0 &&
     providerForm.baseUrl.trim().length > 0;
+  const providerApiKeyValue =
+    providerApiKeyProviderId === selectedProvider?.id
+      ? providerApiKey
+      : selectedProvider?.hasProviderApiKey
+        ? MASKED_PROVIDER_API_KEY
+        : "";
+  const providerApiKeyVisibleForSelected =
+    providerApiKeyProviderId === selectedProvider?.id && providerApiKeyVisible;
+  const providerApiKeyIsMasked =
+    !!selectedProvider?.hasProviderApiKey &&
+    !providerApiKeyVisibleForSelected &&
+    providerApiKeyValue === MASKED_PROVIDER_API_KEY;
+
+  const handleProviderApiKeyChange = (value: string): void => {
+    setProviderApiKeyProviderId(selectedProvider?.id ?? null);
+    setProviderApiKey(value);
+  };
 
   const formatParams = (model: ModelOption): string =>
     t("model.params.workbenchSummary", {
@@ -2176,9 +2202,11 @@ function ProviderModelWorkbench({
         apiFormat: providerForm.apiFormat,
       });
 
-      if (providerApiKey.trim()) {
-        await api.providers.setProviderApiKey(selectedProvider.id, providerApiKey.trim());
-        setProviderApiKey("");
+      if (providerApiKeyValue.trim() && !providerApiKeyIsMasked) {
+        await api.providers.setProviderApiKey(selectedProvider.id, providerApiKeyValue.trim());
+        setProviderApiKeyProviderId(selectedProvider.id);
+        setProviderApiKey(MASKED_PROVIDER_API_KEY);
+        setProviderApiKeyVisible(false);
         return markProviderApiKeyConfigured(provider);
       }
       return provider;
@@ -2199,10 +2227,10 @@ function ProviderModelWorkbench({
   };
 
   const handleSaveProviderApiKey = (): void => {
-    if (!selectedProvider || !providerApiKey.trim()) return;
+    if (!selectedProvider || !providerApiKeyValue.trim() || providerApiKeyIsMasked) return;
     void notify
       .promise(
-        api.providers.setProviderApiKey(selectedProvider.id, providerApiKey.trim()),
+        api.providers.setProviderApiKey(selectedProvider.id, providerApiKeyValue.trim()),
         {
           loading: t("toast.apikey.saving"),
           success: t("toast.apikey.saved"),
@@ -2211,10 +2239,41 @@ function ProviderModelWorkbench({
         locale,
       )
       .then(() => {
-        setProviderApiKey("");
+        setProviderApiKeyProviderId(selectedProvider.id);
+        setProviderApiKey(MASKED_PROVIDER_API_KEY);
+        setProviderApiKeyVisible(false);
         refreshCatalog(markProviderApiKeyConfigured(selectedProvider));
       })
       .catch(() => undefined);
+  };
+
+  const handleRevealProviderApiKey = (): void => {
+    if (!selectedProvider?.hasProviderApiKey || revealingProviderApiKey) return;
+    if (providerApiKeyVisibleForSelected) {
+      setProviderApiKeyProviderId(selectedProvider.id);
+      setProviderApiKey(MASKED_PROVIDER_API_KEY);
+      setProviderApiKeyVisible(false);
+      return;
+    }
+
+    const providerId = selectedProvider.id;
+    setRevealingProviderApiKey(true);
+    setProviderApiKeyProviderId(providerId);
+    void api.providers
+      .revealProviderApiKey(providerId)
+      .then((value) => {
+        if (value == null) {
+          setProviderApiKey("");
+          setProviderApiKeyVisible(false);
+          refreshCatalog();
+          return;
+        }
+        setProviderApiKeyProviderId(providerId);
+        setProviderApiKey(value);
+        setProviderApiKeyVisible(true);
+      })
+      .catch((error) => notify.error(t("toast.apikey.revealFailed"), error, locale))
+      .finally(() => setRevealingProviderApiKey(false));
   };
 
   const handleTestProvider = (): void => {
@@ -2473,7 +2532,9 @@ function ProviderModelWorkbench({
                         onPress={handleTestProvider}
                         aria-label={t("model.provider.test")}
                       >
-                        <IconZap className="size-4" />
+                        {testingProviderId === selectedProvider.id ? null : (
+                          <IconZap className="size-4" />
+                        )}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>{t("model.provider.test")}</TooltipContent>
@@ -2506,7 +2567,8 @@ function ProviderModelWorkbench({
                       </Button>
                     </>
                   ) : selectedProviderIsAnonymous ? null : (
-                    providerApiKey.trim() && (
+                    providerApiKeyValue.trim() &&
+                    !providerApiKeyIsMasked && (
                       <Button variant="secondary" size="sm" onPress={handleSaveProviderApiKey}>
                         {t("common.save")}
                       </Button>
@@ -2574,19 +2636,47 @@ function ProviderModelWorkbench({
                 {!selectedProviderIsAnonymous && (
                   <TextField className="md:col-span-2">
                     <Label>{t("model.apiKey")}</Label>
-                    <Input
-                      type="password"
-                      className="select-text"
-                      value={providerApiKey}
-                      placeholder={
-                        selectedProvider.hasProviderApiKey
-                          ? t("apikey.placeholder.replace")
-                          : t("apikey.placeholder.set", { label: selectedProvider.label })
-                      }
-                      onChange={(event) =>
-                        setProviderApiKey((event.target as HTMLInputElement).value)
-                      }
-                    />
+                    <div className="relative">
+                      <Input
+                        type={providerApiKeyVisibleForSelected ? "text" : "password"}
+                        className="select-text pr-10"
+                        value={providerApiKeyValue}
+                        placeholder={
+                          selectedProvider.hasProviderApiKey
+                            ? t("apikey.placeholder.replace")
+                            : t("apikey.placeholder.set", { label: selectedProvider.label })
+                        }
+                        onFocus={(event) => {
+                          if (providerApiKeyIsMasked) event.currentTarget.select();
+                        }}
+                        onChange={(event) =>
+                          handleProviderApiKeyChange((event.target as HTMLInputElement).value)
+                        }
+                      />
+                      {selectedProvider.hasProviderApiKey && (
+                        <Button
+                          type="button"
+                          isIconOnly
+                          size="sm"
+                          variant="tertiary"
+                          className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+                          isPending={revealingProviderApiKey}
+                          onPress={handleRevealProviderApiKey}
+                          aria-label={
+                            providerApiKeyVisibleForSelected ? t("apikey.hide") : t("apikey.show")
+                          }
+                          title={
+                            providerApiKeyVisibleForSelected ? t("apikey.hide") : t("apikey.show")
+                          }
+                        >
+                          {providerApiKeyVisibleForSelected ? (
+                            <IconEyeOff className="size-4" />
+                          ) : (
+                            <IconEye className="size-4" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                     <Description className="mt-1 flex flex-wrap items-center gap-3">
                       <span>{t("model.provider.keyHelp")}</span>
                       {selectedProvider.helpUrl && (

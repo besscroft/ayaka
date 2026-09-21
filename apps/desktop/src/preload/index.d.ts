@@ -95,7 +95,7 @@ import type { UIMessage } from "ai";
  *
  * 设计原则：
  * - 仅通过 contextBridge 暴露白名单方法，渲染层无法直接访问 Node API
- * - API key 明文不出主进程；这里只提供 set/list，不提供 get
+ * - API key 默认不出主进程；用户明确点击显示时才读取 provider-level key
  * - 所有方法返回 Promise（ipcRenderer.invoke 的语义）
  */
 export interface AyakaApi {
@@ -271,7 +271,7 @@ export interface AyakaApi {
   logs: {
     export: () => Promise<ErrorLogExportResult>;
   };
-  // API Key 管理（明文不外泄）
+  // API Key 管理（默认不外泄；provider-level key 仅响应用户显示操作）
   apikeys: {
     list: () => Promise<string[]>;
     set: (provider: string, apiKey: string) => Promise<boolean>;
@@ -479,6 +479,7 @@ export interface AyakaApi {
     upsertCustomProvider: (input: CustomProviderInput) => Promise<ProviderInfo>;
     deleteCustomProvider: (providerId: string) => Promise<boolean>;
     setProviderApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
+    revealProviderApiKey: (providerId: string) => Promise<string | null>;
     deleteProviderApiKey: (providerId: string) => Promise<boolean>;
     testProvider: (providerId: string) => Promise<ProviderTestResult>;
     syncAvailableModels: (providerId: string) => Promise<ProviderModelSyncResult>;

@@ -109,6 +109,25 @@ void describe("provider helpers", () => {
     assert.equal(getModelApiKeyCalls, 0);
   });
 
+  void it("reveals a provider API key only through the explicit reveal helper", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "reveal-provider",
+      label: "Reveal Provider",
+      baseUrl: "https://reveal.example/v1",
+    });
+    await providerHelpers.saveProviderApiKey("reveal-provider", "provider-key");
+
+    getApiKeyCalls = 0;
+    providerHelpers.listProviders();
+    assert.equal(getApiKeyCalls, 0);
+    assert.equal(providerHelpers.revealProviderApiKey("reveal-provider"), "provider-key");
+    assert.equal(getApiKeyCalls, 1);
+    await assert.rejects(
+      Promise.resolve().then(() => providerHelpers.revealProviderApiKey("missing-provider")),
+      /Unknown provider/,
+    );
+  });
+
   void it("registers the new built-in providers in the approved order", async () => {
     const providers = providerHelpers.listProviders();
     assert.deepEqual(
