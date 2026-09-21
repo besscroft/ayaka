@@ -1659,7 +1659,7 @@ function ModelEditorDialog({
                 </TextField>
                 {!isEditing && (
                   <TextField>
-                    <Label>{t("model.providerId")}</Label>
+                    <Label>{t("model.providerId.optional")}</Label>
                     <Input
                       value={providerForm.id ?? ""}
                       placeholder={t("model.placeholder.providerId")}
@@ -2881,7 +2881,7 @@ function AddProviderDialog({
               />
             </TextField>
             <TextField>
-              <Label>{t("model.providerId")}</Label>
+              <Label>{t("model.providerId.optional")}</Label>
               <Input
                 className="select-text"
                 value={form.id ?? ""}

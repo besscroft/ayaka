@@ -855,8 +855,21 @@ function resolveSelectedChatMemoryModel(
 
 export async function upsertCustomProvider(input: CustomProviderInput): Promise<ProviderInfo> {
   const catalog = readCatalog();
-  const id = normalizeProviderId(input.id ?? input.label);
-  if (!id) throw new Error("Provider id is required");
+  const label = input.label.trim();
+  if (!label) throw new Error("Provider label is required");
+
+  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  if (!baseUrl) throw new Error("Base URL is required");
+
+  // The provider ID is optional in the form. Empty or whitespace-only values
+  // should fall back to a stable identifier instead of being treated as an
+  // explicitly supplied (but invalid) ID. Prefer the display name and use the
+  // endpoint hostname for labels that do not contain ASCII identifier chars.
+  const requestedId = typeof input.id === "string" ? input.id.trim() : "";
+  const id =
+    normalizeProviderId(requestedId || label) ||
+    normalizeProviderId(new URL(baseUrl).hostname) ||
+    "provider";
 
   // Existing custom records may collide with a newly introduced built-in. Keep
   // them editable; only reject attempts to create a fresh built-in collision.
@@ -864,12 +877,6 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
   if (BUILTIN_PROVIDERS.some((provider) => provider.id === id) && !existing) {
     throw new Error("Built-in providers cannot be overwritten");
   }
-
-  const label = input.label.trim();
-  if (!label) throw new Error("Provider label is required");
-
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
-  if (!baseUrl) throw new Error("Base URL is required");
 
   const now = Date.now();
   const nextProvider = {

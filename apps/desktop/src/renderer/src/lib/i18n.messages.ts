@@ -1082,6 +1082,7 @@ const entries = {
   "model.provider.sync": { zh: "同步", en: "Sync" },
   "model.provider.test": { zh: "测试连接", en: "Test connection" },
   "model.providerId": { zh: "提供商 ID", en: "Provider ID" },
+  "model.providerId.optional": { zh: "提供商 ID（可选）", en: "Provider ID (optional)" },
   "model.providerName": { zh: "提供商名称", en: "Provider name" },
   "model.reasoningDefault": { zh: "默认思考程度", en: "Default reasoning level" },
   "model.reasoningDefault.hint": {

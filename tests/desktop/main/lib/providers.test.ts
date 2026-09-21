@@ -72,6 +72,17 @@ const capabilities = {
 };
 
 void describe("provider helpers", () => {
+  void it("derives a provider ID when the optional ID is left blank", async () => {
+    const provider = await providerHelpers.upsertCustomProvider({
+      id: "",
+      label: "Example Provider",
+      baseUrl: "https://example-provider.test/v1",
+    });
+
+    assert.equal(provider.id, "example-provider");
+    assert.equal(provider.label, "Example Provider");
+  });
+
   void it("lists API key metadata without decrypting stored keys", async () => {
     await providerHelpers.upsertCustomProvider({
       id: "metadata-provider",
