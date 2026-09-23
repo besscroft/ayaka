@@ -113,9 +113,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
           aria-hidden="true"
         />
       ) : null}
-      <span data-slot="button-content" className="relative z-[1] inline-flex items-center gap-2">
-        {children}
-      </span>
+      {children != null ? (
+        <span data-slot="button-content" className="relative z-[1] inline-flex items-center gap-2">
+          {children}
+        </span>
+      ) : null}
     </button>
   );
 });

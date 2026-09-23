@@ -2527,6 +2527,7 @@ function ProviderModelWorkbench({
                         type="button"
                         isIconOnly
                         size="sm"
+                        className="size-8"
                         variant="secondary"
                         isPending={testingProviderId === selectedProvider.id}
                         onPress={handleTestProvider}
@@ -2539,15 +2540,6 @@ function ProviderModelWorkbench({
                     </TooltipTrigger>
                     <TooltipContent>{t("model.provider.test")}</TooltipContent>
                   </Tooltip>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    isPending={syncingProviderId === selectedProvider.id}
-                    onPress={handleSyncModels}
-                  >
-                    <IconRefresh className="mr-1 size-3.5" />
-                    {t("model.provider.sync")}
-                  </Button>
                   {canEditProvider ? (
                     <>
                       <Button
@@ -2712,7 +2704,9 @@ function ProviderModelWorkbench({
                       isPending={syncingProviderId === selectedProvider.id}
                       onPress={handleSyncModels}
                     >
-                      <IconRefresh className="mr-1 size-3.5" />
+                      {syncingProviderId === selectedProvider.id ? null : (
+                        <IconRefresh className="mr-1 size-3.5" />
+                      )}
                       {t("model.models.fetch")}
                     </Button>
                     {selectedProvider.source === "custom" && (
