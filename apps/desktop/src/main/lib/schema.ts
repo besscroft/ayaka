@@ -40,6 +40,20 @@ export const messages = sqliteTable(
   (table) => [index("idx_messages_conversation").on(table.conversation_id)],
 );
 
+export const realtimeSessions = sqliteTable(
+  "realtime_sessions",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    provider_id: text("provider_id").notNull(),
+    model_id: text("model_id").notNull(),
+    transcript_json: text("transcript_json").notNull().default("[]"),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (table) => [index("idx_realtime_sessions_updated").on(table.updated_at)],
+);
+
 export const cronJobs = sqliteTable(
   "cron_jobs",
   {
@@ -1113,6 +1127,7 @@ export const browserTabs = sqliteTable(
 export const schema = {
   conversations,
   messages,
+  realtimeSessions,
   cronJobs,
   cronRuns,
   catalogSources,
@@ -1157,6 +1172,7 @@ export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type MessageRow = typeof messages.$inferSelect;
 export type NewMessageRow = typeof messages.$inferInsert;
+export type RealtimeSessionRow = typeof realtimeSessions.$inferSelect;
 export type CronJob = typeof cronJobs.$inferSelect;
 export type NewCronJob = typeof cronJobs.$inferInsert;
 export type CronRun = typeof cronRuns.$inferSelect;

@@ -35,4 +35,70 @@ void describe("Core app package", () => {
       server.close();
     }
   });
+
+  void it("mints realtime client secrets only for an authorized setup request", async () => {
+    const calls: Array<{ modelRef: string; sessionConfig: Record<string, unknown> }> = [];
+    const app = createCoreApp({
+      runtime: {
+        ...createRuntime(),
+        createRealtimeToken: async (modelRef, sessionConfig) => {
+          calls.push({ modelRef, sessionConfig });
+          return { token: "short-lived", url: "wss://example.test/realtime", expiresAt: 123 };
+        },
+      },
+      sessionToken: "local-session",
+    });
+    const sessionConfig = { instructions: "Be concise", voice: "alloy" };
+    const response = await app.request(
+      "/api/realtime/setup?session=local-session&model=custom-openai/gpt-realtime",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionConfig }),
+      },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      token: "short-lived",
+      url: "wss://example.test/realtime",
+      expiresAt: 123,
+      tools: [],
+    });
+    assert.deepEqual(calls, [{ modelRef: "custom-openai/gpt-realtime", sessionConfig }]);
+
+    const unauthorized = await app.request(
+      "/api/realtime/setup?session=wrong&model=custom-openai/gpt-realtime",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionConfig }),
+      },
+    );
+    assert.equal(unauthorized.status, 401);
+    assert.equal(calls.length, 1);
+  });
+
+  void it("rejects invalid realtime model or session input without minting a token", async () => {
+    let calls = 0;
+    const app = createCoreApp({
+      runtime: {
+        ...createRuntime(),
+        createRealtimeToken: async () => {
+          calls++;
+          return { token: "secret", url: "wss://example.test/realtime" };
+        },
+      },
+      sessionToken: "local-session",
+    });
+    const response = await app.request(
+      "/api/realtime/setup?session=local-session&model=bad-model",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionConfig: { instructions: "" } }),
+      },
+    );
+    assert.equal(response.status, 400);
+    assert.equal(calls, 0);
+  });
 });

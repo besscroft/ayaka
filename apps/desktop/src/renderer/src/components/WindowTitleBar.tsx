@@ -8,16 +8,23 @@ import {
   IconRestore,
   IconSidebarCollapse,
   IconSidebarExpand,
+  IconMic,
 } from "./icons";
 
 interface WindowTitleBarProps {
   sidebarExpanded: boolean;
   onToggleSidebar: () => void;
+  onOpenRealtime: () => void;
+  realtimeActive: boolean;
+  showSidebarToggle: boolean;
 }
 
 export function WindowTitleBar({
   sidebarExpanded,
   onToggleSidebar,
+  onOpenRealtime,
+  realtimeActive,
+  showSidebarToggle,
 }: WindowTitleBarProps): React.JSX.Element {
   const { t } = useT();
   const [maximized, setMaximized] = useState(false);
@@ -43,21 +50,39 @@ export function WindowTitleBar({
       className="window-drag-region flex h-10 shrink-0 select-none items-center border-b border-border bg-background"
       data-slot="window-titlebar"
     >
+      {showSidebarToggle ? (
+        <button
+          type="button"
+          className="window-no-drag flex h-full w-11 items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+          data-slot="window-sidebar-toggle"
+          data-icon-only="true"
+          data-icon-tone="neutral"
+          onClick={onToggleSidebar}
+          aria-label={t(sidebarExpanded ? "shell.sidebar.collapse" : "shell.sidebar.expand")}
+          aria-expanded={sidebarExpanded}
+        >
+          {sidebarExpanded ? (
+            <IconSidebarCollapse className="size-4" aria-hidden="true" />
+          ) : (
+            <IconSidebarExpand className="size-4" aria-hidden="true" />
+          )}
+        </button>
+      ) : null}
+
       <button
         type="button"
-        className="window-no-drag flex h-full w-11 items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
-        data-slot="window-sidebar-toggle"
-        data-icon-only="true"
-        data-icon-tone="neutral"
-        onClick={onToggleSidebar}
-        aria-label={t(sidebarExpanded ? "shell.sidebar.collapse" : "shell.sidebar.expand")}
-        aria-expanded={sidebarExpanded}
+        className={[
+          "window-no-drag flex h-full items-center gap-2 px-3 text-xs font-medium transition-colors",
+          realtimeActive
+            ? "bg-accent text-accent-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        ].join(" ")}
+        data-slot="window-realtime-entry"
+        onClick={onOpenRealtime}
+        aria-current={realtimeActive ? "page" : undefined}
       >
-        {sidebarExpanded ? (
-          <IconSidebarCollapse className="size-4" aria-hidden="true" />
-        ) : (
-          <IconSidebarExpand className="size-4" aria-hidden="true" />
-        )}
+        <IconMic className="size-3.5" aria-hidden="true" />
+        {t("shell.nav.realtime")}
       </button>
 
       <div className="flex min-w-0 flex-1 items-center px-2">

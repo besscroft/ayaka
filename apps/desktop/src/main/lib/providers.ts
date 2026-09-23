@@ -2,7 +2,14 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
-import type { ImageModel, LanguageModel, SpeechModel, streamText, TranscriptionModel } from "ai";
+import type {
+  Experimental_RealtimeSessionConfig,
+  ImageModel,
+  LanguageModel,
+  SpeechModel,
+  streamText,
+  TranscriptionModel,
+} from "ai";
 import type { ExactTokenCountInput } from "./context-engine";
 import {
   deleteApiKey,
@@ -77,6 +84,7 @@ const DEFAULT_CAPABILITIES: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
+  realtime: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -313,6 +321,7 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
           kind: "openai-compatible" as const,
           baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
           apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
+          realtimeEnabled: provider.realtimeEnabled === true,
           createdAt: Number(provider.createdAt) || Date.now(),
           updatedAt: Number(provider.updatedAt) || Date.now(),
         }))
@@ -329,6 +338,7 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
         .map((model) => {
           const capabilities = normalizeCapabilities(
             (model as { capabilities?: unknown }).capabilities,
+            String(model.id ?? ""),
           );
           const reasoningLevels = normalizeReasoningLevels(
             (model as { reasoningLevels?: unknown }).reasoningLevels,
@@ -452,7 +462,7 @@ function normalizeContextWindow(raw: unknown): number {
   return Math.floor(normalizeNumber(raw, DEFAULT_MODEL_CONTEXT_WINDOW, 1, 2_000_000));
 }
 
-function normalizeCapabilities(raw: unknown): ModelCapabilities {
+function normalizeCapabilities(raw: unknown, modelId?: string): ModelCapabilities {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_CAPABILITIES };
   const value = raw as Partial<Record<keyof ModelCapabilities, unknown>>;
   const embedding = value.embedding === true;
@@ -476,6 +486,10 @@ function normalizeCapabilities(raw: unknown): ModelCapabilities {
     imageOutput,
     speechOutput,
     transcription,
+    realtime:
+      typeof value.realtime === "boolean"
+        ? value.realtime
+        : /realtime|live/.test((modelId ?? "").toLowerCase()),
     toolCalling: textGeneration && value.toolCalling !== false,
     reasoning: value.reasoning === true,
     embedding,
@@ -683,6 +697,7 @@ export function listProviders(): ProviderInfo[] {
     source: "custom",
     baseUrl: provider.baseUrl,
     apiFormat: provider.apiFormat,
+    realtimeEnabled: provider.realtimeEnabled === true,
     models: [],
   }));
 
@@ -696,6 +711,10 @@ export function listProviders(): ProviderInfo[] {
     }));
     return {
       ...provider,
+      realtimeEnabled:
+        provider.id === "openai" && provider.source === "builtin"
+          ? true
+          : provider.source === "custom" && provider.realtimeEnabled === true,
       authKind: providerAuthKind(provider),
       hasProviderApiKey,
       hasApiKey: hasProviderApiKey || models.some((model) => model.hasApiKey),
@@ -737,6 +756,53 @@ export function listManagedModels(): ManagedModelInfo[] {
       lastSyncedAt: model.lastSyncedAt,
     })),
   );
+}
+
+export function resolveRealtimeModel(modelRef: string): {
+  providerId: string;
+  providerLabel: string;
+  modelId: string;
+  baseUrl: string;
+  apiKey: string;
+} {
+  const separator = modelRef.indexOf("/");
+  if (separator < 1) throw new Error("Invalid Realtime model reference.");
+  const providerId = modelRef.slice(0, separator);
+  const modelId = modelRef.slice(separator + 1);
+  const provider = listProviders().find((candidate) => candidate.id === providerId);
+  if (!provider || !provider.realtimeEnabled)
+    throw new Error("Realtime is not enabled for this provider.");
+  if (provider.kind !== "openai" && provider.kind !== "openai-compatible")
+    throw new Error("This provider does not use the OpenAI Realtime protocol.");
+  if (!provider.baseUrl) throw new Error("Realtime provider base URL is missing.");
+  const model = provider.models.find((candidate) => candidate.id === modelId && candidate.enabled);
+  if (!model || model.capabilities.realtime !== true)
+    throw new Error("Realtime model is unavailable, disabled, or not marked as realtime-capable.");
+  const apiKey = resolveProviderCredential(provider, modelId);
+  if (!apiKey) throw new Error(provider.label + " API key is not configured.");
+  return {
+    providerId: provider.id,
+    providerLabel: provider.label,
+    modelId,
+    baseUrl: provider.baseUrl,
+    apiKey,
+  };
+}
+
+export async function createRealtimeToken(
+  modelRef: string,
+  sessionConfig: Experimental_RealtimeSessionConfig,
+): Promise<{ token: string; url: string; expiresAt?: number }> {
+  const resolved = resolveRealtimeModel(modelRef);
+  const provider = createOpenAI({
+    apiKey: resolved.apiKey,
+    baseURL: resolved.baseUrl,
+    name: resolved.providerId,
+  });
+  return provider.experimental_realtime.getToken({
+    model: resolved.modelId,
+    sessionConfig,
+  });
 }
 
 export function getProviderConfig(providerId: string): ProviderInfo | null {
@@ -885,6 +951,10 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
     kind: "openai-compatible" as const,
     baseUrl,
     apiFormat: normalizeCustomProviderApiFormat(input.apiFormat),
+    realtimeEnabled:
+      input.realtimeEnabled === undefined
+        ? existing?.realtimeEnabled === true
+        : input.realtimeEnabled === true,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -1115,6 +1185,7 @@ export function inferModelCapabilities(modelId: string): ModelCapabilities {
     imageOutput,
     speechOutput,
     transcription,
+    realtime: /realtime|live/.test(lower),
     toolCalling: textGeneration && !imageOutput,
     reasoning:
       textGeneration &&

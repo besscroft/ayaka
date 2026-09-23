@@ -45,6 +45,7 @@ const APP_SETTING_KEYS: string[] = [
   SettingKey.ChatReasoningLevel,
   SettingKey.MemoryLlmModel,
   SettingKey.MemoryEmbeddingModel,
+  SettingKey.RealtimeVoiceModel,
 ];
 
 const ALL_KEYS = [...APP_SETTING_KEYS, SettingKey.ActiveConversationId];
@@ -174,6 +175,7 @@ export function parseSettings(map: Record<string, string | null>): AppSettings {
     chatReasoningLevel,
     memoryLlmModel: map[SettingKey.MemoryLlmModel] || null,
     memoryEmbeddingModel: map[SettingKey.MemoryEmbeddingModel] || null,
+    realtimeVoiceModel: map[SettingKey.RealtimeVoiceModel] || null,
   };
 }
 
@@ -274,6 +276,8 @@ export function SettingsProvider({ children }: { children: ReactNode }): React.J
         key: SettingKey.MemoryEmbeddingModel,
         value: patch.memoryEmbeddingModel ?? "",
       });
+    if (patch.realtimeVoiceModel !== undefined)
+      writes.push({ key: SettingKey.RealtimeVoiceModel, value: patch.realtimeVoiceModel ?? "" });
     await api.settings.setAll(writes);
   }, []);
 

@@ -12,6 +12,10 @@ import {
   permanentlyDeleteConversations,
   purgeExpiredDeletedConversations,
   touchConversation,
+  createRealtimeSession,
+  listRealtimeSessions,
+  saveRealtimeSessionTranscript,
+  deleteRealtimeSession,
   getMessagesSnapshot,
   saveMessage,
   saveMessagesBatch,
@@ -116,6 +120,7 @@ import type {
   TrayMenuLabels,
   ErrorLogInput,
   SettingEntry,
+  RealtimeSessionMessage,
 } from "../../shared/types";
 import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID, SettingKey } from "../../shared/types";
@@ -412,6 +417,23 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   // ---------- 会话历史 ----------
   ipcMain.handle("conversations:list", () => listConversations());
+
+  ipcMain.handle("realtimeSessions:list", () => listRealtimeSessions());
+  ipcMain.handle("realtimeSessions:create", async (_e, input: unknown) => {
+    if (!isRealtimeSessionCreateInput(input)) throw new Error("Invalid realtime session.");
+    return createRealtimeSession(input);
+  });
+  ipcMain.handle("realtimeSessions:saveTranscript", async (_e, id: string, messages: unknown) => {
+    if (!isSessionId(id) || !isRealtimeSessionMessages(messages))
+      throw new Error("Invalid realtime transcript.");
+    const saved = await saveRealtimeSessionTranscript(id, messages);
+    if (!saved) throw new Error("Realtime session was not found.");
+    return listRealtimeSessions().find((session) => session.id === id) ?? null;
+  });
+  ipcMain.handle("realtimeSessions:delete", async (_e, id: string) => {
+    if (!isSessionId(id)) throw new Error("Invalid realtime session ID.");
+    return deleteRealtimeSession(id);
+  });
 
   ipcMain.handle("conversations:get", (_e, id: string) => getConversation(id));
 
@@ -1276,6 +1298,47 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
       resourcesPath: process.resourcesPath,
     }),
   );
+}
+
+function isSessionId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,96}$/.test(value);
+}
+
+function isRealtimeSessionCreateInput(
+  value: unknown,
+): value is { id: string; providerId: string; modelId: string; title?: string } {
+  if (value === null || typeof value !== "object") return false;
+  const input = value as Record<string, unknown>;
+  return (
+    isSessionId(input.id) &&
+    typeof input.providerId === "string" &&
+    /^[a-z0-9._-]{1,48}$/.test(input.providerId) &&
+    typeof input.modelId === "string" &&
+    /^[a-zA-Z0-9._-]{1,128}$/.test(input.modelId) &&
+    (input.title === undefined || (typeof input.title === "string" && input.title.length <= 128))
+  );
+}
+
+function isRealtimeSessionMessages(value: unknown): value is RealtimeSessionMessage[] {
+  if (!Array.isArray(value) || value.length > 2_000) return false;
+  let totalCharacters = 0;
+  for (const message of value) {
+    if (message === null || typeof message !== "object") return false;
+    const item = message as Record<string, unknown>;
+    if (
+      !isSessionId(item.id) ||
+      (item.role !== "user" && item.role !== "assistant") ||
+      typeof item.text !== "string" ||
+      item.text.length > 16_000 ||
+      typeof item.createdAt !== "number" ||
+      !Number.isFinite(item.createdAt)
+    ) {
+      return false;
+    }
+    totalCharacters += item.text.length;
+    if (totalCharacters > 1_000_000) return false;
+  }
+  return true;
 }
 
 function isSkillScriptInput(value: unknown): value is Omit<SkillRunInput, "skillId"> {

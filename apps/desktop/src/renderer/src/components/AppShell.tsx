@@ -24,7 +24,7 @@ import type { MainSection } from "./MainPanelView";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { WindowTitleBar } from "./WindowTitleBar";
 
-export type AppView = "chat" | MainSection;
+export type AppView = "chat" | "realtime" | MainSection;
 
 interface AppShellProps {
   activeView: AppView;
@@ -34,6 +34,7 @@ interface AppShellProps {
   onCreateConversation: () => void;
   onDeleteConversation: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenRealtime: () => void;
   children: ReactNode;
 }
 
@@ -56,6 +57,7 @@ export function AppShell({
   onCreateConversation,
   onDeleteConversation,
   onOpenSettings,
+  onOpenRealtime,
   children,
 }: AppShellProps): React.JSX.Element {
   const { t, locale } = useT();
@@ -67,6 +69,8 @@ export function AppShell({
   const [runningConversationIds, setRunningConversationIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const isRealtimeView = activeView === "realtime";
+  const sidebarVisible = sidebarExpanded && !isRealtimeView;
 
   const refresh = (): void => {
     void api.conversations.list().then(setConversations);
@@ -230,16 +234,19 @@ export function AppShell({
       className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground"
     >
       <WindowTitleBar
-        sidebarExpanded={sidebarExpanded}
+        sidebarExpanded={sidebarVisible}
         onToggleSidebar={() => setSidebarExpanded((expanded) => !expanded)}
+        onOpenRealtime={onOpenRealtime}
+        realtimeActive={isRealtimeView}
+        showSidebarToggle={!isRealtimeView}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <motion.aside
           initial={false}
           animate={{
-            width: sidebarExpanded ? 280 : 0,
-            opacity: sidebarExpanded ? 1 : 0,
+            width: sidebarVisible ? 280 : 0,
+            opacity: sidebarVisible ? 1 : 0,
           }}
           transition={
             reduceMotion
@@ -253,8 +260,8 @@ export function AppShell({
                 }
           }
           className="app-sidebar shrink-0 overflow-hidden bg-sidebar"
-          aria-hidden={!sidebarExpanded}
-          inert={!sidebarExpanded}
+          aria-hidden={!sidebarVisible}
+          inert={!sidebarVisible}
         >
           <div className="flex h-full w-[280px] flex-col border-r border-sidebar-border">
             <nav

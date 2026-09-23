@@ -135,6 +135,13 @@ const api = {
     purgeExpired: () => ipcRenderer.invoke("conversations:purgeExpired"),
     touch: (id: string, title?: string) => ipcRenderer.invoke("conversations:touch", id, title),
   },
+  realtimeSessions: {
+    list: () => ipcRenderer.invoke("realtimeSessions:list"),
+    create: (input: unknown) => ipcRenderer.invoke("realtimeSessions:create", input),
+    saveTranscript: (id: string, messages: unknown) =>
+      ipcRenderer.invoke("realtimeSessions:saveTranscript", id, messages),
+    delete: (id: string) => ipcRenderer.invoke("realtimeSessions:delete", id),
+  },
   messages: {
     list: (conversationId: string) => ipcRenderer.invoke("messages:list", conversationId),
     save: (msg: unknown) => ipcRenderer.invoke("messages:save", msg),

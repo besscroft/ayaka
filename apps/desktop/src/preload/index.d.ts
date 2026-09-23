@@ -43,6 +43,8 @@ import type {
   MessageRow,
   MessageSnapshot,
   ConversationHydration,
+  RealtimeSessionMessage,
+  RealtimeSessionRecord,
   SettingEntry,
   ToolDiscoveryResult,
   ToolServer,
@@ -123,6 +125,20 @@ export interface AyakaApi {
     permanentDeleteBatch: (ids: string[]) => Promise<number>;
     purgeExpired: () => Promise<number>;
     touch: (id: string, title?: string) => Promise<boolean>;
+  };
+  realtimeSessions: {
+    list: () => Promise<RealtimeSessionRecord[]>;
+    create(input: {
+      id: string;
+      providerId: string;
+      modelId: string;
+      title?: string;
+    }): Promise<unknown>;
+    saveTranscript(
+      id: string,
+      messages: RealtimeSessionMessage[],
+    ): Promise<RealtimeSessionRecord | null>;
+    delete(id: string): Promise<boolean>;
   };
   // 消息
   messages: {

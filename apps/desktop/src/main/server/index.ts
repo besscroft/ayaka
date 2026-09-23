@@ -41,6 +41,7 @@ export interface CreateAppOptions {
   resolveModel?: (modelRef: string) => ResolvedChatModel;
   resolveConfiguredVisionModelRef?: typeof resolveConfiguredVisionModelRef;
   resolveMediaModel?: typeof import("../lib/providers").resolveMediaModel;
+  createRealtimeToken?: typeof import("../lib/providers").createRealtimeToken;
   writeMediaAsset?: typeof import("../lib/media-assets").writeMediaAsset;
   buildAgentSystemPrompt?: (
     agentId?: string | null,
@@ -160,6 +161,15 @@ export function createDesktopRuntimeAdapter(options: CreateAppOptions = {}): Cor
         writeMediaAsset: options.writeMediaAsset,
         conversationId: input.conversationId,
       });
+    },
+
+    async createRealtimeToken(modelRef, sessionConfig) {
+      const createToken =
+        options.createRealtimeToken ?? (await import("../lib/providers")).createRealtimeToken;
+      return createToken(
+        modelRef,
+        sessionConfig as import("ai").Experimental_RealtimeSessionConfig,
+      );
     },
 
     classifyChatError(error, errorOptions): CoreChatErrorClassification {

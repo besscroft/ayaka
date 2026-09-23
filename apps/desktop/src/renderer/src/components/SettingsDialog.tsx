@@ -59,6 +59,7 @@ import {
   IconSearch,
   IconFolderOpen,
   IconImage,
+  IconMic,
   IconEye,
   IconEyeOff,
   IconDownload,
@@ -947,6 +948,31 @@ function GeneralSettings({
 
   const memoryLlmOptions = memoryModelOptions("llm", settings.memoryLlmModel);
   const memoryEmbeddingOptions = memoryModelOptions("embedding", settings.memoryEmbeddingModel);
+  const realtimeVoiceModelOptions: Array<{ value: string; label: string; disabled?: boolean }> = [
+    { value: "", label: t("settings.general.auto") },
+    ...providers.flatMap((provider) =>
+      provider.realtimeEnabled && provider.hasApiKey
+        ? provider.models
+            .filter(
+              (model) => model.enabled && model.hasApiKey && model.capabilities.realtime === true,
+            )
+            .map((model) => ({
+              value: `${provider.id}/${model.id}`,
+              label: `${provider.label} / ${model.label ?? model.id}`,
+            }))
+        : [],
+    ),
+  ];
+  if (
+    settings.realtimeVoiceModel &&
+    !realtimeVoiceModelOptions.some((option) => option.value === settings.realtimeVoiceModel)
+  ) {
+    realtimeVoiceModelOptions.push({
+      value: settings.realtimeVoiceModel,
+      label: `${t("settings.general.memory.unavailableSelection")} (${settings.realtimeVoiceModel})`,
+      disabled: true,
+    });
+  }
   const hasMemoryLlmCandidate = memoryLlmOptions.some(
     (option) => option.value !== "" && option.disabled !== true,
   );
@@ -1024,6 +1050,25 @@ function GeneralSettings({
               }
             />
           ))}
+        </SettingSection>
+        <SettingSection
+          title={t("settings.general.realtime.title")}
+          desc={t("settings.general.realtime.desc")}
+          icon={<IconMic className="size-3.5" />}
+        >
+          <SettingItem
+            title={t("settings.general.realtime.model")}
+            desc={t("settings.general.realtime.modelDesc")}
+            control={
+              <SelectField
+                className="min-w-64"
+                value={settings.realtimeVoiceModel ?? ""}
+                options={realtimeVoiceModelOptions}
+                onChange={(value) => void update({ realtimeVoiceModel: value || null })}
+                ariaLabel={t("settings.general.realtime.model")}
+              />
+            }
+          />
         </SettingSection>
         <SettingSection
           title={t("settings.general.vision.title")}
@@ -1452,6 +1497,7 @@ function ModelEditorDialog({
     label: "",
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+    realtimeEnabled: false,
   });
   const [modelForm, setModelForm] = useState<ModelFormState>(() =>
     createEmptyModelForm(providers[0]?.id ?? ""),
@@ -1468,6 +1514,7 @@ function ModelEditorDialog({
         label: model.providerLabel,
         baseUrl: model.providerBaseUrl ?? "",
         apiFormat: model.providerApiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+        realtimeEnabled: providers.find((item) => item.id === model.providerId)?.realtimeEnabled,
       });
       setModelForm({
         providerId: model.providerId,
@@ -1489,6 +1536,7 @@ function ModelEditorDialog({
       label: "",
       baseUrl: "",
       apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+      realtimeEnabled: false,
     });
     setModelForm(createEmptyModelForm(providers[0]?.id ?? ""));
     setApiKey("");
@@ -1864,6 +1912,7 @@ const DEFAULT_MODEL_CAPABILITIES: ModelCapabilities = {
   imageOutput: false,
   speechOutput: false,
   transcription: false,
+  realtime: false,
   toolCalling: true,
   reasoning: false,
   embedding: false,
@@ -1985,11 +2034,13 @@ function ProviderModelWorkbench({
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [providerQuery, setProviderQuery] = useState("");
+  const [modelQuery, setModelQuery] = useState("");
   const [providerForm, setProviderForm] = useState<CustomProviderInput>({
     id: "",
     label: "",
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+    realtimeEnabled: false,
   });
   const [providerApiKey, setProviderApiKey] = useState("");
   const [providerApiKeyProviderId, setProviderApiKeyProviderId] = useState<string | null>(null);
@@ -2070,6 +2121,7 @@ function ProviderModelWorkbench({
       label: selectedProvider.label,
       baseUrl: selectedProvider.baseUrl ?? "",
       apiFormat: selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+      realtimeEnabled: selectedProvider.realtimeEnabled,
     });
     setProviderApiKeyProviderId(selectedProvider.id);
     setProviderApiKey(selectedProvider.hasProviderApiKey ? MASKED_PROVIDER_API_KEY : "");
@@ -2080,6 +2132,7 @@ function ProviderModelWorkbench({
     selectedProvider?.id,
     selectedProvider?.label,
     selectedProvider?.apiFormat,
+    selectedProvider?.realtimeEnabled,
   ]);
 
   const filteredProviders = useMemo(() => {
@@ -2109,6 +2162,13 @@ function ProviderModelWorkbench({
   const canEditProvider = selectedProvider?.source === "custom";
   const selectedProviderIsAnonymous = selectedProvider?.authKind === "none";
   const selectedModels = selectedProvider?.models ?? [];
+  const filteredModels = useMemo(() => {
+    const query = modelQuery.trim().toLowerCase();
+    if (!query) return selectedModels;
+    return selectedModels.filter((model) =>
+      [model.label ?? "", model.id].some((value) => value.toLowerCase().includes(query)),
+    );
+  }, [modelQuery, selectedModels]);
   const enabledCount = selectedModels.filter((model) => model.enabled).length;
   const canSaveProvider =
     !!selectedProvider &&
@@ -2151,6 +2211,7 @@ function ProviderModelWorkbench({
       model.capabilities.toolCalling ? t("model.capability.toolCalling") : "",
       model.capabilities.reasoning ? t("model.capability.reasoning") : "",
       model.capabilities.embedding ? t("model.capability.embedding") : "",
+      model.capabilities.realtime ? t("model.capability.realtime") : "",
     ].filter(Boolean);
     return caps.length > 0 ? caps.join(" / ") : t("common.none");
   };
@@ -2200,6 +2261,7 @@ function ProviderModelWorkbench({
         label: providerForm.label,
         baseUrl: providerForm.baseUrl,
         apiFormat: providerForm.apiFormat,
+        realtimeEnabled: providerForm.realtimeEnabled,
       });
 
       if (providerApiKeyValue.trim() && !providerApiKeyIsMasked) {
@@ -2625,6 +2687,20 @@ function ProviderModelWorkbench({
                     />
                   </label>
                 )}
+                {canEditProvider && (
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <Switch
+                      size="sm"
+                      isSelected={providerForm.realtimeEnabled === true}
+                      onChange={(realtimeEnabled) =>
+                        setProviderForm((prev) => ({ ...prev, realtimeEnabled }))
+                      }
+                    >
+                      {t("model.provider.realtimeEnabled")}
+                    </Switch>
+                    <p className="text-xs text-foreground/45">{t("model.provider.realtimeHint")}</p>
+                  </div>
+                )}
                 {!selectedProviderIsAnonymous && (
                   <TextField className="md:col-span-2">
                     <Label>{t("model.apiKey")}</Label>
@@ -2697,7 +2773,18 @@ function ProviderModelWorkbench({
                       })}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative w-full md:w-52">
+                      <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        aria-label={t("model.models.search")}
+                        value={modelQuery}
+                        onChange={(event) => setModelQuery(event.currentTarget.value)}
+                        placeholder={t("model.models.search")}
+                        className="select-text pl-9"
+                      />
+                    </div>
                     <Button
                       variant="secondary"
                       size="sm"
@@ -2728,9 +2815,13 @@ function ProviderModelWorkbench({
                   <div className="flex flex-1 min-h-0 items-center justify-center px-4 py-10 text-center text-sm text-foreground/50">
                     {t("model.provider.emptyModels")}
                   </div>
+                ) : filteredModels.length === 0 ? (
+                  <div className="flex flex-1 min-h-0 items-center justify-center px-4 py-10 text-center text-sm text-foreground/50">
+                    {t("model.models.noMatches")}
+                  </div>
                 ) : (
                   <div className="flex-1 min-h-0 divide-y divide-foreground/10 overflow-y-auto">
-                    {selectedModels.map((model) => {
+                    {filteredModels.map((model) => {
                       const ref = providerModelRef(selectedProvider.id, model.id);
                       const selected = settings.selectedModel === ref;
                       const optionCount = Object.keys(model.providerOptions ?? {}).length;
@@ -2895,6 +2986,7 @@ function AddProviderDialog({
     label: "",
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+    realtimeEnabled: false,
   });
 
   useEffect(() => {
@@ -2904,6 +2996,7 @@ function AddProviderDialog({
         label: "",
         baseUrl: "",
         apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+        realtimeEnabled: false,
       });
     }
   }, [open]);
@@ -3010,6 +3103,16 @@ function AddProviderDialog({
                 ariaLabel={t("model.apiFormat")}
               />
             </label>
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <Switch
+                size="sm"
+                isSelected={form.realtimeEnabled === true}
+                onChange={(realtimeEnabled) => setForm((prev) => ({ ...prev, realtimeEnabled }))}
+              >
+                {t("model.provider.realtimeEnabled")}
+              </Switch>
+              <p className="text-xs text-foreground/45">{t("model.provider.realtimeHint")}</p>
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -3322,12 +3425,13 @@ function ModelOptionsDialog({
                     ["toolCalling", "model.capability.toolCalling"],
                     ["reasoning", "model.capability.reasoning"],
                     ["embedding", "model.capability.embedding"],
+                    ["realtime", "model.capability.realtime"],
                   ] as const
                 ).map(([key, labelKey]) => (
                   <Switch
                     key={key}
                     size="sm"
-                    isSelected={form.capabilities[key]}
+                    isSelected={form.capabilities[key] === true}
                     onChange={(enabled) => updateCapabilities({ [key]: enabled })}
                   >
                     {t(labelKey)}

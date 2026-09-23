@@ -2332,6 +2332,7 @@ export const MODEL_CAPABILITY_KEYS = [
   "toolCalling",
   "reasoning",
   "embedding",
+  "realtime",
 ] as const;
 
 export type ModelCapabilityKey = (typeof MODEL_CAPABILITY_KEYS)[number];
@@ -2347,6 +2348,8 @@ export interface ModelCapabilities {
   toolCalling: boolean;
   reasoning: boolean;
   embedding: boolean;
+  /** Whether this model supports a provider's bidirectional realtime API. */
+  realtime?: boolean;
   /** Per-tool overrides for providers whose model catalog cannot describe tools precisely. */
   toolCapabilities?: Partial<Record<ChatToolId, boolean>>;
 }
@@ -2388,6 +2391,8 @@ export interface ProviderInfo {
   apiFormat?: CustomProviderApiFormat;
   /** Authentication mode. Missing legacy values are treated as `api-key`. */
   authKind?: ProviderAuthKind;
+  /** Custom OpenAI-compatible provider has declared OpenAI Realtime protocol support. */
+  realtimeEnabled?: boolean;
   /** Provider-level or legacy model-level API key is available. */
   hasApiKey: boolean;
   /** A provider-level API key is configured. */
@@ -2399,6 +2404,7 @@ export interface CustomProviderInput {
   label: string;
   baseUrl: string;
   apiFormat?: CustomProviderApiFormat;
+  realtimeEnabled?: boolean;
 }
 
 export interface CustomModelInput {
@@ -2425,6 +2431,7 @@ export interface ModelCatalogSettings {
     kind: "openai-compatible";
     baseUrl: string;
     apiFormat?: CustomProviderApiFormat;
+    realtimeEnabled?: boolean;
     createdAt: number;
     updatedAt: number;
   }>;
@@ -2452,6 +2459,23 @@ export interface ModelCatalogSettings {
     enabled: boolean;
     updatedAt: number;
   }>;
+}
+
+export interface RealtimeSessionMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: number;
+}
+
+export interface RealtimeSessionRecord {
+  id: string;
+  title: string;
+  providerId: string;
+  modelId: string;
+  messages: RealtimeSessionMessage[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 /** Cached metadata for a built-in provider, kept separate from custom providers. */
@@ -2692,6 +2716,8 @@ export const SettingKey = {
   MemoryLlmModel: "memory_llm_model",
   /** Memory embedding model reference; empty means automatic selection. */
   MemoryEmbeddingModel: "memory_embedding_model",
+  /** Default model for realtime voice conversations; empty means first available. */
+  RealtimeVoiceModel: "realtime_voice_model",
   /** Per-conversation chat tool mode and manual selections. */
   ChatTools: "chat_tools",
   /** Global and per-conversation chat permission modes. */
@@ -2875,6 +2901,7 @@ export interface AppSettings {
   chatReasoningLevel: ChatReasoningLevel;
   memoryLlmModel: string | null;
   memoryEmbeddingModel: string | null;
+  realtimeVoiceModel: string | null;
 }
 
 /**
@@ -2900,4 +2927,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   chatReasoningLevel: "provider-default",
   memoryLlmModel: null,
   memoryEmbeddingModel: null,
+  realtimeVoiceModel: null,
 };

@@ -21,6 +21,7 @@ import "./main/lib/agent-learning.test.ts";
 import "./main/lib/openai-compatible-model.test.ts";
 import "./main/lib/opencode-free-catalog.test.ts";
 import "./main/lib/providers.test.ts";
+import "./main/lib/realtime-sessions.test.ts";
 import "./main/lib/runtime-architecture.test.ts";
 import "./main/lib/runtime-paths.test.ts";
 import "./main/lib/skill-executor-policy.test.ts";

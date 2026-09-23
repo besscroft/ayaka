@@ -5,6 +5,8 @@ import type {
   ErrorLogExportResult,
   Conversation,
   ConversationHydration,
+  RealtimeSessionMessage,
+  RealtimeSessionRecord,
   ArtifactInstallation,
   CatalogInstallInput,
   CatalogItemDetail,
@@ -143,6 +145,17 @@ export const api = {
     purgeExpired: (): Promise<number> => assertApi().conversations.purgeExpired(),
     touch: (id: string, title?: string): Promise<boolean> =>
       assertApi().conversations.touch(id, title),
+  },
+  realtimeSessions: {
+    list: (): Promise<RealtimeSessionRecord[]> => assertApi().realtimeSessions.list(),
+    create: (input: { id: string; providerId: string; modelId: string; title?: string }) =>
+      assertApi().realtimeSessions.create(input),
+    saveTranscript: (
+      id: string,
+      messages: RealtimeSessionMessage[],
+    ): Promise<RealtimeSessionRecord | null> =>
+      assertApi().realtimeSessions.saveTranscript(id, messages),
+    delete: (id: string): Promise<boolean> => assertApi().realtimeSessions.delete(id),
   },
   messages: {
     list: (conversationId: string): Promise<MessageSnapshot> =>

@@ -40,6 +40,30 @@ export function createCoreApp(options: CoreAppOptions): Hono {
 
   app.get("/api/models", async (c) => c.json({ providers: await runtime.listModels() }));
 
+  app.post("/api/realtime/setup", async (c) => {
+    if (!(await isRealtimeSetupAuthorized(c.req.raw, options)))
+      return c.json({ error: "unauthorized" }, 401);
+    if (!runtime.createRealtimeToken) return c.json({ error: "realtime_unavailable" }, 404);
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_request" }, 400);
+    }
+    const model = c.req.query("model") ?? "";
+    if (!isRealtimeSetupRequest(model, body)) return c.json({ error: "invalid_request" }, 400);
+
+    try {
+      const setup = body as { sessionConfig: Record<string, unknown> };
+      const result = await runtime.createRealtimeToken(model, setup.sessionConfig);
+      return c.json({ ...result, tools: [] });
+    } catch {
+      console.error("[core] realtime setup failed.");
+      return c.json({ error: "realtime_setup_failed" }, 502);
+    }
+  });
+
   app.post("/api/media/generate", async (c) => {
     if (!(await isAuthorized(c.req.raw, options))) return unauthorizedMediaResponse(c);
 
@@ -255,6 +279,80 @@ async function isAuthorized(request: Request, options: CoreAppOptions): Promise<
   if (options.authorize) return options.authorize(request);
   if (options.sessionToken === undefined) return true;
   return request.headers.get(CHAT_SESSION_HEADER) === options.sessionToken;
+}
+
+async function isRealtimeSetupAuthorized(
+  request: Request,
+  options: CoreAppOptions,
+): Promise<boolean> {
+  if (options.authorize) return options.authorize(request);
+  if (options.sessionToken === undefined) return true;
+  const provided = new URL(request.url).searchParams.get("session") ?? "";
+  return constantTimeEqual(provided, options.sessionToken);
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const leftBytes = new TextEncoder().encode(left);
+  const rightBytes = new TextEncoder().encode(right);
+  if (leftBytes.length !== rightBytes.length) return false;
+  let difference = 0;
+  for (let index = 0; index < leftBytes.length; index++)
+    difference |= leftBytes[index] ^ rightBytes[index];
+  return difference === 0;
+}
+
+function isRealtimeSetupRequest(
+  model: string,
+  value: unknown,
+): value is { sessionConfig: Record<string, unknown> } {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).some((key) => key !== "sessionConfig")) return false;
+  if (!/^[a-z0-9._-]{1,48}\/[a-zA-Z0-9._-]{1,128}$/.test(model)) return false;
+  if (
+    record.sessionConfig === null ||
+    typeof record.sessionConfig !== "object" ||
+    Array.isArray(record.sessionConfig)
+  )
+    return false;
+  const config = record.sessionConfig as Record<string, unknown>;
+  const allowedKeys = new Set([
+    "instructions",
+    "voice",
+    "inputAudioTranscription",
+    "outputAudioTranscription",
+    "turnDetection",
+    "outputModalities",
+  ]);
+  if (Object.keys(config).some((key) => !allowedKeys.has(key))) return false;
+  return (
+    typeof config.instructions === "string" &&
+    config.instructions.length <= 16_000 &&
+    (config.voice === undefined ||
+      (typeof config.voice === "string" && config.voice.length > 0 && config.voice.length <= 64)) &&
+    isEmptyRecord(config.inputAudioTranscription) &&
+    isEmptyRecord(config.outputAudioTranscription) &&
+    (config.outputModalities === undefined ||
+      (Array.isArray(config.outputModalities) &&
+        config.outputModalities.length <= 2 &&
+        config.outputModalities.every(
+          (modality) => modality === "text" || modality === "audio",
+        ))) &&
+    (config.turnDetection === undefined ||
+      (config.turnDetection !== null &&
+        typeof config.turnDetection === "object" &&
+        (config.turnDetection as Record<string, unknown>).type === "server-vad"))
+  );
+}
+
+function isEmptyRecord(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0)
+  );
 }
 
 function unauthorizedMediaResponse(c: Context) {

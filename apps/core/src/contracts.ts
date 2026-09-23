@@ -128,6 +128,10 @@ export interface CoreRuntime {
   chat(input: CoreChatInput): Promise<Response>;
   generateText(input: CoreTextGenerationInput): Promise<{ text: string }>;
   generateMedia(input: CoreMediaGenerationRequest): Promise<CoreMediaGenerationResponse>;
+  createRealtimeToken?: (
+    modelRef: string,
+    sessionConfig: Record<string, unknown>,
+  ) => Promise<{ token: string; url: string; expiresAt?: number }>;
   classifyChatError?: (
     error: unknown,
     options?: { phase?: "request" | "stream"; abortSignal?: AbortSignal },

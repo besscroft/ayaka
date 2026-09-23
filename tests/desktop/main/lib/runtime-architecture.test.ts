@@ -81,7 +81,18 @@ void describe("runtime architecture", () => {
       "0007_military_white_queen.sql",
       "0008_dapper_captain_midlands.sql",
       "0009_chubby_doctor_spectrum.sql",
+      "0010_safe_human_fly.sql",
     ]);
+  });
+
+  void it("stores Realtime transcripts in a separate text-only table", () => {
+    const migration = readFileSync(
+      path.join(process.cwd(), "drizzle", "0010_safe_human_fly.sql"),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE `realtime_sessions`/);
+    assert.match(migration, /`transcript_json` text DEFAULT '\[\]' NOT NULL/);
+    assert.doesNotMatch(migration, /audio|blob/i);
   });
 
   void it("adds MCP runtime state without deleting existing configuration", () => {

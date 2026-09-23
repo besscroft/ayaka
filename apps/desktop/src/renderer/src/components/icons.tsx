@@ -35,6 +35,7 @@ import {
   LayoutDashboard,
   Link,
   List,
+  Mic,
   MessageSquare,
   MoreHorizontal,
   Moon,
@@ -105,6 +106,7 @@ export const IconCode = fromLucide(Code2);
 export const IconCircleDashed = fromLucide(CircleDashed);
 export const IconBrain = fromLucide(Brain);
 export const IconMessage = fromLucide(MessageSquare);
+export const IconMic = fromLucide(Mic);
 export const IconKey = fromLucide(Key);
 export const IconCheck = fromLucide(Check);
 export const IconClose = fromLucide(X);

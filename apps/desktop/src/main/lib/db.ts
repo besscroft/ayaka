@@ -31,6 +31,7 @@ import {
   memoryObservations,
   memoryJobs,
   messages,
+  realtimeSessions,
   modelApiKeys,
   runtimeEvents,
   runtimeRuns,
@@ -74,6 +75,7 @@ import {
   type NewToolSecret,
   type NewToolServer,
   type ConversationWorkspace,
+  type RealtimeSessionRow,
   type NewConversationWorkspace,
   type RuntimeEvent as DbRuntimeEvent,
   type RuntimeRun as DbRuntimeRun,
@@ -164,6 +166,8 @@ import {
   type McpLifecycleState,
   type McpDependencyStatus,
   type SandboxSessionView,
+  type RealtimeSessionRecord,
+  type RealtimeSessionMessage,
 } from "../../shared/types";
 import { removeAgentSoulFiles } from "./agent-memory-file-storage";
 import { resolveUserDataDir } from "./runtime-paths";
@@ -407,6 +411,101 @@ export async function createConversation(
   };
   getDb().insert(conversations).values(row).run();
   return row;
+}
+
+export async function createRealtimeSession(input: {
+  id: string;
+  providerId: string;
+  modelId: string;
+  title?: string;
+}): Promise<RealtimeSessionRow> {
+  if (shouldRouteWrites()) return writeDb<RealtimeSessionRow>("createRealtimeSession", [input]);
+  const now = Date.now();
+  const row: RealtimeSessionRow = {
+    id: input.id,
+    title: input.title?.trim() || "New realtime conversation",
+    provider_id: input.providerId,
+    model_id: input.modelId,
+    transcript_json: "[]",
+    created_at: now,
+    updated_at: now,
+  };
+  getDb().insert(realtimeSessions).values(row).run();
+  return row;
+}
+
+export function listRealtimeSessions(): RealtimeSessionRecord[] {
+  return getDb()
+    .select()
+    .from(realtimeSessions)
+    .orderBy(desc(realtimeSessions.updated_at))
+    .all()
+    .map(dbRealtimeSessionToShared);
+}
+
+export function getRealtimeSession(id: string): RealtimeSessionRecord | null {
+  const row = getDb().select().from(realtimeSessions).where(eq(realtimeSessions.id, id)).get();
+  return row ? dbRealtimeSessionToShared(row) : null;
+}
+
+export async function saveRealtimeSessionTranscript(
+  id: string,
+  messages: RealtimeSessionMessage[],
+): Promise<RealtimeSessionRow | null> {
+  if (shouldRouteWrites())
+    return writeDb<RealtimeSessionRow | null>("saveRealtimeSessionTranscript", [id, messages]);
+  const existing = getDb().select().from(realtimeSessions).where(eq(realtimeSessions.id, id)).get();
+  if (!existing) return null;
+  const firstUserMessage = messages.find(
+    (message) => message.role === "user" && message.text.trim(),
+  );
+  const title = firstUserMessage?.text.trim().slice(0, 72) || existing.title;
+  const updatedAt = Date.now();
+  getDb()
+    .update(realtimeSessions)
+    .set({
+      title,
+      transcript_json: JSON.stringify(messages),
+      updated_at: updatedAt,
+    })
+    .where(eq(realtimeSessions.id, id))
+    .run();
+  return getDb().select().from(realtimeSessions).where(eq(realtimeSessions.id, id)).get() ?? null;
+}
+
+export async function deleteRealtimeSession(id: string): Promise<boolean> {
+  if (shouldRouteWrites()) return writeDb<boolean>("deleteRealtimeSession", [id]);
+  return getDb().delete(realtimeSessions).where(eq(realtimeSessions.id, id)).run().changes > 0;
+}
+
+function dbRealtimeSessionToShared(row: RealtimeSessionRow): RealtimeSessionRecord {
+  let messages: RealtimeSessionMessage[] = [];
+  try {
+    const parsed = JSON.parse(row.transcript_json) as unknown;
+    if (Array.isArray(parsed)) {
+      messages = parsed.filter(
+        (message): message is RealtimeSessionMessage =>
+          message !== null &&
+          typeof message === "object" &&
+          typeof (message as RealtimeSessionMessage).id === "string" &&
+          ((message as RealtimeSessionMessage).role === "user" ||
+            (message as RealtimeSessionMessage).role === "assistant") &&
+          typeof (message as RealtimeSessionMessage).text === "string" &&
+          typeof (message as RealtimeSessionMessage).createdAt === "number",
+      );
+    }
+  } catch {
+    messages = [];
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    providerId: row.provider_id,
+    modelId: row.model_id,
+    messages,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function listConversations(): Conversation[] {

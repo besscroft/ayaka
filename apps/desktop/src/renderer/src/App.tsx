@@ -3,6 +3,7 @@ import { AppShell, type AppView } from "./components/AppShell";
 import { ChatView } from "./components/ChatView";
 import { SettingsDialog, type SettingsTabId } from "./components/SettingsDialog";
 import { MainPanelView } from "./components/MainPanelView";
+import { RealtimeView } from "./components/RealtimeView";
 import { api } from "./lib/api";
 import { handleTrayAction } from "./lib/tray-actions";
 import { SettingsProvider, useSettings } from "./lib/settings";
@@ -208,6 +209,7 @@ function AppContent(): React.JSX.Element {
           setSettingsInitialTab("appearance");
           setSettingsOpen(true);
         }}
+        onOpenRealtime={() => setActiveView("realtime")}
       >
         <div
           className={activeView === "chat" ? "flex min-h-0 flex-1" : "hidden"}
@@ -226,7 +228,10 @@ function AppContent(): React.JSX.Element {
             </div>
           )}
         </div>
-        {activeView !== "chat" ? (
+        {activeView === "realtime" ? (
+          <RealtimeView serverInfo={serverInfo} onReturnToChat={() => setActiveView("chat")} />
+        ) : null}
+        {activeView !== "chat" && activeView !== "realtime" ? (
           <MainPanelView section={activeView} activeConversationId={activeId} />
         ) : null}
       </AppShell>

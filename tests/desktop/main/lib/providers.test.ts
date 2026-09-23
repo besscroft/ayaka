@@ -1,4 +1,5 @@
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { createServer } from "node:http";
 import assert from "node:assert/strict";
 import { SettingKey, type ModelCatalogSettings } from "@shared/types";
 
@@ -126,6 +127,128 @@ void describe("provider helpers", () => {
       Promise.resolve().then(() => providerHelpers.revealProviderApiKey("missing-provider")),
       /Unknown provider/,
     );
+  });
+
+  void it("only resolves custom Realtime models after explicit provider opt-in", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "realtime-custom",
+      label: "Realtime Custom",
+      baseUrl: "https://realtime.example/v1",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "realtime-custom",
+      id: "voice-model",
+      capabilities: { ...capabilities, realtime: true },
+    });
+    await providerHelpers.saveProviderApiKey("realtime-custom", "provider-key");
+    assert.equal(
+      providerHelpers.listProviders().find((provider) => provider.id === "realtime-custom")
+        ?.realtimeEnabled,
+      false,
+    );
+    assert.throws(
+      () => providerHelpers.resolveRealtimeModel("realtime-custom/voice-model"),
+      /not enabled/,
+    );
+
+    await providerHelpers.upsertCustomProvider({
+      id: "realtime-custom",
+      label: "Realtime Custom",
+      baseUrl: "https://realtime.example/v1",
+      realtimeEnabled: true,
+    });
+    const resolved = providerHelpers.resolveRealtimeModel("realtime-custom/voice-model");
+    assert.equal(resolved.providerId, "realtime-custom");
+    assert.equal(resolved.baseUrl, "https://realtime.example/v1");
+    assert.equal(resolved.apiKey, "provider-key");
+  });
+
+  void it("rejects disabled or keyless Realtime models", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "realtime-keyless",
+      label: "Realtime Keyless",
+      baseUrl: "https://realtime-keyless.example/v1",
+      realtimeEnabled: true,
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "realtime-keyless",
+      id: "voice-model",
+      capabilities: { ...capabilities, realtime: true },
+    });
+    assert.throws(
+      () => providerHelpers.resolveRealtimeModel("realtime-keyless/voice-model"),
+      /API key is not configured/,
+    );
+    assert.throws(
+      () => providerHelpers.resolveRealtimeModel("openrouter/voice-model"),
+      /not enabled/,
+    );
+  });
+
+  void it("infers Realtime capability only from realtime model names", () => {
+    assert.equal(providerHelpers.inferModelCapabilities("gpt-realtime").realtime, true);
+    assert.equal(providerHelpers.inferModelCapabilities("gpt-4o").realtime, false);
+  });
+
+  void it("mints a short-lived client token with the stored provider key kept server-side", async () => {
+    let requestPath = "";
+    let authorization = "";
+    let requestBody: Record<string, unknown> = {};
+    const server = createServer((request, response) => {
+      requestPath = request.url ?? "";
+      authorization = request.headers.authorization ?? "";
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requestBody = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ value: "ephemeral-client-secret", expires_at: 123 }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    try {
+      const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+      await providerHelpers.upsertCustomProvider({
+        id: "realtime-token-provider",
+        label: "Realtime Token Provider",
+        baseUrl,
+        realtimeEnabled: true,
+      });
+      await providerHelpers.upsertCustomModel({
+        providerId: "realtime-token-provider",
+        id: "voice-model",
+        capabilities: { ...capabilities, realtime: true },
+      });
+      await providerHelpers.saveProviderApiKey("realtime-token-provider", "stored-provider-key");
+
+      const result = await providerHelpers.createRealtimeToken(
+        "realtime-token-provider/voice-model",
+        { instructions: "Say hello", voice: "alloy" },
+      );
+      assert.deepEqual(result, {
+        token: "ephemeral-client-secret",
+        url: `wss://127.0.0.1:${address.port}/v1/realtime?model=voice-model`,
+        expiresAt: 123,
+      });
+      assert.equal(requestPath, "/v1/realtime/client_secrets");
+      assert.equal(authorization, "Bearer stored-provider-key");
+      assert.deepEqual(requestBody, {
+        session: {
+          type: "realtime",
+          model: "voice-model",
+          instructions: "Say hello",
+          audio: { output: { voice: "alloy" } },
+        },
+      });
+      assert.equal(JSON.stringify(result).includes("stored-provider-key"), false);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   void it("registers the new built-in providers in the approved order", async () => {
