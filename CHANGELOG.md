@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.1]
+
+### 中文
+
+#### 新增
+
+- 新增服务商 API 密钥显示/隐藏功能，用户可在模型设置中主动查看已保存的密钥。
+
+#### 变更
+
+- 提供商 ID 改为可选；留空时根据提供商名称或服务地址自动生成稳定 ID。
+- 优化模型设置中的同步操作与按钮加载状态展示，并调整按钮空内容的渲染逻辑。
+- 为聊天视图按会话标识组件实例，避免切换会话时复用旧状态。
+
+### English
+
+#### Added
+
+- Added a show/hide control for provider API keys, allowing users to explicitly reveal a saved key in model settings.
+
+#### Changed
+
+- Made provider IDs optional and automatically derive a stable ID from the provider name or endpoint when the field is left blank.
+- Improved model-settings sync actions and loading-state feedback, and refined how buttons render empty content.
+- Keyed chat views by conversation ID to prevent stale component state from carrying over when switching conversations.
+
 ## [0.2.0]
 
 ### 中文
