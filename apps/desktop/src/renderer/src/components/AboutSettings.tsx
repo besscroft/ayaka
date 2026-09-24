@@ -172,10 +172,6 @@ export function AboutSettings(): React.JSX.Element {
                   : t("about.update.neverChecked")}
               </Description>
             </div>
-            <IconRefresh
-              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-              aria-hidden="true"
-            />
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -238,7 +234,9 @@ export function AboutSettings(): React.JSX.Element {
                 isPending={updateState.status === "checking"}
                 onPress={() => void handleCheckForUpdates()}
               >
-                <IconRefresh data-icon="inline-start" aria-hidden="true" />
+                {updateState.status !== "checking" ? (
+                  <IconRefresh data-icon="inline-start" aria-hidden="true" />
+                ) : null}
                 {updateState.status === "checking"
                   ? t("about.update.checking")
                   : t("about.update.check")}

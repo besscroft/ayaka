@@ -96,6 +96,8 @@ import {
   type WorkspaceOrphan,
   type MediaGenerationKind,
   type MediaGenerationSettings,
+  REALTIME_PROTOCOLS,
+  type RealtimeProtocol,
 } from "@shared/types";
 import { SKIN_DEFINITIONS } from "../skins/registry";
 
@@ -119,6 +121,17 @@ function customProviderApiFormatOptions(
   return CUSTOM_PROVIDER_API_FORMATS.map((value) => ({
     value,
     label: t(CUSTOM_PROVIDER_API_FORMAT_LABEL_KEYS[value]),
+  }));
+}
+
+function realtimeProtocolOptions(
+  t: (key: string) => string,
+): Array<{ value: string; label: string }> {
+  return REALTIME_PROTOCOLS.map((value) => ({
+    value,
+    label: t(
+      value === "openai" ? "model.realtimeProtocol.openai" : "model.realtimeProtocol.compatible",
+    ),
   }));
 }
 
@@ -948,6 +961,17 @@ function GeneralSettings({
 
   const memoryLlmOptions = memoryModelOptions("llm", settings.memoryLlmModel);
   const memoryEmbeddingOptions = memoryModelOptions("embedding", settings.memoryEmbeddingModel);
+  const chatModelOptions = [
+    { value: "", label: t("chat.selectModel") },
+    ...providers.flatMap((provider) =>
+      provider.models
+        .filter((model) => model.enabled && model.capabilities.textGeneration !== false)
+        .map((model) => ({
+          value: `${provider.id}/${model.id}`,
+          label: `${provider.label} / ${model.label ?? model.id}`,
+        })),
+    ),
+  ];
   const realtimeVoiceModelOptions: Array<{ value: string; label: string; disabled?: boolean }> = [
     { value: "", label: t("settings.general.auto") },
     ...providers.flatMap((provider) =>
@@ -1030,6 +1054,25 @@ function GeneralSettings({
         <p className="mt-1 text-xs text-foreground/50">{t("settings.general.desc")}</p>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-4">
+        <SettingSection
+          title={t("model.default")}
+          desc={t("model.default.desc")}
+          icon={<IconCpu className="size-3.5" />}
+        >
+          <SettingItem
+            title={t("model.default")}
+            desc={t("model.default.desc")}
+            control={
+              <SelectField
+                className="min-w-64"
+                value={settings.selectedModel ?? ""}
+                options={chatModelOptions}
+                onChange={(value) => void update({ selectedModel: value || null })}
+                ariaLabel={t("model.default")}
+              />
+            }
+          />
+        </SettingSection>
         <SettingSection
           title={t("settings.general.media.title")}
           desc={t("settings.general.media.desc")}
@@ -1498,6 +1541,8 @@ function ModelEditorDialog({
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     realtimeEnabled: false,
+    realtimeProtocol: "openai-compatible",
+    realtimeEndpoint: "",
   });
   const [modelForm, setModelForm] = useState<ModelFormState>(() =>
     createEmptyModelForm(providers[0]?.id ?? ""),
@@ -1515,6 +1560,9 @@ function ModelEditorDialog({
         baseUrl: model.providerBaseUrl ?? "",
         apiFormat: model.providerApiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
         realtimeEnabled: providers.find((item) => item.id === model.providerId)?.realtimeEnabled,
+        realtimeProtocol: providers.find((item) => item.id === model.providerId)?.realtimeProtocol,
+        realtimeEndpoint:
+          providers.find((item) => item.id === model.providerId)?.realtimeEndpoint ?? "",
       });
       setModelForm({
         providerId: model.providerId,
@@ -1537,6 +1585,8 @@ function ModelEditorDialog({
       baseUrl: "",
       apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       realtimeEnabled: false,
+      realtimeProtocol: "openai-compatible",
+      realtimeEndpoint: "",
     });
     setModelForm(createEmptyModelForm(providers[0]?.id ?? ""));
     setApiKey("");
@@ -1706,21 +1756,6 @@ function ModelEditorDialog({
                     }
                   />
                 </TextField>
-                {!isEditing && (
-                  <TextField>
-                    <Label>{t("model.providerId.optional")}</Label>
-                    <Input
-                      value={providerForm.id ?? ""}
-                      placeholder={t("model.placeholder.providerId")}
-                      onChange={(e) =>
-                        setProviderForm((prev) => ({
-                          ...prev,
-                          id: (e.target as HTMLInputElement).value,
-                        }))
-                      }
-                    />
-                  </TextField>
-                )}
                 <TextField>
                   <Label>{t("model.baseUrl")}</Label>
                   <Input
@@ -2122,6 +2157,8 @@ function ProviderModelWorkbench({
       baseUrl: selectedProvider.baseUrl ?? "",
       apiFormat: selectedProvider.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       realtimeEnabled: selectedProvider.realtimeEnabled,
+      realtimeProtocol: selectedProvider.realtimeProtocol,
+      realtimeEndpoint: selectedProvider.realtimeEndpoint ?? "",
     });
     setProviderApiKeyProviderId(selectedProvider.id);
     setProviderApiKey(selectedProvider.hasProviderApiKey ? MASKED_PROVIDER_API_KEY : "");
@@ -2145,19 +2182,6 @@ function ProviderModelWorkbench({
         .includes(query),
     );
   }, [providerQuery, providers]);
-
-  const enabledProviders = useMemo(
-    () =>
-      providers
-        .map((provider) => ({
-          ...provider,
-          models: provider.models.filter(
-            (model) => model.enabled && model.capabilities.textGeneration !== false,
-          ),
-        }))
-        .filter((provider) => provider.models.length > 0),
-    [providers],
-  );
 
   const canEditProvider = selectedProvider?.source === "custom";
   const selectedProviderIsAnonymous = selectedProvider?.authKind === "none";
@@ -2262,6 +2286,8 @@ function ProviderModelWorkbench({
         baseUrl: providerForm.baseUrl,
         apiFormat: providerForm.apiFormat,
         realtimeEnabled: providerForm.realtimeEnabled,
+        realtimeProtocol: providerForm.realtimeProtocol,
+        realtimeEndpoint: providerForm.realtimeEndpoint?.trim() || undefined,
       });
 
       if (providerApiKeyValue.trim() && !providerApiKeyIsMasked) {
@@ -2435,56 +2461,44 @@ function ProviderModelWorkbench({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 select-none">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h3 className="text-base font-semibold">{t("settings.tab.model")}</h3>
-        <div className="flex w-full min-w-0 items-center justify-end gap-2 lg:w-auto">
-          <SelectField
-            className="h-9 w-auto min-w-0 flex-1 lg:w-80 lg:flex-none"
-            value={settings.selectedModel ?? ""}
-            options={[
-              { value: "", label: t("chat.selectModel") },
-              ...enabledProviders.flatMap((provider) =>
-                provider.models.map((model) => ({
-                  value: providerModelRef(provider.id, model.id),
-                  label: `${provider.label} / ${model.label ?? model.id}`,
-                })),
-              ),
-            ]}
-            onChange={(value) => void update({ selectedModel: value || null })}
-            ariaLabel={t("model.provider")}
-          />
-          <Button variant="primary" size="sm" onPress={() => setAddProviderOpen(true)}>
-            <IconPlus className="mr-1 size-3.5" />
-            {t("model.addProvider")}
-          </Button>
-        </div>
-      </header>
-
       <div className="grid min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/40 lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
         <aside className="min-h-0 flex flex-col border-b border-border p-3 lg:border-b-0 lg:border-r">
-          <div className="relative w-full">
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              aria-label={t("model.provider.search")}
-              value={providerQuery}
-              onChange={(event) => setProviderQuery(event.currentTarget.value)}
-              placeholder={t("model.provider.search")}
-              className="select-text pl-9 pr-9"
-            />
-            {providerQuery ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                data-icon-tone="neutral"
-                className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
-                aria-label={t("common.clear")}
-                onPress={() => setProviderQuery("")}
-              >
-                <IconClose aria-hidden="true" />
-              </Button>
-            ) : null}
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                aria-label={t("model.provider.search")}
+                value={providerQuery}
+                onChange={(event) => setProviderQuery(event.currentTarget.value)}
+                placeholder={t("model.provider.search")}
+                className="select-text pl-9 pr-9"
+              />
+              {providerQuery ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  data-icon-tone="neutral"
+                  className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+                  aria-label={t("common.clear")}
+                  onPress={() => setProviderQuery("")}
+                >
+                  <IconClose aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant="primary"
+              aria-label={t("model.addProvider")}
+              title={t("model.addProvider")}
+              onPress={() => setAddProviderOpen(true)}
+            >
+              <IconPlus className="size-4" />
+            </Button>
           </div>
 
           <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
@@ -2583,6 +2597,17 @@ function ProviderModelWorkbench({
                   <p className="mt-1 break-all text-xs text-foreground/45">{selectedProvider.id}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {canEditProvider && (
+                    <Switch
+                      size="sm"
+                      isSelected={providerForm.realtimeEnabled === true}
+                      onChange={(realtimeEnabled) =>
+                        setProviderForm((prev) => ({ ...prev, realtimeEnabled }))
+                      }
+                    >
+                      {t("model.provider.realtimeEnabled")}
+                    </Switch>
+                  )}
                   <Tooltip>
                     <TooltipTrigger>
                       <Button
@@ -2631,7 +2656,7 @@ function ProviderModelWorkbench({
                 </div>
               </div>
 
-              <div className="shrink-0 grid gap-3 md:grid-cols-2">
+              <div className="mb-3 shrink-0 grid gap-3 md:grid-cols-2">
                 <TextField>
                   <Label>{t("model.providerName")}</Label>
                   <Input
@@ -2646,63 +2671,8 @@ function ProviderModelWorkbench({
                     }
                   />
                 </TextField>
-                <TextField>
-                  <Label>{t("model.providerId")}</Label>
-                  <Input className="select-text" value={selectedProvider.id} disabled />
-                </TextField>
-                <TextField>
-                  <Label>{t("model.baseUrl")}</Label>
-                  <Input
-                    className="select-text"
-                    value={providerForm.baseUrl}
-                    placeholder={t("model.provider.builtinEndpoint")}
-                    disabled={!canEditProvider}
-                    onChange={(event) =>
-                      setProviderForm((prev) => ({
-                        ...prev,
-                        baseUrl: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
-                </TextField>
-                {canEditProvider && (
-                  <label className="select-none text-sm">
-                    <span className="mb-1 block text-xs text-foreground/60">
-                      {t("model.apiFormat")}
-                    </span>
-                    <SelectField
-                      value={providerForm.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT}
-                      options={customProviderApiFormatOptions(t)}
-                      onChange={(value) =>
-                        setProviderForm((prev) => ({
-                          ...prev,
-                          apiFormat: CUSTOM_PROVIDER_API_FORMATS.includes(
-                            value as CustomProviderApiFormat,
-                          )
-                            ? (value as CustomProviderApiFormat)
-                            : DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
-                        }))
-                      }
-                      ariaLabel={t("model.apiFormat")}
-                    />
-                  </label>
-                )}
-                {canEditProvider && (
-                  <div className="flex flex-col gap-1 md:col-span-2">
-                    <Switch
-                      size="sm"
-                      isSelected={providerForm.realtimeEnabled === true}
-                      onChange={(realtimeEnabled) =>
-                        setProviderForm((prev) => ({ ...prev, realtimeEnabled }))
-                      }
-                    >
-                      {t("model.provider.realtimeEnabled")}
-                    </Switch>
-                    <p className="text-xs text-foreground/45">{t("model.provider.realtimeHint")}</p>
-                  </div>
-                )}
                 {!selectedProviderIsAnonymous && (
-                  <TextField className="md:col-span-2">
+                  <TextField>
                     <Label>{t("model.apiKey")}</Label>
                     <div className="relative">
                       <Input
@@ -2745,19 +2715,79 @@ function ProviderModelWorkbench({
                         </Button>
                       )}
                     </div>
-                    <Description className="mt-1 flex flex-wrap items-center gap-3">
-                      <span>{t("model.provider.keyHelp")}</span>
-                      {selectedProvider.helpUrl && (
-                        <a
-                          href={selectedProvider.helpUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {t("apikey.getKey")}
-                        </a>
-                      )}
-                    </Description>
+                  </TextField>
+                )}
+                <TextField>
+                  <Label>{t("model.baseUrl")}</Label>
+                  <Input
+                    className="select-text"
+                    value={providerForm.baseUrl}
+                    placeholder={t("model.provider.builtinEndpoint")}
+                    disabled={!canEditProvider}
+                    onChange={(event) =>
+                      setProviderForm((prev) => ({
+                        ...prev,
+                        baseUrl: (event.target as HTMLInputElement).value,
+                      }))
+                    }
+                  />
+                </TextField>
+                {canEditProvider && (
+                  <label className="select-none text-sm">
+                    <span className="mb-1 block text-xs text-foreground/60">
+                      {t("model.apiFormat")}
+                    </span>
+                    <SelectField
+                      value={providerForm.apiFormat ?? DEFAULT_CUSTOM_PROVIDER_API_FORMAT}
+                      options={customProviderApiFormatOptions(t)}
+                      onChange={(value) =>
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          apiFormat: CUSTOM_PROVIDER_API_FORMATS.includes(
+                            value as CustomProviderApiFormat,
+                          )
+                            ? (value as CustomProviderApiFormat)
+                            : DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+                        }))
+                      }
+                      ariaLabel={t("model.apiFormat")}
+                    />
+                  </label>
+                )}
+                {canEditProvider && providerForm.realtimeEnabled && (
+                  <label className="select-none text-sm md:col-span-1">
+                    <span className="mb-1 block text-xs text-foreground/60">
+                      {t("model.realtimeProtocol")}
+                    </span>
+                    <SelectField
+                      value={providerForm.realtimeProtocol ?? "openai-compatible"}
+                      options={realtimeProtocolOptions(t)}
+                      onChange={(value) =>
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          realtimeProtocol: REALTIME_PROTOCOLS.includes(value as RealtimeProtocol)
+                            ? (value as RealtimeProtocol)
+                            : "openai-compatible",
+                        }))
+                      }
+                      ariaLabel={t("model.realtimeProtocol")}
+                    />
+                  </label>
+                )}
+                {canEditProvider && providerForm.realtimeEnabled && (
+                  <TextField className="md:col-span-1">
+                    <Label>{t("model.realtimeEndpoint")}</Label>
+                    <Input
+                      className="select-text"
+                      value={providerForm.realtimeEndpoint ?? ""}
+                      placeholder={t("model.realtimeEndpoint.placeholder")}
+                      onChange={(event) =>
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          realtimeEndpoint: (event.target as HTMLInputElement).value,
+                        }))
+                      }
+                    />
                   </TextField>
                 )}
               </div>
@@ -2987,6 +3017,7 @@ function AddProviderDialog({
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     realtimeEnabled: false,
+    realtimeProtocol: "openai-compatible",
   });
 
   useEffect(() => {
@@ -2997,6 +3028,8 @@ function AddProviderDialog({
         baseUrl: "",
         apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
         realtimeEnabled: false,
+        realtimeProtocol: "openai-compatible",
+        realtimeEndpoint: "",
       });
     }
   }, [open]);
@@ -3058,20 +3091,6 @@ function AddProviderDialog({
               />
             </TextField>
             <TextField>
-              <Label>{t("model.providerId.optional")}</Label>
-              <Input
-                className="select-text"
-                value={form.id ?? ""}
-                placeholder={t("model.placeholder.providerId")}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    id: (event.target as HTMLInputElement).value,
-                  }))
-                }
-              />
-            </TextField>
-            <TextField>
               <Label>{t("model.baseUrl")}</Label>
               <Input
                 className="select-text"
@@ -3111,8 +3130,44 @@ function AddProviderDialog({
               >
                 {t("model.provider.realtimeEnabled")}
               </Switch>
-              <p className="text-xs text-foreground/45">{t("model.provider.realtimeHint")}</p>
             </div>
+            {form.realtimeEnabled && (
+              <label className="select-none text-sm md:col-span-2">
+                <span className="mb-1 block text-xs text-foreground/60">
+                  {t("model.realtimeProtocol")}
+                </span>
+                <SelectField
+                  value={form.realtimeProtocol ?? "openai-compatible"}
+                  options={realtimeProtocolOptions(t)}
+                  onChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      realtimeProtocol: REALTIME_PROTOCOLS.includes(value as RealtimeProtocol)
+                        ? (value as RealtimeProtocol)
+                        : "openai-compatible",
+                    }))
+                  }
+                  ariaLabel={t("model.realtimeProtocol")}
+                />
+              </label>
+            )}
+            {form.realtimeEnabled && (
+              <TextField className="md:col-span-2">
+                <Label>{t("model.realtimeEndpoint")}</Label>
+                <Input
+                  className="select-text"
+                  value={form.realtimeEndpoint ?? ""}
+                  placeholder={t("model.realtimeEndpoint.placeholder")}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      realtimeEndpoint: (event.target as HTMLInputElement).value,
+                    }))
+                  }
+                />
+                <Description className="mt-1">{t("model.realtimeEndpoint.hint")}</Description>
+              </TextField>
+            )}
           </div>
         </div>
         <DialogFooter>

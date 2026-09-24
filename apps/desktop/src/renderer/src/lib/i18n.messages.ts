@@ -1090,6 +1090,21 @@ const entries = {
     zh: "仅当此端点实现 Realtime 短时凭证和 WebSocket 协议时启用。开启后可用于实时对话。",
     en: "Enable only when this endpoint implements Realtime client secrets and the OpenAI WebSocket protocol.",
   },
+  "model.realtimeProtocol": { zh: "Realtime 协议", en: "Realtime protocol" },
+  "model.realtimeProtocol.openai": { zh: "OpenAI 原生 WebSocket", en: "OpenAI native WebSocket" },
+  "model.realtimeProtocol.compatible": {
+    zh: "OpenAI 兼容 WebSocket",
+    en: "OpenAI-compatible WebSocket",
+  },
+  "model.realtimeEndpoint": { zh: "Realtime API 地址", en: "Realtime API URL" },
+  "model.realtimeEndpoint.placeholder": {
+    zh: "支持 http://、https://、ws:// 或 wss://",
+    en: "Supports http://, https://, ws://, or wss://",
+  },
+  "model.realtimeEndpoint.hint": {
+    zh: "填写独立的 Realtime 地址。不同协议的地址格式和事件协议可能不同，具体由对应适配器处理。",
+    en: "Enter the dedicated Realtime endpoint. URL format and event protocol vary by adapter.",
+  },
   "model.provider.noMatches": { zh: "无匹配项", en: "No matches" },
   "model.provider.search": { zh: "搜索提供商", en: "Search providers" },
   "model.provider.sync": { zh: "同步", en: "Sync" },

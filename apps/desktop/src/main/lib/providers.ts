@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
+import { randomUUID } from "node:crypto";
 import type {
   Experimental_RealtimeSessionConfig,
   ImageModel,
@@ -46,6 +47,8 @@ import {
   type ProviderInfo,
   type ProviderTestResult,
   type ProviderAuthKind,
+  type RealtimeProtocol,
+  isRealtimeProtocol,
   isChatReasoningLevel,
   isCustomProviderApiFormat,
 } from "../../shared/types";
@@ -68,6 +71,20 @@ const DEFAULT_MODEL_CONTEXT_WINDOW = 32_000;
 
 function normalizeCustomProviderApiFormat(raw: unknown): CustomProviderApiFormat {
   return isCustomProviderApiFormat(raw) ? raw : DEFAULT_CUSTOM_PROVIDER_API_FORMAT;
+}
+
+function normalizeRealtimeProtocol(raw: unknown): RealtimeProtocol {
+  return isRealtimeProtocol(raw) ? raw : "openai-compatible";
+}
+
+function normalizeRealtimeEndpoint(raw: unknown): string | undefined {
+  const text = normalizeOptionalText(raw);
+  if (!text) return undefined;
+  const url = new URL(text);
+  if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) {
+    throw new Error("Realtime endpoint must start with http://, https://, ws://, or wss://");
+  }
+  return url.toString().replace(/\/+$/, "");
 }
 
 function getCustomProviderApiFormat(
@@ -322,6 +339,9 @@ function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSetti
           baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
           apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
           realtimeEnabled: provider.realtimeEnabled === true,
+          realtimeTransport: "websocket" as const,
+          realtimeProtocol: normalizeRealtimeProtocol(provider.realtimeProtocol),
+          realtimeEndpoint: normalizeRealtimeEndpoint(provider.realtimeEndpoint),
           createdAt: Number(provider.createdAt) || Date.now(),
           updatedAt: Number(provider.updatedAt) || Date.now(),
         }))
@@ -698,6 +718,10 @@ export function listProviders(): ProviderInfo[] {
     baseUrl: provider.baseUrl,
     apiFormat: provider.apiFormat,
     realtimeEnabled: provider.realtimeEnabled === true,
+    realtimeTransport: "websocket" as const,
+    realtimeProtocol:
+      provider.id === "openai" ? "openai" : normalizeRealtimeProtocol(provider.realtimeProtocol),
+    realtimeEndpoint: provider.realtimeEndpoint,
     models: [],
   }));
 
@@ -715,6 +739,11 @@ export function listProviders(): ProviderInfo[] {
         provider.id === "openai" && provider.source === "builtin"
           ? true
           : provider.source === "custom" && provider.realtimeEnabled === true,
+      realtimeProtocol:
+        provider.id === "openai" && provider.source === "builtin"
+          ? "openai"
+          : normalizeRealtimeProtocol(provider.realtimeProtocol),
+      realtimeTransport: "websocket" as const,
       authKind: providerAuthKind(provider),
       hasProviderApiKey,
       hasApiKey: hasProviderApiKey || models.some((model) => model.hasApiKey),
@@ -764,6 +793,8 @@ export function resolveRealtimeModel(modelRef: string): {
   modelId: string;
   baseUrl: string;
   apiKey: string;
+  protocol: RealtimeProtocol;
+  endpoint: string;
 } {
   const separator = modelRef.indexOf("/");
   if (separator < 1) throw new Error("Invalid Realtime model reference.");
@@ -786,23 +817,38 @@ export function resolveRealtimeModel(modelRef: string): {
     modelId,
     baseUrl: provider.baseUrl,
     apiKey,
+    protocol: provider.realtimeProtocol ?? "openai-compatible",
+    endpoint: provider.realtimeEndpoint ?? provider.baseUrl,
   };
 }
 
 export async function createRealtimeToken(
   modelRef: string,
   sessionConfig: Experimental_RealtimeSessionConfig,
-): Promise<{ token: string; url: string; expiresAt?: number }> {
+): Promise<{
+  token: string;
+  url: string;
+  expiresAt?: number;
+  transport: "websocket";
+  protocol: RealtimeProtocol;
+  authMode: "ephemeral-token";
+}> {
   const resolved = resolveRealtimeModel(modelRef);
   const provider = createOpenAI({
     apiKey: resolved.apiKey,
-    baseURL: resolved.baseUrl,
+    baseURL: resolved.endpoint,
     name: resolved.providerId,
   });
-  return provider.experimental_realtime.getToken({
+  const token = await provider.experimental_realtime.getToken({
     model: resolved.modelId,
     sessionConfig,
   });
+  return {
+    ...token,
+    transport: "websocket",
+    protocol: resolved.protocol,
+    authMode: "ephemeral-token",
+  };
 }
 
 export function getProviderConfig(providerId: string): ProviderInfo | null {
@@ -927,15 +973,13 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   if (!baseUrl) throw new Error("Base URL is required");
 
-  // The provider ID is optional in the form. Empty or whitespace-only values
-  // should fall back to a stable identifier instead of being treated as an
-  // explicitly supplied (but invalid) ID. Prefer the display name and use the
-  // endpoint hostname for labels that do not contain ASCII identifier chars.
   const requestedId = typeof input.id === "string" ? input.id.trim() : "";
-  const id =
-    normalizeProviderId(requestedId || label) ||
-    normalizeProviderId(new URL(baseUrl).hostname) ||
-    "provider";
+  let id = normalizeProviderId(requestedId);
+  if (!id) {
+    do {
+      id = `provider-${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    } while (catalog.providers.some((provider) => provider.id === id));
+  }
 
   // Existing custom records may collide with a newly introduced built-in. Keep
   // them editable; only reject attempts to create a fresh built-in collision.
@@ -955,6 +999,12 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
       input.realtimeEnabled === undefined
         ? existing?.realtimeEnabled === true
         : input.realtimeEnabled === true,
+    realtimeProtocol: normalizeRealtimeProtocol(
+      input.realtimeProtocol ?? existing?.realtimeProtocol,
+    ),
+    realtimeTransport: "websocket" as const,
+    realtimeEndpoint:
+      normalizeRealtimeEndpoint(input.realtimeEndpoint) ?? existing?.realtimeEndpoint,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

@@ -43,7 +43,14 @@ void describe("Core app package", () => {
         ...createRuntime(),
         createRealtimeToken: async (modelRef, sessionConfig) => {
           calls.push({ modelRef, sessionConfig });
-          return { token: "short-lived", url: "wss://example.test/realtime", expiresAt: 123 };
+          return {
+            token: "short-lived",
+            url: "wss://example.test/realtime",
+            expiresAt: 123,
+            transport: "websocket",
+            protocol: "openai-compatible",
+            authMode: "ephemeral-token",
+          };
         },
       },
       sessionToken: "local-session",
@@ -62,6 +69,9 @@ void describe("Core app package", () => {
       token: "short-lived",
       url: "wss://example.test/realtime",
       expiresAt: 123,
+      transport: "websocket",
+      protocol: "openai-compatible",
+      authMode: "ephemeral-token",
       tools: [],
     });
     assert.deepEqual(calls, [{ modelRef: "custom-openai/gpt-realtime", sessionConfig }]);
@@ -85,7 +95,13 @@ void describe("Core app package", () => {
         ...createRuntime(),
         createRealtimeToken: async () => {
           calls++;
-          return { token: "secret", url: "wss://example.test/realtime" };
+          return {
+            token: "secret",
+            url: "wss://example.test/realtime",
+            transport: "websocket",
+            protocol: "openai-compatible",
+            authMode: "ephemeral-token",
+          };
         },
       },
       sessionToken: "local-session",

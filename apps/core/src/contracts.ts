@@ -131,7 +131,14 @@ export interface CoreRuntime {
   createRealtimeToken?: (
     modelRef: string,
     sessionConfig: Record<string, unknown>,
-  ) => Promise<{ token: string; url: string; expiresAt?: number }>;
+  ) => Promise<{
+    token: string;
+    url: string;
+    expiresAt?: number;
+    transport: "websocket";
+    protocol: "openai" | "openai-compatible";
+    authMode: "ephemeral-token";
+  }>;
   classifyChatError?: (
     error: unknown,
     options?: { phase?: "request" | "stream"; abortSignal?: AbortSignal },

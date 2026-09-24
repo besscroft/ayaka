@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createOpenAI } from "@ai-sdk/openai";
 import { experimental_useRealtime } from "@ai-sdk/react";
 import type { Experimental_RealtimeSessionConfig } from "ai";
 import type {
@@ -12,6 +11,7 @@ import { Button, SelectField } from "./ui";
 import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { useSettings } from "../lib/settings";
+import { createRealtimeModel } from "../lib/realtime-adapters";
 import { IconArrowLeft, IconMessage, IconMic, IconPlus, IconSend, IconX } from "./icons";
 
 interface RealtimeViewProps {
@@ -405,13 +405,23 @@ function RealtimeSessionPane({
   const createdAtById = useRef(new Map<string, number>());
   const transcriptRef = useRef<RealtimeSessionMessage[]>([]);
   const modelInstance = useMemo(() => {
-    const provider = createOpenAI({
-      apiKey: "",
-      baseURL: model?.provider.baseUrl || "https://api.openai.com/v1",
-      name: model?.provider.id || "openai",
+    return createRealtimeModel({
+      descriptor: {
+        transport: model?.provider.realtimeTransport ?? "websocket",
+        protocol: model?.provider.realtimeProtocol ?? "openai-compatible",
+        endpoint:
+          model?.provider.realtimeEndpoint ??
+          model?.provider.baseUrl ??
+          "https://api.openai.com/v1",
+      },
+      modelId: model?.modelId || "gpt-realtime",
     });
-    return provider.experimental_realtime(model?.modelId || "gpt-realtime");
-  }, [model?.provider.baseUrl, model?.provider.id, model?.modelId]);
+  }, [
+    model?.modelId,
+    model?.provider.baseUrl,
+    model?.provider.realtimeEndpoint,
+    model?.provider.realtimeProtocol,
+  ]);
 
   const contextTranscript = activeSession.context
     .map((message) => `${message.role === "user" ? "User" : "Ayaka"}: ${message.text}`)

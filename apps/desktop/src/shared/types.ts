@@ -2290,6 +2290,15 @@ export type ModelProviderKind = "openai" | "openai-compatible" | "anthropic" | "
 export type ModelCatalogSource = "builtin" | "custom";
 /** Whether a provider requires a user-managed credential before requests. */
 export type ProviderAuthKind = "api-key" | "none";
+export type RealtimeTransport = "websocket";
+export type RealtimeProtocol = "openai" | "openai-compatible";
+export type RealtimeAuthMode = "ephemeral-token";
+
+export const REALTIME_PROTOCOLS = ["openai", "openai-compatible"] as const;
+
+export function isRealtimeProtocol(value: unknown): value is RealtimeProtocol {
+  return (REALTIME_PROTOCOLS as readonly unknown[]).includes(value);
+}
 
 export const CUSTOM_PROVIDER_API_FORMATS = [
   "chat-completions",
@@ -2393,6 +2402,11 @@ export interface ProviderInfo {
   authKind?: ProviderAuthKind;
   /** Custom OpenAI-compatible provider has declared OpenAI Realtime protocol support. */
   realtimeEnabled?: boolean;
+  realtimeTransport?: RealtimeTransport;
+  /** Wire protocol used by the Realtime transport adapter. */
+  realtimeProtocol?: RealtimeProtocol;
+  /** Realtime WebSocket endpoint override for compatible providers. */
+  realtimeEndpoint?: string;
   /** Provider-level or legacy model-level API key is available. */
   hasApiKey: boolean;
   /** A provider-level API key is configured. */
@@ -2405,6 +2419,9 @@ export interface CustomProviderInput {
   baseUrl: string;
   apiFormat?: CustomProviderApiFormat;
   realtimeEnabled?: boolean;
+  realtimeTransport?: RealtimeTransport;
+  realtimeProtocol?: RealtimeProtocol;
+  realtimeEndpoint?: string;
 }
 
 export interface CustomModelInput {
@@ -2432,6 +2449,9 @@ export interface ModelCatalogSettings {
     baseUrl: string;
     apiFormat?: CustomProviderApiFormat;
     realtimeEnabled?: boolean;
+    realtimeTransport?: RealtimeTransport;
+    realtimeProtocol?: RealtimeProtocol;
+    realtimeEndpoint?: string;
     createdAt: number;
     updatedAt: number;
   }>;

@@ -73,15 +73,21 @@ const capabilities = {
 };
 
 void describe("provider helpers", () => {
-  void it("derives a provider ID when the optional ID is left blank", async () => {
+  void it("generates a unique provider ID when the optional ID is left blank", async () => {
     const provider = await providerHelpers.upsertCustomProvider({
       id: "",
       label: "Example Provider",
       baseUrl: "https://example-provider.test/v1",
     });
 
-    assert.equal(provider.id, "example-provider");
+    assert.match(provider.id, /^provider-[a-f0-9]{12}$/);
     assert.equal(provider.label, "Example Provider");
+    const second = await providerHelpers.upsertCustomProvider({
+      id: "",
+      label: "Example Provider",
+      baseUrl: "https://example-provider-2.test/v1",
+    });
+    assert.notEqual(second.id, provider.id);
   });
 
   void it("lists API key metadata without decrypting stored keys", async () => {
@@ -161,6 +167,23 @@ void describe("provider helpers", () => {
     assert.equal(resolved.providerId, "realtime-custom");
     assert.equal(resolved.baseUrl, "https://realtime.example/v1");
     assert.equal(resolved.apiKey, "provider-key");
+    const listed = providerHelpers
+      .listProviders()
+      .find((provider) => provider.id === "realtime-custom");
+    assert.equal(listed?.realtimeTransport, "websocket");
+    assert.equal(listed?.realtimeProtocol, "openai-compatible");
+  });
+
+  void it("accepts WebSocket URLs as Realtime endpoints while keeping text URLs separate", async () => {
+    const provider = await providerHelpers.upsertCustomProvider({
+      id: "websocket-endpoint",
+      label: "WebSocket Endpoint",
+      baseUrl: "https://text.example/v1",
+      realtimeEnabled: true,
+      realtimeEndpoint: "wss://realtime.example/api-ws/v1/realtime",
+    });
+    assert.equal(provider.baseUrl, "https://text.example/v1");
+    assert.equal(provider.realtimeEndpoint, "wss://realtime.example/api-ws/v1/realtime");
   });
 
   void it("rejects disabled or keyless Realtime models", async () => {
@@ -232,6 +255,9 @@ void describe("provider helpers", () => {
         token: "ephemeral-client-secret",
         url: `wss://127.0.0.1:${address.port}/v1/realtime?model=voice-model`,
         expiresAt: 123,
+        transport: "websocket",
+        protocol: "openai-compatible",
+        authMode: "ephemeral-token",
       });
       assert.equal(requestPath, "/v1/realtime/client_secrets");
       assert.equal(authorization, "Bearer stored-provider-key");
