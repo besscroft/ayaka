@@ -2291,13 +2291,19 @@ export type ModelCatalogSource = "builtin" | "custom";
 /** Whether a provider requires a user-managed credential before requests. */
 export type ProviderAuthKind = "api-key" | "none";
 export type RealtimeTransport = "websocket";
-export type RealtimeProtocol = "openai" | "openai-compatible";
-export type RealtimeAuthMode = "ephemeral-token";
+export type RealtimeProtocol = "openai" | "bailian";
+export type BailianRealtimeRegion = "cn-beijing" | "ap-southeast-1";
+export type RealtimeAuthMode = "ephemeral-token" | "api-key-header";
 
-export const REALTIME_PROTOCOLS = ["openai", "openai-compatible"] as const;
+export const REALTIME_PROTOCOLS = ["openai", "bailian"] as const;
+export const BAILIAN_REALTIME_REGIONS = ["cn-beijing", "ap-southeast-1"] as const;
 
 export function isRealtimeProtocol(value: unknown): value is RealtimeProtocol {
   return (REALTIME_PROTOCOLS as readonly unknown[]).includes(value);
+}
+
+export function isBailianRealtimeRegion(value: unknown): value is BailianRealtimeRegion {
+  return (BAILIAN_REALTIME_REGIONS as readonly unknown[]).includes(value);
 }
 
 export const CUSTOM_PROVIDER_API_FORMATS = [
@@ -2400,13 +2406,17 @@ export interface ProviderInfo {
   apiFormat?: CustomProviderApiFormat;
   /** Authentication mode. Missing legacy values are treated as `api-key`. */
   authKind?: ProviderAuthKind;
-  /** Custom OpenAI-compatible provider has declared OpenAI Realtime protocol support. */
+  /** Custom provider has declared a native Realtime protocol implementation. */
   realtimeEnabled?: boolean;
   realtimeTransport?: RealtimeTransport;
   /** Wire protocol used by the Realtime transport adapter. */
   realtimeProtocol?: RealtimeProtocol;
-  /** Realtime WebSocket endpoint override for compatible providers. */
+  /** Realtime WebSocket endpoint override for the selected native protocol. */
   realtimeEndpoint?: string;
+  /** Optional Alibaba Cloud Bailian workspace ID sent during the WebSocket handshake. */
+  realtimeWorkspace?: string;
+  /** Region used to construct the workspace-bound Qwen 3.8 Realtime endpoint. */
+  realtimeRegion?: BailianRealtimeRegion;
   /** Provider-level or legacy model-level API key is available. */
   hasApiKey: boolean;
   /** A provider-level API key is configured. */
@@ -2422,6 +2432,8 @@ export interface CustomProviderInput {
   realtimeTransport?: RealtimeTransport;
   realtimeProtocol?: RealtimeProtocol;
   realtimeEndpoint?: string;
+  realtimeWorkspace?: string;
+  realtimeRegion?: BailianRealtimeRegion;
 }
 
 export interface CustomModelInput {
@@ -2452,6 +2464,8 @@ export interface ModelCatalogSettings {
     realtimeTransport?: RealtimeTransport;
     realtimeProtocol?: RealtimeProtocol;
     realtimeEndpoint?: string;
+    realtimeWorkspace?: string;
+    realtimeRegion?: BailianRealtimeRegion;
     createdAt: number;
     updatedAt: number;
   }>;

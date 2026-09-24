@@ -22,6 +22,7 @@ import { agentLoopSessions } from "./lib/agent-loop-session";
 import { sendUpdateState, updateManager } from "./lib/update-manager";
 import { removeLegacyCompanionData } from "./lib/runtime-paths";
 import { closeAllMcpClients } from "./lib/mcp-manager";
+import { closeRealtimeProxy } from "./lib/realtime-proxy";
 import { recoverMcpDependencyInstallations } from "./lib/mcp-dependencies";
 import {
   recoverMcpLifecycleStates,
@@ -127,15 +128,14 @@ function createWindow(): BrowserWindow {
   });
   mainWindowRef = mainWindow;
 
-  mainWindow.webContents.on("console-message", (_event, level, message, lineNumber, sourceId) => {
-    const numericLevel = Number(level);
-    if (numericLevel < 2) return;
+  mainWindow.webContents.on("console-message", (details) => {
+    if (details.level !== "warning" && details.level !== "error") return;
     recordErrorLog({
       source: "renderer",
-      level: numericLevel >= 3 ? "error" : "warning",
+      level: details.level,
       origin: "console",
-      message,
-      details: { lineNumber, sourceId },
+      message: details.message,
+      details: { lineNumber: details.lineNumber, sourceId: details.sourceId },
     });
   });
 
@@ -297,6 +297,7 @@ if (!hasSingleInstanceLock) {
       .then(async () => {
         await closeAllSandboxPreviews();
         await closeAllBrowserSessions();
+        await closeRealtimeProxy();
         stopServer();
         await closeDb();
         await flushErrorLogs();

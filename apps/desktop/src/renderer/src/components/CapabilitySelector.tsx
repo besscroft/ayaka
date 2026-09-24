@@ -63,24 +63,28 @@ export function CapabilitySelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
-        <TooltipTrigger>
-          <PopoverTrigger>
-            <Button
-              type="button"
-              isIconOnly
-              size="sm"
-              variant="tertiary"
-              isDisabled={disabled}
-              aria-label={t("chatCapabilities.selector")}
-              className={cn(
-                "relative size-8 shrink-0 rounded-xl text-foreground/65",
-                anyDisabled && "text-primary",
-              )}
-            >
-              <IconSliders className="size-4" />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  isIconOnly
+                  size="sm"
+                  variant="tertiary"
+                  isDisabled={disabled}
+                  aria-label={t("chatCapabilities.selector")}
+                  className={cn(
+                    "relative size-8 shrink-0 rounded-xl text-foreground/65",
+                    anyDisabled && "text-primary",
+                  )}
+                >
+                  <IconSliders className="size-4" />
+                </Button>
+              }
+            />
+          }
+        />
         <TooltipContent>{t("chatCapabilities.selector")}</TooltipContent>
       </Tooltip>
 

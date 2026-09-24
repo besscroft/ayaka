@@ -136,8 +136,8 @@ export interface CoreRuntime {
     url: string;
     expiresAt?: number;
     transport: "websocket";
-    protocol: "openai" | "openai-compatible";
-    authMode: "ephemeral-token";
+    protocol: "openai" | "bailian";
+    authMode: "ephemeral-token" | "api-key-header";
   }>;
   classifyChatError?: (
     error: unknown,

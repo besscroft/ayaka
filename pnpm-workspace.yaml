@@ -16,6 +16,7 @@ catalog:
   better-sqlite3: ^12.11.1
   drizzle-kit: ^0.31.10
   "@types/better-sqlite3": ^7.6.13
+  "@types/ws": 8.18.1
   sonner: ^2.0.7
   ai: ^7.0.14
   "@ai-sdk/react": ^4.0.15
@@ -38,6 +39,7 @@ catalog:
   mem0ai: ^3.0.13
   cheerio: ^1.2.0
   croner: ^10.0.1
+  ws: 8.21.0
   date-fns: ^4.4.0
   react-day-picker: ^10.0.1
   tailwindcss: ^4.3.1

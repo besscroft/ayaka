@@ -27,6 +27,7 @@ export default defineConfig({
           "@electron-toolkit/utils",
           "@electron-toolkit/preload",
           "electron-updater",
+          "ws",
           "fflate",
           "better-sqlite3",
           "drizzle-orm",

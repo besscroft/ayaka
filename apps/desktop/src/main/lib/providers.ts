@@ -3,6 +3,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
 import { randomUUID } from "node:crypto";
+import { buildBailianRealtimeEndpoint, createRealtimeProxySession } from "./realtime-proxy";
 import type {
   Experimental_RealtimeSessionConfig,
   ImageModel,
@@ -47,8 +48,9 @@ import {
   type ProviderInfo,
   type ProviderTestResult,
   type ProviderAuthKind,
+  type BailianRealtimeRegion,
   type RealtimeProtocol,
-  isRealtimeProtocol,
+  isBailianRealtimeRegion,
   isChatReasoningLevel,
   isCustomProviderApiFormat,
 } from "../../shared/types";
@@ -73,8 +75,32 @@ function normalizeCustomProviderApiFormat(raw: unknown): CustomProviderApiFormat
   return isCustomProviderApiFormat(raw) ? raw : DEFAULT_CUSTOM_PROVIDER_API_FORMAT;
 }
 
-function normalizeRealtimeProtocol(raw: unknown): RealtimeProtocol {
-  return isRealtimeProtocol(raw) ? raw : "openai-compatible";
+function isBailianRealtimeEndpoint(raw: unknown): boolean {
+  if (typeof raw !== "string" || !raw.trim()) return false;
+  try {
+    const hostname = new URL(raw).hostname.toLowerCase();
+    return (
+      hostname.endsWith(".maas.aliyuncs.com") ||
+      hostname === "dashscope.aliyuncs.com" ||
+      hostname === "dashscope-intl.aliyuncs.com"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeRealtimeProtocol(raw: unknown, endpoint?: unknown): RealtimeProtocol {
+  if (raw === "bailian") return "bailian";
+  if (raw === "openai") return "openai";
+  // Migrate the old compatibility option once. Existing Bailian endpoints are
+  // unambiguous; all other legacy values use the native OpenAI adapter.
+  if (raw === "openai-compatible")
+    return isBailianRealtimeEndpoint(endpoint) ? "bailian" : "openai";
+  return "openai";
+}
+
+function normalizeBailianRealtimeRegion(raw: unknown): BailianRealtimeRegion {
+  return isBailianRealtimeRegion(raw) ? raw : "cn-beijing";
 }
 
 function normalizeRealtimeEndpoint(raw: unknown): string | undefined {
@@ -332,19 +358,29 @@ async function writeCatalog(catalog: ModelCatalogSettings): Promise<void> {
 function normalizeCatalog(raw: Partial<ModelCatalogSettings>): ModelCatalogSettings {
   const providers = Array.isArray(raw.providers)
     ? raw.providers
-        .map((provider) => ({
-          id: normalizeProviderId(provider.id),
-          label: String(provider.label ?? "").trim(),
-          kind: "openai-compatible" as const,
-          baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
-          apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
-          realtimeEnabled: provider.realtimeEnabled === true,
-          realtimeTransport: "websocket" as const,
-          realtimeProtocol: normalizeRealtimeProtocol(provider.realtimeProtocol),
-          realtimeEndpoint: normalizeRealtimeEndpoint(provider.realtimeEndpoint),
-          createdAt: Number(provider.createdAt) || Date.now(),
-          updatedAt: Number(provider.updatedAt) || Date.now(),
-        }))
+        .map((provider) => {
+          const realtimeEndpoint = normalizeRealtimeEndpoint(provider.realtimeEndpoint);
+          const realtimeWorkspace = normalizeOptionalText(provider.realtimeWorkspace);
+          const realtimeRegion = normalizeBailianRealtimeRegion(provider.realtimeRegion);
+          return {
+            id: normalizeProviderId(provider.id),
+            label: String(provider.label ?? "").trim(),
+            kind: "openai-compatible" as const,
+            baseUrl: normalizeBaseUrl(provider.baseUrl ?? ""),
+            apiFormat: normalizeCustomProviderApiFormat(provider.apiFormat),
+            realtimeEnabled: provider.realtimeEnabled === true,
+            realtimeTransport: "websocket" as const,
+            realtimeProtocol: normalizeRealtimeProtocol(
+              provider.realtimeProtocol,
+              realtimeEndpoint,
+            ),
+            realtimeEndpoint,
+            realtimeWorkspace,
+            realtimeRegion,
+            createdAt: Number(provider.createdAt) || Date.now(),
+            updatedAt: Number(provider.updatedAt) || Date.now(),
+          };
+        })
         .filter((provider) => provider.id && provider.label && provider.baseUrl)
     : [];
 
@@ -720,8 +756,12 @@ export function listProviders(): ProviderInfo[] {
     realtimeEnabled: provider.realtimeEnabled === true,
     realtimeTransport: "websocket" as const,
     realtimeProtocol:
-      provider.id === "openai" ? "openai" : normalizeRealtimeProtocol(provider.realtimeProtocol),
+      provider.id === "openai"
+        ? "openai"
+        : normalizeRealtimeProtocol(provider.realtimeProtocol, provider.realtimeEndpoint),
     realtimeEndpoint: provider.realtimeEndpoint,
+    realtimeWorkspace: provider.realtimeWorkspace,
+    realtimeRegion: provider.realtimeRegion,
     models: [],
   }));
 
@@ -742,7 +782,7 @@ export function listProviders(): ProviderInfo[] {
       realtimeProtocol:
         provider.id === "openai" && provider.source === "builtin"
           ? "openai"
-          : normalizeRealtimeProtocol(provider.realtimeProtocol),
+          : normalizeRealtimeProtocol(provider.realtimeProtocol, provider.realtimeEndpoint),
       realtimeTransport: "websocket" as const,
       authKind: providerAuthKind(provider),
       hasProviderApiKey,
@@ -795,6 +835,8 @@ export function resolveRealtimeModel(modelRef: string): {
   apiKey: string;
   protocol: RealtimeProtocol;
   endpoint: string;
+  workspace?: string;
+  region: BailianRealtimeRegion;
 } {
   const separator = modelRef.indexOf("/");
   if (separator < 1) throw new Error("Invalid Realtime model reference.");
@@ -804,7 +846,7 @@ export function resolveRealtimeModel(modelRef: string): {
   if (!provider || !provider.realtimeEnabled)
     throw new Error("Realtime is not enabled for this provider.");
   if (provider.kind !== "openai" && provider.kind !== "openai-compatible")
-    throw new Error("This provider does not use the OpenAI Realtime protocol.");
+    throw new Error("This provider does not expose a supported native Realtime protocol.");
   if (!provider.baseUrl) throw new Error("Realtime provider base URL is missing.");
   const model = provider.models.find((candidate) => candidate.id === modelId && candidate.enabled);
   if (!model || model.capabilities.realtime !== true)
@@ -817,8 +859,10 @@ export function resolveRealtimeModel(modelRef: string): {
     modelId,
     baseUrl: provider.baseUrl,
     apiKey,
-    protocol: provider.realtimeProtocol ?? "openai-compatible",
+    protocol: provider.realtimeProtocol ?? "openai",
     endpoint: provider.realtimeEndpoint ?? provider.baseUrl,
+    workspace: provider.realtimeWorkspace,
+    region: normalizeBailianRealtimeRegion(provider.realtimeRegion),
   };
 }
 
@@ -831,9 +875,37 @@ export async function createRealtimeToken(
   expiresAt?: number;
   transport: "websocket";
   protocol: RealtimeProtocol;
-  authMode: "ephemeral-token";
+  authMode: "ephemeral-token" | "api-key-header";
 }> {
   const resolved = resolveRealtimeModel(modelRef);
+  const endpoint =
+    resolved.protocol === "bailian"
+      ? buildBailianRealtimeEndpoint({
+          modelId: resolved.modelId,
+          endpoint: resolved.endpoint,
+          workspace: resolved.workspace,
+          region: resolved.region,
+        })
+      : resolved.endpoint;
+  const endpointProtocol = new URL(endpoint).protocol;
+  const isWebSocketEndpoint = endpointProtocol === "ws:" || endpointProtocol === "wss:";
+  if (resolved.protocol === "bailian" && !isWebSocketEndpoint) {
+    throw new Error("阿里云百炼 Realtime 地址必须使用 ws:// 或 wss://。");
+  }
+  // Providers such as Bailian expose only a direct-key WebSocket endpoint.
+  // Keep the API key in the main process and let the local proxy add the
+  // Authorization header during the upstream handshake.
+  if (isWebSocketEndpoint) {
+    return {
+      ...(await createRealtimeProxySession({
+        modelId: resolved.modelId,
+        endpoint,
+        apiKey: resolved.apiKey,
+        workspace: resolved.workspace,
+      })),
+      protocol: resolved.protocol,
+    };
+  }
   const provider = createOpenAI({
     apiKey: resolved.apiKey,
     baseURL: resolved.endpoint,
@@ -989,6 +1061,17 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
   }
 
   const now = Date.now();
+  const realtimeEndpoint =
+    input.realtimeEndpoint === undefined
+      ? existing?.realtimeEndpoint
+      : normalizeRealtimeEndpoint(input.realtimeEndpoint);
+  const realtimeWorkspace =
+    input.realtimeWorkspace === undefined
+      ? existing?.realtimeWorkspace
+      : normalizeOptionalText(input.realtimeWorkspace);
+  const realtimeRegion = normalizeBailianRealtimeRegion(
+    input.realtimeRegion ?? existing?.realtimeRegion,
+  );
   const nextProvider = {
     id,
     label,
@@ -1001,10 +1084,12 @@ export async function upsertCustomProvider(input: CustomProviderInput): Promise<
         : input.realtimeEnabled === true,
     realtimeProtocol: normalizeRealtimeProtocol(
       input.realtimeProtocol ?? existing?.realtimeProtocol,
+      realtimeEndpoint,
     ),
     realtimeTransport: "websocket" as const,
-    realtimeEndpoint:
-      normalizeRealtimeEndpoint(input.realtimeEndpoint) ?? existing?.realtimeEndpoint,
+    realtimeEndpoint,
+    realtimeWorkspace,
+    realtimeRegion,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

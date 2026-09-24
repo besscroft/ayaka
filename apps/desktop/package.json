@@ -74,6 +74,7 @@
     "streamdown": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -85,6 +86,7 @@
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "catalog:",
     "@vitejs/plugin-react": "^5.1.1",
     "drizzle-kit": "catalog:",
     "electron": "catalog:",

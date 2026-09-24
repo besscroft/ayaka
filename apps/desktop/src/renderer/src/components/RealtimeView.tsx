@@ -402,13 +402,14 @@ function RealtimeSessionPane({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(activeSession.stream);
+  const connectionLifecycleRef = useRef(0);
   const createdAtById = useRef(new Map<string, number>());
   const transcriptRef = useRef<RealtimeSessionMessage[]>([]);
   const modelInstance = useMemo(() => {
     return createRealtimeModel({
       descriptor: {
         transport: model?.provider.realtimeTransport ?? "websocket",
-        protocol: model?.provider.realtimeProtocol ?? "openai-compatible",
+        protocol: model?.provider.realtimeProtocol ?? "openai",
         endpoint:
           model?.provider.realtimeEndpoint ??
           model?.provider.baseUrl ??
@@ -429,18 +430,23 @@ function RealtimeSessionPane({
   const contextText = contextTranscript
     ? `\n\nContext from the previous realtime conversation (latest turns):\n${contextTranscript.slice(-14_000)}`
     : "";
-  const sessionConfig = useMemo(
-    () =>
-      ({
-        instructions: `You are Ayaka, a natural and concise realtime voice conversation partner. Respond in the user's language.${contextText}`,
-        voice: "alloy",
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        turnDetection: { type: "server-vad" },
-        outputModalities: ["text", "audio"],
-      }) satisfies Partial<Experimental_RealtimeSessionConfig>,
-    [contextText],
-  );
+  const realtimeProtocol = model?.provider.realtimeProtocol ?? "openai";
+  const sessionConfig = useMemo(() => {
+    const config: Partial<Experimental_RealtimeSessionConfig> = {
+      instructions: `You are Ayaka, a natural and concise realtime voice conversation partner. Respond in the user's language.${contextText}`,
+      voice: "alloy",
+      turnDetection: { type: "server-vad" },
+      outputModalities: ["text", "audio"],
+    };
+    if (realtimeProtocol === "bailian") {
+      config.inputAudioFormat = { type: "audio/pcm", rate: 16_000 };
+      config.outputAudioFormat = { type: "audio/pcm", rate: 24_000 };
+    } else {
+      config.inputAudioTranscription = {};
+      config.outputAudioTranscription = {};
+    }
+    return config;
+  }, [contextText, realtimeProtocol]);
   const setupUrl =
     serverInfo && model
       ? `http://127.0.0.1:${serverInfo.port}/api/realtime/setup?session=${encodeURIComponent(serverInfo.token)}&model=${encodeURIComponent(model.ref)}`
@@ -449,7 +455,13 @@ function RealtimeSessionPane({
     model: modelInstance,
     api: { token: setupUrl },
     sessionConfig,
-    onError: () => setError(t("realtime.connectionError")),
+    onEvent: (event) => {
+      if (event.type === "session-created" || event.type === "session-updated") setError(null);
+    },
+    onError: (error) => {
+      console.error("[realtime] connection failed:", error.message);
+      setError(t("realtime.connectionError"));
+    },
   });
 
   const transcript = useMemo(() => {
@@ -491,14 +503,24 @@ function RealtimeSessionPane({
   }, [realtime.status]);
 
   useEffect(() => {
-    void realtime.connect();
+    const lifecycle = ++connectionLifecycleRef.current;
+    // React StrictMode replays effects in development. Defer the connection
+    // until that replay has completed so the discarded mount cannot create a
+    // proxy session that is immediately torn down during the upstream handshake.
+    const connectTimer = window.setTimeout(() => {
+      if (connectionLifecycleRef.current === lifecycle) void realtime.connect();
+    }, 0);
     const stream = streamRef.current;
     return () => {
       if (transcriptRef.current.length)
         void api.realtimeSessions.saveTranscript(activeSession.id, transcriptRef.current);
-      realtime.stopAudioCapture();
-      realtime.disconnect();
-      stream?.getTracks().forEach((track) => track.stop());
+      window.clearTimeout(connectTimer);
+      queueMicrotask(() => {
+        if (connectionLifecycleRef.current !== lifecycle) return;
+        realtime.stopAudioCapture();
+        realtime.disconnect();
+        stream?.getTracks().forEach((track) => track.stop());
+      });
     };
     // This pane represents a single new server session; reconnecting is handled by creating a new one.
     // eslint-disable-next-line react-hooks/exhaustive-deps

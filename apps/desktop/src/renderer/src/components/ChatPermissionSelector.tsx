@@ -73,28 +73,34 @@ export function ChatPermissionSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
-        <TooltipTrigger>
-          <PopoverTrigger>
-            <Button
-              type="button"
-              size="sm"
-              variant="tertiary"
-              isDisabled={disabled}
-              aria-label={t("chatPermission.selector.label")}
-              className={cn(
-                "min-w-0 shrink-0 rounded-xl text-foreground/70",
-                compact ? "h-8 px-2" : "h-9 px-2.5",
-                value === "full_access" && "text-warning",
-              )}
-            >
-              <SelectedIcon className="size-4 shrink-0" />
-              <span className="max-w-32 truncate text-xs font-medium">{t(selected.labelKey)}</span>
-              {inherited ? (
-                <span className="ml-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/55" />
-              ) : null}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="tertiary"
+                  isDisabled={disabled}
+                  aria-label={t("chatPermission.selector.label")}
+                  className={cn(
+                    "min-w-0 shrink-0 rounded-xl text-foreground/70",
+                    compact ? "h-8 px-2" : "h-9 px-2.5",
+                    value === "full_access" && "text-warning",
+                  )}
+                >
+                  <SelectedIcon className="size-4 shrink-0" />
+                  <span className="max-w-32 truncate text-xs font-medium">
+                    {t(selected.labelKey)}
+                  </span>
+                  {inherited ? (
+                    <span className="ml-0.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/55" />
+                  ) : null}
+                </Button>
+              }
+            />
+          }
+        />
         <TooltipContent>{t("chatPermission.selector.label")}</TooltipContent>
       </Tooltip>
 

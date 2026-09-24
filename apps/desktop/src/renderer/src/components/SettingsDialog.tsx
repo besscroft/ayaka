@@ -68,6 +68,7 @@ import {
   CHAT_REASONING_LEVELS,
   CUSTOM_PROVIDER_API_FORMATS,
   DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
+  BAILIAN_REALTIME_REGIONS,
   MODEL_CAPABILITY_KEYS,
   SettingKey,
   type AgentProfile,
@@ -77,6 +78,7 @@ import {
   type Conversation,
   type CustomProviderApiFormat,
   type CustomProviderInput,
+  type BailianRealtimeRegion,
   type FontPreset,
   type ManagedModelInfo,
   type ModelCapabilities,
@@ -130,7 +132,18 @@ function realtimeProtocolOptions(
   return REALTIME_PROTOCOLS.map((value) => ({
     value,
     label: t(
-      value === "openai" ? "model.realtimeProtocol.openai" : "model.realtimeProtocol.compatible",
+      value === "openai" ? "model.realtimeProtocol.openai" : "model.realtimeProtocol.bailian",
+    ),
+  }));
+}
+
+function bailianRealtimeRegionOptions(
+  t: (key: string) => string,
+): Array<{ value: string; label: string }> {
+  return BAILIAN_REALTIME_REGIONS.map((value) => ({
+    value,
+    label: t(
+      value === "cn-beijing" ? "model.realtimeRegion.beijing" : "model.realtimeRegion.singapore",
     ),
   }));
 }
@@ -1541,8 +1554,10 @@ function ModelEditorDialog({
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     realtimeEnabled: false,
-    realtimeProtocol: "openai-compatible",
+    realtimeProtocol: "openai",
     realtimeEndpoint: "",
+    realtimeWorkspace: "",
+    realtimeRegion: "cn-beijing",
   });
   const [modelForm, setModelForm] = useState<ModelFormState>(() =>
     createEmptyModelForm(providers[0]?.id ?? ""),
@@ -1563,6 +1578,10 @@ function ModelEditorDialog({
         realtimeProtocol: providers.find((item) => item.id === model.providerId)?.realtimeProtocol,
         realtimeEndpoint:
           providers.find((item) => item.id === model.providerId)?.realtimeEndpoint ?? "",
+        realtimeWorkspace:
+          providers.find((item) => item.id === model.providerId)?.realtimeWorkspace ?? "",
+        realtimeRegion:
+          providers.find((item) => item.id === model.providerId)?.realtimeRegion ?? "cn-beijing",
       });
       setModelForm({
         providerId: model.providerId,
@@ -1585,8 +1604,10 @@ function ModelEditorDialog({
       baseUrl: "",
       apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
       realtimeEnabled: false,
-      realtimeProtocol: "openai-compatible",
+      realtimeProtocol: "openai",
       realtimeEndpoint: "",
+      realtimeWorkspace: "",
+      realtimeRegion: "cn-beijing",
     });
     setModelForm(createEmptyModelForm(providers[0]?.id ?? ""));
     setApiKey("");
@@ -2159,6 +2180,8 @@ function ProviderModelWorkbench({
       realtimeEnabled: selectedProvider.realtimeEnabled,
       realtimeProtocol: selectedProvider.realtimeProtocol,
       realtimeEndpoint: selectedProvider.realtimeEndpoint ?? "",
+      realtimeWorkspace: selectedProvider.realtimeWorkspace ?? "",
+      realtimeRegion: selectedProvider.realtimeRegion ?? "cn-beijing",
     });
     setProviderApiKeyProviderId(selectedProvider.id);
     setProviderApiKey(selectedProvider.hasProviderApiKey ? MASKED_PROVIDER_API_KEY : "");
@@ -2170,6 +2193,10 @@ function ProviderModelWorkbench({
     selectedProvider?.label,
     selectedProvider?.apiFormat,
     selectedProvider?.realtimeEnabled,
+    selectedProvider?.realtimeProtocol,
+    selectedProvider?.realtimeEndpoint,
+    selectedProvider?.realtimeWorkspace,
+    selectedProvider?.realtimeRegion,
   ]);
 
   const filteredProviders = useMemo(() => {
@@ -2287,7 +2314,9 @@ function ProviderModelWorkbench({
         apiFormat: providerForm.apiFormat,
         realtimeEnabled: providerForm.realtimeEnabled,
         realtimeProtocol: providerForm.realtimeProtocol,
-        realtimeEndpoint: providerForm.realtimeEndpoint?.trim() || undefined,
+        realtimeEndpoint: providerForm.realtimeEndpoint?.trim(),
+        realtimeWorkspace: providerForm.realtimeWorkspace?.trim(),
+        realtimeRegion: providerForm.realtimeRegion,
       });
 
       if (providerApiKeyValue.trim() && !providerApiKeyIsMasked) {
@@ -2760,14 +2789,14 @@ function ProviderModelWorkbench({
                       {t("model.realtimeProtocol")}
                     </span>
                     <SelectField
-                      value={providerForm.realtimeProtocol ?? "openai-compatible"}
+                      value={providerForm.realtimeProtocol ?? "openai"}
                       options={realtimeProtocolOptions(t)}
                       onChange={(value) =>
                         setProviderForm((prev) => ({
                           ...prev,
                           realtimeProtocol: REALTIME_PROTOCOLS.includes(value as RealtimeProtocol)
                             ? (value as RealtimeProtocol)
-                            : "openai-compatible",
+                            : "openai",
                         }))
                       }
                       ariaLabel={t("model.realtimeProtocol")}
@@ -2788,8 +2817,54 @@ function ProviderModelWorkbench({
                         }))
                       }
                     />
+                    <Description className="mt-1">{t("model.realtimeEndpoint.hint")}</Description>
                   </TextField>
                 )}
+                {canEditProvider &&
+                  providerForm.realtimeEnabled &&
+                  providerForm.realtimeProtocol === "bailian" && (
+                    <TextField className="md:col-span-1">
+                      <Label>{t("model.realtimeWorkspace")}</Label>
+                      <Input
+                        className="select-text"
+                        value={providerForm.realtimeWorkspace ?? ""}
+                        placeholder={t("model.realtimeWorkspace.placeholder")}
+                        onChange={(event) =>
+                          setProviderForm((prev) => ({
+                            ...prev,
+                            realtimeWorkspace: (event.target as HTMLInputElement).value,
+                          }))
+                        }
+                      />
+                      <Description className="mt-1">
+                        {t("model.realtimeWorkspace.hint")}
+                      </Description>
+                    </TextField>
+                  )}
+                {canEditProvider &&
+                  providerForm.realtimeEnabled &&
+                  providerForm.realtimeProtocol === "bailian" && (
+                    <label className="select-none text-sm md:col-span-1">
+                      <span className="mb-1 block text-xs text-foreground/60">
+                        {t("model.realtimeRegion")}
+                      </span>
+                      <SelectField
+                        value={providerForm.realtimeRegion ?? "cn-beijing"}
+                        options={bailianRealtimeRegionOptions(t)}
+                        onChange={(value) =>
+                          setProviderForm((prev) => ({
+                            ...prev,
+                            realtimeRegion: BAILIAN_REALTIME_REGIONS.includes(
+                              value as BailianRealtimeRegion,
+                            )
+                              ? (value as BailianRealtimeRegion)
+                              : "cn-beijing",
+                          }))
+                        }
+                        ariaLabel={t("model.realtimeRegion")}
+                      />
+                    </label>
+                  )}
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
@@ -3017,7 +3092,9 @@ function AddProviderDialog({
     baseUrl: "",
     apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
     realtimeEnabled: false,
-    realtimeProtocol: "openai-compatible",
+    realtimeProtocol: "openai",
+    realtimeWorkspace: "",
+    realtimeRegion: "cn-beijing",
   });
 
   useEffect(() => {
@@ -3028,8 +3105,10 @@ function AddProviderDialog({
         baseUrl: "",
         apiFormat: DEFAULT_CUSTOM_PROVIDER_API_FORMAT,
         realtimeEnabled: false,
-        realtimeProtocol: "openai-compatible",
+        realtimeProtocol: "openai",
         realtimeEndpoint: "",
+        realtimeWorkspace: "",
+        realtimeRegion: "cn-beijing",
       });
     }
   }, [open]);
@@ -3137,17 +3216,56 @@ function AddProviderDialog({
                   {t("model.realtimeProtocol")}
                 </span>
                 <SelectField
-                  value={form.realtimeProtocol ?? "openai-compatible"}
+                  value={form.realtimeProtocol ?? "openai"}
                   options={realtimeProtocolOptions(t)}
                   onChange={(value) =>
                     setForm((prev) => ({
                       ...prev,
                       realtimeProtocol: REALTIME_PROTOCOLS.includes(value as RealtimeProtocol)
                         ? (value as RealtimeProtocol)
-                        : "openai-compatible",
+                        : "openai",
                     }))
                   }
                   ariaLabel={t("model.realtimeProtocol")}
+                />
+              </label>
+            )}
+            {form.realtimeEnabled && form.realtimeProtocol === "bailian" && (
+              <TextField className="md:col-span-2">
+                <Label>{t("model.realtimeWorkspace")}</Label>
+                <Input
+                  className="select-text"
+                  value={form.realtimeWorkspace ?? ""}
+                  placeholder={t("model.realtimeWorkspace.placeholder")}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      realtimeWorkspace: (event.target as HTMLInputElement).value,
+                    }))
+                  }
+                />
+                <Description className="mt-1">{t("model.realtimeWorkspace.hint")}</Description>
+              </TextField>
+            )}
+            {form.realtimeEnabled && form.realtimeProtocol === "bailian" && (
+              <label className="select-none text-sm md:col-span-2">
+                <span className="mb-1 block text-xs text-foreground/60">
+                  {t("model.realtimeRegion")}
+                </span>
+                <SelectField
+                  value={form.realtimeRegion ?? "cn-beijing"}
+                  options={bailianRealtimeRegionOptions(t)}
+                  onChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      realtimeRegion: BAILIAN_REALTIME_REGIONS.includes(
+                        value as BailianRealtimeRegion,
+                      )
+                        ? (value as BailianRealtimeRegion)
+                        : "cn-beijing",
+                    }))
+                  }
+                  ariaLabel={t("model.realtimeRegion")}
                 />
               </label>
             )}

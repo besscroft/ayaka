@@ -164,24 +164,28 @@ export function ToolSelector({
       }}
     >
       <Tooltip>
-        <TooltipTrigger>
-          <PopoverTrigger>
-            <Button
-              type="button"
-              isIconOnly
-              size="sm"
-              variant="tertiary"
-              isDisabled={isDisabled}
-              aria-label={t("chatTools.selector.label")}
-              className={cn(
-                "relative size-8 shrink-0 rounded-xl text-foreground/65",
-                activeToolIds.length > 0 && "text-primary",
-              )}
-            >
-              <IconWrench className="size-4" />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  isIconOnly
+                  size="sm"
+                  variant="tertiary"
+                  isDisabled={isDisabled}
+                  aria-label={t("chatTools.selector.label")}
+                  className={cn(
+                    "relative size-8 shrink-0 rounded-xl text-foreground/65",
+                    activeToolIds.length > 0 && "text-primary",
+                  )}
+                >
+                  <IconWrench className="size-4" />
+                </Button>
+              }
+            />
+          }
+        />
         <TooltipContent>{summary}</TooltipContent>
       </Tooltip>
 

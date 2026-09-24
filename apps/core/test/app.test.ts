@@ -48,7 +48,7 @@ void describe("Core app package", () => {
             url: "wss://example.test/realtime",
             expiresAt: 123,
             transport: "websocket",
-            protocol: "openai-compatible",
+            protocol: "openai",
             authMode: "ephemeral-token",
           };
         },
@@ -70,7 +70,7 @@ void describe("Core app package", () => {
       url: "wss://example.test/realtime",
       expiresAt: 123,
       transport: "websocket",
-      protocol: "openai-compatible",
+      protocol: "openai",
       authMode: "ephemeral-token",
       tools: [],
     });
@@ -99,7 +99,7 @@ void describe("Core app package", () => {
             token: "secret",
             url: "wss://example.test/realtime",
             transport: "websocket",
-            protocol: "openai-compatible",
+            protocol: "openai",
             authMode: "ephemeral-token",
           };
         },
@@ -116,5 +116,40 @@ void describe("Core app package", () => {
     );
     assert.equal(response.status, 400);
     assert.equal(calls, 0);
+  });
+
+  void it("accepts native realtime audio format fields during setup", async () => {
+    let received: Record<string, unknown> | null = null;
+    const app = createCoreApp({
+      runtime: {
+        ...createRuntime(),
+        createRealtimeToken: async (_modelRef, sessionConfig) => {
+          received = sessionConfig;
+          return {
+            token: "short-lived",
+            url: "wss://example.test/realtime",
+            transport: "websocket",
+            protocol: "bailian",
+            authMode: "api-key-header",
+          };
+        },
+      },
+      sessionToken: "local-session",
+    });
+    const sessionConfig = {
+      instructions: "Be concise",
+      inputAudioFormat: { type: "audio/pcm", rate: 16_000 },
+      outputAudioFormat: { type: "audio/pcm", rate: 24_000 },
+    };
+    const response = await app.request(
+      "/api/realtime/setup?session=local-session&model=bailian/qwen-realtime",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionConfig }),
+      },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(received, sessionConfig);
   });
 });

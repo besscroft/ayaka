@@ -1,7 +1,9 @@
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
+import WebSocket, { WebSocketServer } from "ws";
 import { SettingKey, type ModelCatalogSettings } from "@shared/types";
+import { closeRealtimeProxy } from "../../../../apps/desktop/src/main/lib/realtime-proxy";
 
 let providerHelpers: typeof import("@desktop-main/lib/providers");
 
@@ -59,6 +61,10 @@ beforeEach(() => {
   getModelApiKeyCalls = 0;
   settings.set(SettingKey.ModelCatalog, JSON.stringify(emptyCatalog()));
   settings.set(SettingKey.SelectedModel, "");
+});
+
+afterEach(async () => {
+  await closeRealtimeProxy();
 });
 
 const capabilities = {
@@ -171,7 +177,7 @@ void describe("provider helpers", () => {
       .listProviders()
       .find((provider) => provider.id === "realtime-custom");
     assert.equal(listed?.realtimeTransport, "websocket");
-    assert.equal(listed?.realtimeProtocol, "openai-compatible");
+    assert.equal(listed?.realtimeProtocol, "openai");
   });
 
   void it("accepts WebSocket URLs as Realtime endpoints while keeping text URLs separate", async () => {
@@ -184,6 +190,63 @@ void describe("provider helpers", () => {
     });
     assert.equal(provider.baseUrl, "https://text.example/v1");
     assert.equal(provider.realtimeEndpoint, "wss://realtime.example/api-ws/v1/realtime");
+  });
+
+  void it("persists Bailian region settings and allows clearing the workspace override", async () => {
+    const created = await providerHelpers.upsertCustomProvider({
+      id: "bailian-region-settings",
+      label: "Bailian region settings",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      realtimeEnabled: true,
+      realtimeProtocol: "bailian",
+      realtimeEndpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+      realtimeWorkspace: "workspace-test",
+      realtimeRegion: "ap-southeast-1",
+    });
+    assert.equal(created.realtimeWorkspace, "workspace-test");
+    assert.equal(created.realtimeRegion, "ap-southeast-1");
+
+    const updated = await providerHelpers.upsertCustomProvider({
+      id: created.id,
+      label: created.label,
+      baseUrl: created.baseUrl ?? "",
+      realtimeEnabled: true,
+      realtimeProtocol: "bailian",
+      realtimeEndpoint: "",
+      realtimeWorkspace: "",
+      realtimeRegion: "cn-beijing",
+    });
+    assert.equal(updated.realtimeEndpoint, undefined);
+    assert.equal(updated.realtimeWorkspace, undefined);
+    assert.equal(updated.realtimeRegion, "cn-beijing");
+  });
+
+  void it("migrates the removed compatibility value to native Bailian by endpoint", () => {
+    settings.set(
+      SettingKey.ModelCatalog,
+      JSON.stringify({
+        providers: [
+          {
+            id: "legacy-bailian",
+            label: "Legacy Bailian",
+            kind: "openai-compatible",
+            baseUrl: "https://text.example/v1",
+            realtimeEnabled: true,
+            realtimeProtocol: "openai-compatible",
+            realtimeEndpoint: "wss://workspace.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ],
+        models: [],
+        modelStates: [],
+      }),
+    );
+    assert.equal(
+      providerHelpers.listProviders().find((provider) => provider.id === "legacy-bailian")
+        ?.realtimeProtocol,
+      "bailian",
+    );
   });
 
   void it("rejects disabled or keyless Realtime models", async () => {
@@ -256,7 +319,7 @@ void describe("provider helpers", () => {
         url: `wss://127.0.0.1:${address.port}/v1/realtime?model=voice-model`,
         expiresAt: 123,
         transport: "websocket",
-        protocol: "openai-compatible",
+        protocol: "openai",
         authMode: "ephemeral-token",
       });
       assert.equal(requestPath, "/v1/realtime/client_secrets");
@@ -275,6 +338,86 @@ void describe("provider helpers", () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     }
+  });
+
+  void it("uses a main-process proxy for direct-key WebSocket endpoints", async () => {
+    let authorization = "";
+    let workspace = "";
+    let upstreamConnectedResolve: (() => void) | null = null;
+    const upstreamConnected = new Promise<void>((resolve) => {
+      upstreamConnectedResolve = resolve;
+    });
+    const upstream = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    upstream.on("connection", (_socket, request) => {
+      authorization = request.headers.authorization ?? "";
+      const workspaceHeader = request.headers["x-dashscope-workspace"];
+      workspace = Array.isArray(workspaceHeader)
+        ? (workspaceHeader[0] ?? "")
+        : (workspaceHeader ?? "");
+      upstreamConnectedResolve?.();
+    });
+    await new Promise<void>((resolve) => upstream.once("listening", () => resolve()));
+    const address = upstream.address();
+    assert.ok(address && typeof address !== "string");
+
+    try {
+      await providerHelpers.upsertCustomProvider({
+        id: "direct-key-realtime",
+        label: "Direct key realtime",
+        baseUrl: "https://text.example/v1",
+        realtimeEnabled: true,
+        realtimeProtocol: "bailian",
+        realtimeEndpoint: `ws://127.0.0.1:${address.port}/api-ws/v1/realtime`,
+        realtimeWorkspace: "workspace-test",
+      });
+      await providerHelpers.upsertCustomModel({
+        providerId: "direct-key-realtime",
+        id: "voice-model",
+        capabilities: { ...capabilities, realtime: true },
+      });
+      await providerHelpers.saveProviderApiKey("direct-key-realtime", "direct-provider-key");
+
+      const result = await providerHelpers.createRealtimeToken(
+        "direct-key-realtime/voice-model",
+        {},
+      );
+      assert.equal(result.authMode, "api-key-header");
+      assert.equal(result.protocol, "bailian");
+
+      const client = new WebSocket(result.url, ["realtime"]);
+      await new Promise<void>((resolve, reject) => {
+        client.once("open", () => resolve());
+        client.once("error", reject);
+      });
+      await upstreamConnected;
+      assert.equal(authorization, "Bearer direct-provider-key");
+      assert.equal(workspace, "workspace-test");
+      client.close();
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  });
+
+  void it("requires a WebSocket endpoint for native Bailian Realtime", async () => {
+    await providerHelpers.upsertCustomProvider({
+      id: "bailian-http",
+      label: "Bailian HTTP",
+      baseUrl: "https://text.example/v1",
+      realtimeEnabled: true,
+      realtimeProtocol: "bailian",
+      realtimeEndpoint: "https://dashscope.aliyuncs.com/api-ws/v1/realtime",
+    });
+    await providerHelpers.upsertCustomModel({
+      providerId: "bailian-http",
+      id: "qwen-realtime",
+      capabilities: { ...capabilities, realtime: true },
+    });
+    await providerHelpers.saveProviderApiKey("bailian-http", "bailian-key");
+
+    await assert.rejects(
+      providerHelpers.createRealtimeToken("bailian-http/qwen-realtime", {}),
+      /必须使用 ws:\/\/ 或 wss:\/\//,
+    );
   });
 
   void it("registers the new built-in providers in the approved order", async () => {
@@ -458,7 +601,9 @@ void describe("provider helpers", () => {
         );
       }
       if (url.endsWith("/chat/completions")) {
-        return new Response("fixture request reached chat completions", { status: 400 });
+        return new Response("fixture request reached chat completions", {
+          status: 400,
+        });
       }
       throw new Error("Unexpected fixture URL: " + url);
     }) as typeof fetch;
@@ -524,7 +669,9 @@ void describe("provider helpers", () => {
           { status: 200, headers: { ETag: '"fixture-v1"' } },
         );
       }
-      return new Response(JSON.stringify({ data: [{ id: "big-pickle" }] }), { status: 200 });
+      return new Response(JSON.stringify({ data: [{ id: "big-pickle" }] }), {
+        status: 200,
+      });
     }) as typeof fetch;
 
     try {
@@ -589,7 +736,14 @@ void describe("provider helpers", () => {
           updatedAt: 1,
         },
       ],
-      modelStates: [{ providerId: "siliconflow-cn", id: modelId, enabled: true, updatedAt: 1 }],
+      modelStates: [
+        {
+          providerId: "siliconflow-cn",
+          id: modelId,
+          enabled: true,
+          updatedAt: 1,
+        },
+      ],
     };
     settings.set(SettingKey.ModelCatalog, JSON.stringify(catalog));
 
@@ -697,7 +851,10 @@ void describe("provider helpers", () => {
     const previousFetch = globalThis.fetch;
     const requests: Array<{ url: string; headers: Headers }> = [];
     globalThis.fetch = (async (input, init) => {
-      requests.push({ url: String(input), headers: new Headers(init?.headers) });
+      requests.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+      });
       return new Response(JSON.stringify({ data: [{ id: "format-model" }] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -757,7 +914,10 @@ void describe("provider helpers", () => {
     const previousFetch = globalThis.fetch;
     const requests: Array<{ url: string; headers: Headers }> = [];
     globalThis.fetch = (async (input, init) => {
-      requests.push({ url: String(input), headers: new Headers(init?.headers) });
+      requests.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+      });
       return new Response("unsupported test endpoint", { status: 400 });
     }) as typeof fetch;
 
@@ -810,7 +970,10 @@ void describe("provider helpers", () => {
           display_name: "GPT-4o",
           context_length: 256_000,
           max_completion_tokens: 16_384,
-          architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
+          architecture: {
+            input_modalities: ["text", "image"],
+            output_modalities: ["text"],
+          },
           supported_parameters: ["tools", "reasoning_effort"],
           reasoning_levels: ["low", "medium", "high"],
           reasoning_default: "medium",
@@ -922,7 +1085,10 @@ void describe("provider helpers", () => {
           name: "models/veo-3.0-generate-preview",
           supportedGenerationMethods: ["predictLongRunning"],
         },
-        { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+        {
+          name: "models/text-embedding-004",
+          supportedGenerationMethods: ["embedContent"],
+        },
       ],
     });
 
@@ -975,7 +1141,9 @@ void describe("provider helpers", () => {
     const existing = result.catalog.models.find((model) => model.id === "gpt-4o");
     assert.equal(existing?.enabled, true);
     assert.equal(existing?.temperature, 0.2);
-    assert.deepEqual(existing?.providerOptions, { openai: { textVerbosity: "low" } });
+    assert.deepEqual(existing?.providerOptions, {
+      openai: { textVerbosity: "low" },
+    });
     assert.equal(existing?.label, "GPT-4o");
     assert.equal(existing?.contextWindow, 128_000);
     assert.equal(existing?.maxOutputTokens, 8_192);
@@ -1010,7 +1178,14 @@ void describe("provider helpers", () => {
           updatedAt: 1,
         },
       ],
-      modelStates: [{ providerId: "openai", id: "local-model", enabled: true, updatedAt: 1 }],
+      modelStates: [
+        {
+          providerId: "openai",
+          id: "local-model",
+          enabled: true,
+          updatedAt: 1,
+        },
+      ],
     };
 
     const result = providerHelpers.mergeRemoteModelsIntoCatalog(
@@ -1050,7 +1225,14 @@ void describe("provider helpers", () => {
           updatedAt: 1,
         },
       ],
-      modelStates: [{ providerId: "openai", id: "custom-model", enabled: true, updatedAt: 1 }],
+      modelStates: [
+        {
+          providerId: "openai",
+          id: "custom-model",
+          enabled: true,
+          updatedAt: 1,
+        },
+      ],
     };
 
     const result = providerHelpers.mergeRemoteModelsIntoCatalog(
@@ -1073,7 +1255,9 @@ void describe("provider helpers", () => {
     assert.equal(model.reasoningDefault, "provider-default");
     assert.equal(model.capabilitySources?.vision, "provider");
     assert.equal(model.temperature, 0.4);
-    assert.deepEqual(model.providerOptions, { openai: { reasoningEffort: "low" } });
+    assert.deepEqual(model.providerOptions, {
+      openai: { reasoningEffort: "low" },
+    });
     assert.equal(result.updatedCapabilities, 1);
   });
 
@@ -1141,7 +1325,10 @@ void describe("provider helpers", () => {
     await providerHelpers.upsertCustomModel({
       providerId: "memory-provider",
       id: "embedding-model",
-      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+      capabilities: memoryCapabilities({
+        textGeneration: false,
+        embedding: true,
+      }),
     });
     await providerHelpers.saveModelApiKey("memory-provider", "chat-model", "memory-chat-key");
     await providerHelpers.saveModelApiKey(
@@ -1188,12 +1375,18 @@ void describe("provider helpers", () => {
     await providerHelpers.upsertCustomModel({
       providerId: "memory-chat",
       id: "chat-embedding",
-      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+      capabilities: memoryCapabilities({
+        textGeneration: false,
+        embedding: true,
+      }),
     });
     await providerHelpers.upsertCustomModel({
       providerId: "memory-embedding",
       id: "embedding-model",
-      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+      capabilities: memoryCapabilities({
+        textGeneration: false,
+        embedding: true,
+      }),
     });
     await providerHelpers.saveProviderApiKey("memory-chat", "chat-key");
     await providerHelpers.saveProviderApiKey("memory-embedding", "embedding-key");
@@ -1242,7 +1435,10 @@ void describe("provider helpers", () => {
     await providerHelpers.upsertCustomModel({
       providerId: "missing-memory",
       id: "embedding-model",
-      capabilities: memoryCapabilities({ textGeneration: false, embedding: true }),
+      capabilities: memoryCapabilities({
+        textGeneration: false,
+        embedding: true,
+      }),
     });
 
     const resolved = providerHelpers.resolveMemoryConfiguration();

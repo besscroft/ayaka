@@ -58,8 +58,11 @@ export function createCoreApp(options: CoreAppOptions): Hono {
       const setup = body as { sessionConfig: Record<string, unknown> };
       const result = await runtime.createRealtimeToken(model, setup.sessionConfig);
       return c.json({ ...result, tools: [] });
-    } catch {
-      console.error("[core] realtime setup failed.");
+    } catch (error) {
+      console.error(
+        "[core] realtime setup failed:",
+        error instanceof Error ? error.message : "Unknown realtime setup error",
+      );
       return c.json({ error: "realtime_setup_failed" }, 502);
     }
   });
@@ -320,7 +323,9 @@ function isRealtimeSetupRequest(
     "instructions",
     "voice",
     "inputAudioTranscription",
+    "inputAudioFormat",
     "outputAudioTranscription",
+    "outputAudioFormat",
     "turnDetection",
     "outputModalities",
   ]);
