@@ -423,13 +423,24 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     if (!isRealtimeSessionCreateInput(input)) throw new Error("Invalid realtime session.");
     return createRealtimeSession(input);
   });
-  ipcMain.handle("realtimeSessions:saveTranscript", async (_e, id: string, messages: unknown) => {
-    if (!isSessionId(id) || !isRealtimeSessionMessages(messages))
-      throw new Error("Invalid realtime transcript.");
-    const saved = await saveRealtimeSessionTranscript(id, messages);
-    if (!saved) throw new Error("Realtime session was not found.");
-    return listRealtimeSessions().find((session) => session.id === id) ?? null;
-  });
+  ipcMain.handle(
+    "realtimeSessions:saveTranscript",
+    async (_e, id: string, messages: unknown, title?: unknown) => {
+      if (
+        !isSessionId(id) ||
+        !isRealtimeSessionMessages(messages) ||
+        (title !== undefined && (typeof title !== "string" || title.length > 128))
+      )
+        throw new Error("Invalid realtime transcript.");
+      const saved = await saveRealtimeSessionTranscript(
+        id,
+        messages,
+        typeof title === "string" ? title : undefined,
+      );
+      if (!saved) throw new Error("Realtime session was not found.");
+      return listRealtimeSessions().find((session) => session.id === id) ?? null;
+    },
+  );
   ipcMain.handle("realtimeSessions:delete", async (_e, id: string) => {
     if (!isSessionId(id)) throw new Error("Invalid realtime session ID.");
     return deleteRealtimeSession(id);

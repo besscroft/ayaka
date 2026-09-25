@@ -1477,7 +1477,7 @@ const entries = {
     en: "The latest 20 turns will be included in a new realtime session.",
   },
   "realtime.delete": { zh: "删除实时会话", en: "Delete realtime session" },
-  "realtime.defaultTitle": { zh: "新的实时对话", en: "New realtime conversation" },
+  "realtime.defaultTitle": { zh: "新的聊天", en: "New chat" },
   "realtime.you": { zh: "你", en: "You" },
   "realtime.assistant": { zh: "Ayaka", en: "Ayaka" },
   "realtime.connectHint": {

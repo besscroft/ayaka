@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { experimental_useRealtime } from "@ai-sdk/react";
-import type { Experimental_RealtimeSessionConfig } from "ai";
+import type { Experimental_RealtimeSessionConfig, UIMessage } from "ai";
+import { CHAT_SESSION_HEADER } from "@shared/types";
 import type {
   LocalServerInfo,
   ProviderInfo,
@@ -10,6 +11,7 @@ import type {
 } from "@shared/types";
 import { Button, SelectField } from "./ui";
 import { api } from "../lib/api";
+import { generateConversationTitleWithFallback } from "../lib/conversation-title";
 import { useT } from "../lib/i18n";
 import { useSettings } from "../lib/settings";
 import { createRealtimeModel } from "../lib/realtime-adapters";
@@ -319,6 +321,7 @@ export function RealtimeView({
             model={
               modelOptions.find((model) => model.ref === activeSession.modelRef) ?? selectedModel
             }
+            titleModel={settings.selectedModel}
             serverInfo={serverInfo}
             onTranscriptChanged={refreshSessions}
             onEnd={finishSession}
@@ -336,10 +339,7 @@ export function RealtimeView({
           <section className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between border-b border-border px-7 py-5">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                  {t("realtime.history")}
-                </p>
-                <h1 className="mt-1 text-lg font-semibold">{t("realtime.defaultTitle")}</h1>
+                <h1 className="text-lg font-semibold">{t("realtime.defaultTitle")}</h1>
               </div>
               <div className="w-[260px] max-w-[45%]">
                 <SelectField
@@ -400,10 +400,7 @@ function RealtimeHistoryPane({
     <>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-7 py-5">
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            {t("realtime.readOnly")}
-          </p>
-          <h1 className="mt-1 truncate text-lg font-semibold">{session.title}</h1>
+          <h1 className="truncate text-lg font-semibold">{session.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">{f.dateTime(session.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -430,7 +427,7 @@ function RealtimeHistoryPane({
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
           {session.messages.map((message) => (
             <TranscriptBubble key={message.id} message={message} />
           ))}
@@ -451,12 +448,14 @@ function RealtimeHistoryPane({
 function RealtimeSessionPane({
   activeSession,
   model,
+  titleModel,
   serverInfo,
   onTranscriptChanged,
   onEnd,
 }: {
   activeSession: ActiveRealtimeSession;
   model: RealtimeModelOption | null;
+  titleModel: string | null;
   serverInfo: LocalServerInfo | null;
   onTranscriptChanged: () => Promise<void>;
   onEnd: () => void;
@@ -464,10 +463,13 @@ function RealtimeSessionPane({
   const { t } = useT();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [sessionTitle, setSessionTitle] = useState(() => t("realtime.defaultTitle"));
   const streamRef = useRef<MediaStream | null>(activeSession.stream);
   const connectionLifecycleRef = useRef(0);
   const createdAtById = useRef(new Map<string, number>());
   const transcriptRef = useRef<RealtimeSessionMessage[]>([]);
+  const sessionTitleRef = useRef(sessionTitle);
+  const titleGenerationStartedRef = useRef(false);
   const modelInstance = useMemo(() => {
     return createRealtimeModel({
       descriptor: {
@@ -552,6 +554,36 @@ function RealtimeSessionPane({
   transcriptRef.current = transcript;
 
   useEffect(() => {
+    if (titleGenerationStartedRef.current || !serverInfo) return;
+    if (!hasCompletedTitleExchange(realtime.messages)) return;
+
+    titleGenerationStartedRef.current = true;
+    void generateConversationTitleWithFallback({
+      messages: realtime.messages,
+      generate: (excerpt) =>
+        fetchRealtimeTitle(serverInfo, titleModel ?? activeSession.modelRef, excerpt),
+    })
+      .then((title) => {
+        if (!title) return;
+        sessionTitleRef.current = title;
+        setSessionTitle(title);
+        return api.realtimeSessions
+          .saveTranscript(activeSession.id, transcriptRef.current, title)
+          .then(() => onTranscriptChanged());
+      })
+      .catch(() => setError(t("realtime.connectionError")));
+  }, [
+    activeSession.id,
+    activeSession.modelRef,
+    onTranscriptChanged,
+    realtime.messages,
+    serverInfo,
+    titleModel,
+    t,
+    transcript,
+  ]);
+
+  useEffect(() => {
     if (realtime.status === "connected" && streamRef.current && !realtime.isCapturing) {
       realtime.startAudioCapture(streamRef.current);
     }
@@ -576,7 +608,11 @@ function RealtimeSessionPane({
     const stream = streamRef.current;
     return () => {
       if (transcriptRef.current.length)
-        void api.realtimeSessions.saveTranscript(activeSession.id, transcriptRef.current);
+        void api.realtimeSessions.saveTranscript(
+          activeSession.id,
+          transcriptRef.current,
+          sessionTitleRef.current,
+        );
       window.clearTimeout(connectTimer);
       queueMicrotask(() => {
         if (connectionLifecycleRef.current !== lifecycle) return;
@@ -593,7 +629,7 @@ function RealtimeSessionPane({
     if (!transcript.length) return;
     const timer = window.setTimeout(() => {
       void api.realtimeSessions
-        .saveTranscript(activeSession.id, transcript)
+        .saveTranscript(activeSession.id, transcript, sessionTitleRef.current)
         .then(() => onTranscriptChanged())
         .catch(() => setError(t("realtime.connectionError")));
     }, 600);
@@ -607,7 +643,7 @@ function RealtimeSessionPane({
     streamRef.current = null;
     if (transcriptRef.current.length)
       void api.realtimeSessions
-        .saveTranscript(activeSession.id, transcriptRef.current)
+        .saveTranscript(activeSession.id, transcriptRef.current, sessionTitleRef.current)
         .then(() => onTranscriptChanged());
     onEnd();
   };
@@ -632,14 +668,7 @@ function RealtimeSessionPane({
     <>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-7 py-5">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            {t("realtime.history")}
-          </p>
-          <h1 className="mt-1 text-lg font-semibold">
-            {transcript[0]?.role === "user"
-              ? transcript[0].text.slice(0, 72)
-              : t("realtime.defaultTitle")}
-          </h1>
+          <h1 className="text-lg font-semibold">{sessionTitle}</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground">
@@ -665,7 +694,7 @@ function RealtimeSessionPane({
         </div>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto px-6 py-7">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
           {transcript.map((message) => (
             <TranscriptBubble key={message.id} message={message} />
           ))}
@@ -724,8 +753,45 @@ function RealtimeSessionPane({
   );
 }
 
+function hasCompletedTitleExchange(messages: UIMessage[]): boolean {
+  const userIndex = messages.findIndex((message) => message.role === "user");
+  return (
+    userIndex >= 0 &&
+    messages
+      .slice(userIndex + 1)
+      .some(
+        (message) =>
+          message.role === "assistant" &&
+          message.parts.some((part) => part.type === "text" && part.state === "done"),
+      )
+  );
+}
+
+async function fetchRealtimeTitle(
+  info: LocalServerInfo,
+  model: string,
+  messages: UIMessage[],
+): Promise<string | null> {
+  try {
+    const response = await fetch(`http://127.0.0.1:${info.port}/api/title`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [CHAT_SESSION_HEADER]: info.token,
+      },
+      body: JSON.stringify({ model, messages }),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { title?: unknown };
+    return typeof data.title === "string" && data.title.trim() ? data.title : null;
+  } catch (error) {
+    console.error("[realtime] title generation failed:", error);
+    return null;
+  }
+}
+
 function TranscriptBubble({ message }: { message: RealtimeSessionMessage }): React.JSX.Element {
-  const { t } = useT();
+  const { t, f } = useT();
   const isUser = message.role === "user";
   return (
     <article
@@ -747,6 +813,12 @@ function TranscriptBubble({ message }: { message: RealtimeSessionMessage }): Rea
       >
         {message.text}
       </div>
+      <time
+        dateTime={new Date(message.createdAt).toISOString()}
+        className="px-1 text-[10px] text-muted-foreground"
+      >
+        {f.dateTime(message.createdAt, { hour: "2-digit", minute: "2-digit" })}
+      </time>
     </article>
   );
 }

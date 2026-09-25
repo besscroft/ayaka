@@ -423,7 +423,7 @@ export async function createRealtimeSession(input: {
   const now = Date.now();
   const row: RealtimeSessionRow = {
     id: input.id,
-    title: input.title?.trim() || "New realtime conversation",
+    title: input.title?.trim() || "New chat",
     provider_id: input.providerId,
     model_id: input.modelId,
     transcript_json: "[]",
@@ -451,20 +451,25 @@ export function getRealtimeSession(id: string): RealtimeSessionRecord | null {
 export async function saveRealtimeSessionTranscript(
   id: string,
   messages: RealtimeSessionMessage[],
+  title?: string,
 ): Promise<RealtimeSessionRow | null> {
   if (shouldRouteWrites())
-    return writeDb<RealtimeSessionRow | null>("saveRealtimeSessionTranscript", [id, messages]);
+    return writeDb<RealtimeSessionRow | null>("saveRealtimeSessionTranscript", [
+      id,
+      messages,
+      title,
+    ]);
   const existing = getDb().select().from(realtimeSessions).where(eq(realtimeSessions.id, id)).get();
   if (!existing) return null;
   const firstUserMessage = messages.find(
     (message) => message.role === "user" && message.text.trim(),
   );
-  const title = firstUserMessage?.text.trim().slice(0, 72) || existing.title;
+  const nextTitle = title?.trim() || firstUserMessage?.text.trim().slice(0, 72) || existing.title;
   const updatedAt = Date.now();
   getDb()
     .update(realtimeSessions)
     .set({
-      title,
+      title: nextTitle,
       transcript_json: JSON.stringify(messages),
       updated_at: updatedAt,
     })

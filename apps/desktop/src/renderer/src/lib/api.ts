@@ -153,8 +153,9 @@ export const api = {
     saveTranscript: (
       id: string,
       messages: RealtimeSessionMessage[],
+      title?: string,
     ): Promise<RealtimeSessionRecord | null> =>
-      assertApi().realtimeSessions.saveTranscript(id, messages),
+      assertApi().realtimeSessions.saveTranscript(id, messages, title),
     delete: (id: string): Promise<boolean> => assertApi().realtimeSessions.delete(id),
   },
   messages: {

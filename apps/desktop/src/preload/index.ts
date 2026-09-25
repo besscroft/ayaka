@@ -138,8 +138,8 @@ const api = {
   realtimeSessions: {
     list: () => ipcRenderer.invoke("realtimeSessions:list"),
     create: (input: unknown) => ipcRenderer.invoke("realtimeSessions:create", input),
-    saveTranscript: (id: string, messages: unknown) =>
-      ipcRenderer.invoke("realtimeSessions:saveTranscript", id, messages),
+    saveTranscript: (id: string, messages: unknown, title?: string) =>
+      ipcRenderer.invoke("realtimeSessions:saveTranscript", id, messages, title),
     delete: (id: string) => ipcRenderer.invoke("realtimeSessions:delete", id),
   },
   messages: {

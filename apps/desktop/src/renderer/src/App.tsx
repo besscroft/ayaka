@@ -51,7 +51,7 @@ function AppContent(): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newConversationId, setNewConversationId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AppView>("chat");
-  const [realtimeSidebarExpanded, setRealtimeSidebarExpanded] = useState(true);
+  const [realtimeSidebarExpanded, setRealtimeSidebarExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>("appearance");
   const announcedUpdateVersion = useRef<string | null>(null);

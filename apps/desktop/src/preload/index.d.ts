@@ -137,6 +137,7 @@ export interface AyakaApi {
     saveTranscript(
       id: string,
       messages: RealtimeSessionMessage[],
+      title?: string,
     ): Promise<RealtimeSessionRecord | null>;
     delete(id: string): Promise<boolean>;
   };
