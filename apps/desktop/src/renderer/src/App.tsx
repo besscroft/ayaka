@@ -51,6 +51,7 @@ function AppContent(): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newConversationId, setNewConversationId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AppView>("chat");
+  const [realtimeSidebarExpanded, setRealtimeSidebarExpanded] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>("appearance");
   const announcedUpdateVersion = useRef<string | null>(null);
@@ -210,6 +211,8 @@ function AppContent(): React.JSX.Element {
           setSettingsOpen(true);
         }}
         onOpenRealtime={() => setActiveView("realtime")}
+        realtimeSidebarExpanded={realtimeSidebarExpanded}
+        onToggleRealtimeSidebar={() => setRealtimeSidebarExpanded((expanded) => !expanded)}
       >
         <div
           className={activeView === "chat" ? "flex min-h-0 flex-1" : "hidden"}
@@ -229,7 +232,7 @@ function AppContent(): React.JSX.Element {
           )}
         </div>
         {activeView === "realtime" ? (
-          <RealtimeView serverInfo={serverInfo} onReturnToChat={() => setActiveView("chat")} />
+          <RealtimeView serverInfo={serverInfo} sidebarExpanded={realtimeSidebarExpanded} />
         ) : null}
         {activeView !== "chat" && activeView !== "realtime" ? (
           <MainPanelView section={activeView} activeConversationId={activeId} />

@@ -35,6 +35,8 @@ interface AppShellProps {
   onDeleteConversation: (id: string) => void;
   onOpenSettings: () => void;
   onOpenRealtime: () => void;
+  realtimeSidebarExpanded: boolean;
+  onToggleRealtimeSidebar: () => void;
   children: ReactNode;
 }
 
@@ -58,6 +60,8 @@ export function AppShell({
   onDeleteConversation,
   onOpenSettings,
   onOpenRealtime,
+  realtimeSidebarExpanded,
+  onToggleRealtimeSidebar,
   children,
 }: AppShellProps): React.JSX.Element {
   const { t, locale } = useT();
@@ -71,6 +75,15 @@ export function AppShell({
   );
   const isRealtimeView = activeView === "realtime";
   const sidebarVisible = sidebarExpanded && !isRealtimeView;
+  const titlebarSidebarExpanded = isRealtimeView ? realtimeSidebarExpanded : sidebarExpanded;
+
+  const toggleSidebar = (): void => {
+    if (isRealtimeView) {
+      onToggleRealtimeSidebar();
+      return;
+    }
+    setSidebarExpanded((expanded) => !expanded);
+  };
 
   const refresh = (): void => {
     void api.conversations.list().then(setConversations);
@@ -234,11 +247,13 @@ export function AppShell({
       className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground"
     >
       <WindowTitleBar
-        sidebarExpanded={sidebarVisible}
-        onToggleSidebar={() => setSidebarExpanded((expanded) => !expanded)}
+        sidebarExpanded={titlebarSidebarExpanded}
+        onToggleSidebar={toggleSidebar}
+        onOpenChat={() => onSelectView("chat")}
         onOpenRealtime={onOpenRealtime}
+        chatActive={activeView === "chat"}
         realtimeActive={isRealtimeView}
-        showSidebarToggle={!isRealtimeView}
+        showSidebarToggle
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">

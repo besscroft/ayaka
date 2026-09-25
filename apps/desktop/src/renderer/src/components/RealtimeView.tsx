@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { experimental_useRealtime } from "@ai-sdk/react";
 import type { Experimental_RealtimeSessionConfig } from "ai";
 import type {
@@ -12,11 +13,11 @@ import { api } from "../lib/api";
 import { useT } from "../lib/i18n";
 import { useSettings } from "../lib/settings";
 import { createRealtimeModel } from "../lib/realtime-adapters";
-import { IconArrowLeft, IconMessage, IconMic, IconPlus, IconSend, IconX } from "./icons";
+import { IconClose, IconMic, IconPlus, IconSearch, IconSend, IconX } from "./icons";
 
 interface RealtimeViewProps {
   serverInfo: LocalServerInfo | null;
-  onReturnToChat: () => void;
+  sidebarExpanded: boolean;
 }
 
 interface RealtimeModelOption {
@@ -33,11 +34,16 @@ interface ActiveRealtimeSession {
   context: RealtimeSessionMessage[];
 }
 
-export function RealtimeView({ serverInfo, onReturnToChat }: RealtimeViewProps): React.JSX.Element {
+export function RealtimeView({
+  serverInfo,
+  sidebarExpanded,
+}: RealtimeViewProps): React.JSX.Element {
   const { t, f } = useT();
   const { settings } = useSettings();
+  const reduceMotion = useReducedMotion();
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [sessions, setSessions] = useState<RealtimeSessionRecord[]>([]);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [selectedModelRef, setSelectedModelRef] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveRealtimeSession | null>(null);
@@ -127,6 +133,11 @@ export function RealtimeView({ serverInfo, onReturnToChat }: RealtimeViewProps):
 
   const selectedModel = modelOptions.find((model) => model.ref === selectedModelRef) ?? null;
   const selectedHistory = sessions.find((session) => session.id === selectedSessionId) ?? null;
+  const filteredSessions = useMemo(() => {
+    const query = sessionSearchQuery.trim().toLowerCase();
+    if (!query) return sessions;
+    return sessions.filter((session) => session.title.toLowerCase().includes(query));
+  }, [sessions, sessionSearchQuery]);
 
   const beginSession = useCallback(
     async (context: RealtimeSessionMessage[] = []): Promise<void> => {
@@ -189,12 +200,28 @@ export function RealtimeView({ serverInfo, onReturnToChat }: RealtimeViewProps):
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-      <aside className="flex w-[250px] shrink-0 flex-col border-r border-border bg-sidebar">
+      <motion.aside
+        initial={false}
+        animate={{
+          width: sidebarExpanded ? 250 : 0,
+          opacity: sidebarExpanded ? 1 : 0,
+        }}
+        transition={
+          reduceMotion
+            ? { duration: 0 }
+            : {
+                type: "spring",
+                stiffness: 320,
+                damping: 34,
+                mass: 0.8,
+                opacity: { duration: 0.18, ease: "easeOut" },
+              }
+        }
+        className="flex shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar"
+        aria-hidden={!sidebarExpanded}
+        inert={!sidebarExpanded}
+      >
         <div className="border-b border-sidebar-border px-4 pb-3 pt-4">
-          <Button variant="ghost" size="sm" className="mb-4 -ml-2 gap-2" onPress={onReturnToChat}>
-            <IconArrowLeft className="size-4" />
-            {t("shell.nav.conversations")}
-          </Button>
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-semibold text-sidebar-foreground/75">
               {t("realtime.history")}
@@ -214,30 +241,66 @@ export function RealtimeView({ serverInfo, onReturnToChat }: RealtimeViewProps):
             </Button>
           </div>
         </div>
+        {sessions.length > 0 ? (
+          <div className="relative px-3 pb-2 pt-2">
+            <div className="relative">
+              <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground/40" />
+              <input
+                type="text"
+                value={sessionSearchQuery}
+                onChange={(event) => setSessionSearchQuery(event.currentTarget.value)}
+                placeholder={t("realtime.searchPlaceholder")}
+                aria-label={t("realtime.searchPlaceholder")}
+                className="h-8 w-full rounded-md border border-input bg-background px-3 pl-7 pr-7 text-xs text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+              {sessionSearchQuery ? (
+                <button
+                  type="button"
+                  data-icon-only="true"
+                  data-icon-tone="neutral"
+                  onClick={() => setSessionSearchQuery("")}
+                  aria-label={t("common.close")}
+                  className="absolute right-1.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-foreground/40 transition hover:text-foreground"
+                >
+                  <IconClose className="size-3" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label={t("realtime.history")}>
           {sessions.length === 0 ? (
             <p className="px-3 py-8 text-center text-xs text-muted-foreground">
               {loading ? t("chat.initializing") : t("realtime.emptyHistory")}
             </p>
+          ) : filteredSessions.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+              {t("realtime.noSearchResult")}
+            </p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {sessions.map((session) => (
+              {filteredSessions.map((session) => (
                 <li key={session.id}>
                   <button
                     type="button"
                     className={[
-                      "group flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition-colors",
+                      "group flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors",
                       selectedSessionId === session.id
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                         : "text-sidebar-foreground/75 hover:bg-sidebar-accent",
                     ].join(" ")}
                     onClick={() => openHistory(session.id)}
                   >
-                    <IconMessage className="mt-0.5 size-3.5 shrink-0 opacity-60" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs">{session.title}</span>
-                      <span className="mt-1 block text-[10px] text-muted-foreground">
-                        {f.dateTime(session.updatedAt)}
+                    <IconMic className="size-3.5 shrink-0 opacity-60" />
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-xs">{session.title}</span>
+                      <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
+                        {f.dateTime(session.updatedAt, {
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
                     </span>
                   </button>
@@ -246,7 +309,7 @@ export function RealtimeView({ serverInfo, onReturnToChat }: RealtimeViewProps):
             </ul>
           )}
         </nav>
-      </aside>
+      </motion.aside>
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {activeSession ? (

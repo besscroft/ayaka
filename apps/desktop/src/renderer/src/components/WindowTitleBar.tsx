@@ -9,12 +9,15 @@ import {
   IconSidebarCollapse,
   IconSidebarExpand,
   IconMic,
+  IconMessage,
 } from "./icons";
 
 interface WindowTitleBarProps {
   sidebarExpanded: boolean;
   onToggleSidebar: () => void;
+  onOpenChat: () => void;
   onOpenRealtime: () => void;
+  chatActive: boolean;
   realtimeActive: boolean;
   showSidebarToggle: boolean;
 }
@@ -22,7 +25,9 @@ interface WindowTitleBarProps {
 export function WindowTitleBar({
   sidebarExpanded,
   onToggleSidebar,
+  onOpenChat,
   onOpenRealtime,
+  chatActive,
   realtimeActive,
   showSidebarToggle,
 }: WindowTitleBarProps): React.JSX.Element {
@@ -47,7 +52,7 @@ export function WindowTitleBar({
 
   return (
     <header
-      className="window-drag-region flex h-10 shrink-0 select-none items-center border-b border-border bg-background"
+      className="window-drag-region relative flex h-10 shrink-0 select-none items-center border-b border-border bg-background"
       data-slot="window-titlebar"
     >
       {showSidebarToggle ? (
@@ -73,6 +78,22 @@ export function WindowTitleBar({
         type="button"
         className={[
           "window-no-drag flex h-full items-center gap-2 px-3 text-xs font-medium transition-colors",
+          chatActive
+            ? "bg-accent text-accent-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        ].join(" ")}
+        data-slot="window-chat-entry"
+        onClick={onOpenChat}
+        aria-current={chatActive ? "page" : undefined}
+      >
+        <IconMessage className="size-3.5" aria-hidden="true" />
+        {t("shell.nav.conversations")}
+      </button>
+
+      <button
+        type="button"
+        className={[
+          "window-no-drag flex h-full items-center gap-2 px-3 text-xs font-medium transition-colors",
           realtimeActive
             ? "bg-accent text-accent-foreground"
             : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -85,7 +106,7 @@ export function WindowTitleBar({
         {t("shell.nav.realtime")}
       </button>
 
-      <div className="flex min-w-0 flex-1 items-center px-2">
+      <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center">
         <span
           className="truncate text-[11px] font-medium tracking-wide text-muted-foreground"
           data-slot="window-brand"
@@ -94,7 +115,7 @@ export function WindowTitleBar({
         </span>
       </div>
 
-      <div className="window-no-drag flex h-full items-stretch" data-slot="window-controls">
+      <div className="window-no-drag ml-auto flex h-full items-stretch" data-slot="window-controls">
         <button
           type="button"
           className="window-control-button"
