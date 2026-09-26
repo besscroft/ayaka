@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.2]
+
+### 中文
+
+#### 新增
+
+- 新增实时语音对话功能，支持麦克风采集、实时语音模型选择、文本消息收发以及实时会话历史持久化。
+- 新增 OpenAI 原生 Realtime 和 OpenAI 兼容 Realtime 协议支持，可配置传输协议与服务端点。
+- 新增阿里云百炼原生 Realtime 支持，适配工作空间、地域、音频格式和事件转发。
+- 新增实时会话自动标题生成、可折叠历史侧栏和会话搜索功能。
+- 新增实时会话断线重连能力，可在保留当前转录内容的情况下重新建立连接。
+
+#### 变更
+
+- 优化实时会话历史界面、消息时间显示、默认标题和窗口顶部导航，改善聊天与实时视图之间的切换体验。
+- 扩展服务商和模型配置，支持实时能力开关、协议选项及 Realtime 端点参数，并完善对应的配置校验。
+
+### English
+
+#### Added
+
+- Added realtime voice conversations with microphone capture, realtime model selection, text messaging, and persisted session history.
+- Added support for OpenAI Realtime and OpenAI-compatible Realtime protocols with configurable transports and service endpoints.
+- Added native Alibaba Cloud Bailian Realtime support, including workspace, region, audio-format, and event-forwarding adaptations.
+- Added automatic titles for realtime sessions, a collapsible history sidebar, and session search.
+- Added realtime-session reconnection, allowing the transport to be re-established while keeping the current transcript.
+
+#### Changed
+
+- Improved the realtime history view, message timestamps, default titles, and window navigation for smoother switching between chat and realtime views.
+- Extended provider and model settings with realtime capability toggles, protocol choices, endpoint parameters, and related validation.
+
 ## [0.2.1]
 
 ### 中文
