@@ -1453,6 +1453,8 @@ const entries = {
   "realtime.chooseModel": { zh: "选择实时模型", en: "Choose a Realtime model" },
   "realtime.connect": { zh: "连接并开始说话", en: "Connect and start talking" },
   "realtime.connecting": { zh: "正在连接…", en: "Connecting…" },
+  "realtime.reconnect": { zh: "重新连接", en: "Reconnect" },
+  "realtime.reconnecting": { zh: "正在重连…", en: "Reconnecting…" },
   "realtime.connected": { zh: "已连接", en: "Connected" },
   "realtime.disconnected": { zh: "已断开", en: "Disconnected" },
   "realtime.listening": { zh: "正在聆听", en: "Listening" },

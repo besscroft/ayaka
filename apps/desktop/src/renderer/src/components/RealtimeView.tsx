@@ -15,7 +15,7 @@ import { generateConversationTitleWithFallback } from "../lib/conversation-title
 import { useT } from "../lib/i18n";
 import { useSettings } from "../lib/settings";
 import { createRealtimeModel } from "../lib/realtime-adapters";
-import { IconClose, IconMic, IconPlus, IconSearch, IconSend, IconX } from "./icons";
+import { IconClose, IconMic, IconPlus, IconRotateCcw, IconSearch, IconSend, IconX } from "./icons";
 
 interface RealtimeViewProps {
   serverInfo: LocalServerInfo | null;
@@ -463,9 +463,11 @@ function RealtimeSessionPane({
   const { t } = useT();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
   const [sessionTitle, setSessionTitle] = useState(() => t("realtime.defaultTitle"));
   const streamRef = useRef<MediaStream | null>(activeSession.stream);
   const connectionLifecycleRef = useRef(0);
+  const connectionAttemptedRef = useRef(false);
   const createdAtById = useRef(new Map<string, number>());
   const transcriptRef = useRef<RealtimeSessionMessage[]>([]);
   const sessionTitleRef = useRef(sessionTitle);
@@ -590,11 +592,16 @@ function RealtimeSessionPane({
   }, [realtime.status, realtime.isCapturing, realtime.startAudioCapture]);
 
   useEffect(() => {
-    if (realtime.status !== "disconnected" && realtime.status !== "error") return;
-    if (realtime.status === "error") {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+    if (!connectionAttemptedRef.current) return;
+    if (realtime.status === "connected") {
+      setReconnecting(false);
+      return;
     }
+    if (realtime.status !== "disconnected" && realtime.status !== "error") return;
+    realtime.stopAudioCapture();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setReconnecting(false);
   }, [realtime.status]);
 
   useEffect(() => {
@@ -603,9 +610,10 @@ function RealtimeSessionPane({
     // until that replay has completed so the discarded mount cannot create a
     // proxy session that is immediately torn down during the upstream handshake.
     const connectTimer = window.setTimeout(() => {
-      if (connectionLifecycleRef.current === lifecycle) void realtime.connect();
+      if (connectionLifecycleRef.current !== lifecycle) return;
+      connectionAttemptedRef.current = true;
+      void realtime.connect();
     }, 0);
-    const stream = streamRef.current;
     return () => {
       if (transcriptRef.current.length)
         void api.realtimeSessions.saveTranscript(
@@ -618,10 +626,11 @@ function RealtimeSessionPane({
         if (connectionLifecycleRef.current !== lifecycle) return;
         realtime.stopAudioCapture();
         realtime.disconnect();
-        stream?.getTracks().forEach((track) => track.stop());
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       });
     };
-    // This pane represents a single new server session; reconnecting is handled by creating a new one.
+    // This pane represents one local chat session and can reconnect its transport in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -647,6 +656,37 @@ function RealtimeSessionPane({
         .then(() => onTranscriptChanged());
     onEnd();
   };
+
+  const handleReconnect = async (): Promise<void> => {
+    if (reconnecting || realtime.status === "connecting") return;
+    if (!model || !serverInfo) {
+      setError(t("realtime.noModels"));
+      return;
+    }
+
+    setReconnecting(true);
+    setError(null);
+
+    const hasLiveAudioTrack = streamRef.current
+      ?.getAudioTracks()
+      .some((track) => track.readyState === "live");
+    if (!hasLiveAudioTrack) {
+      try {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        streamRef.current = null;
+        setReconnecting(false);
+        setError(t("realtime.permissionError"));
+        return;
+      }
+    }
+
+    connectionAttemptedRef.current = true;
+    await realtime.connect();
+  };
+
+  const canReconnect = realtime.status === "disconnected" || realtime.status === "error";
 
   const submitText = (): void => {
     const value = text.trim();
@@ -687,6 +727,23 @@ function RealtimeSessionPane({
           <span className="max-w-[220px] truncate text-xs text-muted-foreground">
             {model?.label ?? ""}
           </span>
+          {canReconnect && transcript.length > 0 ? (
+            <Button
+              variant="primary"
+              size="sm"
+              className="gap-2"
+              isDisabled={!model || !serverInfo || reconnecting}
+              onPress={() => void handleReconnect()}
+            >
+              <IconRotateCcw
+                className={[
+                  "size-3.5",
+                  reconnecting ? "animate-spin motion-reduce:animate-none" : "",
+                ].join(" ")}
+              />
+              {reconnecting ? t("realtime.reconnecting") : t("realtime.reconnect")}
+            </Button>
+          ) : null}
           <Button variant="tertiary" size="sm" className="gap-2" onPress={handleEnd}>
             <IconX className="size-3.5" />
             {t("realtime.disconnect")}
@@ -709,6 +766,23 @@ function RealtimeSessionPane({
                   <span key={index} className="w-1 rounded-full bg-primary/55" style={{ height }} />
                 ))}
               </div>
+              {canReconnect ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-6 gap-2"
+                  isDisabled={!model || !serverInfo || reconnecting}
+                  onPress={() => void handleReconnect()}
+                >
+                  <IconRotateCcw
+                    className={[
+                      "size-3.5",
+                      reconnecting ? "animate-spin motion-reduce:animate-none" : "",
+                    ].join(" ")}
+                  />
+                  {reconnecting ? t("realtime.reconnecting") : t("realtime.reconnect")}
+                </Button>
+              ) : null}
             </div>
           ) : null}
           {error ? (
