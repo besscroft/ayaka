@@ -1636,6 +1636,7 @@ export function ChatView({
                 key={conversationId}
                 conversationId={conversationId}
                 messages={renderedMessages}
+                createdAtById={createdAtRef.current}
                 skillMentions={skillMentionCatalog}
                 isLoading={isLoading}
                 status={statusKind}

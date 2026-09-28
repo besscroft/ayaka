@@ -72,6 +72,7 @@ import {
 interface MessageListProps {
   conversationId?: string;
   messages: UIMessage[];
+  createdAtById?: ReadonlyMap<string, number>;
   skillMentions?: readonly MentionSkill[];
   isLoading: boolean;
   status: ConversationStatusKind;
@@ -105,6 +106,7 @@ export function isMessageStreaming(isLoading: boolean, index: number, lastIndex:
 export function MessageList({
   conversationId,
   messages,
+  createdAtById,
   skillMentions,
   isLoading,
   status,
@@ -184,6 +186,7 @@ export function MessageList({
         <VirtualMessageRows
           conversationId={conversationId}
           messages={messages}
+          createdAtById={createdAtById}
           skillMentions={skillMentions}
           isLoading={isLoading}
           onEdit={onEditMessage ? stableEditMessage : undefined}
@@ -261,6 +264,7 @@ export function MessageList({
 interface VirtualMessageRowsProps {
   conversationId?: string;
   messages: UIMessage[];
+  createdAtById?: ReadonlyMap<string, number>;
   skillMentions?: readonly MentionSkill[];
   isLoading: boolean;
   onEdit?: (messageId: string, text: string) => Promise<void> | void;
@@ -303,6 +307,7 @@ export function shouldInitializeConversationScroll({
 function VirtualMessageRows({
   conversationId,
   messages,
+  createdAtById,
   skillMentions,
   isLoading,
   onEdit,
@@ -408,6 +413,7 @@ function VirtualMessageRows({
             <MemoMessageItem
               conversationId={conversationId}
               message={message}
+              createdAt={createdAtById?.get(message.id)}
               skillMentions={skillMentions}
               isLastMessage={virtualItem.index === messages.length - 1}
               isStreaming={isMessageStreaming(isLoading, virtualItem.index, messages.length - 1)}
@@ -543,6 +549,7 @@ export function getReasoningDisplays(
 export interface MessageItemProps {
   conversationId?: string;
   message: UIMessage;
+  createdAt?: number;
   skillMentions?: readonly MentionSkill[];
   isLastMessage: boolean;
   isStreaming: boolean;
@@ -591,6 +598,7 @@ export async function saveMessageEdit({
 function MessageItem({
   conversationId,
   message,
+  createdAt,
   skillMentions,
   isLastMessage,
   isStreaming,
@@ -603,6 +611,7 @@ function MessageItem({
 }: MessageItemProps): React.JSX.Element {
   const { t, f } = useT();
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [fallbackCreatedAt] = useState(() => Date.now());
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -626,6 +635,19 @@ function MessageItem({
   // 消息操作仅在非流式中可用，完成后始终显示
   const actionsEnabled = !messageStreaming;
   const showExecutionTime = message.role === "assistant" && !messageStreaming && executionTime;
+  const messageCreatedAt = createdAt ?? fallbackCreatedAt;
+  const messageTime = (
+    <time
+      dateTime={new Date(messageCreatedAt).toISOString()}
+      className="relative top-px text-[10px] leading-none text-muted-foreground"
+    >
+      {f.dateTime(messageCreatedAt, {
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </time>
+  );
 
   /* ---------- 复制 ---------- */
   const handleCopy = async (): Promise<void> => {
@@ -713,6 +735,7 @@ function MessageItem({
           onCancel={cancelEdit}
           isSaving={saving}
         />
+        <div className="mt-1 flex items-center gap-2">{messageTime}</div>
       </Message>
     );
   }
@@ -882,33 +905,32 @@ function MessageItem({
         })}
       </MessageContent>
 
-      {/* 操作条与耗时统计：放在气泡下方同一行，assistant 常显、user hover 显示 */}
-      {(actionsEnabled && fullText) || showExecutionTime ? (
-        <div className="mt-1 flex items-center gap-2">
-          {actionsEnabled && fullText ? (
-            <MessageActions
-              placement={isUser ? "left" : "right"}
-              alwaysVisible={!isUser}
-              onCopy={handleCopy}
-              onEdit={isUser && onEdit ? startEdit : undefined}
-              onResend={
-                isUser && onResend
-                  ? handleResend
-                  : isMediaError && onRetry
-                    ? handleMediaRetry
-                    : undefined
-              }
-              onDelete={onDelete ? handleDelete : undefined}
-            />
-          ) : null}
+      {/* 操作条、耗时统计与消息时间显示在气泡下方；assistant 常显，user 操作条 hover 显示 */}
+      <div className="mt-1 flex items-center gap-2">
+        {actionsEnabled && fullText ? (
+          <MessageActions
+            placement={isUser ? "left" : "right"}
+            alwaysVisible={!isUser}
+            onCopy={handleCopy}
+            onEdit={isUser && onEdit ? startEdit : undefined}
+            onResend={
+              isUser && onResend
+                ? handleResend
+                : isMediaError && onRetry
+                  ? handleMediaRetry
+                  : undefined
+            }
+            onDelete={onDelete ? handleDelete : undefined}
+          />
+        ) : null}
 
-          {showExecutionTime ? (
-            <span className="text-[10.5px] leading-none text-foreground/40">
-              {t("msg.executionTime", { duration: executionTime })}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+        {showExecutionTime ? (
+          <span className="text-[10.5px] leading-none text-foreground/40">
+            {t("msg.executionTime", { duration: executionTime })}
+          </span>
+        ) : null}
+        {messageTime}
+      </div>
       {message.role === "assistant" &&
       !messageStreaming &&
       metadata.execution?.agentPath &&
@@ -945,6 +967,7 @@ export function areMessageItemPropsEqual(
 ): boolean {
   return (
     previous.message === next.message &&
+    previous.createdAt === next.createdAt &&
     previous.conversationId === next.conversationId &&
     previous.skillMentions === next.skillMentions &&
     previous.isLastMessage === next.isLastMessage &&

@@ -1479,6 +1479,13 @@ const entries = {
     en: "The latest 20 turns will be included in a new realtime session.",
   },
   "realtime.delete": { zh: "删除实时会话", en: "Delete realtime session" },
+  "realtime.delete.confirm": {
+    zh: "永久删除“{title}”及其逐字稿？此操作无法撤销。",
+    en: "Permanently delete “{title}” and its transcript? This cannot be undone.",
+  },
+  "realtime.delete.loading": { zh: "正在删除聊天", en: "Deleting chat" },
+  "realtime.delete.success": { zh: "聊天及逐字稿已删除", en: "Chat and transcript deleted" },
+  "realtime.delete.failed": { zh: "删除聊天失败", en: "Failed to delete chat" },
   "realtime.defaultTitle": { zh: "新的聊天", en: "New chat" },
   "realtime.you": { zh: "你", en: "You" },
   "realtime.assistant": { zh: "Ayaka", en: "Ayaka" },

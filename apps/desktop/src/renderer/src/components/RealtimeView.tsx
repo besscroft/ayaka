@@ -10,12 +10,23 @@ import type {
   RealtimeSessionRecord,
 } from "@shared/types";
 import { Button, SelectField } from "./ui";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { api } from "../lib/api";
 import { generateConversationTitleWithFallback } from "../lib/conversation-title";
 import { useT } from "../lib/i18n";
 import { useSettings } from "../lib/settings";
 import { createRealtimeModel } from "../lib/realtime-adapters";
-import { IconClose, IconMic, IconPlus, IconRotateCcw, IconSearch, IconSend, IconX } from "./icons";
+import { notify } from "../lib/toast";
+import {
+  IconClose,
+  IconMic,
+  IconPlus,
+  IconRotateCcw,
+  IconSearch,
+  IconSend,
+  IconTrash,
+  IconX,
+} from "./icons";
 
 interface RealtimeViewProps {
   serverInfo: LocalServerInfo | null;
@@ -40,7 +51,7 @@ export function RealtimeView({
   serverInfo,
   sidebarExpanded,
 }: RealtimeViewProps): React.JSX.Element {
-  const { t, f } = useT();
+  const { t, locale } = useT();
   const { settings } = useSettings();
   const reduceMotion = useReducedMotion();
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -48,6 +59,9 @@ export function RealtimeView({
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [selectedModelRef, setSelectedModelRef] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<RealtimeSessionRecord | null>(
+    null,
+  );
   const [activeSession, setActiveSession] = useState<ActiveRealtimeSession | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,6 +214,27 @@ export function RealtimeView({
     void refreshSessions();
   };
 
+  const confirmDeleteSession = (): void => {
+    if (!pendingDeleteSession || pendingDeleteSession.id === activeSession?.id) return;
+    const { id } = pendingDeleteSession;
+    setPendingDeleteSession(null);
+    void notify
+      .promise(
+        api.realtimeSessions.delete(id),
+        {
+          loading: t("realtime.delete.loading"),
+          success: t("realtime.delete.success"),
+          error: t("realtime.delete.failed"),
+        },
+        locale,
+      )
+      .then(() => {
+        setSessions((current) => current.filter((session) => session.id !== id));
+        setSelectedSessionId((current) => (current === id ? null : current));
+      })
+      .catch(() => undefined);
+  };
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
       <motion.aside
@@ -281,33 +316,42 @@ export function RealtimeView({
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {filteredSessions.map((session) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className={[
-                      "group flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors",
-                      selectedSessionId === session.id
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent",
-                    ].join(" ")}
-                    onClick={() => openHistory(session.id)}
-                  >
-                    <IconMic className="size-3.5 shrink-0 opacity-60" />
-                    <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-xs">{session.title}</span>
-                      <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
-                        {f.dateTime(session.updatedAt, {
-                          month: "numeric",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {filteredSessions.map((session) => {
+                const isActive = activeSession?.id === session.id;
+                return (
+                  <li key={session.id}>
+                    <div
+                      className={[
+                        "group/realtime-session flex items-center gap-1 rounded-md px-1 transition-colors",
+                        selectedSessionId === session.id
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/75 hover:bg-sidebar-accent",
+                      ].join(" ")}
+                    >
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-left"
+                        onClick={() => openHistory(session.id)}
+                      >
+                        <IconMic className="size-3.5 shrink-0 opacity-60" />
+                        <span className="min-w-0 flex-1 truncate text-xs">{session.title}</span>
+                      </button>
+                      <button
+                        type="button"
+                        data-icon-only="true"
+                        data-icon-tone="danger"
+                        className="opacity-0 transition group-hover/realtime-session:opacity-100 group-focus-within/realtime-session:opacity-100 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={isActive}
+                        aria-label={`${t("common.delete")} ${session.title}`}
+                        title={t("realtime.delete")}
+                        onClick={() => setPendingDeleteSession(session)}
+                      >
+                        <IconTrash className="size-3" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </nav>
@@ -376,6 +420,15 @@ export function RealtimeView({
           </section>
         )}
       </section>
+      <ConfirmDialog
+        open={pendingDeleteSession !== null}
+        title={t("realtime.delete")}
+        message={t("realtime.delete.confirm", { title: pendingDeleteSession?.title ?? "" })}
+        danger
+        confirmLabel={t("common.delete")}
+        onConfirm={confirmDeleteSession}
+        onClose={() => setPendingDeleteSession(null)}
+      />
     </div>
   );
 }
