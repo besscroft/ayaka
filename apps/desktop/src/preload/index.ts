@@ -325,6 +325,8 @@ const api = {
       if (result.ok) return result.value;
       throw Object.assign(new Error(result.error), { code: result.code });
     },
+    discardQueuedInput: (runId: string, inputId: string) =>
+      ipcRenderer.invoke("runtime:discardQueuedInput", runId, inputId),
     cancelRun: (runId: string) => ipcRenderer.invoke("runtime:cancelRun", runId),
     events: {
       list: () => ipcRenderer.invoke("runtime:events:list"),

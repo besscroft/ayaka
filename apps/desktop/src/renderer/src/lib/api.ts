@@ -356,6 +356,8 @@ export const api = {
       source?: AgentRunInputSource;
       message: UIMessage;
     }): Promise<AgentRunInput> => assertApi().runtime.enqueueInput(input),
+    discardQueuedInput: (runId: string, inputId: string): Promise<boolean> =>
+      assertApi().runtime.discardQueuedInput(runId, inputId),
     cancelRun: (runId: string): Promise<boolean> => assertApi().runtime.cancelRun(runId),
     events: {
       list: (): Promise<RuntimeEvent[]> => assertApi().runtime.events.list(),

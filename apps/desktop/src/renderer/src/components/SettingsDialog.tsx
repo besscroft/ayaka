@@ -2748,18 +2748,33 @@ function ProviderModelWorkbench({
                 )}
                 <TextField>
                   <Label>{t("model.baseUrl")}</Label>
-                  <Input
-                    className="select-text"
-                    value={providerForm.baseUrl}
-                    placeholder={t("model.provider.builtinEndpoint")}
-                    disabled={!canEditProvider}
-                    onChange={(event) =>
-                      setProviderForm((prev) => ({
-                        ...prev,
-                        baseUrl: (event.target as HTMLInputElement).value,
-                      }))
-                    }
-                  />
+                  <div className="relative">
+                    <Input
+                      className="select-text pr-9"
+                      value={providerForm.baseUrl}
+                      placeholder={t("model.provider.builtinEndpoint")}
+                      disabled={!canEditProvider}
+                      onChange={(event) =>
+                        setProviderForm((prev) => ({
+                          ...prev,
+                          baseUrl: (event.target as HTMLInputElement).value,
+                        }))
+                      }
+                    />
+                    {canEditProvider && providerForm.baseUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        data-icon-tone="neutral"
+                        className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+                        aria-label={t("common.clear")}
+                        onPress={() => setProviderForm((prev) => ({ ...prev, baseUrl: "" }))}
+                      >
+                        <IconClose aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </TextField>
                 {canEditProvider && (
                   <label className="select-none text-sm">
@@ -2806,65 +2821,36 @@ function ProviderModelWorkbench({
                 {canEditProvider && providerForm.realtimeEnabled && (
                   <TextField className="md:col-span-1">
                     <Label>{t("model.realtimeEndpoint")}</Label>
-                    <Input
-                      className="select-text"
-                      value={providerForm.realtimeEndpoint ?? ""}
-                      placeholder={t("model.realtimeEndpoint.placeholder")}
-                      onChange={(event) =>
-                        setProviderForm((prev) => ({
-                          ...prev,
-                          realtimeEndpoint: (event.target as HTMLInputElement).value,
-                        }))
-                      }
-                    />
-                    <Description className="mt-1">{t("model.realtimeEndpoint.hint")}</Description>
-                  </TextField>
-                )}
-                {canEditProvider &&
-                  providerForm.realtimeEnabled &&
-                  providerForm.realtimeProtocol === "bailian" && (
-                    <TextField className="md:col-span-1">
-                      <Label>{t("model.realtimeWorkspace")}</Label>
+                    <div className="relative">
                       <Input
-                        className="select-text"
-                        value={providerForm.realtimeWorkspace ?? ""}
-                        placeholder={t("model.realtimeWorkspace.placeholder")}
+                        className="select-text pr-9"
+                        value={providerForm.realtimeEndpoint ?? ""}
+                        placeholder={t("model.realtimeEndpoint.placeholder")}
                         onChange={(event) =>
                           setProviderForm((prev) => ({
                             ...prev,
-                            realtimeWorkspace: (event.target as HTMLInputElement).value,
+                            realtimeEndpoint: (event.target as HTMLInputElement).value,
                           }))
                         }
                       />
-                      <Description className="mt-1">
-                        {t("model.realtimeWorkspace.hint")}
-                      </Description>
-                    </TextField>
-                  )}
-                {canEditProvider &&
-                  providerForm.realtimeEnabled &&
-                  providerForm.realtimeProtocol === "bailian" && (
-                    <label className="select-none text-sm md:col-span-1">
-                      <span className="mb-1 block text-xs text-foreground/60">
-                        {t("model.realtimeRegion")}
-                      </span>
-                      <SelectField
-                        value={providerForm.realtimeRegion ?? "cn-beijing"}
-                        options={bailianRealtimeRegionOptions(t)}
-                        onChange={(value) =>
-                          setProviderForm((prev) => ({
-                            ...prev,
-                            realtimeRegion: BAILIAN_REALTIME_REGIONS.includes(
-                              value as BailianRealtimeRegion,
-                            )
-                              ? (value as BailianRealtimeRegion)
-                              : "cn-beijing",
-                          }))
-                        }
-                        ariaLabel={t("model.realtimeRegion")}
-                      />
-                    </label>
-                  )}
+                      {providerForm.realtimeEndpoint ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          data-icon-tone="neutral"
+                          className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+                          aria-label={t("common.clear")}
+                          onPress={() =>
+                            setProviderForm((prev) => ({ ...prev, realtimeEndpoint: "" }))
+                          }
+                        >
+                          <IconClose aria-hidden="true" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TextField>
+                )}
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">

@@ -28,22 +28,9 @@ export async function persistChatStreamSnapshot(
   let snapshot = getMessagesSnapshot(conversationId);
 
   for (let attempt = 0; attempt < MAX_PERSIST_ATTEMPTS; attempt += 1) {
-    const createdAtById = new Map(
-      snapshot.messages.map((message) => [message.id, message.created_at]),
-    );
     const existingById = new Map(snapshot.messages.map((message) => [message.id, message]));
-    const nextCreatedAt = Math.max(
-      Date.now(),
-      ...snapshot.messages.map((message) => message.created_at + 1),
-    );
-    const upserts = buildRows(
-      conversationId,
-      persistableMessages.filter(
-        (message) => message.role !== "user" || !existingById.has(message.id),
-      ),
-      createdAtById,
-      nextCreatedAt,
-    );
+    const createdAtById = assignCreatedAtByMessageOrder(persistableMessages, snapshot.messages);
+    const upserts = buildRows(conversationId, persistableMessages, existingById, createdAtById);
     if (upserts.length === 0) {
       return { revision: snapshot.revision, messageCount: 0 };
     }
@@ -71,15 +58,53 @@ function isPersistableMessage(message: UIMessage): boolean {
 function buildRows(
   conversationId: string,
   messages: UIMessage[],
-  createdAtById: Map<string, number>,
-  firstNewCreatedAt: number,
+  existingById: Map<string, MessageRow>,
+  createdAtById: ReadonlyMap<string, number>,
 ): MessageRow[] {
+  return messages
+    .filter((message) => message.role !== "user" || !existingById.has(message.id))
+    .map((message) => ({
+      id: message.id,
+      conversation_id: conversationId,
+      role: message.role,
+      content: JSON.stringify(message),
+      created_at: createdAtById.get(message.id) ?? Date.now(),
+    }));
+}
+
+/**
+ * Assign timestamps that follow the stream order while keeping stable history
+ * timestamps whenever they do not conflict with a newly inserted message.
+ *
+ * A queued user message is appended to the runtime trace while the active
+ * assistant message may already exist in the database. If we keep that old
+ * assistant timestamp, an ORDER BY created_at query renders the assistant
+ * before the queued message even though the stream order is correct. Once a
+ * message needs a newer slot, subsequent messages are shifted forward.
+ */
+function assignCreatedAtByMessageOrder(
+  messages: UIMessage[],
+  existingMessages: MessageRow[],
+): Map<string, number> {
+  const existingById = new Map(existingMessages.map((message) => [message.id, message]));
+  const firstNewCreatedAt = Math.max(
+    Date.now(),
+    ...existingMessages.map((message) => message.created_at + 1),
+  );
+  const createdAtById = new Map<string, number>();
+  let previousCreatedAt = Number.MIN_SAFE_INTEGER;
   let newMessageIndex = 0;
-  return messages.map((message) => ({
-    id: message.id,
-    conversation_id: conversationId,
-    role: message.role,
-    content: JSON.stringify(message),
-    created_at: createdAtById.get(message.id) ?? firstNewCreatedAt + newMessageIndex++,
-  }));
+
+  for (const message of messages) {
+    const existing = existingById.get(message.id);
+    const candidate = existing?.created_at ?? firstNewCreatedAt + newMessageIndex++;
+    const createdAt =
+      message.role === "user" && existing
+        ? existing.created_at
+        : Math.max(candidate, previousCreatedAt + 1);
+    createdAtById.set(message.id, createdAt);
+    previousCreatedAt = Math.max(previousCreatedAt, createdAt);
+  }
+
+  return createdAtById;
 }

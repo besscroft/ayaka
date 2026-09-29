@@ -65,6 +65,8 @@ interface PromptInputProps extends Omit<FormHTMLAttributes<HTMLFormElement>, "on
   onSubmit: (message: PromptInputMessage) => void;
   value?: string;
   status?: SubmitStatus;
+  /** Allow submitting while the current response is still streaming. */
+  allowSubmitWhileLoading?: boolean;
   children?: ReactNode;
 }
 
@@ -76,6 +78,7 @@ export function PromptInput({
   onSubmit,
   value: controlledValue,
   status = "ready",
+  allowSubmitWhileLoading = false,
   className,
   children,
   ...rest
@@ -89,7 +92,7 @@ export function PromptInput({
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     const text = valueRef.current.trim();
-    if (status === "streaming" || status === "submitted") return;
+    if (!allowSubmitWhileLoading && (status === "streaming" || status === "submitted")) return;
     onSubmit({ text, files: [] });
     setInternalValue("");
   };

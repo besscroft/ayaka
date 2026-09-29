@@ -54,9 +54,112 @@ void describe("AgentLoopSessionManager", () => {
     await manager.enqueue(runId, "steering", "user", message("s2"));
     await manager.enqueueFollowUp(runId, message("f1"));
 
-    assert.deepEqual((await session.drain("steering")).map(readText), ["s1", "s2"]);
+    assert.deepEqual((await session.drain("steering")).map(readText), ["s1"]);
+    assert.deepEqual((await session.drain("steering")).map(readText), ["s2"]);
     assert.deepEqual((await session.drain("follow_up")).map(readText), ["f1"]);
     assert.equal(await manager.start({ ...baseOptions(runId), mode: "resume" }), session);
+    await session.complete();
+  });
+
+  void it("drains mixed queued inputs in sequence order", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    const session = await manager.start(baseOptions(runId));
+    await manager.enqueueFollowUp(runId, message("follow-up first"), "user");
+    await manager.enqueue(runId, "steering", "user", message("steering second"));
+    await manager.enqueueFollowUp(runId, message("follow-up third"), "user");
+
+    const drained: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const next = await session.drainNext();
+      if (next) drained.push(readText(next));
+    }
+    assert.deepEqual(drained, ["follow-up first", "steering second", "follow-up third"]);
+
+    await session.complete();
+  });
+
+  void it("removes a queued follow-up before it is consumed", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    const session = await manager.start(baseOptions(runId));
+    const queuedMessage = message("remove me");
+    const queued = await manager.enqueueFollowUp(runId, queuedMessage, "user");
+
+    assert.equal(
+      session.messageTrace.some((item) => item.id === queuedMessage.id),
+      false,
+    );
+    assert.equal(
+      db.getMessagesSnapshot(conversationId).messages.some((item) => item.id === queuedMessage.id),
+      false,
+    );
+    assert.equal(await manager.discardQueuedInput(runId, queued.id), true);
+    assert.equal(await manager.discardQueuedInput(runId, queued.id), false);
+    assert.deepEqual(await session.drain("follow_up"), []);
+    assert.equal(
+      session.messageTrace.some((item) => item.id === queuedMessage.id),
+      false,
+    );
+    assert.equal(db.listAgentRunInputs(runId)[0]?.status, "discarded");
+    const removalEvent = db
+      .listRuntimeEvents()
+      .find((event) => event.run_id === runId && event.title === "Queued input removed from queue");
+    assert.equal(removalEvent?.status, "cancelled");
+    assert.deepEqual(JSON.parse(removalEvent?.detail_json ?? "{}"), { inputId: queued.id });
+
+    await session.complete();
+  });
+
+  void it("does not remove a follow-up after the runtime has consumed it", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    const session = await manager.start(baseOptions(runId));
+    const queuedMessage = message("already consumed");
+    const queued = await manager.enqueueFollowUp(runId, queuedMessage, "user");
+
+    assert.deepEqual(await session.drain("follow_up"), [queuedMessage]);
+    assert.equal(
+      session.messageTrace.some((item) => item.id === queuedMessage.id),
+      true,
+    );
+    assert.equal(await manager.discardQueuedInput(runId, queued.id), false);
+    assert.equal(db.listAgentRunInputs(runId)[0]?.status, "consumed");
+
+    await session.complete();
+  });
+
+  void it("claims completion only after draining queued inputs and rejects later input", async () => {
+    const manager = new sessionModule.AgentLoopSessionManager();
+    const runId = randomUUID();
+    const session = await manager.start(baseOptions(runId));
+    const queuedMessage = message("arrived near completion");
+    const queued = await manager.enqueueFollowUp(runId, queuedMessage, "user");
+
+    const pending = await session.claimCompletionIfNoQueuedInputs();
+    assert.equal(pending.claimed, false);
+    assert.deepEqual(pending.followUps, [queuedMessage]);
+
+    const completionPromise = session.claimCompletionIfNoQueuedInputs();
+    const tooLateMessage = message("too late");
+    const tooLateEnqueuePromise = manager.enqueueFollowUp(runId, tooLateMessage, "user");
+    const claimed = await completionPromise;
+    assert.equal(claimed.claimed, true);
+    await assert.rejects(
+      tooLateEnqueuePromise,
+      (error: unknown) =>
+        error instanceof sessionModule.AgentLoopSessionError && error.code === "run_not_active",
+    );
+    assert.equal(
+      session.messageTrace.some((item) => item.id === tooLateMessage.id),
+      false,
+    );
+    assert.equal(db.listAgentRunInputs(runId).length, 1);
+    assert.equal(
+      db.listAgentRunInputs(runId).find((input) => input.id === queued.id)?.status,
+      "consumed",
+    );
+
     await session.complete();
   });
 

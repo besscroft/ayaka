@@ -308,6 +308,7 @@ export interface AyakaApi {
       source?: AgentRunInputSource;
       message: UIMessage;
     }) => Promise<AgentRunInput>;
+    discardQueuedInput: (runId: string, inputId: string) => Promise<boolean>;
     cancelRun: (runId: string) => Promise<boolean>;
     events: {
       list: () => Promise<RuntimeEvent[]>;

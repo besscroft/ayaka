@@ -27,13 +27,16 @@ import {
   PromptInput,
   PromptInputSubmit,
   SkillTokenInput,
+  Queue,
+  QueueItem,
+  QueueList,
   type SkillTokenInputHandle,
   type AttachmentItem,
   type ContextMetrics,
   type FilePartLike,
   type PromptInputMessage,
 } from "./ai-elements";
-import { IconCheck, IconPaperclip } from "./icons";
+import { IconCheck, IconPaperclip, IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
 import { notify } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -45,10 +48,18 @@ export interface PendingAttachment extends AttachmentItem {
   file: File;
 }
 
+export interface QueuedMessagePreview {
+  id: string;
+  text: string;
+  attachmentCount: number;
+}
+
 export interface MessageInputProps {
   conversationId?: string;
   isLoading: boolean;
   isRunActive?: boolean;
+  queuedMessages?: QueuedMessagePreview[];
+  onRemoveQueuedMessage?: (id: string) => Promise<boolean>;
   onSend: (payload: { text: string; files: FilePartLike[] }) => void;
   onStop?: () => void;
   selectedModel: string | null;
@@ -76,6 +87,8 @@ export function MessageInput({
   conversationId,
   isLoading,
   isRunActive = isLoading,
+  queuedMessages = [],
+  onRemoveQueuedMessage,
   onSend,
   onStop,
   selectedModel,
@@ -101,6 +114,9 @@ export function MessageInput({
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillQuery, setSkillQuery] = useState("");
   const [skillMenuIndex, setSkillMenuIndex] = useState(0);
+  const [removingQueuedMessageIds, setRemovingQueuedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<SkillTokenInputHandle | null>(null);
   const skillMenuRangeRef = useRef<{ start: number; end: number } | null>(null);
@@ -348,6 +364,23 @@ export function MessageInput({
     });
   };
 
+  const handleRemoveQueuedMessage = async (id: string): Promise<void> => {
+    if (!onRemoveQueuedMessage || removingQueuedMessageIds.has(id)) return;
+    setRemovingQueuedMessageIds((current) => new Set(current).add(id));
+    try {
+      const removed = await onRemoveQueuedMessage(id);
+      if (!removed) notify.error(t("input.queue.removeUnavailable"));
+    } catch (error) {
+      notify.error(t("input.queue.removeFailed"), error);
+    } finally {
+      setRemovingQueuedMessageIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const handleKeyDownExtra = (event: KeyboardEvent<HTMLDivElement>): void => {
     handleSkillMenuKeyDown(event);
     if (event.defaultPrevented) return;
@@ -365,6 +398,45 @@ export function MessageInput({
       onDrop={handleDrop}
     >
       <div className="mx-auto w-full max-w-[min(1400px,100%)]">
+        {queuedMessages.length > 0 ? (
+          <div className="px-0.5">
+            <Queue title={t("input.queue.title")} className="mb-2 bg-background/90">
+              <QueueList className="max-h-28 overflow-y-auto">
+                {queuedMessages.map((message) => (
+                  <QueueItem
+                    key={message.id}
+                    status="pending"
+                    title={
+                      message.text ||
+                      (message.attachmentCount > 0
+                        ? t("input.queue.attachmentsOnly", { count: message.attachmentCount })
+                        : t("input.queue.message"))
+                    }
+                    action={
+                      onRemoveQueuedMessage ? (
+                        <button
+                          type="button"
+                          aria-label={t("input.queue.remove")}
+                          title={t("input.queue.remove")}
+                          disabled={removingQueuedMessageIds.has(message.id)}
+                          onClick={() => void handleRemoveQueuedMessage(message.id)}
+                          className={cn(
+                            "-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition",
+                            "hover:bg-background hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
+                            removingQueuedMessageIds.has(message.id) && "opacity-50",
+                          )}
+                        >
+                          <IconTrash className="size-3.5" />
+                        </button>
+                      ) : null
+                    }
+                  />
+                ))}
+              </QueueList>
+            </Queue>
+          </div>
+        ) : null}
         <div
           className={cn(
             "select-none rounded-lg border bg-background/95 shadow-lg transition-all duration-200",
@@ -380,6 +452,7 @@ export function MessageInput({
             <PromptInput
               value={input}
               status={isLoading ? "streaming" : "ready"}
+              allowSubmitWhileLoading
               onSubmit={handleSubmit}
               onKeyDownCapture={handlePromptKeyDownCapture}
               className="relative"
@@ -542,12 +615,14 @@ export function MessageInput({
                     model={selectedReasoningModel}
                     disabled={isRunActive}
                   />
-                  <PromptInputSubmit
-                    status="ready"
-                    disabled={!canSend}
-                    aria-label={t("input.send")}
-                    className="size-8"
-                  />
+                  {isRunActive && !hasContent ? null : (
+                    <PromptInputSubmit
+                      status="ready"
+                      disabled={!canSend}
+                      aria-label={t("input.send")}
+                      className="size-8"
+                    />
+                  )}
                   {isRunActive && onStop ? (
                     <button
                       type="button"

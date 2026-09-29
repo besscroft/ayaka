@@ -993,6 +993,15 @@ const entries = {
     en: "Add a specific task after the Skill before sending the message.",
   },
   "input.params": { zh: "参数", en: "Params" },
+  "input.queue.title": { zh: "待发送队列", en: "Queued messages" },
+  "input.queue.attachmentsOnly": { zh: "{count} 个附件", en: "{count} attachment(s)" },
+  "input.queue.message": { zh: "待发送消息", en: "Queued message" },
+  "input.queue.remove": { zh: "从队列中移除", en: "Remove from queue" },
+  "input.queue.removeUnavailable": {
+    zh: "这条消息已开始处理，无法移除。",
+    en: "This message is already being processed and can no longer be removed.",
+  },
+  "input.queue.removeFailed": { zh: "移除待发送消息失败", en: "Failed to remove queued message" },
   "input.placeholder": { zh: "问 Ayaka 任何事", en: "Ask Ayaka anything" },
   "input.placeholder.withAttachments": {
     zh: "配合附件一起描述…",
@@ -1083,8 +1092,8 @@ const entries = {
   },
   "model.provider.modelsCount": { zh: "{count} 个模型", en: "{count} models" },
   "model.provider.realtimeEnabled": {
-    zh: "支持原生 Realtime",
-    en: "Supports native Realtime",
+    zh: "支持 Realtime",
+    en: "Supports Realtime",
   },
   "model.provider.realtimeHint": {
     zh: "启用后可选择 OpenAI 原生或阿里云百炼原生 Realtime 协议。",

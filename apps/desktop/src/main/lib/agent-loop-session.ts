@@ -11,8 +11,10 @@ import {
 } from "../../shared/types";
 import {
   consumeAgentRunInputs,
+  consumeNextAgentRunInput,
   createRuntimeRun,
   discardAgentRunInputs,
+  discardQueuedAgentRunInput,
   enqueueAgentRunInput,
   getConversationAgentState,
   getRuntimeRun,
@@ -66,6 +68,13 @@ export interface AgentLoopSessionOptions {
   messages?: UIMessage[];
 }
 
+export interface AgentLoopInputConsumed {
+  input: AgentRunInput;
+  message: UIMessage;
+}
+
+export type AgentLoopInputConsumedListener = (event: AgentLoopInputConsumed) => void;
+
 export class AgentLoopSession {
   readonly runId: string;
   readonly conversationId?: string;
@@ -73,6 +82,8 @@ export class AgentLoopSession {
   readonly controller = new AbortController();
   readonly startedAt: number;
   readonly messageTrace: UIMessage[] = [];
+  readonly consumedInputTrace: AgentLoopInputConsumed[] = [];
+  private readonly inputConsumedListeners = new Set<AgentLoopInputConsumedListener>();
 
   private readonly maxTurns: number;
   private readonly maxDurationMs: number;
@@ -90,6 +101,8 @@ export class AgentLoopSession {
   private budgetReason: AgentLoopBudgetReason | null = null;
   private absoluteLimitReason: AgentLoopAbsoluteLimitReason | null = null;
   private readonly streamCompletions = new Set<Promise<void>>();
+  private inputQueueTail: Promise<void> = Promise.resolve();
+  private acceptingInputs = true;
   runtimeHandles: { coordinator: unknown; recorder: unknown } | null = null;
 
   constructor(
@@ -191,34 +204,90 @@ export class AgentLoopSession {
     source: AgentRunInputSource,
     message: UIMessage,
   ): Promise<AgentRunInput> {
-    this.assertActive();
-    this.appendMessages([message]);
-    const queued = await enqueueAgentRunInput({ runId: this.runId, kind, source, message });
-    insertRuntimeEvent({
-      runId: this.runId,
-      conversationId: this.conversationId,
-      kind: "loop_input",
-      status: "queued",
-      title: `${kind} input queued`,
-      detail: { inputId: queued.id, source, sequence: queued.sequence },
-    });
-    return queued;
-  }
-
-  async drain(kind: AgentRunInputKind): Promise<UIMessage[]> {
-    this.assertActive();
-    const inputs = await consumeAgentRunInputs(this.runId, kind);
-    for (const input of inputs) {
+    return this.withInputQueueLock(async () => {
+      this.assertActive();
+      if (!this.acceptingInputs) {
+        throw new AgentLoopSessionError(
+          "run_not_active",
+          `Agent run '${this.runId}' is completing and no longer accepts queued input.`,
+        );
+      }
+      const queued = await enqueueAgentRunInput({ runId: this.runId, kind, source, message });
       insertRuntimeEvent({
         runId: this.runId,
         conversationId: this.conversationId,
         kind: "loop_input",
-        status: "succeeded",
-        title: `${kind} input consumed`,
-        detail: { inputId: input.id, source: input.source, sequence: input.sequence },
+        status: "queued",
+        title: `${kind} input queued`,
+        detail: { inputId: queued.id, source, sequence: queued.sequence },
       });
-    }
-    return inputs.map(parseInputMessage);
+      return queued;
+    });
+  }
+
+  async drain(kind: AgentRunInputKind): Promise<UIMessage[]> {
+    const consumed = await this.withInputQueueLock(async () => {
+      this.assertActive();
+      return this.consumeInputs(await consumeAgentRunInputs(this.runId, kind));
+    });
+    return consumed.map(({ message }) => message);
+  }
+
+  async drainNext(): Promise<UIMessage | null> {
+    const consumed = await this.withInputQueueLock(async () => {
+      this.assertActive();
+      const input = await consumeNextAgentRunInput(this.runId);
+      return input ? (this.consumeInputs([input])[0] ?? null) : null;
+    });
+    return consumed?.message ?? null;
+  }
+
+  onInputConsumed(listener: AgentLoopInputConsumedListener): () => void {
+    this.inputConsumedListeners.add(listener);
+    return () => this.inputConsumedListeners.delete(listener);
+  }
+
+  async claimCompletionIfNoQueuedInputs(): Promise<{
+    claimed: boolean;
+    steering: UIMessage[];
+    followUps: UIMessage[];
+    messages: UIMessage[];
+  }> {
+    return this.withInputQueueLock(async () => {
+      this.assertActive();
+      const input = await consumeNextAgentRunInput(this.runId);
+      const consumed = input ? this.consumeInputs([input]) : [];
+      if (consumed.length > 0) {
+        return {
+          claimed: false,
+          steering: consumed
+            .filter(({ input }) => input.kind === "steering")
+            .map(({ message }) => message),
+          followUps: consumed
+            .filter(({ input }) => input.kind === "follow_up")
+            .map(({ message }) => message),
+          messages: consumed.map(({ message }) => message),
+        };
+      }
+      this.acceptingInputs = false;
+      return { claimed: true, steering: [], followUps: [], messages: [] };
+    });
+  }
+
+  async discardQueuedInput(inputId: string): Promise<boolean> {
+    this.assertActive();
+    const discarded = await discardQueuedAgentRunInput(this.runId, inputId);
+    if (!discarded) return false;
+
+    insertRuntimeEvent({
+      runId: this.runId,
+      conversationId: this.conversationId,
+      kind: "loop_input",
+      status: "cancelled",
+      title: "Queued input removed from queue",
+      detail: { inputId },
+    });
+    return true;
   }
 
   recordStep(): AgentLoopBudgetReason | null {
@@ -282,6 +351,34 @@ export class AgentLoopSession {
     }
   }
 
+  private consumeInputs(inputs: AgentRunInput[]): AgentLoopInputConsumed[] {
+    const consumed = inputs.map((input) => ({ input, message: parseInputMessage(input) }));
+    for (const event of consumed) {
+      this.appendMessages([event.message]);
+      this.consumedInputTrace.push(event);
+      insertRuntimeEvent({
+        runId: this.runId,
+        conversationId: this.conversationId,
+        kind: "loop_input",
+        status: "succeeded",
+        title: `${event.input.kind} input consumed`,
+        detail: {
+          inputId: event.input.id,
+          source: event.input.source,
+          sequence: event.input.sequence,
+        },
+      });
+      for (const listener of this.inputConsumedListeners) {
+        try {
+          listener(event);
+        } catch (error) {
+          console.error("[agent-loop-session] input consumed listener failed", error);
+        }
+      }
+    }
+    return consumed;
+  }
+
   async cancel(reason = "user_cancelled"): Promise<void> {
     if (this.closed) return;
     this.controller.abort(reason);
@@ -335,6 +432,20 @@ export class AgentLoopSession {
   private assertActive(): void {
     if (!this.isActive) {
       throw new AgentLoopSessionError("run_not_active", `Agent run '${this.runId}' is not active.`);
+    }
+  }
+
+  private async withInputQueueLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.inputQueueTail;
+    let release!: () => void;
+    this.inputQueueTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
     }
   }
 
@@ -589,7 +700,17 @@ export class AgentLoopSessionManager {
     return session.enqueue(kind, source, message);
   }
 
-  enqueueFollowUp(runId: string, message: UIMessage, source: AgentRunInputSource = "system") {
+  async discardQueuedInput(runId: string, inputId: string): Promise<boolean> {
+    const session = this.sessions.get(runId);
+    if (!session || !session.isActive) return false;
+    return session.discardQueuedInput(inputId);
+  }
+
+  enqueueFollowUp(
+    runId: string,
+    message: UIMessage,
+    source: AgentRunInputSource = "system",
+  ): Promise<AgentRunInput> {
     return this.enqueue(runId, "follow_up", source, message);
   }
 

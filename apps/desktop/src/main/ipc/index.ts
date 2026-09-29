@@ -113,8 +113,6 @@ import type {
   MessagePatch,
   MessageRow,
   ToolServerInput,
-  AgentRunInputKind,
-  AgentRunInputSource,
   WorkspaceMediaSaveInput,
   McpInputRequest,
   TrayMenuLabels,
@@ -122,7 +120,6 @@ import type {
   SettingEntry,
   RealtimeSessionMessage,
 } from "../../shared/types";
-import type { UIMessage } from "ai";
 import { DEFAULT_AGENT_ID, SettingKey } from "../../shared/types";
 import { notifyMemoryConfigurationChanged, queueAgentLearning } from "../lib/agent-learning";
 import { memoryOrchestrator } from "../lib/memory-orchestrator";
@@ -220,6 +217,10 @@ import {
   removeSkillPackageDirectory,
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
+import {
+  createRuntimeEnqueueInputHandler,
+  type RuntimeEnqueueInput,
+} from "../lib/agent-run-input-ipc";
 import {
   getConversationHydrationInfo,
   getConversationWorkspaceInfo,
@@ -764,51 +765,28 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
 
   // ---------- AI 工作台 ----------
   ipcMain.handle("runtime:snapshot", () => getRuntimeSnapshot());
-  ipcMain.handle(
-    "runtime:enqueueInput",
-    (
-      _event,
-      input: {
-        runId: string;
-        kind: AgentRunInputKind;
-        source?: AgentRunInputSource;
-        message: UIMessage;
-      },
-    ) => {
-      if (!input || typeof input.runId !== "string") throw new Error("runId is required.");
-      if (input.kind !== "steering" && input.kind !== "follow_up") {
-        throw new Error("kind must be steering or follow_up.");
-      }
-      if (
-        !input.message ||
-        typeof input.message.id !== "string" ||
-        !Array.isArray(input.message.parts)
-      ) {
-        throw new Error("message must be a valid UI message.");
-      }
-      try {
-        return {
-          ok: true as const,
-          value: agentLoopSessions.enqueue(
-            input.runId,
-            input.kind,
-            input.source ?? "user",
-            input.message,
-          ),
-        };
-      } catch (error) {
-        const code =
-          error && typeof error === "object" && "code" in error
-            ? String(error.code)
-            : "enqueue_failed";
-        return {
-          ok: false as const,
-          code,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    },
+  const enqueueRuntimeInput = createRuntimeEnqueueInputHandler((runId, kind, source, message) =>
+    agentLoopSessions.enqueue(runId, kind, source, message),
   );
+  ipcMain.handle("runtime:enqueueInput", (_event, input: RuntimeEnqueueInput) => {
+    if (!input || typeof input.runId !== "string") throw new Error("runId is required.");
+    if (input.kind !== "steering" && input.kind !== "follow_up") {
+      throw new Error("kind must be steering or follow_up.");
+    }
+    if (
+      !input.message ||
+      typeof input.message.id !== "string" ||
+      !Array.isArray(input.message.parts)
+    ) {
+      throw new Error("message must be a valid UI message.");
+    }
+    return enqueueRuntimeInput(input);
+  });
+  ipcMain.handle("runtime:discardQueuedInput", (_event, runId: string, inputId: string) => {
+    if (typeof runId !== "string" || !runId) throw new Error("runId is required.");
+    if (typeof inputId !== "string" || !inputId) throw new Error("inputId is required.");
+    return agentLoopSessions.discardQueuedInput(runId, inputId);
+  });
   ipcMain.handle("runtime:cancelRun", async (_event, runId: string) => {
     if (typeof runId !== "string" || !runId) throw new Error("runId is required.");
     return agentLoopSessions.cancel(runId);

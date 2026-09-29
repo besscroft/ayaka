@@ -1531,23 +1531,66 @@ export async function consumeAgentRunInputs(
     const rows = tx
       .select()
       .from(agentRunInputs)
-      .where(
-        and(
-          eq(agentRunInputs.run_id, runId),
-          eq(agentRunInputs.kind, kind),
-          eq(agentRunInputs.status, "queued"),
-        ),
-      )
+      .where(and(eq(agentRunInputs.run_id, runId), eq(agentRunInputs.status, "queued")))
       .orderBy(asc(agentRunInputs.sequence))
+      .limit(1)
       .all();
-    for (const row of rows) {
-      tx.update(agentRunInputs)
-        .set({ status: "consumed", consumed_at: now })
-        .where(and(eq(agentRunInputs.id, row.id), eq(agentRunInputs.status, "queued")))
-        .run();
-    }
-    return rows.map((row) => toAgentRunInput({ ...row, status: "consumed", consumed_at: now }));
+    const row = rows[0];
+    if (!row || row.kind !== kind) return [];
+    tx.update(agentRunInputs)
+      .set({ status: "consumed", consumed_at: now })
+      .where(and(eq(agentRunInputs.id, row.id), eq(agentRunInputs.status, "queued")))
+      .run();
+    return [toAgentRunInput({ ...row, status: "consumed", consumed_at: now })];
   });
+}
+
+/** Atomically consume the next queued input for a run, regardless of its kind. */
+export async function consumeNextAgentRunInput(
+  runId: string,
+  expectedKind?: AgentRunInputKind,
+  now = Date.now(),
+): Promise<AgentRunInput | null> {
+  if (shouldRouteWrites())
+    return writeDb<AgentRunInput | null>("consumeNextAgentRunInput", [runId, expectedKind, now]);
+  return getDb().transaction((tx) => {
+    const rows = tx
+      .select()
+      .from(agentRunInputs)
+      .where(and(eq(agentRunInputs.run_id, runId), eq(agentRunInputs.status, "queued")))
+      .orderBy(asc(agentRunInputs.sequence))
+      .limit(1)
+      .all();
+    const row = rows[0];
+    if (!row || (expectedKind && row.kind !== expectedKind)) return null;
+    tx.update(agentRunInputs)
+      .set({ status: "consumed", consumed_at: now })
+      .where(and(eq(agentRunInputs.id, row.id), eq(agentRunInputs.status, "queued")))
+      .run();
+    return toAgentRunInput({ ...row, status: "consumed", consumed_at: now });
+  });
+}
+
+export async function discardQueuedAgentRunInput(
+  runId: string,
+  inputId: string,
+  reason = "user_removed_from_queue",
+  now = Date.now(),
+): Promise<boolean> {
+  if (shouldRouteWrites())
+    return writeDb<boolean>("discardQueuedAgentRunInput", [runId, inputId, reason, now]);
+  const result = getDb()
+    .update(agentRunInputs)
+    .set({ status: "discarded", consumed_at: now, discarded_reason: reason.slice(0, 240) })
+    .where(
+      and(
+        eq(agentRunInputs.run_id, runId),
+        eq(agentRunInputs.id, inputId),
+        eq(agentRunInputs.status, "queued"),
+      ),
+    )
+    .run();
+  return result.changes > 0;
 }
 
 export async function discardAgentRunInputs(

@@ -64,7 +64,7 @@ export function snapshotUIMessage(message: UIMessage): UIMessage {
 }
 
 export function snapshotUIMessages(messages: UIMessage[]): UIMessage[] {
-  return messages.map(snapshotUIMessage);
+  return dedupeMessages(messages).map(snapshotUIMessage);
 }
 
 /**
@@ -94,21 +94,9 @@ export function selectLiveChatMessages(
   liveMessages: UIMessage[],
   fallbackMessages: UIMessage[],
 ): UIMessage[] {
-  if (liveMessages.length === 0) return fallbackMessages;
+  if (liveMessages.length === 0) return dedupeMessages(fallbackMessages);
   if (fallbackMessages.length === 0) return snapshotUIMessages(liveMessages);
-
-  const fallbackById = new Map(fallbackMessages.map((message) => [message.id, message]));
-  let changed = liveMessages.length !== fallbackMessages.length;
-  const selected = liveMessages.map((message, index) => {
-    const previous =
-      fallbackMessages[index]?.id === message.id
-        ? fallbackMessages[index]
-        : fallbackById.get(message.id);
-    const resolved = reconcileMessageReference(previous, message);
-    if (resolved !== previous) changed = true;
-    return resolved;
-  });
-  return changed ? selected : fallbackMessages;
+  return reconcilePersistedOrder(liveMessages, fallbackMessages);
 }
 
 /**
@@ -120,6 +108,8 @@ export function selectLiveChatMessages(
  * directly, so deletion and edit semantics remain intact.
  */
 export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): UIMessage[] | null {
+  current = dedupeMessages(current);
+  incoming = dedupeMessages(incoming);
   if (incoming.length === 0) return current.length === 0 ? [] : null;
   if (current.length === 0) return snapshotUIMessages(incoming);
 
@@ -153,13 +143,76 @@ export function mergeChatMessages(current: UIMessage[], incoming: UIMessage[]): 
 
 /**
  * Prefer the most complete snapshot while preserving the current message order.
- * Persisted messages that appear after the current tail are appended so a final
- * assistant message can be recovered without reviving older deleted messages.
+ * Queued user messages persisted before the final assistant response use that
+ * order; messages after the current tail are appended to recover final output.
  */
 export function reconcileChatMessages(
   current: UIMessage[],
   persisted: UIMessage[],
 ): UIMessage[] | null {
+  current = dedupeMessages(current);
+  persisted = dedupeMessages(persisted);
   if (!hasAssistantMessage(persisted)) return null;
+  if (hasQueuedInputBeforeAssistant(current, persisted) || hasOrderMismatch(current, persisted)) {
+    return reconcilePersistedOrder(current, persisted);
+  }
   return mergeChatMessages(current, persisted);
+}
+
+function hasQueuedInputBeforeAssistant(current: UIMessage[], persisted: UIMessage[]): boolean {
+  const currentIds = new Set(current.map((message) => message.id));
+  let hasAssistantAfter = false;
+  for (let index = persisted.length - 1; index >= 0; index -= 1) {
+    const message = persisted[index];
+    if (!message) continue;
+    if (message.role === "assistant") hasAssistantAfter = true;
+    if (message.role === "user" && !currentIds.has(message.id) && hasAssistantAfter) return true;
+  }
+  return false;
+}
+
+function hasOrderMismatch(current: UIMessage[], persisted: UIMessage[]): boolean {
+  const persistedIndexById = new Map(persisted.map((message, index) => [message.id, index]));
+  let lastPersistedIndex = -1;
+  for (const message of current) {
+    const persistedIndex = persistedIndexById.get(message.id);
+    if (persistedIndex === undefined) continue;
+    if (persistedIndex < lastPersistedIndex) return true;
+    lastPersistedIndex = persistedIndex;
+  }
+  return false;
+}
+
+function reconcilePersistedOrder(current: UIMessage[], persisted: UIMessage[]): UIMessage[] {
+  current = dedupeMessages(current);
+  persisted = dedupeMessages(persisted);
+  const currentById = new Map(current.map((message) => [message.id, message]));
+  const persistedIds = new Set<string>();
+  const ordered = persisted.map((message) => {
+    persistedIds.add(message.id);
+    const currentMessage = currentById.get(message.id);
+    if (!currentMessage) return snapshotUIMessage(message);
+    if (currentMessage.role === "user" || messageScore(message) < messageScore(currentMessage)) {
+      return currentMessage;
+    }
+    return reconcileMessageReference(currentMessage, message);
+  });
+  for (const message of current) {
+    if (!persistedIds.has(message.id)) ordered.push(message);
+  }
+  return ordered;
+}
+
+function dedupeMessages(messages: UIMessage[]): UIMessage[] {
+  const seen = new Set<string>();
+  let hasDuplicate = false;
+  for (const message of messages) {
+    if (seen.has(message.id)) hasDuplicate = true;
+    seen.add(message.id);
+  }
+  if (!hasDuplicate) return messages;
+
+  const byId = new Map<string, UIMessage>();
+  for (const message of messages) byId.set(message.id, message);
+  return [...byId.values()];
 }

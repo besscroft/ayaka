@@ -111,7 +111,12 @@ import { publishSandboxArtifact } from "./sandbox-artifact-manager";
 import { startSandboxPreview } from "./sandbox-preview-manager";
 import { getSandboxSessionOrThrow } from "./sandbox-runtime";
 import { resolveAgentStepDisposition, ROOT_AGENT_STOP_WHEN } from "./agent-run-policy";
-import { agentLoopSessions, type AgentLoopMode, type AgentLoopSession } from "./agent-loop-session";
+import {
+  agentLoopSessions,
+  type AgentLoopInputConsumed,
+  type AgentLoopMode,
+  type AgentLoopSession,
+} from "./agent-loop-session";
 import {
   createToolTurnControl,
   RunToolScheduler,
@@ -122,6 +127,7 @@ import { buildMediaGenerationToolRequest, executeMediaGeneration } from "./media
 import { addAgentManagementTools } from "./agent-management-tools";
 import { classifyChatError } from "./chat-errors";
 import { reconcileToolResults, removeIncompleteToolParts } from "./agent-tool-results";
+import { writeStreamSequentially } from "./agent-ui-stream";
 import { getChatSamplingSettings } from "./chat-model-settings";
 import { persistChatStreamSnapshot } from "./chat-history";
 import {
@@ -476,6 +482,7 @@ async function streamRootAgentLoop({
   let lastText = "";
   let lastUsage: unknown;
   let finalExecution: ChatMessageMetadata["execution"];
+  let responseBoundary = false;
   const releaseStream = context.session.registerStreamCompletion();
   let streamReleased = false;
   const releaseStreamOnce = (): void => {
@@ -487,6 +494,23 @@ async function streamRootAgentLoop({
   const stream = createUIMessageStream<UIMessage<ChatMessageMetadata>>({
     originalMessages: initialMessages as UIMessage<ChatMessageMetadata>[],
     execute: async ({ writer }) => {
+      const unsubscribeInputConsumed = context.session.onInputConsumed(
+        ({ input, message }: AgentLoopInputConsumed) => {
+          writer.write({
+            type: "data-run-input-consumed",
+            data: {
+              inputId: input.id,
+              runId: input.run_id,
+              kind: input.kind,
+              source: input.source,
+              sequence: input.sequence,
+              message,
+              continueRun: input.kind === "follow_up",
+            },
+            transient: true,
+          });
+        },
+      );
       try {
         const completeRun = async (outputSummary?: string): Promise<void> => {
           finalExecution ??= tracker.finalize(lastFinishReason, lastUsage);
@@ -509,11 +533,11 @@ async function streamRootAgentLoop({
             }
             context.session.beginNextWindow();
           }
-          modelMessages = await appendQueuedMessages(
-            modelMessages,
-            await context.session.drain("steering"),
-            agent.tools,
-          );
+          const steering = await context.session.drain("steering");
+          if (steering.length > 0) {
+            context.messages.push(...steering);
+            modelMessages = await appendQueuedMessages(modelMessages, steering, agent.tools);
+          }
           context.toolTurnControl.reset();
           let result: Awaited<ReturnType<typeof agent.stream>>;
           try {
@@ -546,7 +570,10 @@ async function streamRootAgentLoop({
                 abortSignal: context.session.signal,
               }).error,
           });
-          writer.merge(pipeGeneratedUIStream(uiStream));
+          // Drain this epoch before starting the next; merge() readers can interleave repeated text IDs.
+          await writeStreamSequentially(pipeGeneratedUIStream(uiStream), (chunk) =>
+            writer.write(chunk),
+          );
 
           const responseMessages = (await result.responseMessages) as ModelMessage[];
           modelMessages.push(
@@ -576,20 +603,6 @@ async function streamRootAgentLoop({
             await finishRun(context, "succeeded");
             break;
           }
-          const steering = await context.session.drain("steering");
-          if (steering.length > 0) {
-            context.messages.push(...steering);
-            modelMessages = await appendQueuedMessages(modelMessages, steering, agent.tools);
-            if (budgetReason) context.session.beginNextWindow();
-            continue;
-          }
-          const followUps = await context.session.drain("follow_up");
-          if (followUps.length > 0) {
-            modelMessages = await appendQueuedMessages(modelMessages, followUps, agent.tools);
-            if (budgetReason) context.session.beginNextWindow();
-            continue;
-          }
-
           const disposition = resolveAgentStepDisposition({
             finishReason: lastFinishReason,
             toolCallCount: toolCalls.length,
@@ -597,8 +610,25 @@ async function streamRootAgentLoop({
           });
 
           if (disposition === "complete") {
-            await completeRun(lastText.trim() || undefined);
-            break;
+            const completion = await context.session.claimCompletionIfNoQueuedInputs();
+            const queuedInputs = completion.messages;
+            if (queuedInputs.length > 0) {
+              if (completion.followUps.length > 0) {
+                // A follow-up belongs to the next assistant response. End this
+                // HTTP stream after the current response so the client can add
+                // the consumed user message before opening the next request.
+                responseBoundary = true;
+                break;
+              }
+              context.messages.push(...queuedInputs);
+              modelMessages = await appendQueuedMessages(modelMessages, queuedInputs, agent.tools);
+              if (budgetReason) context.session.beginNextWindow();
+              continue;
+            }
+            if (completion.claimed) {
+              await completeRun(lastText.trim() || undefined);
+              break;
+            }
           }
 
           if (budgetReason) {
@@ -620,7 +650,7 @@ async function streamRootAgentLoop({
             reason: String(context.session.signal.reason ?? "cancelled"),
           });
         } else {
-          if (finalExecution) {
+          if (finalExecution && !responseBoundary) {
             writer.write({
               type: "message-metadata",
               messageMetadata: { execution: finalExecution },
@@ -655,12 +685,18 @@ async function streamRootAgentLoop({
         );
         writer.write({ type: "error", errorText: classification.error });
         writer.write({ type: "finish", finishReason: "error" });
+      } finally {
+        unsubscribeInputConsumed();
       }
     },
     onEnd: async ({ messages, isAborted }) => {
       try {
         if (context.conversationId) {
-          const snapshotMessages = mergeStreamMessages(messages, context.session.messageTrace);
+          const snapshotMessages = mergeStreamMessages(
+            messages,
+            context.session.messageTrace,
+            context.session.consumedInputTrace,
+          );
           const result = await persistChatStreamSnapshot(context.conversationId, snapshotMessages);
           console.info("[agent-runtime] persisted chat stream snapshot", {
             runId: context.runId,
@@ -694,13 +730,31 @@ async function streamRootAgentLoop({
 function mergeStreamMessages(
   messages: UIMessage<ChatMessageMetadata>[],
   tracedMessages: UIMessage[],
+  consumedInputs: AgentLoopInputConsumed[] = [],
 ): UIMessage<ChatMessageMetadata>[] {
   const merged = new Map<string, UIMessage<ChatMessageMetadata>>();
   for (const message of messages) merged.set(message.id, message);
+  const streamMessages = [...merged.values()];
+  const consumedByMessageId = new Map(
+    consumedInputs.map((event) => [event.message.id, event] as const),
+  );
   for (const message of tracedMessages) {
-    if (!merged.has(message.id)) merged.set(message.id, message as UIMessage<ChatMessageMetadata>);
+    if (merged.has(message.id)) continue;
+    const tracedMessage = message as UIMessage<ChatMessageMetadata>;
+    const consumed = consumedByMessageId.get(message.id);
+    if (!consumed || consumed.input.kind === "follow_up") {
+      streamMessages.push(tracedMessage);
+      merged.set(message.id, tracedMessage);
+      continue;
+    }
+    const assistantIndex = streamMessages.findLastIndex(
+      (candidate) => candidate.role === "assistant",
+    );
+    const insertAt = assistantIndex >= 0 ? assistantIndex : streamMessages.length;
+    streamMessages.splice(insertAt, 0, tracedMessage);
+    merged.set(message.id, tracedMessage);
   }
-  return [...merged.values()];
+  return streamMessages;
 }
 
 async function appendQueuedMessages(

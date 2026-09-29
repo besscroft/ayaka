@@ -2,11 +2,14 @@ import { Chat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithApprovalResponses,
+  type DataUIPart,
   type ChatOnFinishCallback,
   type ChatTransport,
   type UIMessage,
 } from "ai";
 import type {
+  AgentRunInputKind,
+  AgentRunInputSource,
   ChatPermissionMode,
   ChatReasoningLevel,
   ChatToolSelectionRequest,
@@ -23,9 +26,20 @@ import { sanitizeBrowserScreenshotMessage } from "@shared/browser-message";
 
 export type ChatSessionFinishEvent = Parameters<ChatOnFinishCallback<UIMessage>>[0];
 
+export interface ChatSessionInputConsumedPayload {
+  inputId: string;
+  runId: string;
+  kind: AgentRunInputKind;
+  source: AgentRunInputSource;
+  sequence: number;
+  continueRun: boolean;
+  message: UIMessage;
+}
+
 export type ChatSessionEvent =
   | { type: "finish"; payload: ChatSessionFinishEvent }
-  | { type: "error"; error: Error };
+  | { type: "error"; error: Error }
+  | { type: "input-consumed"; payload: ChatSessionInputConsumedPayload };
 
 export interface ChatSessionRequestConfig {
   model: string | null;
@@ -49,6 +63,7 @@ export interface ChatSessionEntry {
   isStopped: boolean;
   errorMessage: string | null;
   errorRetryable: boolean;
+  pendingContinuationRunId: string | null;
   lastUsedAt: number;
 }
 
@@ -119,6 +134,7 @@ export class ChatSessionRegistry {
       isStopped: false,
       errorMessage: null,
       errorRetryable: false,
+      pendingContinuationRunId: null,
       lastUsedAt: Date.now(),
     } satisfies Omit<ChatSessionEntry, "chat" | "transport"> & {
       chat: Chat<UIMessage>;
@@ -136,6 +152,10 @@ export class ChatSessionRegistry {
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
       onFinish: (payload) => this.emit(entry, { type: "finish", payload }),
       onError: (error) => this.emit(entry, { type: "error", error }),
+      onData: (data) => {
+        const payload = parseInputConsumedData(data);
+        if (payload) this.emit(entry, { type: "input-consumed", payload });
+      },
     });
 
     this.sessions.set(options.conversationId, entry);
@@ -181,6 +201,7 @@ export class ChatSessionRegistry {
     this.sessions.delete(conversationId);
     this.listeners.delete(conversationId);
     entry.pendingEvents.length = 0;
+    entry.pendingContinuationRunId = null;
     if (entry.reconciliationRef.current.timer !== null) {
       window.clearTimeout(entry.reconciliationRef.current.timer);
       entry.reconciliationRef.current.timer = null;
@@ -194,6 +215,19 @@ export class ChatSessionRegistry {
 
   size(): number {
     return this.sessions.size;
+  }
+
+  /**
+   * Consume the continuation marker emitted when a follow-up was taken at the
+   * end of a response. The caller must wait until Chat has finished the
+   * current HTTP stream before opening the next request.
+   */
+  takePendingContinuation(conversationId: string): string | null {
+    const entry = this.sessions.get(conversationId);
+    if (!entry) return null;
+    const runId = entry.pendingContinuationRunId;
+    entry.pendingContinuationRunId = null;
+    return runId;
   }
 
   updateRequestConfig(
@@ -219,6 +253,9 @@ export class ChatSessionRegistry {
 
   private emit(entry: ChatSessionEntry, event: ChatSessionEvent): void {
     entry.lastUsedAt = Date.now();
+    if (event.type === "input-consumed" && event.payload.continueRun) {
+      entry.pendingContinuationRunId = event.payload.runId;
+    }
     const listeners = this.listeners.get(entry.conversationId);
     if (!listeners || listeners.size === 0) {
       entry.pendingEvents.push(event);
@@ -289,6 +326,45 @@ export class ChatSessionRegistry {
       this.sessions.delete(entry.conversationId);
     }
   }
+}
+
+function parseInputConsumedData(
+  data: DataUIPart<Record<string, unknown>>,
+): ChatSessionInputConsumedPayload | null {
+  if (data.type !== "data-run-input-consumed") return null;
+  if (!data.data || typeof data.data !== "object" || Array.isArray(data.data)) return null;
+  const value = data.data as Record<string, unknown>;
+  if (
+    typeof value.inputId !== "string" ||
+    typeof value.runId !== "string" ||
+    (value.kind !== "steering" && value.kind !== "follow_up") ||
+    (value.source !== "user" &&
+      value.source !== "system" &&
+      value.source !== "automation" &&
+      value.source !== "tool") ||
+    typeof value.sequence !== "number"
+  ) {
+    return null;
+  }
+  const message = value.message;
+  if (!message || typeof message !== "object" || Array.isArray(message)) return null;
+  const candidate = message as Partial<UIMessage>;
+  if (
+    typeof candidate.id !== "string" ||
+    (candidate.role !== "user" && candidate.role !== "assistant" && candidate.role !== "system") ||
+    !Array.isArray(candidate.parts)
+  ) {
+    return null;
+  }
+  return {
+    inputId: value.inputId,
+    runId: value.runId,
+    kind: value.kind,
+    source: value.source,
+    sequence: value.sequence,
+    continueRun: value.continueRun === true,
+    message: candidate as UIMessage,
+  };
 }
 
 export const chatSessionRegistry = new ChatSessionRegistry();

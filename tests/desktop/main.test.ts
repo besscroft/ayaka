@@ -38,6 +38,8 @@ import "./main/lib/update-manager.test.ts";
 import "./main/lib/web-page-reader.test.ts";
 import "./main/lib/agent-context-manager.test.ts";
 import "./main/lib/agent-coordinator.test.ts";
+import "./main/lib/agent-run-input-ipc.test.ts";
+import "./main/lib/agent-ui-stream.test.ts";
 import "./main/lib/agent-run-policy.test.ts";
 import "./main/lib/automation-workspace.test.ts";
 import "./main/lib/cron-store.test.ts";

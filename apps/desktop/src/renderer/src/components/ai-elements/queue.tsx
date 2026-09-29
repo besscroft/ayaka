@@ -134,6 +134,7 @@ interface QueueItemProps extends Omit<HTMLAttributes<HTMLLIElement>, "title"> {
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
+  action?: ReactNode;
 }
 
 const STATUS_TONE: Record<QueueItemStatus, string> = {
@@ -155,6 +156,7 @@ export function QueueItem({
   description,
   className,
   children,
+  action,
   ...rest
 }: QueueItemProps): React.JSX.Element {
   const { t } = useT();
@@ -163,13 +165,13 @@ export function QueueItem({
       data-slot="queue-item"
       data-status={status}
       className={cn(
-        "flex items-start gap-2 rounded-md px-2 py-1.5 text-xs transition",
+        "group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition",
         "hover:bg-muted",
         className,
       )}
       {...rest}
     >
-      <span className={cn("mt-1 shrink-0", STATUS_TONE[status])}>
+      <span className={cn("shrink-0", STATUS_TONE[status])}>
         <IconStatusDot className={cn("size-1.5", status === "active" && "animate-pulse")} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -198,6 +200,7 @@ export function QueueItem({
         ) : null}
         {children}
       </div>
+      {action}
     </li>
   );
 }

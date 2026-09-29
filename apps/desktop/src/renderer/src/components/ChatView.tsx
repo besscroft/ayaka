@@ -16,7 +16,7 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { MessageList } from "./MessageList";
 import { persistGeneratedUIStateChange } from "@shared/generated-ui/message";
-import { MessageInput } from "./MessageInput";
+import { MessageInput, type QueuedMessagePreview } from "./MessageInput";
 import { McpInputDialog } from "./McpWorkspace";
 import { IconFolderOpen } from "./icons";
 import { getModelReasoningDefault } from "./ReasoningSelector";
@@ -64,7 +64,11 @@ import {
   selectChatRetryRun,
   shouldFallbackToFreshRun,
 } from "../lib/chat-retry";
-import { chatSessionRegistry, type ChatSessionFinishEvent } from "../lib/chat-session-registry";
+import {
+  chatSessionRegistry,
+  type ChatSessionFinishEvent,
+  type ChatSessionInputConsumedPayload,
+} from "../lib/chat-session-registry";
 import { createIncrementalTokenCache } from "../lib/chat-token-cache";
 import { notify } from "../lib/toast";
 import { useT } from "../lib/i18n";
@@ -90,6 +94,7 @@ import {
   type ChatToolSelectionRequest,
   type ConversationHydration,
   type AgentProfile,
+  type AgentRunInput,
   type LocalServerInfo,
   type McpInputRequest,
   type ProviderInfo,
@@ -104,6 +109,38 @@ interface ChatViewProps {
 }
 
 type AutoTitleStatus = "running" | "completed";
+
+type ChatRuntimeSnapshot = Pick<
+  RuntimeSnapshot,
+  | "runtimeRuns"
+  | "runtimeSteps"
+  | "agentRuntimeStates"
+  | "conversationAgentStates"
+  | "agentInstances"
+  | "agentRunInputs"
+  | "runtimeEvents"
+  | "sandboxSessions"
+  | "sandboxSnapshots"
+  | "sandboxArtifacts"
+>;
+
+function retainTerminalRunInputStatuses(
+  current: ChatRuntimeSnapshot | null,
+  next: ChatRuntimeSnapshot,
+): ChatRuntimeSnapshot {
+  if (!current) return next;
+  const currentInputs = new Map(current.agentRunInputs.map((input) => [input.id, input]));
+  let changed = false;
+  const agentRunInputs = next.agentRunInputs.map((input) => {
+    const currentInput = currentInputs.get(input.id);
+    if (currentInput && currentInput.status !== "queued" && input.status === "queued") {
+      changed = true;
+      return currentInput;
+    }
+    return input;
+  });
+  return changed ? { ...next, agentRunInputs } : next;
+}
 
 /**
  * 模型上下文窗口查找（粗略）。
@@ -143,6 +180,39 @@ function getContextWindowForModel(
   return DEFAULT_CONTEXT_WINDOW;
 }
 
+function getQueuedMessagePreview(input: AgentRunInput): QueuedMessagePreview {
+  try {
+    const message = JSON.parse(input.message_json) as Partial<UIMessage>;
+    const parts = Array.isArray(message.parts) ? message.parts : [];
+    const text = parts
+      .filter(
+        (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
+          part.type === "text",
+      )
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
+    const attachmentCount = parts.filter((part) => part.type === "file").length;
+    return { id: input.id, text, attachmentCount };
+  } catch {
+    return { id: input.id, text: "", attachmentCount: 0 };
+  }
+}
+
+/** Append a consumed follow-up after the assistant response that preceded it. */
+function appendConsumedMessage(messages: UIMessage[], message: UIMessage): UIMessage[] {
+  if (messages.some((candidate) => candidate.id === message.id)) return messages;
+  return [...messages, message];
+}
+
+/** Keep a steering message before the currently streaming assistant response. */
+function insertSteeringMessage(messages: UIMessage[], message: UIMessage): UIMessage[] {
+  if (messages.some((candidate) => candidate.id === message.id)) return messages;
+  const assistantIndex = messages.findLastIndex((candidate) => candidate.role === "assistant");
+  const insertAt = assistantIndex >= 0 ? assistantIndex : messages.length;
+  return [...messages.slice(0, insertAt), message, ...messages.slice(insertAt)];
+}
+
 export function ChatView({
   conversationId,
   serverInfo,
@@ -156,7 +226,7 @@ export function ChatView({
     DEFAULT_SETTINGS.chatReasoningLevel,
   );
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [isPersistedConversation, setIsPersistedConversation] = useState(hasCachedSession);
+  const persistedConversationRef = useRef(hasCachedSession);
   const [workspace, setWorkspace] = useState<import("@shared/types").WorkspaceInfo | null>(null);
   const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "error">(
     hasCachedSession ? "ready" : "loading",
@@ -174,19 +244,7 @@ export function ChatView({
     () => getEnabledSkillMentions(toolsSnapshot),
     [toolsSnapshot],
   );
-  const [runtimeSnapshot, setRuntimeSnapshot] = useState<Pick<
-    RuntimeSnapshot,
-    | "runtimeRuns"
-    | "runtimeSteps"
-    | "agentRuntimeStates"
-    | "conversationAgentStates"
-    | "agentInstances"
-    | "agentRunInputs"
-    | "runtimeEvents"
-    | "sandboxSessions"
-    | "sandboxSnapshots"
-    | "sandboxArtifacts"
-  > | null>(null);
+  const [runtimeSnapshot, setRuntimeSnapshot] = useState<ChatRuntimeSnapshot | null>(null);
   const [modelContextWindows, setModelContextWindows] = useState<Map<string, number>>(new Map());
   const [toolSelection, setToolSelection] = useState<ChatToolSelectionRequest>(
     DEFAULT_CHAT_TOOL_SELECTION,
@@ -229,11 +287,15 @@ export function ChatView({
   const followupRequestRef = useRef<string | null>(null);
   const followupAbortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef(createIncrementalTokenCache());
+  const activeChatSendsRef = useRef(new Map<string, Promise<void>>());
+  const freshChatSendQueuesRef = useRef(new Map<string, Promise<void>>());
+  const pendingConsumedInputsRef = useRef<ChatSessionInputConsumedPayload[]>([]);
   const runIdRef = session.runIdRef;
   const runModeRef = session.runModeRef;
   const reconciliationRef = session.reconciliationRef;
   const chatRef = useRef<{
     regenerate: () => Promise<void>;
+    sendMessage: () => Promise<void>;
     clearError: () => void;
     setMessages: (messages: UIMessage[]) => void;
   } | null>(null);
@@ -534,7 +596,7 @@ export function ChatView({
       setHydrationState("loading");
       hydrationStateRef.current = "loading";
     }
-    setIsPersistedConversation(canUseCachedSession);
+    persistedConversationRef.current = canUseCachedSession;
     setWorkspace(null);
     setChatError(alreadyHydrated ? session.errorMessage : null);
     setChatErrorRetryable(alreadyHydrated ? session.errorRetryable : false);
@@ -587,7 +649,7 @@ export function ChatView({
       lastNonEmptyMessagesRef.current = messages.length > 0 ? messages : [];
       explicitEmptyMessagesRef.current = messages.length === 0;
       session.hydrated = true;
-      setIsPersistedConversation(true);
+      persistedConversationRef.current = true;
       setWorkspace(hydration.workspace);
       setInitialMessages(messages);
       setHydrationState("ready");
@@ -648,7 +710,7 @@ export function ChatView({
             lastNonEmptyMessagesRef.current = [];
             explicitEmptyMessagesRef.current = true;
             setInitialMessages([]);
-            setIsPersistedConversation(false);
+            persistedConversationRef.current = false;
             session.hydrated = true;
             setHydrationState("ready");
             hydrationStateRef.current = "ready";
@@ -660,7 +722,7 @@ export function ChatView({
               persistenceDirtyRef.current ||
               session.chat.messages !== cachedMessages)
           ) {
-            setIsPersistedConversation(true);
+            persistedConversationRef.current = true;
             setWorkspace(hydration.workspace);
             if (hasMeaningfulConversationTitle(hydration.conversation.title)) {
               titleStateRef.current.set(conversationId, "completed");
@@ -770,9 +832,24 @@ export function ChatView({
 
   const handleChatFinish = useCallback(
     ({ messages, isError, isAbort }: ChatSessionFinishEvent): void => {
-      if (messages.length > 0) {
-        latestMessagesRef.current = messages;
-        lastNonEmptyMessagesRef.current = messages;
+      const pendingContinuationRunId = chatSessionRegistry.takePendingContinuation(conversationId);
+      const continuationRunId = !isError && !isAbort ? pendingContinuationRunId : null;
+      const consumedInputs = pendingConsumedInputsRef.current.splice(0);
+      const streamedMessages =
+        messages.length > 0
+          ? (reconcileChatMessages(latestMessagesRef.current, messages) ?? messages)
+          : latestMessagesRef.current;
+      const completedMessages = consumedInputs.reduce(
+        (current, payload) =>
+          payload.continueRun
+            ? appendConsumedMessage(current, payload.message)
+            : insertSteeringMessage(current, payload.message),
+        streamedMessages,
+      );
+      if (consumedInputs.length > 0) chat.setMessages(completedMessages);
+      if (completedMessages.length > 0) {
+        latestMessagesRef.current = completedMessages;
+        lastNonEmptyMessagesRef.current = completedMessages;
         explicitEmptyMessagesRef.current = false;
       }
       if (!isError) {
@@ -788,12 +865,14 @@ export function ChatView({
       cancelFollowupSuggestions();
       const learningKey = isAbort
         ? null
-        : getAgentLearningQueueKey(conversationId, messages, isError);
+        : getAgentLearningQueueKey(conversationId, completedMessages, isError);
       const shouldQueueLearning =
         learningKey != null && learningQueueKeyRef.current !== learningKey;
       if (shouldQueueLearning) learningQueueKeyRef.current = learningKey;
-      const snapshot = isError ? prepareFailedChatSnapshot(messages) : { messages, deleteIds: [] };
-      void persistAndTouch(snapshot.messages, snapshot.deleteIds)
+      const snapshot = isError
+        ? prepareFailedChatSnapshot(completedMessages)
+        : { messages: completedMessages, deleteIds: [] };
+      const persistPromise = persistAndTouch(snapshot.messages, snapshot.deleteIds)
         .then((persisted) => {
           if (!persisted && shouldQueueLearning && learningQueueKeyRef.current === learningKey) {
             learningQueueKeyRef.current = null;
@@ -809,9 +888,31 @@ export function ChatView({
           console.error("[chat] failed to persist messages or queue learning:", err);
         });
 
-      if (!isError && !isAbort) tryAutoTitle(conversationId, messages, titleStateRef);
+      void api.agents
+        .runtimeSnapshot()
+        .then((snapshot) =>
+          setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
+        )
+        .catch((error) => console.error("[chat] failed to refresh queue state:", error));
+
+      if (continuationRunId) {
+        runIdRef.current = continuationRunId;
+        runModeRef.current = "resume";
+        void persistPromise.then(() => {
+          const currentChat = chatRef.current;
+          if (!currentChat || session.isStopped || runIdRef.current !== continuationRunId) return;
+          void currentChat.sendMessage().catch((error) => {
+            reportChatError("resume queued response", error, {
+              persistSnapshot: latestMessagesRef.current,
+            });
+          });
+        });
+        return;
+      }
+
+      if (!isError && !isAbort) tryAutoTitle(conversationId, completedMessages, titleStateRef);
       if (!isError && !isAbort) {
-        const assistantMessage = [...messages]
+        const assistantMessage = [...completedMessages]
           .reverse()
           .find((message) => message.role === "assistant");
         if (assistantMessage) {
@@ -821,7 +922,7 @@ export function ChatView({
           followupAbortControllerRef.current = controller;
           followupRequestRef.current = requestKey;
           setFollowupLoading(true);
-          void fetchFollowupSuggestions(messages, controller.signal)
+          void fetchFollowupSuggestions(completedMessages, controller.signal)
             .then((suggestions) => {
               if (followupRequestRef.current !== requestKey || suggestions.length === 0) return;
               const updatedMessages = updateFollowupSuggestions({
@@ -853,7 +954,9 @@ export function ChatView({
       fetchFollowupSuggestions,
       persistAndTouch,
       persistInBackground,
+      reportChatError,
       session,
+      chat,
     ],
   );
 
@@ -910,12 +1013,49 @@ export function ChatView({
     [cancelFollowupSuggestions, locale, persistInBackground, reportChatError, session],
   );
 
+  const handleInputConsumed = useCallback(
+    (payload: ChatSessionInputConsumedPayload): void => {
+      runIdRef.current = payload.runId;
+      runModeRef.current = "resume";
+      if (!pendingConsumedInputsRef.current.some((item) => item.inputId === payload.inputId)) {
+        pendingConsumedInputsRef.current.push(payload);
+      }
+
+      const consumedAt = Date.now();
+      setRuntimeSnapshot((snapshot) =>
+        snapshot
+          ? {
+              ...snapshot,
+              agentRunInputs: snapshot.agentRunInputs.map((input) =>
+                input.id === payload.inputId
+                  ? { ...input, status: "consumed", consumed_at: consumedAt }
+                  : input,
+              ),
+            }
+          : snapshot,
+      );
+      const snapshotContainsInput = runtimeSnapshot?.agentRunInputs.some(
+        (input) => input.id === payload.inputId,
+      );
+      if (!snapshotContainsInput) {
+        void api.agents
+          .runtimeSnapshot()
+          .then((snapshot) =>
+            setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
+          )
+          .catch((error) => console.error("[chat] failed to refresh consumed input:", error));
+      }
+    },
+    [runtimeSnapshot],
+  );
+
   useEffect(() => {
     return chatSessionRegistry.subscribe(conversationId, (event) => {
       if (event.type === "finish") handleChatFinish(event.payload);
-      else handleChatError(event.error);
+      else if (event.type === "error") handleChatError(event.error);
+      else handleInputConsumed(event.payload);
     });
-  }, [conversationId, handleChatError, handleChatFinish]);
+  }, [conversationId, handleChatError, handleChatFinish, handleInputConsumed]);
 
   const isChatLoading = chat.status === "submitted" || chat.status === "streaming";
   const mergedChatMessages = isChatLoading
@@ -970,6 +1110,28 @@ export function ChatView({
       ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
   );
   const isAgentRunActive = isChatLoading || hasActivePersistedRun;
+  const activeRunIdForConversation =
+    runtimeSnapshot?.runtimeRuns
+      .filter(
+        (item) =>
+          item.conversation_id === conversationId &&
+          ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
+      )
+      .sort((a, b) => b.started_at - a.started_at)[0]?.id ??
+    (isChatLoading ? runIdRef.current : null);
+  const queuedMessagePreviews = useMemo(
+    () =>
+      runtimeSnapshot?.agentRunInputs
+        .filter(
+          (item) =>
+            item.run_id === activeRunIdForConversation &&
+            item.kind === "follow_up" &&
+            item.status === "queued",
+        )
+        .map(getQueuedMessagePreview) ?? [],
+    [activeRunIdForConversation, runtimeSnapshot?.agentRunInputs],
+  );
+
   const shouldPollRuntime = isLoading || hasActivePersistedRun || externalReconciliationPending;
 
   const { setMessages: setChatMessages, stop: stopChat } = chat;
@@ -1023,7 +1185,7 @@ export function ChatView({
         const hasAssistant = persistedMessages.some(
           (message) => message.role === "assistant" && message.parts.length > 0,
         );
-        const reconciled = mergeChatMessages(latestMessagesRef.current, persistedMessages);
+        const reconciled = reconcileChatMessages(latestMessagesRef.current, persistedMessages);
         if (!reconciled || reconciled === latestMessagesRef.current) return hasAssistant;
         latestMessagesRef.current = reconciled;
         if (reconciled.length > 0) lastNonEmptyMessagesRef.current = reconciled;
@@ -1083,7 +1245,7 @@ export function ChatView({
         .runtimeSnapshot()
         .then((snapshot) => {
           if (!cancelled) {
-            setRuntimeSnapshot(snapshot);
+            setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot));
             const activeRun = snapshot.runtimeRuns
               .filter(
                 (item) =>
@@ -1147,7 +1309,7 @@ export function ChatView({
         }
       };
     }
-    const id = window.setInterval(load, 1_200);
+    const id = window.setInterval(load, queuedMessagePreviews.length > 0 ? 250 : 1_200);
     return () => {
       cancelled = true;
       cancelScheduled();
@@ -1161,6 +1323,7 @@ export function ChatView({
     conversationId,
     externalReconciliationPending,
     hydrationState,
+    queuedMessagePreviews.length,
     reconcileCompletedRun,
     refreshPersistedMessages,
     shouldPollRuntime,
@@ -1196,13 +1359,103 @@ export function ChatView({
     files: FilePartLike[];
   }): Promise<void> => {
     let finalFiles = toFileUIParts(files);
-
     if (!selectedModel) return;
     cancelFollowupSuggestions();
 
-    const wasTemporary = !isPersistedConversation;
+    const resetChatForSend = (): void => {
+      setChatError(null);
+      setChatErrorRetryable(false);
+      session.errorMessage = null;
+      session.errorRetryable = false;
+      session.isStopped = false;
+      setIsStopped(false);
+      manualMessageMutationRef.current = false;
+      chatFailureRef.current = false;
+      errorReportedRef.current = false;
+      chat.clearError();
+    };
+
+    const tryQueueMessage = async (userMessage: UIMessage): Promise<boolean> => {
+      const activeRunId = runIdRef.current ?? activeRunIdForConversation;
+      if (!activeRunId) return false;
+
+      const activeRuntimeRun = runtimeSnapshot?.runtimeRuns.some(
+        (item) =>
+          item.id === activeRunId &&
+          ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
+      );
+      const blockedRun = runtimeSnapshot?.runtimeRuns.find(
+        (item) => item.id === activeRunId && item.status === "blocked",
+      );
+      const hasLocalStream = activeChatSendsRef.current.has(conversationId);
+      if (!(isChatLoadingRef.current || hasLocalStream || activeRuntimeRun || blockedRun)) {
+        return false;
+      }
+      if (blockedRun && !isResumableBlockedRun(blockedRun)) {
+        reportChatError(
+          "resume blocked run",
+          new Error(blockedRun.error ?? "Agent run is blocked."),
+        );
+        return true;
+      }
+
+      if (blockedRun) runModeRef.current = "resume";
+      try {
+        const queuedInput = await api.runtime.enqueueInput({
+          runId: activeRunId,
+          kind: "follow_up",
+          source: "user",
+          message: userMessage,
+        });
+        setRuntimeSnapshot((snapshot) =>
+          snapshot
+            ? {
+                ...snapshot,
+                agentRunInputs: [
+                  ...snapshot.agentRunInputs.filter((item) => item.id !== queuedInput.id),
+                  queuedInput,
+                ],
+              }
+            : snapshot,
+        );
+        if (!runtimeSnapshot) {
+          void api.agents
+            .runtimeSnapshot()
+            .then((snapshot) =>
+              setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
+            )
+            .catch((error) => console.error("[chat] failed to refresh queued messages:", error));
+        }
+        return true;
+      } catch (err) {
+        const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
+        if (code !== "run_not_active" && code !== "run_not_found") {
+          reportChatError("queue follow-up", err);
+          return true;
+        }
+        if (runIdRef.current === activeRunId && !activeChatSendsRef.current.has(conversationId)) {
+          runIdRef.current = null;
+          runModeRef.current = "start";
+        }
+        return false;
+      }
+    };
+
+    const tryTextQueueBeforeWorkspace = files.length === 0;
+    let userMessage: UIMessage | null = null;
+    if (tryTextQueueBeforeWorkspace) {
+      try {
+        userMessage = buildUserMessage({ id: crypto.randomUUID(), text, files: finalFiles });
+      } catch {
+        return;
+      }
+      resetChatForSend();
+      if (await tryQueueMessage(userMessage)) return;
+    }
+
+    const wasTemporaryBeforeWorkspace = !persistedConversationRef.current;
     try {
-      if (wasTemporary) {
+      if (wasTemporaryBeforeWorkspace) {
         const prepared = await api.workspace.prepare(conversationId, t("shell.newConversation"));
         setWorkspace(prepared);
       } else {
@@ -1227,122 +1480,124 @@ export function ChatView({
         );
       }
     } catch (error) {
-      if (wasTemporary) await api.workspace.rollback(conversationId).catch(() => undefined);
+      if (wasTemporaryBeforeWorkspace) {
+        await api.workspace.rollback(conversationId).catch(() => undefined);
+      }
       reportChatError("prepare workspace", error);
       return;
     }
 
-    const messageId = crypto.randomUUID();
-    let userMessage: UIMessage;
-
-    try {
-      userMessage = buildUserMessage({ id: messageId, text, files: finalFiles });
-    } catch {
-      if (wasTemporary) await api.workspace.rollback(conversationId).catch(() => undefined);
-      return;
-    }
-    setChatError(null);
-    setChatErrorRetryable(false);
-    session.errorMessage = null;
-    session.errorRetryable = false;
-    session.isStopped = false;
-    setIsStopped(false);
-    manualMessageMutationRef.current = false;
-    chatFailureRef.current = false;
-    errorReportedRef.current = false;
-    chat.clearError();
-
-    const pendingMessages = appendOrReplaceMessage(latestMessagesRef.current, userMessage);
-    const activeRunId = runIdRef.current;
-    const activeRuntimeRun = activeRunId
-      ? runtimeSnapshot?.runtimeRuns.some(
-          (item) =>
-            item.id === activeRunId &&
-            ["queued", "running", "waiting_approval", "waiting_handoff"].includes(item.status),
-        )
-      : false;
-    const blockedRun = activeRunId
-      ? runtimeSnapshot?.runtimeRuns.find(
-          (item) => item.id === activeRunId && item.status === "blocked",
-        )
-      : undefined;
-    if (blockedRun) {
-      if (!isResumableBlockedRun(blockedRun)) {
-        reportChatError(
-          "resume blocked run",
-          new Error(blockedRun.error ?? "Agent run is blocked."),
-        );
+    if (!userMessage) {
+      try {
+        userMessage = buildUserMessage({ id: crypto.randomUUID(), text, files: finalFiles });
+      } catch {
+        if (wasTemporaryBeforeWorkspace) {
+          await api.workspace.rollback(conversationId).catch(() => undefined);
+        }
         return;
       }
+      resetChatForSend();
     }
-    if (activeRunId && (isChatLoading || activeRuntimeRun || !!blockedRun)) {
-      runModeRef.current = blockedRun ? "resume" : runModeRef.current;
-      void api.runtime
-        .enqueueInput({
-          runId: activeRunId,
-          kind: "steering",
-          source: "user",
-          message: userMessage,
-        })
-        .then(() => {
-          chat.setMessages(pendingMessages);
-          latestMessagesRef.current = pendingMessages;
-          persistInBackground(pendingMessages, "steering input");
-        })
-        .catch(async (err) => {
-          const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
-          runIdRef.current = null;
-          runModeRef.current = "start";
-          if (code === "run_not_active" || code === "run_not_found") {
-            latestMessagesRef.current = pendingMessages;
-            void persistAndTouch(pendingMessages);
-            await chat.sendMessage({ ...userMessage, messageId: userMessage.id });
-            return;
-          }
-          reportChatError("send", err, { persistSnapshot: pendingMessages });
+    const finalUserMessage = userMessage;
+    if (await tryQueueMessage(finalUserMessage)) return;
+
+    const sendFreshRun = async (): Promise<void> => {
+      const waitForCurrentResponse = async (): Promise<void> => {
+        const pendingSend = activeChatSendsRef.current.get(conversationId);
+        if (pendingSend) {
+          await pendingSend;
+          return;
+        }
+        const status = session.chat.status;
+        if (status !== "submitted" && status !== "streaming") return;
+
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          let unsubscribe: (() => void) | undefined;
+          const finish = (): void => {
+            if (settled) return;
+            settled = true;
+            unsubscribe?.();
+            resolve();
+          };
+          unsubscribe = chatSessionRegistry.subscribe(conversationId, (event) => {
+            if (event.type === "finish" || event.type === "error") finish();
+          });
+          if (settled) unsubscribe();
         });
-      return;
-    }
-    runIdRef.current = crypto.randomUUID();
-    runModeRef.current = "start";
-    reconciliationRef.current = { runId: runIdRef.current, attempts: 0, timer: null };
-    latestMessagesRef.current = pendingMessages;
-    try {
-      const persisted = await persistAndTouch(pendingMessages);
-      if (!persisted) throw new Error("Conversation is not ready to save messages.");
-    } catch (err) {
-      runIdRef.current = null;
+      };
+
+      await waitForCurrentResponse();
+      const wasTemporary = !persistedConversationRef.current;
+      const pendingMessages = appendOrReplaceMessage(latestMessagesRef.current, finalUserMessage);
+      runIdRef.current = crypto.randomUUID();
       runModeRef.current = "start";
-      reconciliationRef.current = { runId: null, attempts: 0, timer: null };
-      if (wasTemporary) {
-        await api.workspace.rollback(conversationId).catch(() => undefined);
-        setIsPersistedConversation(false);
-        setWorkspace(null);
+      reconciliationRef.current = { runId: runIdRef.current, attempts: 0, timer: null };
+      latestMessagesRef.current = pendingMessages;
+      try {
+        const persisted = await persistAndTouch(pendingMessages);
+        if (!persisted) throw new Error("Conversation is not ready to save messages.");
+      } catch (err) {
+        runIdRef.current = null;
+        runModeRef.current = "start";
+        reconciliationRef.current = { runId: null, attempts: 0, timer: null };
+        if (wasTemporary) {
+          await api.workspace.rollback(conversationId).catch(() => undefined);
+          persistedConversationRef.current = false;
+          setWorkspace(null);
+        }
+        reportChatError("save user message", err);
+        return;
       }
-      reportChatError("save user message", err);
-      return;
-    }
-    if (wasTemporary) {
-      setIsPersistedConversation(true);
-      window.dispatchEvent(
-        new CustomEvent("ayaka:conversation-created", {
-          detail: { id: conversationId },
-        }),
-      );
-    }
-    void chat.sendMessage(userMessage).catch((err) => {
-      reportChatError("send", err, { persistSnapshot: pendingMessages });
+      if (wasTemporary) {
+        persistedConversationRef.current = true;
+        window.dispatchEvent(
+          new CustomEvent("ayaka:conversation-created", {
+            detail: { id: conversationId },
+          }),
+        );
+      }
+
+      const sendPromise = chat.sendMessage(finalUserMessage).catch((err) => {
+        reportChatError("send", err, { persistSnapshot: pendingMessages });
+      });
+      activeChatSendsRef.current.set(conversationId, sendPromise);
+      void sendPromise.then(() => {
+        if (activeChatSendsRef.current.get(conversationId) === sendPromise) {
+          activeChatSendsRef.current.delete(conversationId);
+        }
+      });
+      await sendPromise;
+    };
+
+    // AI SDK's Chat owns one active response; serialize fresh sends after a late enqueue rejection.
+    const previousFreshSends =
+      freshChatSendQueuesRef.current.get(conversationId) ?? Promise.resolve();
+    const queuedFreshSend = previousFreshSends.then(sendFreshRun);
+    const handledFreshSend = queuedFreshSend.catch((err: unknown) => {
+      reportChatError("send", err, { persistSnapshot: latestMessagesRef.current });
     });
+    freshChatSendQueuesRef.current.set(conversationId, handledFreshSend);
+    void handledFreshSend.then(() => {
+      if (freshChatSendQueuesRef.current.get(conversationId) === handledFreshSend) {
+        freshChatSendQueuesRef.current.delete(conversationId);
+      }
+    });
+    await handledFreshSend;
   };
 
   const handleStop = (): void => {
     const runId = runIdRef.current;
+    session.isStopped = true;
+    setIsStopped(true);
     void Promise.allSettled([
       chat.stop(),
       runId ? api.runtime.cancelRun(runId) : Promise.resolve(false),
     ])
       .then(() => api.agents.runtimeSnapshot())
-      .then((snapshot) => setRuntimeSnapshot(snapshot))
+      .then((snapshot) =>
+        setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
+      )
       .catch((error) => console.error("[chat] failed to refresh stopped runtime:", error))
       .finally(() => {
         runIdRef.current = null;
@@ -1352,6 +1607,42 @@ export function ChatView({
         persistInBackground(latestMessagesRef.current, "stopped response");
       });
   };
+
+  const handleRemoveQueuedMessage = useCallback(
+    async (inputId: string): Promise<boolean> => {
+      if (!activeRunIdForConversation) return false;
+      const removed = await api.runtime.discardQueuedInput(activeRunIdForConversation, inputId);
+      if (removed) {
+        const removedAt = Date.now();
+        setRuntimeSnapshot((snapshot) =>
+          snapshot
+            ? {
+                ...snapshot,
+                agentRunInputs: snapshot.agentRunInputs.map((input) =>
+                  input.id === inputId
+                    ? {
+                        ...input,
+                        status: "discarded",
+                        consumed_at: removedAt,
+                        discarded_reason: "user_removed_from_queue",
+                      }
+                    : input,
+                ),
+              }
+            : snapshot,
+        );
+      } else {
+        void api.agents
+          .runtimeSnapshot()
+          .then((snapshot) =>
+            setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
+          )
+          .catch((error) => console.error("[chat] failed to refresh queued messages:", error));
+      }
+      return removed;
+    },
+    [activeRunIdForConversation, runtimeSnapshot],
+  );
 
   const handleRetry = (): void => {
     if (!chatErrorRetryable) return;
@@ -1659,6 +1950,8 @@ export function ChatView({
               conversationId={conversationId}
               isLoading={isLoading}
               isRunActive={isAgentRunActive}
+              queuedMessages={queuedMessagePreviews}
+              onRemoveQueuedMessage={handleRemoveQueuedMessage}
               onSend={handleSend}
               onStop={isAgentRunActive ? handleStop : undefined}
               selectedModel={selectedModel}
