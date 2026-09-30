@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.3]
+
+### 中文
+
+#### 新增
+
+- 新增响应生成期间提交消息的能力，用户可继续输入并将消息加入处理队列，也可移除尚未处理的队列消息。
+- 新增实时会话删除功能，删除前会显示确认提示。
+- 为聊天消息和实时会话消息新增时间显示。
+
+#### 变更
+
+- 优化消息队列、运行时输入和消息持久化流程，确保排队消息按顺序处理并正确同步到会话记录。
+- 优化消息操作栏布局，将消息时间与操作项、助手执行耗时统一展示。
+- 更新 ZZZ 皮肤的颜色变量，改善文字和输入占位符在深色背景下的可读性。
+
+### English
+
+#### Added
+
+- Added message submission while a response is streaming. New messages can be queued for processing, and pending queued messages can be removed.
+- Added realtime-session deletion with a confirmation prompt.
+- Added timestamps to chat messages and realtime-session messages.
+
+#### Changed
+
+- Improved message-queue, runtime-input, and persistence flows so queued messages are processed in order and synchronized correctly with conversation history.
+- Updated the message-action row to show timestamps alongside actions and assistant execution time.
+- Updated ZZZ skin color variables to improve text and input-placeholder readability on dark backgrounds.
+
 ## [0.2.2]
 
 ### 中文
