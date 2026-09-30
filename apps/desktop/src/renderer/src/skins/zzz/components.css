@@ -199,7 +199,7 @@
 }
 
 :root[data-skin="zzz"] :is([data-slot="input"], [data-slot="textarea"])::placeholder {
-  color: #565656;
+  color: var(--skin-dark-muted);
 }
 
 :root[data-skin="zzz"] [data-slot="textarea"]:focus-visible {

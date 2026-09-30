@@ -4,7 +4,7 @@
   --skin-font-stack: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --skin-mono-font-stack: "JetBrains Mono", "Fira Code", "Sarasa Mono SC", ui-monospace, monospace;
   --skin-background: #323232;
-  --skin-foreground: #1c1c1c;
+  --skin-foreground: #ffffff;
   --skin-surface: #ffffff;
   --skin-surface-foreground: #1c1c1c;
   --skin-overlay: #1c1c1c;
@@ -16,7 +16,7 @@
   --skin-secondary: #cccccc;
   --skin-secondary-foreground: #000000;
   --skin-muted: #e0e3e4;
-  --skin-muted-foreground: #626262;
+  --skin-muted-foreground: #b4b4b4;
   --skin-border: #000000;
   --skin-separator: #c2c6c8;
   --skin-accent: #98eff0;
