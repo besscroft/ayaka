@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.4]
+
+### 中文
+
+#### 新增
+
+- 新增本地执行引擎和五种工具，支持执行本地命令、读取和写入文件、精确编辑文本及应用多文件补丁。
+- 新增本地执行风险评估与权限审批，根据操作类型和目标路径判断是否需要确认，并在聊天中展示操作摘要和结果。
+
+#### 变更
+
+- 统一本地命令与文件操作的运行记录、取消处理和错误结果；文件变更支持路径校验、冲突检测及补丁失败回滚。
+- 保留沙箱工具和会话工作区命令的现有边界，本地执行工具在主进程中运行，并通过结构化参数调用命令。
+
+### English
+
+#### Added
+
+- Added a local execution engine and five tools for running local commands, reading and writing files, making exact text edits, and applying multi-file patches.
+- Added risk assessment and permission review for local execution, determining when confirmation is needed from the operation and target path and showing operation summaries and results in chat.
+
+#### Changed
+
+- Unified runtime records, cancellation, and error results for local commands and file operations. File changes include path validation, conflict detection, and rollback after patch failures.
+- Preserved the existing boundaries for sandbox tools and conversation-workspace commands. Local execution runs in the main process and invokes commands with structured arguments.
+
 ## [0.2.3]
 
 ### 中文
