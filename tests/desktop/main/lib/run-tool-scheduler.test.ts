@@ -15,10 +15,12 @@ void describe("RunToolScheduler", () => {
     const second = await scheduler.acquire("runtime_snapshot", signal);
     const third = await scheduler.acquire("soul_read", signal);
     const fourth = await scheduler.acquire("memory_list", signal);
+    const fifth = await scheduler.acquire("local_read_file", signal);
     first();
     second();
     third();
     fourth();
+    fifth();
   });
 
   void it("serializes side effects in acquisition order", async () => {

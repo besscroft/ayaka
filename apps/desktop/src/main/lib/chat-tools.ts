@@ -555,6 +555,51 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
     defaultAuto: true,
     requiresApproval: true,
   },
+  local_run_command: {
+    id: "local_run_command",
+    label: "Run local command",
+    description: "Run a structured command anywhere on the local host with risk-based review.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  local_read_file: {
+    id: "local_read_file",
+    label: "Read local file",
+    description: "Read bounded UTF-8 text from any valid local path.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: false,
+  },
+  local_write_file: {
+    id: "local_write_file",
+    label: "Write local file",
+    description: "Create or replace a UTF-8 text file on the local host.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: true,
+  },
+  local_edit_file: {
+    id: "local_edit_file",
+    label: "Edit local file",
+    description: "Replace an exact text match in a local UTF-8 file.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: true,
+  },
+  local_apply_patch: {
+    id: "local_apply_patch",
+    label: "Apply local patch",
+    description: "Apply a validated multi-file patch to local UTF-8 files.",
+    kind: "host",
+    category: "execution",
+    defaultAuto: true,
+    requiresApproval: true,
+  },
   cron: {
     id: "cron",
     label: "Automation",
@@ -980,10 +1025,17 @@ export async function executeChatHostTool({
         case "sandbox_publish_artifact":
         case "sandbox_start_preview":
         case "workspace_run_command":
+        case "local_run_command":
+        case "local_read_file":
+        case "local_write_file":
+        case "local_edit_file":
+        case "local_apply_patch":
           throw new Error(
             toolId === "workspace_run_command"
               ? "workspace_run_command is only available through the root Agent runtime."
-              : toolId + " is only available through the agent sandbox runtime.",
+              : toolId.startsWith("local_")
+                ? toolId + " is only available through the root Agent runtime."
+                : toolId + " is only available through the agent sandbox runtime.",
           );
       }
       throw new Error("Unsupported chat tool: " + toolId);

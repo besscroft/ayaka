@@ -15,6 +15,11 @@ void describe("chat permission policy", () => {
       "sandbox_write_file",
       "sandbox_run_command",
       "workspace_run_command",
+      "local_run_command",
+      "local_read_file",
+      "local_write_file",
+      "local_edit_file",
+      "local_apply_patch",
       "sandbox_start_preview",
     ]) {
       assert.equal(isChatPermissionSensitiveTool(toolName), true, toolName);

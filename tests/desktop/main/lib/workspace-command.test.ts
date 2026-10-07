@@ -119,7 +119,7 @@ void describe("workspace command policy", () => {
     );
   });
 
-  void it("allows the explicit tool setting to disable every approval source", () => {
+  void it("does not let the tool setting disable risky or policy-requested reviews", () => {
     assert.equal(
       command.shouldRequireWorkspaceCommandApproval({
         approvalEnabled: false,
@@ -128,7 +128,7 @@ void describe("workspace command policy", () => {
         toolApprovalRequested: true,
         agentPolicyRequiresApproval: true,
       }),
-      false,
+      true,
     );
     assert.equal(
       command.shouldRequireWorkspaceCommandApproval({
@@ -139,6 +139,16 @@ void describe("workspace command policy", () => {
         agentPolicyRequiresApproval: false,
       }),
       true,
+    );
+    assert.equal(
+      command.shouldRequireWorkspaceCommandApproval({
+        approvalEnabled: false,
+        commandDecision: "allow",
+        reviewAll: false,
+        toolApprovalRequested: false,
+        agentPolicyRequiresApproval: false,
+      }),
+      false,
     );
   });
 

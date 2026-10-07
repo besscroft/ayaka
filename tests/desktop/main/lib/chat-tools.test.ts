@@ -860,7 +860,11 @@ void describe("chat tool runtime", () => {
     for (const id of CHAT_TOOL_IDS) {
       assert.equal(
         descriptors.find((descriptor) => descriptor.id === id)?.requiresApproval,
-        id === "workspace_run_command" || id === "sandbox_start_preview",
+        id === "workspace_run_command" ||
+          id === "sandbox_start_preview" ||
+          id === "local_write_file" ||
+          id === "local_edit_file" ||
+          id === "local_apply_patch",
       );
     }
   });

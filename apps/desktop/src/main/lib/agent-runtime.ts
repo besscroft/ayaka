@@ -49,6 +49,12 @@ import {
   type ChatReasoningLevel,
   type ChatToolId,
   type ChatToolSelectionRequest,
+  type LocalApplyPatchInput,
+  type LocalEditFileInput,
+  type LocalExecutionResult,
+  type LocalReadFileInput,
+  type LocalRunCommandInput,
+  type LocalWriteFileInput,
   type MediaGenerationToolInput,
   type ModelCapabilities,
   type WorkspaceCommandInput,
@@ -132,13 +138,24 @@ import { getChatSamplingSettings } from "./chat-model-settings";
 import { persistChatStreamSnapshot } from "./chat-history";
 import {
   disposeWorkspaceCommandSession,
-  evaluateWorkspaceCommandPolicy,
-  executeWorkspaceCommand,
   redactWorkspaceCommandInput,
   redactWorkspaceCommandText,
-  shouldRequireWorkspaceCommandApproval,
   WORKSPACE_COMMAND_TOOL_ID,
 } from "./workspace-command";
+import {
+  assessWorkspaceCommandInput,
+  assessLocalExecutionInput,
+  disposeLocalExecutionEngine,
+  getLocalExecutionEngine,
+  LOCAL_APPLY_PATCH_TOOL_ID,
+  LOCAL_EDIT_FILE_TOOL_ID,
+  LOCAL_EXECUTION_TOOL_IDS,
+  LOCAL_READ_FILE_TOOL_ID,
+  LOCAL_RUN_COMMAND_TOOL_ID,
+  LOCAL_WRITE_FILE_TOOL_ID,
+  redactLocalExecutionInput,
+  shouldRequireLocalExecutionApproval,
+} from "./local-execution-engine";
 
 type StreamTextOptions = Parameters<typeof streamText>[0];
 type MessageMetadataCallback = NonNullable<
@@ -786,6 +803,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     userText: latestUserText(context.messages),
     explicitSkillIds: context.explicitSkillIds,
   });
+  const toolApprovalNames = new Set(base.approvalToolNames ?? []);
 
   if (!context.modelContext.capabilities.toolCalling) {
     return base;
@@ -825,13 +843,29 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
   // The remaining orchestration tools follow the user's selection as before.
   const workspaceCommandSelected = isWorkspaceCommandSelected(context);
   if (workspaceCommandSelected) {
-    assignTool(tools, WORKSPACE_COMMAND_TOOL_ID, createWorkspaceCommandTool(context));
+    assignTool(
+      tools,
+      WORKSPACE_COMMAND_TOOL_ID,
+      createWorkspaceCommandTool(context, toolApprovalNames),
+    );
     activeTools.add(WORKSPACE_COMMAND_TOOL_ID);
   }
+  const localExecutionToolIds = selectedLocalExecutionToolIds(context);
+  for (const toolId of localExecutionToolIds) {
+    assignTool(tools, toolId, createLocalExecutionTool(context, toolId, toolApprovalNames));
+    activeTools.add(toolId);
+    builtinToolNames.add(toolId);
+  }
+  const localExecutionSelected = localExecutionToolIds.length > 0;
 
   const policy = readToolPolicy(context.rootAgent.tool_policy_json);
   const sandboxToolIds = selectedSandboxToolIds(context, policy);
-  if (base.toolChoice !== "none" || workspaceCommandSelected || sandboxToolIds.length > 0) {
+  if (
+    base.toolChoice !== "none" ||
+    workspaceCommandSelected ||
+    localExecutionSelected ||
+    sandboxToolIds.length > 0
+  ) {
     if (context.disableCronTools) {
       delete tools.cron;
       activeTools.delete("cron");
@@ -879,7 +913,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
     builtinToolNames: [...builtinToolNames],
     toolApproval: bypassesChatPermissionApproval(context.permissionMode)
       ? undefined
-      : createGuardrailApproval(context, new Set(base.approvalToolNames ?? []), builtinToolNames),
+      : createGuardrailApproval(context, toolApprovalNames, builtinToolNames),
     stopWhen: ROOT_AGENT_STOP_WHEN,
     onStepEnd: (event) => {
       base.onStepEnd?.(event);
@@ -889,6 +923,7 @@ async function buildRootToolRuntime(context: RuntimeContext): Promise<ChatToolRu
       base.instructions,
       createSandboxIsolationNote(context),
       createWorkspaceCommandNote(context, workspaceCommandSelected),
+      createLocalExecutionNote(context, localExecutionSelected),
     ]
       .filter(Boolean)
       .join("\n"),
@@ -902,6 +937,22 @@ function isWorkspaceCommandSelected(context: RuntimeContext): boolean {
     selection.mode === "auto" ||
     (selection.mode === "manual" && selection.selectedToolIds.includes(WORKSPACE_COMMAND_TOOL_ID))
   );
+}
+
+function selectedLocalExecutionToolIds(
+  context: RuntimeContext,
+): (typeof LOCAL_EXECUTION_TOOL_IDS)[number][] {
+  if (!context.modelContext.capabilities.toolCalling) return [];
+  const selection = normalizeChatToolSelection(context.toolSelection);
+  if (selection.mode === "off") return [];
+  const disabled = new Set(selection.disabledToolIds ?? []);
+  const selected =
+    selection.mode === "auto"
+      ? LOCAL_EXECUTION_TOOL_IDS.filter((id) => !disabled.has(id))
+      : LOCAL_EXECUTION_TOOL_IDS.filter(
+          (id) => selection.selectedToolIds.includes(id) && !disabled.has(id),
+        );
+  return [...selected];
 }
 
 function isMemoryCapabilityEnabled(selection: ChatToolSelectionRequest | undefined): boolean {
@@ -962,7 +1013,10 @@ function createWorkspaceCommandNote(
   ].join("\n");
 }
 
-function createWorkspaceCommandTool(context: RuntimeContext): ToolSet[string] {
+function createWorkspaceCommandTool(
+  context: RuntimeContext,
+  toolApprovalNames: Set<string>,
+): ToolSet[string] {
   return tool({
     description:
       "Run one structured executable with string argv in the current conversation workspace. cwd is relative and persists for this Agent run; env is per-call only. Approval is controlled by the workspace command tool setting. This is controlled local execution, not an OS sandbox.",
@@ -988,16 +1042,353 @@ function createWorkspaceCommandTool(context: RuntimeContext): ToolSet[string] {
       required: ["executable"],
       additionalProperties: false,
     }),
-    execute: (input) => runWorkspaceCommandStep(context, input),
+    execute: (input, options) =>
+      runWorkspaceCommandStep(context, input, options.toolCallId, toolApprovalNames),
   });
+}
+
+function createLocalExecutionNote(context: RuntimeContext, selected: boolean): string | undefined {
+  if (!selected || !context.modelContext.capabilities.toolCalling) return undefined;
+  return [
+    "Local file and command execution:",
+    "- Use local_read_file before editing when you need current file contents; use local_edit_file for one exact, unique text replacement and local_apply_patch for coordinated changes.",
+    "- Use local_write_file only when replacing or creating a whole UTF-8 text file is intended. These tools can access any valid local path, so verify the target paths carefully.",
+    "- Use local_run_command with a structured executable and argv array, never a composed shell command string. cwd is a local path and persists for this Agent run.",
+    "- Approval is evaluated per operation from the active permission mode, operation risk, sensitive paths, and configured tool/Agent review policies. full_access still enforces path, encoding, type, and size validation.",
+    "- Local files, conversation-workspace command compatibility, and sandbox preview files are separate capabilities. Use sandbox_write_file for preview source files; do not treat sandbox paths as host paths.",
+  ].join("\n");
+}
+
+function createLocalExecutionTool(
+  context: RuntimeContext,
+  toolId: (typeof LOCAL_EXECUTION_TOOL_IDS)[number],
+  toolApprovalNames: Set<string>,
+): ToolSet[string] {
+  const execute = (input: unknown, options: { toolCallId: string }) =>
+    runLocalExecutionStep(context, toolId, input, options.toolCallId, toolApprovalNames);
+  switch (toolId) {
+    case LOCAL_RUN_COMMAND_TOOL_ID:
+      return tool({
+        description:
+          "Run one structured executable with string argv on the local host. cwd may be absolute or relative and persists for this Agent run; this is controlled local execution, not an OS sandbox.",
+        inputSchema: jsonSchema<LocalRunCommandInput>({
+          type: "object",
+          properties: {
+            executable: { type: "string", description: "Executable name or local path." },
+            args: {
+              type: "array",
+              items: { type: "string" },
+              description: "Structured argv values.",
+            },
+            cwd: {
+              type: "string",
+              description:
+                "Local working directory; absolute or relative to the current local cwd.",
+            },
+            env: {
+              type: "object",
+              additionalProperties: { type: "string" },
+              description: "Allowlisted environment overrides for this call only.",
+            },
+            timeoutMs: {
+              type: "number",
+              description: "Timeout from 1,000 to 60,000 milliseconds; default 20,000.",
+            },
+          },
+          required: ["executable"],
+          additionalProperties: false,
+        }),
+        execute,
+      });
+    case LOCAL_READ_FILE_TOOL_ID:
+      return tool({
+        description:
+          "Read a UTF-8 text file from any valid local path. Supports one-based inclusive line ranges and a bounded response; use the returned hash for conflict-aware edits.",
+        inputSchema: jsonSchema<LocalReadFileInput>({
+          type: "object",
+          properties: {
+            path: {
+              type: "string",
+              description: "Absolute local path or path relative to the current local cwd.",
+            },
+            startLine: { type: "integer", minimum: 1 },
+            endLine: { type: "integer", minimum: 1 },
+            maxBytes: { type: "integer", minimum: 1, maximum: 262144 },
+          },
+          required: ["path"],
+          additionalProperties: false,
+        }),
+        execute,
+      });
+    case LOCAL_WRITE_FILE_TOOL_ID:
+      return tool({
+        description:
+          "Create or replace a UTF-8 text file on the local host using an atomic replacement. Pass expectedHash from a previous read to prevent overwriting changed content.",
+        inputSchema: jsonSchema<LocalWriteFileInput>({
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            content: { type: "string" },
+            expectedHash: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+          },
+          required: ["path", "content"],
+          additionalProperties: false,
+        }),
+        execute,
+      });
+    case LOCAL_EDIT_FILE_TOOL_ID:
+      return tool({
+        description:
+          "Replace an exact text match in a local UTF-8 text file. By default the old text must match exactly once; set replaceAll only when every match should change.",
+        inputSchema: jsonSchema<LocalEditFileInput>({
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            oldText: { type: "string" },
+            newText: { type: "string" },
+            replaceAll: { type: "boolean" },
+            expectedHash: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+          },
+          required: ["path", "oldText", "newText"],
+          additionalProperties: false,
+        }),
+        execute,
+      });
+    case LOCAL_APPLY_PATCH_TOOL_ID:
+      return tool({
+        description:
+          "Apply a validated multi-file patch to local UTF-8 files. The full patch is parsed and checked before files are changed; failed commits are rolled back where possible.",
+        inputSchema: jsonSchema<LocalApplyPatchInput>({
+          type: "object",
+          properties: {
+            patch: {
+              type: "string",
+              description: "Patch using Begin/End Patch and Add/Update/Delete File directives.",
+            },
+          },
+          required: ["patch"],
+          additionalProperties: false,
+        }),
+        execute,
+      });
+  }
+}
+
+async function runLocalExecutionStep(
+  context: RuntimeContext,
+  toolId: (typeof LOCAL_EXECUTION_TOOL_IDS)[number],
+  input: unknown,
+  toolCallId: string,
+  toolApprovalNames: Set<string>,
+): Promise<LocalExecutionResult> {
+  const auditInput = redactLocalExecutionInput(toolId, input);
+  let assessment: Awaited<ReturnType<typeof assessLocalExecutionInput>> | undefined;
+  try {
+    assessment = await assessLocalExecutionInput({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      toolName: toolId,
+      input,
+    });
+  } catch {
+    // The operation methods return a structured error for missing or invalid runtime state.
+  }
+  const step = await createRuntimeStep({
+    run_id: context.runId,
+    agent_id: DEFAULT_AGENT_ID,
+    tool_id: toolId,
+    kind: "tool",
+    status: "running",
+    title: "Local execution: " + toolId,
+    detail: {
+      toolId,
+      toolCallId,
+      operation: assessment?.operation,
+      input: auditInput,
+      risk: assessment?.risk,
+      paths: assessment?.paths,
+    },
+  });
+  let result: LocalExecutionResult;
+  try {
+    const engine = await getLocalExecutionEngine({
+      runId: context.runId,
+      conversationId: context.conversationId,
+    });
+    const requiresReview = assessment
+      ? localExecutionRequiresReview(context, toolId, assessment, toolApprovalNames)
+      : false;
+    if (
+      !(await engine.validateApprovalBeforeExecution(toolCallId, assessment, input, requiresReview))
+    ) {
+      result = {
+        ok: false,
+        operation: assessment?.operation ?? localOperationForTool(toolId),
+        error: {
+          code: "HASH_CONFLICT",
+          retryable: true,
+          message:
+            "The local target changed after approval. Submit the operation again for review.",
+        },
+      };
+    } else {
+      switch (toolId) {
+        case LOCAL_RUN_COMMAND_TOOL_ID:
+          result = await engine.runCommand(input as LocalRunCommandInput, context.session.signal);
+          break;
+        case LOCAL_READ_FILE_TOOL_ID:
+          result = await engine.readFile(input as LocalReadFileInput);
+          break;
+        case LOCAL_WRITE_FILE_TOOL_ID:
+          result = await engine.writeFile(input as LocalWriteFileInput);
+          break;
+        case LOCAL_EDIT_FILE_TOOL_ID:
+          result = await engine.editFile(input as LocalEditFileInput);
+          break;
+        case LOCAL_APPLY_PATCH_TOOL_ID:
+          result = await engine.applyPatch(input as LocalApplyPatchInput);
+          break;
+      }
+    }
+    const status = result.ok
+      ? "succeeded"
+      : result.error.code === "CANCELLED"
+        ? "cancelled"
+        : "failed";
+    const summary = summarizeLocalExecutionResult(result);
+    await updateRuntimeStep(step.id, {
+      status,
+      detail: {
+        toolId,
+        toolCallId,
+        operation: assessment?.operation,
+        input: auditInput,
+        risk: assessment?.risk,
+        paths: assessment?.paths,
+        ...summary,
+      },
+      ...(result.ok ? {} : { error: result.error.message }),
+      finished_at: Date.now(),
+    });
+    insertRuntimeEvent({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      agentId: DEFAULT_AGENT_ID,
+      kind: "tool",
+      title: "Local execution " + (result.ok ? "succeeded" : result.error.code.toLowerCase()),
+      status,
+      detail: {
+        runId: context.runId,
+        toolCallId,
+        toolId,
+        operation: assessment?.operation,
+        risk: assessment?.risk,
+        paths: assessment?.paths,
+        ...summary,
+      },
+    });
+    return result;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? redactWorkspaceCommandText(error.message)
+        : "Local execution failed.";
+    result = {
+      ok: false,
+      operation: assessment?.operation ?? localOperationForTool(toolId),
+      error: { code: "RUNTIME_ERROR", retryable: false, message },
+    };
+    const summary = summarizeLocalExecutionResult(result);
+    await updateRuntimeStep(step.id, {
+      status: "failed",
+      error: message,
+      detail: {
+        toolId,
+        toolCallId,
+        input: auditInput,
+        risk: assessment?.risk,
+        paths: assessment?.paths,
+        ...summary,
+      },
+      finished_at: Date.now(),
+    });
+    insertRuntimeEvent({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      agentId: DEFAULT_AGENT_ID,
+      kind: "tool",
+      title: "Local execution failed",
+      status: "failed",
+      detail: { toolId, toolCallId, risk: assessment?.risk, paths: assessment?.paths, ...summary },
+    });
+    return result;
+  }
+}
+
+function localOperationForTool(
+  toolId: (typeof LOCAL_EXECUTION_TOOL_IDS)[number],
+): LocalExecutionResult["operation"] {
+  switch (toolId) {
+    case LOCAL_RUN_COMMAND_TOOL_ID:
+      return "run_command";
+    case LOCAL_READ_FILE_TOOL_ID:
+      return "read_file";
+    case LOCAL_WRITE_FILE_TOOL_ID:
+      return "write_file";
+    case LOCAL_EDIT_FILE_TOOL_ID:
+      return "edit_file";
+    case LOCAL_APPLY_PATCH_TOOL_ID:
+      return "apply_patch";
+  }
+}
+
+function summarizeLocalExecutionResult(result: LocalExecutionResult): Record<string, unknown> {
+  if (!result.ok) {
+    return {
+      ok: false,
+      operation: result.operation,
+      error: { ...result.error },
+      ...(result.partialResult && typeof result.partialResult === "object"
+        ? { partialResult: summarizeCommandPartial(result.partialResult) }
+        : {}),
+    };
+  }
+  const data =
+    result.data && typeof result.data === "object" ? (result.data as Record<string, unknown>) : {};
+  const {
+    content: _content,
+    stdout: _stdout,
+    stderr: _stderr,
+    diffPreview: _diffPreview,
+    ...summary
+  } = data;
+  return { ok: true, operation: result.operation, data: summary };
+}
+
+function summarizeCommandPartial(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const { stdout: _stdout, stderr: _stderr, command: _command, ...summary } = record;
+  return summary;
 }
 
 async function runWorkspaceCommandStep(
   context: RuntimeContext,
   input: WorkspaceCommandInput,
+  toolCallId: string,
+  toolApprovalNames: Set<string>,
 ): Promise<WorkspaceCommandResult> {
-  const decision = evaluateWorkspaceCommandPolicy(input);
   const auditInput = redactWorkspaceCommandInput(input);
+  let assessment: Awaited<ReturnType<typeof assessWorkspaceCommandInput>> | undefined;
+  try {
+    assessment = await assessWorkspaceCommandInput({
+      runId: context.runId,
+      conversationId: context.conversationId,
+      input,
+    });
+  } catch {
+    // The executor returns a structured failure when its runtime context is unavailable.
+  }
   const step = await createRuntimeStep({
     run_id: context.runId,
     agent_id: DEFAULT_AGENT_ID,
@@ -1007,18 +1398,37 @@ async function runWorkspaceCommandStep(
     title: "Run workspace command",
     detail: {
       toolId: WORKSPACE_COMMAND_TOOL_ID,
+      toolCallId,
+      operation: assessment?.operation,
       input: auditInput,
-      risk: decision.risk,
-      approval: decision.decision,
+      risk: assessment?.risk,
+      paths: assessment?.paths,
     },
   });
   try {
-    const result = await executeWorkspaceCommand({
+    const engine = await getLocalExecutionEngine({
       runId: context.runId,
       conversationId: context.conversationId,
-      signal: context.session.signal,
-      input,
     });
+    const requiresReview = assessment
+      ? localExecutionRequiresReview(
+          context,
+          WORKSPACE_COMMAND_TOOL_ID,
+          assessment,
+          toolApprovalNames,
+        )
+      : false;
+    if (
+      !(await engine.validateApprovalBeforeExecution(toolCallId, assessment, input, requiresReview))
+    ) {
+      throw new Error("The workspace command changed after approval. Submit it again for review.");
+    }
+    const execution = await engine.runCommand(
+      input,
+      context.session.signal,
+      "conversation_workspace",
+    );
+    const result = toWorkspaceCommandResult(execution);
     const summary = summarizeWorkspaceCommandResult(result);
     const status =
       result.outcome === "cancelled"
@@ -1030,7 +1440,15 @@ async function runWorkspaceCommandStep(
           : "succeeded";
     await updateRuntimeStep(step.id, {
       status,
-      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, input: auditInput, ...summary },
+      detail: {
+        toolId: WORKSPACE_COMMAND_TOOL_ID,
+        toolCallId,
+        operation: assessment?.operation,
+        input: auditInput,
+        risk: assessment?.risk,
+        paths: assessment?.paths,
+        ...summary,
+      },
       finished_at: Date.now(),
     });
     insertRuntimeEvent({
@@ -1040,7 +1458,13 @@ async function runWorkspaceCommandStep(
       kind: "tool",
       title: "Workspace command " + result.outcome,
       status,
-      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, ...summary },
+      detail: {
+        toolId: WORKSPACE_COMMAND_TOOL_ID,
+        toolCallId,
+        operation: assessment?.operation,
+        paths: assessment?.paths,
+        ...summary,
+      },
     });
     return result;
   } catch (error) {
@@ -1052,7 +1476,7 @@ async function runWorkspaceCommandStep(
       detail: {
         toolId: WORKSPACE_COMMAND_TOOL_ID,
         input: auditInput,
-        risk: decision.risk,
+        risk: assessment?.risk,
         error: safeMessage,
       },
       finished_at: Date.now(),
@@ -1064,10 +1488,39 @@ async function runWorkspaceCommandStep(
       kind: "tool",
       title: "Workspace command failed",
       status: "failed",
-      detail: { toolId: WORKSPACE_COMMAND_TOOL_ID, risk: decision.risk, error: safeMessage },
+      detail: {
+        toolId: WORKSPACE_COMMAND_TOOL_ID,
+        toolCallId,
+        risk: assessment?.risk,
+        paths: assessment?.paths,
+        error: safeMessage,
+      },
     });
     throw error;
   }
+}
+
+function toWorkspaceCommandResult(result: LocalExecutionResult): WorkspaceCommandResult {
+  const data = result.ok ? result.data : result.partialResult;
+  if (!data || typeof data !== "object") {
+    throw new Error(result.ok ? "Local command returned no result." : result.error.message);
+  }
+  const command = data as Record<string, unknown>;
+  if (
+    typeof command.executable !== "string" ||
+    !Array.isArray(command.args) ||
+    typeof command.cwd !== "string" ||
+    typeof command.outcome !== "string"
+  ) {
+    throw new Error(result.ok ? "Local command returned an invalid result." : result.error.message);
+  }
+  return {
+    ...(command as unknown as WorkspaceCommandResult),
+    risk:
+      command.risk === "sensitive_path"
+        ? "unknown"
+        : (command.risk as WorkspaceCommandResult["risk"]),
+  };
 }
 
 function summarizeWorkspaceCommandResult(result: WorkspaceCommandResult): Record<string, unknown> {
@@ -1853,20 +2306,24 @@ function createGuardrailApproval(
   return async ({ toolCall }) => {
     const toolName = String(toolCall.toolName);
     const input = (toolCall as { input?: unknown }).input;
-    const auditInput =
-      toolName === WORKSPACE_COMMAND_TOOL_ID
+    const auditInput = LOCAL_EXECUTION_TOOL_IDS.includes(
+      toolName as (typeof LOCAL_EXECUTION_TOOL_IDS)[number],
+    )
+      ? redactLocalExecutionInput(toolName, input)
+      : toolName === WORKSPACE_COMMAND_TOOL_ID
         ? redactWorkspaceCommandInput(input)
         : toolName === "sandbox_start_preview"
           ? redactSandboxPreviewInput(input)
           : toolName === "browser_type"
             ? redactBrowserInput(input)
             : redactMemoryContentForAudit(toolName, input);
-    const decision = evaluateToolGuardrail(
+    const decision = await evaluateToolGuardrail(
       context,
       toolName,
       input,
       toolApprovalToolNames,
       builtinToolNames,
+      toolCall.toolCallId,
     );
     const step = await createRuntimeStep({
       run_id: context.runId,
@@ -1919,6 +2376,25 @@ function createGuardrailApproval(
   };
 }
 
+function localExecutionRequiresReview(
+  context: RuntimeContext,
+  toolName: string,
+  assessment: Awaited<ReturnType<typeof assessLocalExecutionInput>>,
+  toolApprovalNames: Set<string>,
+): boolean {
+  const agentPolicy = readToolPolicy(context.rootAgent.tool_policy_json);
+  const reviewAll =
+    readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
+  return shouldRequireLocalExecutionApproval({
+    permissionMode: context.permissionMode,
+    risk: assessment.risk,
+    reviewAll,
+    toolRequiresApproval: getToolRecord(toolName)?.requires_approval !== 0,
+    toolApprovalRequested: toolApprovalNames.has(toolName),
+    agentPolicyRequiresApproval: agentPolicy.requireApprovalToolIds.includes(toolName),
+  });
+}
+
 function redactMemoryContentForAudit(toolName: string, input: unknown): unknown {
   if (
     !["soul_write", "memory_file_write", "memory_save", "memory_update"].includes(toolName) ||
@@ -1952,17 +2428,18 @@ function redactSandboxPreviewInput(input: unknown): unknown {
   };
 }
 
-function evaluateToolGuardrail(
+async function evaluateToolGuardrail(
   context: RuntimeContext,
   toolName: string,
   input: unknown,
   toolApprovalToolNames = new Set<string>(),
   builtinToolNames = new Set<string>(),
-): {
+  toolCallId = "",
+): Promise<{
   decision: "allow" | "deny" | "require_review";
   risk: "low" | "medium" | "high";
   reason: string;
-} {
+}> {
   if (toolName.startsWith("handoff_") || toolName.startsWith("consult_")) {
     return { decision: "allow", risk: "low", reason: "Agent orchestration tool." };
   }
@@ -1983,39 +2460,90 @@ function evaluateToolGuardrail(
         "Starting a localhost preview launches a long-running process and opens a local network port.",
     };
   }
-  if (toolName === WORKSPACE_COMMAND_TOOL_ID) {
-    const commandPolicy = evaluateWorkspaceCommandPolicy(input);
-    if (commandPolicy.decision === "deny") {
-      return { decision: "deny", risk: "high", reason: commandPolicy.reason };
+  if (
+    toolName === WORKSPACE_COMMAND_TOOL_ID ||
+    LOCAL_EXECUTION_TOOL_IDS.includes(toolName as (typeof LOCAL_EXECUTION_TOOL_IDS)[number])
+  ) {
+    const isWorkspaceCommand = toolName === WORKSPACE_COMMAND_TOOL_ID;
+    let assessment: Awaited<ReturnType<typeof assessLocalExecutionInput>>;
+    try {
+      assessment = isWorkspaceCommand
+        ? await assessWorkspaceCommandInput({
+            runId: context.runId,
+            conversationId: context.conversationId,
+            input,
+          })
+        : await assessLocalExecutionInput({
+            runId: context.runId,
+            conversationId: context.conversationId,
+            toolName,
+            input,
+          });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid local execution request.";
+      return { decision: "deny", risk: "high", reason: redactWorkspaceCommandText(message) };
+    }
+    if (assessment.decision === "deny") {
+      return { decision: "deny", risk: "high", reason: assessment.reason };
     }
     const agentPolicy = readToolPolicy(context.rootAgent.tool_policy_json);
     const reviewAll =
       readRuntimeConfig(context.rootAgent.runtime_config_json).reviewPolicy === "review_all";
-    const approvalEnabled = getToolRecord(WORKSPACE_COMMAND_TOOL_ID)?.requires_approval !== 0;
-    const requiresReview =
-      !bypassesChatPermissionApproval(context.permissionMode) &&
-      (requiresChatPermissionApproval(context.permissionMode, toolName) ||
-        shouldRequireWorkspaceCommandApproval({
-          approvalEnabled,
-          commandDecision: commandPolicy.decision,
-          reviewAll,
-          toolApprovalRequested: toolApprovalToolNames.has(toolName),
-          agentPolicyRequiresApproval:
-            agentPolicy.requireApprovalToolIds.includes(WORKSPACE_COMMAND_TOOL_ID),
-        }));
+    const toolSettingRequiresApproval = getToolRecord(toolName)?.requires_approval !== 0;
+    const additiveReview =
+      reviewAll ||
+      toolSettingRequiresApproval ||
+      toolApprovalToolNames.has(toolName) ||
+      agentPolicy.requireApprovalToolIds.includes(toolName);
+    const requiresReview = localExecutionRequiresReview(
+      context,
+      toolName,
+      assessment,
+      toolApprovalToolNames,
+    );
+    let approvalResolution: "not_required" | "requested" | "approved" | "changed";
+    try {
+      const engine = await getLocalExecutionEngine({
+        runId: context.runId,
+        conversationId: context.conversationId,
+      });
+      approvalResolution = await engine.resolveToolApproval(
+        toolCallId,
+        assessment,
+        input,
+        requiresReview,
+      );
+    } catch {
+      return {
+        decision: "deny",
+        risk: "high",
+        reason: "Could not validate the local approval target.",
+      };
+    }
+    if (approvalResolution === "changed") {
+      return {
+        decision: "deny",
+        risk: "high",
+        reason:
+          "The target changed while approval was pending. Submit the operation again for review.",
+      };
+    }
+    if (approvalResolution === "approved") {
+      return { decision: "allow", risk: "low", reason: "Approved target state was revalidated." };
+    }
     if (requiresReview) {
       return {
         decision: "require_review",
-        risk: commandPolicy.risk === "read_only" ? "medium" : "high",
+        risk: assessment.risk === "read_only" ? "medium" : "high",
         reason:
-          commandPolicy.decision === "require_review"
-            ? commandPolicy.reason
-            : reviewAll
-              ? "Agent review policy requires approval for every tool call."
-              : "Agent tool policy requires chat approval.",
+          assessment.decision === "require_review"
+            ? assessment.reason
+            : additiveReview
+              ? "Configured Agent or tool policy requires approval."
+              : assessment.reason,
       };
     }
-    return { decision: "allow", risk: "low", reason: commandPolicy.reason };
+    return { decision: "allow", risk: "low", reason: assessment.reason };
   }
   if (requiresChatPermissionApproval(context.permissionMode, toolName)) {
     return {
@@ -2080,6 +2608,7 @@ async function finishRun(
   const approvalPending = finalStatus === "waiting_approval";
   try {
     await disposeWorkspaceCommandSession(context.runId);
+    if (!approvalPending) await disposeLocalExecutionEngine(context.runId);
   } catch (error) {
     console.warn("[agent-runtime] failed to dispose workspace command session:", error);
   }

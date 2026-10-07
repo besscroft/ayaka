@@ -185,7 +185,14 @@ void describe("runtime architecture", () => {
     assert.ok(DEFAULT_BUILTIN_TOOL_SEEDS.some((tool) => tool.id === "sandbox_run_command"));
     assert.ok(
       DEFAULT_BUILTIN_TOOL_SEEDS.filter(
-        (tool) => !["workspace_run_command", "sandbox_start_preview"].includes(tool.id),
+        (tool) =>
+          ![
+            "workspace_run_command",
+            "sandbox_start_preview",
+            "local_write_file",
+            "local_edit_file",
+            "local_apply_patch",
+          ].includes(tool.id),
       ).every((tool) => tool.requiresApproval === 0),
     );
     assert.equal(

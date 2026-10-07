@@ -78,6 +78,12 @@ export function GeneratedToolResult({
       return <SandboxCommandResult output={part.output} />;
     case "workspace_run_command":
       return <WorkspaceCommandResult output={part.output} />;
+    case "local_run_command":
+    case "local_read_file":
+    case "local_write_file":
+    case "local_edit_file":
+    case "local_apply_patch":
+      return <LocalExecutionResult toolName={toolName} output={part.output} />;
     case "sandbox_snapshot":
     case "sandbox_restore":
       return <SandboxSnapshotResult toolName={toolName} output={part.output} />;
@@ -542,6 +548,178 @@ function WorkspaceCommandResult({ output }: { output: unknown }): React.JSX.Elem
       {result.timedOut ? (
         <p className="text-[10px] text-danger">{t("tool.generated.timedOut")}</p>
       ) : null}
+    </ResultStack>
+  );
+}
+
+function LocalExecutionResult({
+  toolName,
+  output,
+}: {
+  toolName: string;
+  output: unknown;
+}): React.JSX.Element {
+  const { t, f } = useT();
+  const envelope = asRecord(output);
+  if (!envelope) return <FallbackResult output={output} />;
+  const ok = readBoolean(envelope.ok) === true;
+  const data = asRecord(envelope.data);
+  if (!ok) {
+    const error = asRecord(envelope.error);
+    const partial = asRecord(envelope.partialResult);
+    const message = readString(error?.message) ?? t("tool.error");
+    const code = readString(error?.code) ?? "RUNTIME_ERROR";
+    const path = readString(error?.path);
+    const log = [readString(partial?.stdout), readString(partial?.stderr)]
+      .filter(Boolean)
+      .join("\n");
+    return (
+      <ResultStack>
+        <div className="flex min-w-0 items-center gap-2">
+          <IconWrench className="size-3 shrink-0 text-danger" />
+          <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-danger">
+            {t("tool.generated.localError", { code, message })}
+          </span>
+        </div>
+        {path ? <p className="truncate font-mono text-[10px] text-foreground/45">{path}</p> : null}
+        {partial?.affectedPaths ? (
+          <p className="text-[10px] text-danger">
+            {t("tool.generated.localPartialCommit", {
+              paths: readArray(partial.affectedPaths).map(String).join(", "),
+            })}
+          </p>
+        ) : null}
+        {log ? (
+          <details className="rounded-md bg-muted p-2">
+            <summary className="cursor-pointer text-[10px] text-foreground/55">
+              {t("tool.generated.localCommandOutput")}
+            </summary>
+            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground/75">
+              {truncateText(log, 16_000)}
+            </pre>
+          </details>
+        ) : null}
+      </ResultStack>
+    );
+  }
+  if (!data) return <EmptyResult />;
+
+  if (toolName === "local_run_command") {
+    const executable = readString(data.executable) ?? "";
+    const args = readArray(data.args).map(String);
+    const command = [executable, ...args].join(" ");
+    const stdout = readString(data.stdout) ?? "";
+    const stderr = readString(data.stderr) ?? "";
+    const log = [stdout, stderr].filter(Boolean).join("\n");
+    const exitCode = readNumber(data.exitCode);
+    const outcome = readString(data.outcome) ?? "completed";
+    const risk = readString(data.risk) ?? "unknown";
+    return (
+      <ResultStack>
+        <div className="flex min-w-0 items-center gap-2">
+          <IconWrench className="size-3 shrink-0 text-foreground/50" />
+          <code className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">
+            $ {command}
+          </code>
+          <StatusText value={t(`tool.generated.outcome.${outcome}`)} />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-foreground/45">
+          <span>{t("tool.generated.commandRisk", { risk: t(`tool.generated.risk.${risk}`) })}</span>
+          {readString(data.cwd) ? (
+            <span className="truncate font-mono">{readString(data.cwd)}</span>
+          ) : null}
+          {exitCode !== undefined ? (
+            <span>{t("tool.generated.exitCode", { code: exitCode })}</span>
+          ) : null}
+          {readNumber(data.durationMs) !== undefined ? (
+            <span>
+              {t("tool.generated.duration", {
+                value: f.fixed((readNumber(data.durationMs) ?? 0) / 1000, 1),
+              })}
+            </span>
+          ) : null}
+        </div>
+        {log ? (
+          <details className="rounded-md bg-muted p-2">
+            <summary className="cursor-pointer text-[10px] text-foreground/55">
+              {t("tool.generated.localCommandOutput")} ·{" "}
+              {f.bytes(readNumber(data.stdoutBytes) ?? 0)}
+            </summary>
+            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground/75">
+              {truncateText(log, 16_000)}
+            </pre>
+          </details>
+        ) : null}
+      </ResultStack>
+    );
+  }
+
+  if (toolName === "local_read_file") {
+    const filePath = readString(data.path) ?? "";
+    const content = readString(data.content) ?? "";
+    const lineStart = readNumber(data.startLine) ?? 1;
+    const lineEnd = readNumber(data.endLine) ?? lineStart;
+    return (
+      <ResultStack>
+        <ResultLabel icon={<IconBookOpen />} text={filePath} />
+        <p className="text-[10px] text-foreground/45">
+          {t("tool.generated.localReadSummary", {
+            lines: `${lineStart}–${lineEnd} / ${readNumber(data.totalLines) ?? lineEnd}`,
+            bytes: f.bytes(readNumber(data.returnedBytes) ?? 0),
+            hash: (readString(data.sha256) ?? "").slice(0, 12),
+          })}
+        </p>
+        {readBoolean(data.truncated) ? (
+          <p className="text-[10px] text-foreground/45">{t("tool.generated.truncated")}</p>
+        ) : null}
+        {content ? (
+          <details className="rounded-md bg-muted p-2">
+            <summary className="cursor-pointer text-[10px] text-foreground/55">
+              {t("tool.generated.localReadContent")}
+            </summary>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground/75">
+              {content}
+            </pre>
+          </details>
+        ) : null}
+      </ResultStack>
+    );
+  }
+
+  const files = readArray(data.files);
+  const records = files.length > 0 ? files : [data];
+  return (
+    <ResultStack>
+      {records.map((value, index) => {
+        const file = asRecord(value);
+        const filePath = readString(file?.path) ?? readArray(data.paths).map(String)[index] ?? "";
+        const added = readNumber(file?.addedLines) ?? readNumber(data.addedLines) ?? 0;
+        const removed = readNumber(file?.removedLines) ?? readNumber(data.removedLines) ?? 0;
+        const bytes =
+          readNumber(file?.afterBytes) ??
+          readNumber(data.afterBytes) ??
+          readNumber(data.bytes) ??
+          0;
+        const diff = readString(file?.diffPreview) ?? readString(data.diffPreview);
+        return (
+          <div key={filePath || index} className="flex min-w-0 flex-col gap-1">
+            {filePath ? <ResultLabel icon={<IconCheck />} text={filePath} /> : null}
+            <p className="text-[10px] text-foreground/45">
+              {t("tool.generated.localMutationSummary", { added, removed, bytes: f.bytes(bytes) })}
+            </p>
+            {diff ? (
+              <details className="rounded-md bg-muted p-2">
+                <summary className="cursor-pointer text-[10px] text-foreground/55">
+                  {t("tool.generated.localDiffPreview")}
+                </summary>
+                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-foreground/70">
+                  {truncateText(diff, 16_000)}
+                </pre>
+              </details>
+            ) : null}
+          </div>
+        );
+      })}
     </ResultStack>
   );
 }

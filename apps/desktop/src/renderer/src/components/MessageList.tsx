@@ -55,10 +55,13 @@ import { GeneratedUIMessage } from "./GeneratedUIMessage";
 import type { MentionSkill } from "../lib/chat-tools";
 import type { GeneratedUIStateChange } from "@shared/generated-ui/types";
 import {
+  asRecord,
   getToolPartName,
   getToolSummary,
   isSilentToolPart,
   estimateWorkspaceCommandRisk,
+  readNumber,
+  readString,
   normalizeWorkspaceCommandInput,
   normalizeToolState,
   type RenderableToolPart,
@@ -877,6 +880,9 @@ function MessageItem({
                         {toolName === "workspace_run_command" ? (
                           <WorkspaceCommandApproval input={part.input} />
                         ) : null}
+                        {toolName?.startsWith("local_") ? (
+                          <LocalExecutionApproval toolName={toolName} input={part.input} />
+                        ) : null}
                         <ToolApprovalActions
                           approvalId={approval.id}
                           onRespond={onToolApprovalResponse}
@@ -1072,6 +1078,74 @@ function WorkspaceCommandApproval({ input }: { input: unknown }): React.JSX.Elem
       <p className="mt-1.5 text-[10px] leading-relaxed text-warning/85">
         {t("tool.approval.workspaceWarning")}
       </p>
+    </div>
+  );
+}
+
+function LocalExecutionApproval({
+  toolName,
+  input,
+}: {
+  toolName: string;
+  input: unknown;
+}): React.JSX.Element {
+  const { t } = useT();
+  const value = asRecord(input);
+  const operation = toolName.replace("local_", "").replaceAll("_", " ");
+  const paths =
+    toolName === "local_apply_patch"
+      ? [
+          ...new Set(
+            (readString(value?.patch) ?? "")
+              .matchAll(/^\*\*\* (?:(?:Add|Update|Delete) File:|Move to:) (.+)$/gm)
+              .map((match) => match[1]!.trim()),
+          ),
+        ]
+      : [readString(value?.path) ?? readString(value?.cwd)].filter(Boolean);
+  const commandInput =
+    toolName === "local_run_command" ? normalizeWorkspaceCommandInput(input) : null;
+  const contentLength =
+    readString(value?.content)?.length ??
+    readString(value?.newText)?.length ??
+    readString(value?.patch)?.length;
+  return (
+    <div className="mb-2 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-warning">
+        <IconTerminal className="size-3.5" />
+        <span>{t("tool.approval.localOperation", { operation })}</span>
+      </div>
+      {commandInput ? (
+        <code className="mt-1 block max-h-16 overflow-auto whitespace-pre-wrap break-all text-[11px] text-foreground/75">
+          {commandInput.executable} {JSON.stringify(commandInput.args)} · cwd {commandInput.cwd}
+        </code>
+      ) : null}
+      {paths.length > 0 ? (
+        <div className="mt-1 flex flex-col gap-0.5 text-[10px] text-foreground/55">
+          <span>{t("tool.approval.localTargets")}</span>
+          {paths.slice(0, 8).map((path) => (
+            <code key={path} className="truncate font-mono">
+              {path}
+            </code>
+          ))}
+          {paths.length > 8 ? <span>{t("tool.generated.truncated")}</span> : null}
+        </div>
+      ) : null}
+      {contentLength !== undefined ? (
+        <p className="mt-1 text-[10px] text-foreground/55">
+          {t("tool.approval.localContentSize", { chars: contentLength })}
+        </p>
+      ) : null}
+      <p className="mt-1.5 text-[10px] leading-relaxed text-warning/85">
+        {t("tool.approval.localWarning")}
+      </p>
+      {readNumber(value?.startLine) || readNumber(value?.endLine) ? (
+        <p className="mt-1 text-[10px] text-foreground/55">
+          {t("tool.approval.localLineRange", {
+            start: readNumber(value?.startLine) ?? 1,
+            end: readNumber(value?.endLine) ?? "…",
+          })}
+        </p>
+      ) : null}
     </div>
   );
 }

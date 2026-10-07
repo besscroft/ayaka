@@ -35,6 +35,7 @@ const READ_ONLY_TOOLS = new Set([
   "web_open",
   "google_search",
   "sandbox_read_file",
+  "local_read_file",
   "sandbox_list_files",
   "sandbox_list_artifacts",
 ]);

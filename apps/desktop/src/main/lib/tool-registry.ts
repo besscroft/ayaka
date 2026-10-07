@@ -65,6 +65,11 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "sandbox_publish_artifact",
   "sandbox_start_preview",
   "workspace_run_command",
+  "local_run_command",
+  "local_read_file",
+  "local_write_file",
+  "local_edit_file",
+  "local_apply_patch",
   "cron",
 ]);
 

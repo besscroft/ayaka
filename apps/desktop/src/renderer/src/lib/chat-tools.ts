@@ -36,6 +36,11 @@ const DEFAULT_AUTO_TOOL_IDS = new Set<ChatToolId>([
   "sandbox_publish_artifact",
   "sandbox_start_preview",
   "workspace_run_command",
+  "local_run_command",
+  "local_read_file",
+  "local_write_file",
+  "local_edit_file",
+  "local_apply_patch",
   "cron",
 ]);
 
@@ -275,6 +280,41 @@ const TOOL_METADATA: Record<
     label: "Run workspace command",
     description:
       "Run a structured executable and argument list in the conversation workspace. This is not an OS sandbox.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: true,
+  },
+  local_run_command: {
+    label: "Run local command",
+    description: "Run a structured command anywhere on the local host with risk-based review.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: false,
+  },
+  local_read_file: {
+    label: "Read local file",
+    description: "Read bounded UTF-8 text from any valid local path.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: false,
+  },
+  local_write_file: {
+    label: "Write local file",
+    description: "Create or replace a UTF-8 text file on the local host.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: true,
+  },
+  local_edit_file: {
+    label: "Edit local file",
+    description: "Replace an exact text match in a local UTF-8 file.",
+    kind: "host",
+    category: "execution",
+    requiresApproval: true,
+  },
+  local_apply_patch: {
+    label: "Apply local patch",
+    description: "Apply a validated multi-file patch to local UTF-8 files.",
     kind: "host",
     category: "execution",
     requiresApproval: true,

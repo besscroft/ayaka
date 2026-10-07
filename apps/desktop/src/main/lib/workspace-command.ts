@@ -83,7 +83,7 @@ const SHELL_EXECUTABLES = new Set([
 
 const SENSITIVE_ARGUMENT_PATTERN = /token|secret|password|authorization|api[-_]?key|cookie/i;
 
-type WorkspaceCommandPolicyDecision =
+export type WorkspaceCommandPolicyDecision =
   | { decision: "allow"; risk: "read_only"; reason: string }
   | { decision: "require_review"; risk: Exclude<WorkspaceCommandRisk, "read_only">; reason: string }
   | { decision: "deny"; risk: WorkspaceCommandRisk; reason: string };
@@ -95,16 +95,16 @@ export function shouldRequireWorkspaceCommandApproval(options: {
   toolApprovalRequested: boolean;
   agentPolicyRequiresApproval: boolean;
 }): boolean {
-  if (!options.approvalEnabled) return false;
   return (
     options.commandDecision === "require_review" ||
+    options.approvalEnabled ||
     options.reviewAll ||
     options.toolApprovalRequested ||
     options.agentPolicyRequiresApproval
   );
 }
 
-interface NormalizedWorkspaceCommandInput {
+export interface NormalizedWorkspaceCommandInput {
   executable: string;
   args: string[];
   cwd?: string;
@@ -130,7 +130,11 @@ const sessions = new Map<string, WorkspaceCommandSession>();
 
 export function evaluateWorkspaceCommandPolicy(
   input: unknown,
-  options?: { allowedArgumentRoots?: string[]; allowedExecutableRoots?: string[] },
+  options?: {
+    allowedArgumentRoots?: string[];
+    allowedExecutableRoots?: string[];
+    workspaceBounded?: boolean;
+  },
 ): WorkspaceCommandPolicyDecision {
   let normalized: NormalizedWorkspaceCommandInput;
   try {
@@ -144,6 +148,7 @@ export function evaluateWorkspaceCommandPolicy(
   }
 
   if (
+    options?.workspaceBounded !== false &&
     looksLikePathEscape(normalized.executable) &&
     !isAllowedArgumentPath(normalized.executable, options?.allowedExecutableRoots ?? [])
   ) {
@@ -154,7 +159,11 @@ export function evaluateWorkspaceCommandPolicy(
         "The command executable must be resolved by name or remain inside the conversation workspace.",
     };
   }
-  if (normalized.cwd && looksLikePathEscape(normalized.cwd)) {
+  if (
+    options?.workspaceBounded !== false &&
+    normalized.cwd &&
+    looksLikePathEscape(normalized.cwd)
+  ) {
     return {
       decision: "deny",
       risk: "unknown",
@@ -162,6 +171,7 @@ export function evaluateWorkspaceCommandPolicy(
     };
   }
   if (
+    options?.workspaceBounded !== false &&
     normalized.args.some(
       (value) =>
         looksLikePathEscape(value) &&
@@ -254,6 +264,10 @@ export function evaluateWorkspaceCommandPolicy(
     risk: "unknown",
     reason: "The command could not be proven read-only.",
   };
+}
+
+export function evaluateLocalCommandPolicy(input: unknown): WorkspaceCommandPolicyDecision {
+  return evaluateWorkspaceCommandPolicy(input, { workspaceBounded: false });
 }
 
 export function redactWorkspaceCommandInput(input: unknown): unknown {
@@ -401,49 +415,70 @@ class WorkspaceCommandSession {
     risk: WorkspaceCommandRisk,
     signal: AbortSignal,
   ): Promise<WorkspaceCommandResult> {
-    const startedAt = Date.now();
     const resolvedCwd = resolveWorkspacePath(this.rootPath, cwd);
-    let child: ChildProcess;
-    try {
-      child = spawn(executable, input.args, {
-        cwd: resolvedCwd,
-        env: buildCommandEnv(input.env),
-        shell: false,
-        windowsHide: true,
-        detached: process.platform !== "win32",
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-    } catch (error) {
-      return createResult({
-        input,
-        cwd,
-        risk,
-        outcome: "failed_to_start",
-        exitCode: null,
-        signal: null,
-        timedOut: false,
-        aborted: signal.aborted,
-        stdout: createCapture(),
-        stderr: createCapture(),
-        startedAt,
-        error: redactCommandText(error instanceof Error ? error.message : String(error)),
-      });
-    }
-    this.activeProcesses.add(child);
+    return runStructuredCommandProcess({
+      input,
+      executable,
+      cwd: resolvedCwd,
+      displayCwd: cwd,
+      risk,
+      signal,
+      activeProcesses: this.activeProcesses,
+    });
+  }
+}
 
-    try {
-      return await collectProcessOutput({
-        child,
-        input,
-        cwd,
-        risk,
-        signal,
-        timeoutMs: input.timeoutMs,
-        startedAt,
-      });
-    } finally {
-      this.activeProcesses.delete(child);
-    }
+export async function runStructuredCommandProcess(options: {
+  input: NormalizedWorkspaceCommandInput;
+  executable: string;
+  cwd: string;
+  displayCwd?: string;
+  risk: WorkspaceCommandRisk;
+  signal: AbortSignal;
+  activeProcesses?: Set<ChildProcess>;
+}): Promise<WorkspaceCommandResult> {
+  const { input, executable, cwd, risk, signal } = options;
+  const displayCwd = options.displayCwd ?? cwd;
+  const startedAt = Date.now();
+  let child: ChildProcess;
+  try {
+    child = spawn(executable, input.args, {
+      cwd,
+      env: buildCommandEnv(input.env),
+      shell: false,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    return createResult({
+      input,
+      cwd: displayCwd,
+      risk,
+      outcome: "failed_to_start",
+      exitCode: null,
+      signal: null,
+      timedOut: false,
+      aborted: signal.aborted,
+      stdout: createCapture(),
+      stderr: createCapture(),
+      startedAt,
+      error: redactCommandText(error instanceof Error ? error.message : String(error)),
+    });
+  }
+  options.activeProcesses?.add(child);
+  try {
+    return await collectProcessOutput({
+      child,
+      input,
+      cwd: displayCwd,
+      risk,
+      signal,
+      timeoutMs: input.timeoutMs,
+      startedAt,
+    });
+  } finally {
+    options.activeProcesses?.delete(child);
   }
 }
 
@@ -539,7 +574,7 @@ async function collectProcessOutput(options: {
   });
 }
 
-function normalizeWorkspaceCommandInput(input: unknown): NormalizedWorkspaceCommandInput {
+export function normalizeWorkspaceCommandInput(input: unknown): NormalizedWorkspaceCommandInput {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("Workspace command input must be an object.");
   }

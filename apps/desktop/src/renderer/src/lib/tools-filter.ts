@@ -11,7 +11,9 @@ export interface ToolRecordFilters {
 
 export function isToolRecordApprovalEligible(tool: ToolRecord): boolean {
   return (
-    tool.id === "workspace_run_command" || (tool.kind !== "builtin" && tool.kind !== "sandbox")
+    tool.id === "workspace_run_command" ||
+    tool.id.startsWith("local_") ||
+    (tool.kind !== "builtin" && tool.kind !== "sandbox")
   );
 }
 

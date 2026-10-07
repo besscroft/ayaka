@@ -202,6 +202,11 @@ export function isGeneratedToolName(toolName: string | null): boolean {
       "sandbox_publish_artifact",
       "sandbox_start_preview",
       "file_search",
+      "local_run_command",
+      "local_read_file",
+      "local_write_file",
+      "local_edit_file",
+      "local_apply_patch",
       "code_interpreter",
       "tool_search",
       "current_time",
@@ -299,6 +304,55 @@ export function getToolSummary(part: RenderableToolPart): ToolSummary | null {
             },
           }
         : null;
+    }
+    case "local_run_command":
+    case "local_read_file":
+    case "local_write_file":
+    case "local_edit_file":
+    case "local_apply_patch": {
+      if (output?.ok === false) {
+        const error = asRecord(output.error);
+        const code = readString(error?.code);
+        return code ? { key: "tool.generated.localErrorSummary", params: { code } } : null;
+      }
+      const data = asRecord(output?.data);
+      if (!data) return null;
+      if (toolName === "local_run_command") {
+        const outcome = readString(data.outcome);
+        const exitCode = readNumber(data.exitCode);
+        return {
+          key: "tool.generated.command",
+          params: {
+            status:
+              outcome === "completed" && exitCode === 0
+                ? "ok"
+                : (outcome ?? String(exitCode ?? "done")),
+          },
+        };
+      }
+      if (toolName === "local_read_file") {
+        const lines = readNumber(data.returnedLines) ?? 0;
+        return {
+          key: "tool.generated.localReadSummary",
+          params: {
+            lines,
+            bytes: readNumber(data.returnedBytes) ?? 0,
+            hash: (readString(data.sha256) ?? "").slice(0, 12),
+          },
+        };
+      }
+      const files = readArray(data.files);
+      const added =
+        readNumber(data.addedLines) ??
+        files.reduce<number>((sum, item) => sum + (readNumber(asRecord(item)?.addedLines) ?? 0), 0);
+      const removed =
+        readNumber(data.removedLines) ??
+        files.reduce<number>(
+          (sum, item) => sum + (readNumber(asRecord(item)?.removedLines) ?? 0),
+          0,
+        );
+      const bytes = readNumber(data.afterBytes) ?? readNumber(data.bytes) ?? 0;
+      return { key: "tool.generated.localMutationSummary", params: { added, removed, bytes } };
     }
     case "sandbox_list_artifacts": {
       const artifacts = readArray(output?.artifacts);

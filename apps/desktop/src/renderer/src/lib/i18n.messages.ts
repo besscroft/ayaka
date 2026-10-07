@@ -691,6 +691,31 @@ const entries = {
     en: "Run a structured local command in the conversation workspace; known read-only commands may run automatically, while risky commands still require approval. This is not an OS sandbox.",
   },
   "chatTools.workspace_run_command.label": { zh: "执行工作区命令", en: "Run workspace command" },
+  "chatTools.local_run_command.description": {
+    zh: "使用结构化参数在本地执行命令；风险命令和敏感路径按当前权限模式审批。",
+    en: "Run a structured command locally; risky commands and sensitive paths follow the active permission mode.",
+  },
+  "chatTools.local_run_command.label": { zh: "执行本地命令", en: "Run local command" },
+  "chatTools.local_read_file.description": {
+    zh: "读取任意本地路径中的 UTF-8 文本，支持行范围和大小限制。",
+    en: "Read bounded UTF-8 text from any valid local path, with optional line ranges.",
+  },
+  "chatTools.local_read_file.label": { zh: "读取本地文件", en: "Read local file" },
+  "chatTools.local_write_file.description": {
+    zh: "以原子替换方式创建或覆盖本地 UTF-8 文本文件。",
+    en: "Create or replace a local UTF-8 text file using atomic replacement.",
+  },
+  "chatTools.local_write_file.label": { zh: "写入本地文件", en: "Write local file" },
+  "chatTools.local_edit_file.description": {
+    zh: "精确替换本地文件中的文本；默认要求唯一匹配。",
+    en: "Replace exact text in a local file; the match must be unique by default.",
+  },
+  "chatTools.local_edit_file.label": { zh: "编辑本地文件", en: "Edit local file" },
+  "chatTools.local_apply_patch.description": {
+    zh: "完整校验后应用多文件补丁；失败时尝试回滚已提交文件。",
+    en: "Validate a multi-file patch before applying it and roll back partial commits when possible.",
+  },
+  "chatTools.local_apply_patch.label": { zh: "应用本地补丁", en: "Apply local patch" },
   "chatTools.selector.description": {
     zh: "配置对话可用的工具",
     en: "Configure tools available in chat",
@@ -1691,6 +1716,23 @@ const entries = {
     zh: "工作区限制不等于 OS 沙箱；程序仍可能访问外部文件、联网或启动进程。",
     en: "The workspace restriction is not an OS sandbox; the program may still access external files, use the network, or start processes.",
   },
+  "tool.approval.localOperation": {
+    zh: "本地操作：{operation}",
+    en: "Local operation: {operation}",
+  },
+  "tool.approval.localTargets": { zh: "目标路径", en: "Target paths" },
+  "tool.approval.localWarning": {
+    zh: "该操作将访问本机路径；写入或敏感目标需要按当前权限模式审批。请核对路径与操作范围。",
+    en: "This operation accesses local paths; writes and sensitive targets follow the active approval mode. Check the path and scope.",
+  },
+  "tool.approval.localContentSize": {
+    zh: "拟写入内容：{chars} 个字符",
+    en: "Proposed content: {chars} characters",
+  },
+  "tool.approval.localLineRange": {
+    zh: "读取行范围：{start}–{end}",
+    en: "Read line range: {start}–{end}",
+  },
   "tool.approval.unavailable": { zh: "工具审批功能不可用", en: "Tool approval is unavailable" },
   "tool.empty": { zh: "暂无工具调用", en: "No tool calls yet" },
   "tool.error": { zh: "工具错误", en: "Tool error" },
@@ -1715,6 +1757,24 @@ const entries = {
     zh: "工作区 cwd 不是操作系统安全边界；命令仍可能访问外部文件、联网或启动其他进程。",
     en: "The workspace cwd is not an OS security boundary; a command may still access external files, use the network, or start other processes.",
   },
+  "tool.generated.localReadSummary": {
+    zh: "{lines} 行 · {bytes} · SHA-256 {hash}",
+    en: "{lines} lines · {bytes} · SHA-256 {hash}",
+  },
+  "tool.generated.localMutationSummary": {
+    zh: "新增 {added} 行 · 删除 {removed} 行 · {bytes}",
+    en: "+{added} lines · −{removed} lines · {bytes}",
+  },
+  "tool.generated.localCommand": { zh: "本地命令", en: "Local command" },
+  "tool.generated.localError": { zh: "{code}：{message}", en: "{code}: {message}" },
+  "tool.generated.localErrorSummary": { zh: "失败 · {code}", en: "Failed · {code}" },
+  "tool.generated.localCommandOutput": { zh: "命令输出", en: "Command output" },
+  "tool.generated.localReadContent": { zh: "查看文件内容", en: "View file content" },
+  "tool.generated.localDiffPreview": { zh: "查看差异预览", en: "View diff preview" },
+  "tool.generated.localPartialCommit": {
+    zh: "部分提交失败；受影响路径：{paths}",
+    en: "Partial commit failed; affected paths: {paths}",
+  },
   "tool.generated.risk.read_only": { zh: "只读", en: "read-only" },
   "tool.generated.risk.write": { zh: "写入", en: "write" },
   "tool.generated.risk.destructive": { zh: "破坏性", en: "destructive" },
@@ -1722,6 +1782,7 @@ const entries = {
   "tool.generated.risk.network": { zh: "网络", en: "network" },
   "tool.generated.risk.process": { zh: "进程", en: "process" },
   "tool.generated.risk.unknown": { zh: "未知", en: "unknown" },
+  "tool.generated.risk.sensitive_path": { zh: "敏感路径", en: "sensitive path" },
   "tool.generated.outcome.completed": { zh: "已完成", en: "completed" },
   "tool.generated.outcome.failed_to_start": { zh: "启动失败", en: "failed to start" },
   "tool.generated.outcome.timed_out": { zh: "已超时", en: "timed out" },

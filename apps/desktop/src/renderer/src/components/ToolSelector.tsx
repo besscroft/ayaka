@@ -93,6 +93,11 @@ const ICONS: Record<ChatToolId, (props: SVGProps<SVGSVGElement>) => React.JSX.El
   sandbox_publish_artifact: IconBookOpen,
   sandbox_start_preview: IconGlobe,
   workspace_run_command: IconTerminal,
+  local_run_command: IconTerminal,
+  local_read_file: IconBookOpen,
+  local_write_file: IconWrench,
+  local_edit_file: IconWrench,
+  local_apply_patch: IconWrench,
   cron: IconClock,
 };
 

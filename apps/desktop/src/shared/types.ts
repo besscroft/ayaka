@@ -586,6 +586,76 @@ export interface WorkspaceCommandResult {
   error?: string;
 }
 
+export type LocalExecutionRisk = WorkspaceCommandRisk | "sensitive_path";
+
+export type LocalExecutionErrorCode =
+  | "INVALID_INPUT"
+  | "INVALID_PATH"
+  | "PATH_NOT_FOUND"
+  | "NOT_A_FILE"
+  | "ACCESS_DENIED"
+  | "UNSUPPORTED_ENCODING"
+  | "SIZE_LIMIT"
+  | "MATCH_NOT_FOUND"
+  | "MATCH_AMBIGUOUS"
+  | "HASH_CONFLICT"
+  | "PATCH_INVALID"
+  | "PATCH_CONFLICT"
+  | "COMMAND_NOT_FOUND"
+  | "COMMAND_FAILED"
+  | "TIMED_OUT"
+  | "CANCELLED"
+  | "PARTIAL_COMMIT"
+  | "RUNTIME_ERROR";
+
+export type LocalExecutionOperation =
+  | "run_command"
+  | "read_file"
+  | "write_file"
+  | "edit_file"
+  | "apply_patch";
+
+export type LocalExecutionResult<T = unknown> =
+  | { ok: true; operation: LocalExecutionOperation; data: T }
+  | {
+      ok: false;
+      operation: LocalExecutionOperation;
+      error: {
+        code: LocalExecutionErrorCode;
+        path?: string;
+        retryable: boolean;
+        message: string;
+      };
+      partialResult?: unknown;
+    };
+
+export type LocalRunCommandInput = WorkspaceCommandInput;
+
+export interface LocalReadFileInput {
+  path: string;
+  startLine?: number;
+  endLine?: number;
+  maxBytes?: number;
+}
+
+export interface LocalWriteFileInput {
+  path: string;
+  content: string;
+  expectedHash?: string;
+}
+
+export interface LocalEditFileInput {
+  path: string;
+  oldText: string;
+  newText: string;
+  replaceAll?: boolean;
+  expectedHash?: string;
+}
+
+export interface LocalApplyPatchInput {
+  patch: string;
+}
+
 export interface RuntimeStep {
   id: string;
   run_id: string;
@@ -1738,6 +1808,11 @@ export const CHAT_TOOL_IDS = [
   "sandbox_publish_artifact",
   "sandbox_start_preview",
   "workspace_run_command",
+  "local_run_command",
+  "local_read_file",
+  "local_write_file",
+  "local_edit_file",
+  "local_apply_patch",
   "cron",
 ] as const;
 
