@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.5]
+
+### 中文
+
+#### 变更
+
+- 将“新建任务 / New task”识别为会话标题占位符，使新建任务会话能够正常生成并保存实际标题。
+
+### English
+
+#### Changed
+
+- Recognized “新建任务 / New task” as a placeholder conversation title so new task conversations can generate and save their actual titles.
+
 ## [0.2.4]
 
 ### 中文
