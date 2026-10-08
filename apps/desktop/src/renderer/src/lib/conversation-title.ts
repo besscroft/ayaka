@@ -4,8 +4,10 @@ const PLACEHOLDER_CONVERSATION_TITLES = new Set([
   "新会话",
   "新建会话",
   "新建对话",
+  "新建任务",
   "New chat",
   "New conversation",
+  "New task",
 ]);
 
 export const CONVERSATION_TITLE_RETRY_DELAYS_MS = [250, 750] as const;
