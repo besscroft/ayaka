@@ -21,7 +21,7 @@ import { McpInputDialog } from "./McpWorkspace";
 import { IconFolderOpen } from "./icons";
 import { getModelReasoningDefault } from "./ReasoningSelector";
 import { Button, LoadingIndicator } from "./ui";
-import { api, type RuntimeSnapshot } from "../lib/api";
+import { api, type RuntimeStatusSnapshot } from "../lib/api";
 import {
   deriveFallbackConversationTitle,
   generateConversationTitleWithFallback,
@@ -110,19 +110,7 @@ interface ChatViewProps {
 
 type AutoTitleStatus = "running" | "completed";
 
-type ChatRuntimeSnapshot = Pick<
-  RuntimeSnapshot,
-  | "runtimeRuns"
-  | "runtimeSteps"
-  | "agentRuntimeStates"
-  | "conversationAgentStates"
-  | "agentInstances"
-  | "agentRunInputs"
-  | "runtimeEvents"
-  | "sandboxSessions"
-  | "sandboxSnapshots"
-  | "sandboxArtifacts"
->;
+type ChatRuntimeSnapshot = RuntimeStatusSnapshot;
 
 function retainTerminalRunInputStatuses(
   current: ChatRuntimeSnapshot | null,
@@ -889,7 +877,7 @@ export function ChatView({
         });
 
       void api.agents
-        .runtimeSnapshot()
+        .runtimeStatus({ conversationId, options: { runId: runIdRef.current ?? undefined } })
         .then((snapshot) =>
           setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
         )
@@ -1039,14 +1027,14 @@ export function ChatView({
       );
       if (!snapshotContainsInput) {
         void api.agents
-          .runtimeSnapshot()
+          .runtimeStatus({ conversationId, options: { runId: runIdRef.current ?? undefined } })
           .then((snapshot) =>
             setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
           )
           .catch((error) => console.error("[chat] failed to refresh consumed input:", error));
       }
     },
-    [runtimeSnapshot],
+    [conversationId, runtimeSnapshot],
   );
 
   useEffect(() => {
@@ -1242,7 +1230,7 @@ export function ChatView({
       if (inFlight) return;
       inFlight = true;
       void api.agents
-        .runtimeSnapshot()
+        .runtimeStatus({ conversationId, options: { runId: runIdRef.current ?? undefined } })
         .then((snapshot) => {
           if (!cancelled) {
             setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot));
@@ -1420,7 +1408,7 @@ export function ChatView({
         );
         if (!runtimeSnapshot) {
           void api.agents
-            .runtimeSnapshot()
+            .runtimeStatus({ conversationId, options: { runId: runIdRef.current ?? undefined } })
             .then((snapshot) =>
               setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
             )
@@ -1594,7 +1582,9 @@ export function ChatView({
       chat.stop(),
       runId ? api.runtime.cancelRun(runId) : Promise.resolve(false),
     ])
-      .then(() => api.agents.runtimeSnapshot())
+      .then(() =>
+        api.agents.runtimeStatus({ conversationId, options: { runId: runId ?? undefined } }),
+      )
       .then((snapshot) =>
         setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
       )
@@ -1633,7 +1623,7 @@ export function ChatView({
         );
       } else {
         void api.agents
-          .runtimeSnapshot()
+          .runtimeStatus({ conversationId, options: { runId: runIdRef.current ?? undefined } })
           .then((snapshot) =>
             setRuntimeSnapshot((current) => retainTerminalRunInputStatuses(current, snapshot)),
           )
@@ -1641,7 +1631,7 @@ export function ChatView({
       }
       return removed;
     },
-    [activeRunIdForConversation, runtimeSnapshot],
+    [activeRunIdForConversation, conversationId, runtimeSnapshot],
   );
 
   const handleRetry = (): void => {

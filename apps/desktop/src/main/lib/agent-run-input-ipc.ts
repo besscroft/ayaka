@@ -1,12 +1,8 @@
 import type { UIMessage } from "ai";
+import type { IpcInput } from "../../shared/ipc-schema";
 import type { AgentRunInput, AgentRunInputKind, AgentRunInputSource } from "../../shared/types";
 
-export interface RuntimeEnqueueInput {
-  runId: string;
-  kind: AgentRunInputKind;
-  source?: AgentRunInputSource;
-  message: UIMessage;
-}
+export type RuntimeEnqueueInput = IpcInput<"runtime:enqueueInput">;
 
 type EnqueueAgentRunInput = (
   runId: string,

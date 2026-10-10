@@ -22,7 +22,9 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 This is a pnpm workspace for a local-first AI desktop application.
 
 - `apps/desktop`: the production Electron app. It contains the main process, preload bridge, React renderer, SQLite/Drizzle persistence, local Hono server, agents, workflows, tools, memory, providers, and desktop pets.
-- `apps/docs`: the Nuxt documentation site.
+- `apps/core`: the host-agnostic Hono backend package used as the HTTP contract boundary.
+- `apps/docs`: the React Router v8 documentation site deployed to Cloudflare Workers.
+- `packages/assets`: shared static assets consumed by the desktop app and documentation site.
 - `apps/desktop/drizzle`: checked-in SQLite migrations and Drizzle metadata. The runtime database is created under Electron's `userData/data/ayaka.db`, not in the repository.
 - `apps/desktop/resources`: packaged desktop assets, including pet resources.
 - `tests/vite-plus`: root-level Vite+ smoke tests.
@@ -30,13 +32,14 @@ This is a pnpm workspace for a local-first AI desktop application.
 - `docs`: architecture notes, component notes, and implementation specifications. `docs/architecture.md` is the source of truth for the product/runtime model.
 - `.agents/skills`: local agent skills. Root formatting and linting intentionally ignore skill trees.
 
-The workspace currently has no shared package. Keep new reusable code in the owning app until a real cross-app consumer exists; do not create a package only to move one file.
+Keep new reusable code in the owning app until a real cross-app consumer exists; do not create a package only to move one file. Use `apps/core` for host-agnostic HTTP/runtime contracts and `packages/assets` for genuinely shared static assets.
 
 ## Runtime Boundaries
 
 - The Electron main process owns filesystem access, SQLite, migrations, provider/API keys, MCP connections, sandbox execution, and other privileged operations.
 - The renderer must use `window.api` through the preload bridge. Do not import Electron, Node built-ins, database clients, or provider secrets into `apps/desktop/src/renderer`.
 - An IPC feature normally has three coordinated pieces: the handler in `apps/desktop/src/main/ipc/index.ts` (or the owning main-process module), the exposed method in `apps/desktop/src/preload/index.ts` and its type in `index.d.ts`, and the renderer wrapper/consumer in `src/renderer/src/lib/api.ts` or a component.
+- IPC inputs that cross the main-process boundary should be declared in `apps/desktop/src/shared/ipc-schema.ts` and parsed by the main-process handler; preload and renderer types should be derived from the same contract where that channel has been migrated.
 - API keys and MCP/Skill secrets are encrypted and resolved in the main process. Never return decrypted values through IPC, logs, tests, or UI state.
 - The app is local-first. Runtime facts, approvals, tool calls, handoffs, sandbox work, and errors are recorded in SQLite runtime tables; keep those records consistent when adding execution paths.
 

@@ -38,9 +38,7 @@ import type {
   MemoryKind,
   MemoryRecord,
   MemoryScope,
-  MessagePatch,
   MessagePatchResult,
-  MessageRow,
   MessageSnapshot,
   ConversationHydration,
   RealtimeSessionMessage,
@@ -62,6 +60,7 @@ import type {
   ProviderTestResult,
   SyncState,
   RuntimeSnapshot,
+  RuntimeStatusSnapshot,
   ManagedRuntimeSnapshot,
   McpManagerSnapshot,
   McpServerRuntimeState,
@@ -70,8 +69,6 @@ import type {
   McpConfigImportPreview,
   McpConfigImportResult,
   AgentRunInput,
-  AgentRunInputKind,
-  AgentRunInputSource,
   TrayAction,
   TrayMenuLabels,
   UpdateState,
@@ -90,7 +87,7 @@ import type {
   BrowserSessionSnapshot,
   BrowserSessionUpdate,
 } from "../shared/types";
-import type { UIMessage } from "ai";
+import type { IpcInput } from "../shared/ipc-schema";
 
 /**
  * Ayaka 暴露给渲染进程的 API
@@ -143,10 +140,10 @@ export interface AyakaApi {
   };
   // 消息
   messages: {
-    list: (conversationId: string) => Promise<MessageSnapshot>;
-    save: (msg: MessageRow) => Promise<boolean>;
-    saveBatch: (msgs: MessageRow[]) => Promise<boolean>;
-    applyPatch: (patch: MessagePatch) => Promise<MessagePatchResult>;
+    list: (input: IpcInput<"messages:list">) => Promise<MessageSnapshot>;
+    save: (input: IpcInput<"messages:save">) => Promise<boolean>;
+    saveBatch: (input: IpcInput<"messages:saveBatch">) => Promise<boolean>;
+    applyPatch: (input: IpcInput<"messages:applyPatch">) => Promise<MessagePatchResult>;
   };
   workspace: {
     get: (conversationId: string) => Promise<WorkspaceInfo | null>;
@@ -302,14 +299,9 @@ export interface AyakaApi {
     managedUninstall: (runtimeId: string) => Promise<boolean>;
     managedSetSource: (kind: "node" | "uv", manifestUrl: string) => Promise<ManagedRuntimeSnapshot>;
     onStateChanged: (handler: (snapshot: ManagedRuntimeSnapshot) => void) => () => void;
-    enqueueInput: (input: {
-      runId: string;
-      kind: AgentRunInputKind;
-      source?: AgentRunInputSource;
-      message: UIMessage;
-    }) => Promise<AgentRunInput>;
-    discardQueuedInput: (runId: string, inputId: string) => Promise<boolean>;
-    cancelRun: (runId: string) => Promise<boolean>;
+    enqueueInput: (input: IpcInput<"runtime:enqueueInput">) => Promise<AgentRunInput>;
+    discardQueuedInput: (input: IpcInput<"runtime:discardQueuedInput">) => Promise<boolean>;
+    cancelRun: (input: IpcInput<"runtime:cancelRun">) => Promise<boolean>;
     events: {
       list: () => Promise<RuntimeEvent[]>;
     };
@@ -341,6 +333,7 @@ export interface AyakaApi {
         | "contextCheckpoints"
       >
     >;
+    runtimeStatus: (input: IpcInput<"agents:runtimeStatus">) => Promise<RuntimeStatusSnapshot>;
     runningConversationIds: () => Promise<string[]>;
     save: (agent: AgentProfile) => Promise<boolean>;
     memoryFiles: {

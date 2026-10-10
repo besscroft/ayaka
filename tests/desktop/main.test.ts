@@ -5,6 +5,7 @@ import "./main/lib/chat-errors.test.ts";
 import "./main/lib/chat-model-settings.test.ts";
 import "./main/lib/chat-tools.test.ts";
 import "./main/lib/db-performance.test.ts";
+import "./main/lib/ipc-schema.test.ts";
 import "./main/lib/chat-permission-policy.test.ts";
 import "./main/lib/drizzle-metadata.test.ts";
 import "./main/lib/error-logger.test.ts";

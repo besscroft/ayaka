@@ -48,6 +48,7 @@ import {
   listInteractionProfiles,
   getSyncState,
   getRuntimeSnapshot,
+  getConversationRuntimeStatus,
   getToolsSnapshot,
   getSkillInspection,
   getSkillPackage,
@@ -110,7 +111,6 @@ import type {
   ToolSkillInput,
   SkillRunInput,
   MemoryRecord,
-  MessagePatch,
   MessageRow,
   ToolServerInput,
   WorkspaceMediaSaveInput,
@@ -121,6 +121,7 @@ import type {
   RealtimeSessionMessage,
 } from "../../shared/types";
 import { DEFAULT_AGENT_ID, SettingKey } from "../../shared/types";
+import { parseIpcInput } from "../../shared/ipc-schema";
 import { notifyMemoryConfigurationChanged, queueAgentLearning } from "../lib/agent-learning";
 import { memoryOrchestrator } from "../lib/memory-orchestrator";
 import { createMemoryAccessContext } from "../lib/memory-access";
@@ -217,10 +218,7 @@ import {
   removeSkillPackageDirectory,
 } from "../lib/catalog-service";
 import { agentLoopSessions } from "../lib/agent-loop-session";
-import {
-  createRuntimeEnqueueInputHandler,
-  type RuntimeEnqueueInput,
-} from "../lib/agent-run-input-ipc";
+import { createRuntimeEnqueueInputHandler } from "../lib/agent-run-input-ipc";
 import {
   getConversationHydrationInfo,
   getConversationWorkspaceInfo,
@@ -656,21 +654,24 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   });
 
   // ---------- 消息 ----------
-  ipcMain.handle("messages:list", (_e, conversationId: string) =>
-    getMessagesSnapshot(conversationId),
+  ipcMain.handle("messages:list", (_e, input: unknown) => {
+    const { conversationId } = parseIpcInput("messages:list", input);
+    return getMessagesSnapshot(conversationId);
+  });
+
+  ipcMain.handle("messages:save", async (_e, input: unknown) => {
+    await saveMessage(parseIpcInput("messages:save", input));
+    return true;
+  });
+
+  ipcMain.handle("messages:saveBatch", async (_e, input: unknown) => {
+    await saveMessagesBatch(parseIpcInput("messages:saveBatch", input));
+    return true;
+  });
+
+  ipcMain.handle("messages:applyPatch", (_e, input: unknown) =>
+    applyMessagesPatch(parseIpcInput("messages:applyPatch", input)),
   );
-
-  ipcMain.handle("messages:save", async (_e, msg: MessageRow) => {
-    await saveMessage(msg);
-    return true;
-  });
-
-  ipcMain.handle("messages:saveBatch", async (_e, msgs: MessageRow[]) => {
-    await saveMessagesBatch(msgs);
-    return true;
-  });
-
-  ipcMain.handle("messages:applyPatch", (_e, patch: MessagePatch) => applyMessagesPatch(patch));
 
   ipcMain.handle("cron:list", () => listCronJobs());
   ipcMain.handle("cron:get", (_e, id: string) => getCronJob(id));
@@ -768,27 +769,15 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
   const enqueueRuntimeInput = createRuntimeEnqueueInputHandler((runId, kind, source, message) =>
     agentLoopSessions.enqueue(runId, kind, source, message),
   );
-  ipcMain.handle("runtime:enqueueInput", (_event, input: RuntimeEnqueueInput) => {
-    if (!input || typeof input.runId !== "string") throw new Error("runId is required.");
-    if (input.kind !== "steering" && input.kind !== "follow_up") {
-      throw new Error("kind must be steering or follow_up.");
-    }
-    if (
-      !input.message ||
-      typeof input.message.id !== "string" ||
-      !Array.isArray(input.message.parts)
-    ) {
-      throw new Error("message must be a valid UI message.");
-    }
-    return enqueueRuntimeInput(input);
+  ipcMain.handle("runtime:enqueueInput", (_event, input: unknown) => {
+    return enqueueRuntimeInput(parseIpcInput("runtime:enqueueInput", input));
   });
-  ipcMain.handle("runtime:discardQueuedInput", (_event, runId: string, inputId: string) => {
-    if (typeof runId !== "string" || !runId) throw new Error("runId is required.");
-    if (typeof inputId !== "string" || !inputId) throw new Error("inputId is required.");
+  ipcMain.handle("runtime:discardQueuedInput", (_event, input: unknown) => {
+    const { runId, inputId } = parseIpcInput("runtime:discardQueuedInput", input);
     return agentLoopSessions.discardQueuedInput(runId, inputId);
   });
-  ipcMain.handle("runtime:cancelRun", async (_event, runId: string) => {
-    if (typeof runId !== "string" || !runId) throw new Error("runId is required.");
+  ipcMain.handle("runtime:cancelRun", async (_event, input: unknown) => {
+    const { runId } = parseIpcInput("runtime:cancelRun", input);
     return agentLoopSessions.cancel(runId);
   });
   ipcMain.handle("agents:list", () => listAgents());
@@ -805,6 +794,10 @@ export function registerIpcHandlers(options: IpcHandlerOptions = {}): void {
     return true;
   });
   ipcMain.handle("agents:runtimeSnapshot", () => runtimeSnapshot());
+  ipcMain.handle("agents:runtimeStatus", (_event, input: unknown) => {
+    const { conversationId, options } = parseIpcInput("agents:runtimeStatus", input);
+    return getConversationRuntimeStatus(conversationId, options);
+  });
   ipcMain.handle("agents:runningConversationIds", () => listRunningConversationIds());
   ipcMain.handle("agents:queueLearning", (_e, conversationId: string) => {
     return queueAgentLearning(conversationId);

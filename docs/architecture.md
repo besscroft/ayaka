@@ -17,6 +17,15 @@ are disabled for one final response and a `budget` event is recorded. Approval p
 same `runId`; cancellation, errors, aborts, and application shutdown are hard stops. Startup marks
 unfinished runs `interrupted` and discards queued inputs without replaying side effects.
 
+The chat renderer uses a conversation-scoped `agents:runtimeStatus` read for active status and
+queue polling. It returns recent runs for that conversation and records for the selected run
+(inputs, steps, instances, and events). A caller-supplied run is included only when it belongs to
+the requested conversation, even when it falls outside the recent-run limit. The full
+`agents:runtimeSnapshot` and `runtime:snapshot`
+reads remain available for explicit diagnostics and administration views; they are not part of the
+chat polling loop. Cold collections such as collaboration messages, sandbox history, memories,
+and context checkpoints therefore stay out of the 250 ms queue refresh path.
+
 `RunToolScheduler` allows known read-only tools to execute concurrently and serializes writes to
 memory, the sandbox, settings, automations, and local workspace command execution. The local
 command tool is deliberately serialized even for read-only commands so its run-scoped cwd and
@@ -72,6 +81,18 @@ command and sandbox command must not be mixed when producing a preview artifact.
 stores the input kind, source, JSON message, sequence, lifecycle status, and discard reason. The
 `(run_id, status, sequence)` index provides FIFO reads. Runtime events use `agent`, `loop_input`,
 `skill`, `budget`, `tool`, and diagnostic kinds.
+
+Message persistence is revisioned per conversation. `messages:saveBatch` accepts one conversation
+per batch, validates every row and the target conversation before writing, upserts all rows in one
+transaction, and increments `conversations.message_revision` once. A mixed-conversation batch,
+invalid row, missing conversation, or cross-conversation message id is rejected before any row is
+changed. `messages:applyPatch` uses the same ownership rule and optimistic base revision check.
+
+IPC contracts are shared between the main process, preload, and renderer. Channels migrated to the
+shared schema registry (`apps/desktop/src/shared/ipc-schema.ts`) parse input at the main-process
+boundary; the preload bridge remains the only renderer entry point. New high-frequency runtime
+reads should use the scoped status contract, while the full snapshot is reserved for low-frequency
+diagnostics.
 
 The development database is intentionally greenfield. The initial Drizzle migration contains no
 legacy execution tables or compatibility columns.

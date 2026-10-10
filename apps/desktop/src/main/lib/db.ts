@@ -179,6 +179,22 @@ import {
   startDbWriter,
   writeDb,
 } from "./db-writer";
+import {
+  applyMessagesPatch as applyMessagesPatchStore,
+  dbMessageToShared,
+  getMessagesSnapshot as getMessagesSnapshotStore,
+  listMessages as listMessagesStore,
+  saveMessage as saveMessageStore,
+  saveMessagesBatch as saveMessagesBatchStore,
+} from "./message-store";
+import {
+  buildAgentRuntimeSnapshot,
+  buildRuntimeSnapshot,
+  buildRuntimeStatusSnapshot,
+  type RuntimeSnapshotReaders,
+  type RuntimeStatusOptions,
+  type RuntimeStatusReaders,
+} from "./runtime-snapshot";
 export type {
   AgentRunInput,
   AgentProfile,
@@ -215,7 +231,7 @@ const DEFAULT_MEMORY_ORIGIN: MemoryOrigin = "manual";
 const DEFAULT_MEMORY_STATUS: MemoryStatus = "active";
 const MEMORY_JOB_MAX_ATTEMPTS = 5;
 
-type DbInstance = BetterSQLite3Database<typeof schema>;
+export type DbInstance = BetterSQLite3Database<typeof schema>;
 type RuntimeStatus = RunStatus;
 
 let rawDb: Database.Database | null = null;
@@ -781,141 +797,25 @@ export async function purgeExpiredDeletedConversations(now = Date.now()): Promis
 
 export async function saveMessage(msg: MessageRow): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("saveMessage", [msg]);
-  const row = messageToDb(msg);
-  getDb().transaction((tx) => {
-    tx.insert(messages)
-      .values(row)
-      .onConflictDoUpdate({
-        target: messages.id,
-        set: {
-          conversation_id: row.conversation_id,
-          role: row.role,
-          content_json: row.content_json,
-          metadata_json: row.metadata_json,
-          created_at: row.created_at,
-        },
-      })
-      .run();
-    const conversation = tx
-      .select({ revision: conversations.message_revision })
-      .from(conversations)
-      .where(eq(conversations.id, msg.conversation_id))
-      .get();
-    if (!conversation) throw new Error("Conversation does not exist.");
-    tx.update(conversations)
-      .set({ message_revision: conversation.revision + 1, updated_at: Date.now() })
-      .where(eq(conversations.id, msg.conversation_id))
-      .run();
-  });
+  saveMessageStore(getDb(), msg);
 }
 
 export async function saveMessagesBatch(rows: MessageRow[]): Promise<void> {
   if (shouldRouteWrites()) return writeDb<void>("saveMessagesBatch", [rows]);
-  const db = getDb();
-  db.transaction((tx) => {
-    for (const msg of rows) {
-      const row = messageToDb(msg);
-      tx.insert(messages)
-        .values(row)
-        .onConflictDoUpdate({
-          target: messages.id,
-          set: {
-            conversation_id: row.conversation_id,
-            role: row.role,
-            content_json: row.content_json,
-            metadata_json: row.metadata_json,
-            created_at: row.created_at,
-          },
-        })
-        .run();
-    }
-    if (rows[0]) {
-      const conversation = tx
-        .select({ revision: conversations.message_revision })
-        .from(conversations)
-        .where(eq(conversations.id, rows[0].conversation_id))
-        .get();
-      if (!conversation) throw new Error("Conversation does not exist.");
-      tx.update(conversations)
-        .set({ message_revision: conversation.revision + 1, updated_at: Date.now() })
-        .where(eq(conversations.id, rows[0].conversation_id))
-        .run();
-    }
-  });
+  saveMessagesBatchStore(getDb(), rows);
 }
 
 export async function applyMessagesPatch(patch: MessagePatch): Promise<MessagePatchResult> {
   if (shouldRouteWrites()) return writeDb<MessagePatchResult>("applyMessagesPatch", [patch]);
-  const { conversationId, baseRevision, upserts, deleteIds } = patch;
-  if (upserts.some((row) => row.conversation_id !== conversationId)) {
-    throw new Error("Message patch contains rows from another conversation.");
-  }
-  if (!Number.isSafeInteger(baseRevision) || baseRevision < 0) {
-    throw new Error("Message patch base revision is invalid.");
-  }
-
-  const db = getDb();
-  return db.transaction((tx) => {
-    const conversation = tx
-      .select({ revision: conversations.message_revision })
-      .from(conversations)
-      .where(eq(conversations.id, conversationId))
-      .get();
-    if (!conversation) throw new Error("Conversation does not exist.");
-    if (conversation.revision !== baseRevision) {
-      return { applied: false, revision: conversation.revision };
-    }
-
-    for (const id of new Set(deleteIds.filter(Boolean))) {
-      tx.delete(messages)
-        .where(and(eq(messages.conversation_id, conversationId), eq(messages.id, id)))
-        .run();
-    }
-    for (const msg of upserts) {
-      const row = messageToDb(msg);
-      tx.insert(messages)
-        .values(row)
-        .onConflictDoUpdate({
-          target: messages.id,
-          set: {
-            conversation_id: row.conversation_id,
-            role: row.role,
-            content_json: row.content_json,
-            metadata_json: row.metadata_json,
-            created_at: row.created_at,
-          },
-        })
-        .run();
-    }
-    const revision = baseRevision + 1;
-    tx.update(conversations)
-      .set({ message_revision: revision, updated_at: Date.now() })
-      .where(
-        and(eq(conversations.id, conversationId), eq(conversations.message_revision, baseRevision)),
-      )
-      .run();
-    return { applied: true, revision };
-  });
+  return applyMessagesPatchStore(getDb(), patch);
 }
 
 export function listMessages(conversationId: string): MessageRow[] {
-  return getDb()
-    .select()
-    .from(messages)
-    .where(eq(messages.conversation_id, conversationId))
-    .orderBy(messages.created_at)
-    .all()
-    .map(dbMessageToShared);
+  return listMessagesStore(getDb(), conversationId);
 }
 
 export function getMessagesSnapshot(conversationId: string): MessageSnapshot {
-  const conversation = getDb()
-    .select({ revision: conversations.message_revision })
-    .from(conversations)
-    .where(eq(conversations.id, conversationId))
-    .get();
-  if (!conversation) throw new Error("Conversation does not exist.");
-  return { messages: listMessages(conversationId), revision: conversation.revision };
+  return getMessagesSnapshotStore(getDb(), conversationId);
 }
 
 export function getSetting(key: string): string | null {
@@ -1327,6 +1227,29 @@ export function listRuntimeRuns(limit = 50): RuntimeRun[] {
     .map(toRuntimeRun);
 }
 
+export function listRuntimeRunsForConversation(conversationId: string, limit = 20): RuntimeRun[] {
+  return getDb()
+    .select()
+    .from(runtimeRuns)
+    .where(eq(runtimeRuns.conversation_id, conversationId))
+    .orderBy(desc(runtimeRuns.started_at))
+    .limit(Math.max(1, Math.min(50, limit)))
+    .all()
+    .map(toRuntimeRun);
+}
+
+export function getRuntimeRunForConversation(
+  conversationId: string,
+  runId: string,
+): RuntimeRun | null {
+  const row = getDb()
+    .select()
+    .from(runtimeRuns)
+    .where(and(eq(runtimeRuns.id, runId), eq(runtimeRuns.conversation_id, conversationId)))
+    .get();
+  return row ? toRuntimeRun(row) : null;
+}
+
 export function listRunningConversationIds(): string[] {
   return getDb()
     .select({ conversationId: runtimeRuns.conversation_id })
@@ -1616,6 +1539,17 @@ export function listRuntimeSteps(limit = 200): RuntimeStep[] {
     .map(toRuntimeStep);
 }
 
+export function listRuntimeStepsForRun(runId: string, limit = 100): RuntimeStep[] {
+  return getDb()
+    .select()
+    .from(runtimeSteps)
+    .where(eq(runtimeSteps.run_id, runId))
+    .orderBy(desc(runtimeSteps.started_at))
+    .limit(Math.max(1, Math.min(300, limit)))
+    .all()
+    .map(toRuntimeStep);
+}
+
 export async function createRuntimeStep(input: {
   id?: string;
   run_id: string;
@@ -1681,6 +1615,17 @@ export function listRuntimeEvents(limit = 500): RuntimeEvent[] {
     .from(runtimeEvents)
     .orderBy(desc(runtimeEvents.created_at))
     .limit(limit)
+    .all()
+    .map(toRuntimeEvent);
+}
+
+export function listRuntimeEventsForRun(runId: string, limit = 100): RuntimeEvent[] {
+  return getDb()
+    .select()
+    .from(runtimeEvents)
+    .where(eq(runtimeEvents.run_id, runId))
+    .orderBy(desc(runtimeEvents.created_at))
+    .limit(Math.max(1, Math.min(300, limit)))
     .all()
     .map(toRuntimeEvent);
 }
@@ -1781,6 +1726,17 @@ export function listAgentInstances(limit = 300): AgentInstanceRecord[] {
     .from(agentInstances)
     .orderBy(desc(agentInstances.updated_at))
     .limit(limit)
+    .all()
+    .map((row: DbAgentInstance) => row as AgentInstanceRecord);
+}
+
+export function listAgentInstancesForRun(runId: string, limit = 100): AgentInstanceRecord[] {
+  return getDb()
+    .select()
+    .from(agentInstances)
+    .where(eq(agentInstances.run_id, runId))
+    .orderBy(desc(agentInstances.updated_at))
+    .limit(Math.max(1, Math.min(300, limit)))
     .all()
     .map((row: DbAgentInstance) => row as AgentInstanceRecord);
 }
@@ -1912,19 +1868,46 @@ export function runtimeSnapshot(): Pick<
   | "collaborationMessages"
   | "contextCheckpoints"
 > {
+  return buildAgentRuntimeSnapshot(createRuntimeSnapshotReaders());
+}
+
+export function getConversationRuntimeStatus(
+  conversationId: string,
+  options: RuntimeStatusOptions = {},
+) {
+  return buildRuntimeStatusSnapshot(createRuntimeStatusReaders(), conversationId, options);
+}
+
+function createRuntimeSnapshotReaders(): RuntimeSnapshotReaders {
   return {
-    runtimeRuns: listRuntimeRuns(),
-    agentRunInputs: listAgentRunInputs(),
-    runtimeSteps: listRuntimeSteps(),
-    agentRuntimeStates: listagentRuntimeStates(),
-    conversationAgentStates: listConversationAgentStates(),
-    sandboxSessions: listSandboxSessions().map(toSandboxSessionView),
-    sandboxSnapshots: listSandboxSnapshots(),
-    sandboxArtifacts: listSandboxArtifacts(),
-    runtimeEvents: listRuntimeEvents(),
-    agentInstances: listAgentInstances(),
-    collaborationMessages: listCollaborationMessages(),
-    contextCheckpoints: listContextCheckpoints(),
+    listRuntimeRuns,
+    listRuntimeSteps,
+    listAgentRuntimeStates: listagentRuntimeStates,
+    listConversationAgentStates,
+    listSandboxSessions: () => listSandboxSessions().map(toSandboxSessionView),
+    listSandboxSnapshots,
+    listSandboxArtifacts,
+    listAgentRunInputs,
+    listRuntimeEvents,
+    listAgentInstances,
+    listCollaborationMessages,
+    listContextCheckpoints,
+    listAgents,
+    listMemories,
+    listInteractionProfiles,
+    getSyncState,
+  };
+}
+
+function createRuntimeStatusReaders(): RuntimeStatusReaders {
+  return {
+    listRuntimeRunsForConversation,
+    getRuntimeRunForConversation,
+    listRuntimeStepsForRun,
+    listAgentRunInputsForRun: (runId, limit) => listAgentRunInputs(runId, limit),
+    listRuntimeEventsForRun,
+    listAgentInstancesForRun,
+    getConversationAgentState,
   };
 }
 
@@ -3936,24 +3919,7 @@ function toSandboxSessionView(session: SandboxSession): SandboxSessionView {
 }
 
 export function getRuntimeSnapshot(): RuntimeSnapshot {
-  return {
-    agents: listAgents(),
-    runtimeRuns: listRuntimeRuns(),
-    runtimeSteps: listRuntimeSteps(),
-    agentRuntimeStates: listagentRuntimeStates(),
-    conversationAgentStates: listConversationAgentStates(),
-    sandboxSessions: listSandboxSessions().map(toSandboxSessionView),
-    sandboxSnapshots: listSandboxSnapshots(),
-    sandboxArtifacts: listSandboxArtifacts(),
-    memories: listMemories(),
-    agentRunInputs: listAgentRunInputs(),
-    runtimeEvents: listRuntimeEvents(),
-    agentInstances: listAgentInstances(),
-    collaborationMessages: listCollaborationMessages(),
-    contextCheckpoints: listContextCheckpoints(),
-    interactionProfiles: listInteractionProfiles(),
-    syncState: getSyncState(),
-  };
+  return buildRuntimeSnapshot(createRuntimeSnapshotReaders());
 }
 
 export function updateAyakaLearningState(input: {
@@ -4269,43 +4235,6 @@ function seedBuiltinTools(now: number): void {
       })
       .run();
   }
-}
-
-function messageToDb(msg: MessageRow): {
-  id: string;
-  conversation_id: string;
-  role: "user" | "assistant" | "system";
-  content_json: string;
-  metadata_json: string;
-  created_at: number;
-} {
-  return {
-    id: msg.id,
-    conversation_id: msg.conversation_id,
-    role: msg.role,
-    content_json: msg.content_json ?? msg.content,
-    metadata_json: msg.metadata_json ?? "{}",
-    created_at: msg.created_at,
-  };
-}
-
-function dbMessageToShared(row: {
-  id: string;
-  conversation_id: string;
-  role: "user" | "assistant" | "system";
-  content_json: string;
-  metadata_json: string;
-  created_at: number;
-}): MessageRow {
-  return {
-    id: row.id,
-    conversation_id: row.conversation_id,
-    role: row.role,
-    content: row.content_json,
-    content_json: row.content_json,
-    metadata_json: row.metadata_json,
-    created_at: row.created_at,
-  };
 }
 
 function toAgentProfile(row: DbAgentProfile): AgentProfile {

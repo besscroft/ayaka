@@ -143,10 +143,10 @@ const api = {
     delete: (id: string) => ipcRenderer.invoke("realtimeSessions:delete", id),
   },
   messages: {
-    list: (conversationId: string) => ipcRenderer.invoke("messages:list", conversationId),
-    save: (msg: unknown) => ipcRenderer.invoke("messages:save", msg),
-    saveBatch: (msgs: unknown[]) => ipcRenderer.invoke("messages:saveBatch", msgs),
-    applyPatch: (patch: unknown) => ipcRenderer.invoke("messages:applyPatch", patch),
+    list: (input: unknown) => ipcRenderer.invoke("messages:list", input),
+    save: (input: unknown) => ipcRenderer.invoke("messages:save", input),
+    saveBatch: (input: unknown[]) => ipcRenderer.invoke("messages:saveBatch", input),
+    applyPatch: (input: unknown) => ipcRenderer.invoke("messages:applyPatch", input),
   },
   workspace: {
     get: (conversationId: string) => ipcRenderer.invoke("workspace:get", conversationId),
@@ -325,9 +325,8 @@ const api = {
       if (result.ok) return result.value;
       throw Object.assign(new Error(result.error), { code: result.code });
     },
-    discardQueuedInput: (runId: string, inputId: string) =>
-      ipcRenderer.invoke("runtime:discardQueuedInput", runId, inputId),
-    cancelRun: (runId: string) => ipcRenderer.invoke("runtime:cancelRun", runId),
+    discardQueuedInput: (input: unknown) => ipcRenderer.invoke("runtime:discardQueuedInput", input),
+    cancelRun: (input: unknown) => ipcRenderer.invoke("runtime:cancelRun", input),
     events: {
       list: () => ipcRenderer.invoke("runtime:events:list"),
     },
@@ -344,6 +343,7 @@ const api = {
     queueLearning: (conversationId: string) =>
       ipcRenderer.invoke("agents:queueLearning", conversationId),
     runtimeSnapshot: () => ipcRenderer.invoke("agents:runtimeSnapshot"),
+    runtimeStatus: (input: unknown) => ipcRenderer.invoke("agents:runtimeStatus", input),
     runningConversationIds: () => ipcRenderer.invoke("agents:runningConversationIds"),
     save: (agent: unknown) => ipcRenderer.invoke("agents:save", agent),
     memoryFiles: {

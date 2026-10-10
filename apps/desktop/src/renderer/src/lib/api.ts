@@ -39,7 +39,6 @@ import type {
   MemoryKind,
   MemoryRecord,
   MemoryScope,
-  MessagePatch,
   MessagePatchResult,
   MessageRow,
   MessageSnapshot,
@@ -60,9 +59,8 @@ import type {
   ProviderTestResult,
   SyncState,
   AgentRunInput,
-  AgentRunInputKind,
-  AgentRunInputSource,
   RuntimeSnapshot,
+  RuntimeStatusSnapshot,
   ManagedRuntimeSnapshot,
   McpManagerSnapshot,
   McpServerRuntimeState,
@@ -88,7 +86,7 @@ import type {
   BrowserSessionSnapshot,
   BrowserSessionUpdate,
 } from "@shared/types";
-import type { UIMessage } from "ai";
+import type { IpcInput } from "@shared/ipc-schema";
 
 /**
  * 渲染层对 window.api 的类型化封装
@@ -160,10 +158,11 @@ export const api = {
   },
   messages: {
     list: (conversationId: string): Promise<MessageSnapshot> =>
-      assertApi().messages.list(conversationId),
-    save: (msg: MessageRow): Promise<boolean> => assertApi().messages.save(msg),
-    saveBatch: (msgs: MessageRow[]): Promise<boolean> => assertApi().messages.saveBatch(msgs),
-    applyPatch: (patch: MessagePatch): Promise<MessagePatchResult> =>
+      assertApi().messages.list({ conversationId }),
+    save: (msg: IpcInput<"messages:save">): Promise<boolean> => assertApi().messages.save(msg),
+    saveBatch: (msgs: IpcInput<"messages:saveBatch">): Promise<boolean> =>
+      assertApi().messages.saveBatch(msgs),
+    applyPatch: (patch: IpcInput<"messages:applyPatch">): Promise<MessagePatchResult> =>
       assertApi().messages.applyPatch(patch),
   },
   workspace: {
@@ -350,15 +349,11 @@ export const api = {
       assertApi().runtime.managedSetSource(kind, manifestUrl),
     onStateChanged: (handler: (snapshot: ManagedRuntimeSnapshot) => void): (() => void) =>
       assertApi().runtime.onStateChanged(handler),
-    enqueueInput: (input: {
-      runId: string;
-      kind: AgentRunInputKind;
-      source?: AgentRunInputSource;
-      message: UIMessage;
-    }): Promise<AgentRunInput> => assertApi().runtime.enqueueInput(input),
+    enqueueInput: (input: IpcInput<"runtime:enqueueInput">): Promise<AgentRunInput> =>
+      assertApi().runtime.enqueueInput(input),
     discardQueuedInput: (runId: string, inputId: string): Promise<boolean> =>
-      assertApi().runtime.discardQueuedInput(runId, inputId),
-    cancelRun: (runId: string): Promise<boolean> => assertApi().runtime.cancelRun(runId),
+      assertApi().runtime.discardQueuedInput({ runId, inputId }),
+    cancelRun: (runId: string): Promise<boolean> => assertApi().runtime.cancelRun({ runId }),
     events: {
       list: (): Promise<RuntimeEvent[]> => assertApi().runtime.events.list(),
     },
@@ -392,6 +387,8 @@ export const api = {
         | "contextCheckpoints"
       >
     > => assertApi().agents.runtimeSnapshot(),
+    runtimeStatus: (input: IpcInput<"agents:runtimeStatus">): Promise<RuntimeStatusSnapshot> =>
+      assertApi().agents.runtimeStatus(input),
     runningConversationIds: (): Promise<string[]> => assertApi().agents.runningConversationIds(),
     save: (agent: AgentProfile): Promise<boolean> => assertApi().agents.save(agent),
     memoryFiles: {
@@ -659,5 +656,6 @@ export type {
   ProviderTestResult,
   SyncState,
   RuntimeSnapshot,
+  RuntimeStatusSnapshot,
   UpdateState,
 };

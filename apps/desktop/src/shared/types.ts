@@ -2988,6 +2988,20 @@ export interface RuntimeSnapshot {
 }
 
 /**
+ * Conversation-scoped runtime data used by the chat status panel and its polling loop.
+ * Cold diagnostics (memories, collaboration, sandbox history, and checkpoints) stay in
+ * RuntimeSnapshot and are loaded only by explicit diagnostic views.
+ */
+export interface RuntimeStatusSnapshot {
+  runtimeRuns: RuntimeRun[];
+  runtimeSteps: RuntimeStep[];
+  conversationAgentStates: ConversationAgentState[];
+  agentInstances: AgentInstanceRecord[];
+  agentRunInputs: AgentRunInput[];
+  runtimeEvents: RuntimeEvent[];
+}
+
+/**
  * 应用设置聚合（渲染层使用）
  *
  * 每个字段都可独立持久化，聚合后便于在 UI 中统一消费与实时应用。
