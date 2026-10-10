@@ -638,6 +638,14 @@ function MessageItem({
   // 消息操作仅在非流式中可用，完成后始终显示
   const actionsEnabled = !messageStreaming;
   const showExecutionTime = message.role === "assistant" && !messageStreaming && executionTime;
+  const showMessageTime = !(
+    message.role === "assistant" &&
+    messageStreaming &&
+    !fullText.trim() &&
+    reasoningDisplays.length === 0 &&
+    !hasRenderableActivity(parts) &&
+    generatedUISpecPartIndex < 0
+  );
   const messageCreatedAt = createdAt ?? fallbackCreatedAt;
   const messageTime = (
     <time
@@ -935,7 +943,7 @@ function MessageItem({
             {t("msg.executionTime", { duration: executionTime })}
           </span>
         ) : null}
-        {messageTime}
+        {showMessageTime ? messageTime : null}
       </div>
       {message.role === "assistant" &&
       !messageStreaming &&
