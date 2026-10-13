@@ -544,6 +544,8 @@ void describe("chat tool runtime", () => {
       type: "tool",
       toolName: "web_open",
     });
+    assert.match(runtime.instructions ?? "", /user provides a public page URL/);
+    assert.match(runtime.instructions ?? "", /static public HTML/);
     const output = (await webOpen.execute?.({
       url: "https://93.184.216.34/page",
     })) as {
@@ -625,12 +627,28 @@ void describe("chat tool runtime", () => {
     assert.equal(runtime.toolChoice, "auto");
     assert.equal(typeof runtime.tools?.web_search, "object");
     assert.match(runtime.instructions ?? "", /current, live, recent/);
+    assert.match(runtime.instructions ?? "", /discover relevant sources/);
+    assert.doesNotMatch(runtime.instructions ?? "", /web_open/);
+    assert.doesNotMatch(
+      (runtime.tools?.web_search as { description?: string }).description ?? "",
+      /web_open/,
+    );
+    assert.match(runtime.instructions ?? "", /discover relevant sources/);
+    assert.doesNotMatch(runtime.instructions ?? "", /If search snippets answer/);
 
     const web = chatTools
       .createChatToolDescriptors(modelContext("openai-compatible"))
       .find((descriptor) => descriptor.id === "web_search");
     assert.equal(web?.available, true);
     assert.equal(web?.execution, "host");
+    assert.match(web?.description ?? "", /use web_open when you need full-page text/);
+
+    const combinedRuntime = chatTools.buildChatToolRuntime({
+      selection: { mode: "manual", selectedToolIds: ["web_search", "web_open"] },
+      model: modelContext("openai-compatible"),
+    });
+    assert.match(combinedRuntime.instructions ?? "", /pass that URL to web_open/);
+    assert.match(combinedRuntime.instructions ?? "", /do not open every result/);
   });
 
   void it("executes the current time tool with host time metadata", async () => {

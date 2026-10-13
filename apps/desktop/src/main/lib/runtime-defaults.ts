@@ -255,7 +255,7 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
   {
     id: "web_search",
     title: "Web search",
-    description: "Search the live web when the model/provider supports it.",
+    description: "Find relevant live-web sources and return snippets and links.",
     category: "web",
     requiresApproval: 0,
     defaultAuto: 1,
@@ -263,7 +263,8 @@ export const DEFAULT_BUILTIN_TOOL_SEEDS = [
   {
     id: "web_open",
     title: "Open web page",
-    description: "Read a public HTML web page provided by the user.",
+    description:
+      "Fetch readable text from a public HTML page at a user-provided or search-result URL; it does not support interactive browsing.",
     category: "web",
     requiresApproval: 0,
     defaultAuto: 1,

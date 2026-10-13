@@ -50,14 +50,16 @@ const TOOL_METADATA: Record<
 > = {
   web_search: {
     label: "Web search",
-    description: "Search the live web with native provider search or a host fallback.",
+    description:
+      "Find relevant live-web sources and return snippets and links; use Open web page to read a source in full.",
     kind: "provider",
     category: "web",
     requiresApproval: false,
   },
   web_open: {
     label: "Open web page",
-    description: "Read a public HTML web page provided by the user.",
+    description:
+      "Fetch readable text from a public HTML page at a user-provided or search-result URL; it does not support interactive browsing.",
     kind: "host",
     category: "web",
     requiresApproval: false,
@@ -379,8 +381,8 @@ export function createClientChatToolDescriptors({
             execution: webSearchExecution,
             description:
               webSearchExecution === "provider"
-                ? "Search the live web with the selected model provider."
-                : "Search the live web through the app when native provider search is unavailable.",
+                ? "Discover live-web sources with native provider search; use Open web page when you need full-page text."
+                : "Discover live-web sources through the app; use Open web page when you need full-page text.",
           }
         : {}),
       defaultAuto: DEFAULT_AUTO_TOOL_IDS.has(id),

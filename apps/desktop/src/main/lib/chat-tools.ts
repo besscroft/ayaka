@@ -256,7 +256,7 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   web_search: {
     id: "web_search",
     label: "Web search",
-    description: "Search the live web with native provider search or a host fallback.",
+    description: "Find relevant live-web sources for a query and return snippets and links.",
     kind: "provider",
     category: "web",
     defaultAuto: true,
@@ -265,7 +265,8 @@ const TOOL_DEFINITIONS: Record<ChatToolId, ToolDefinition> = {
   web_open: {
     id: "web_open",
     label: "Open web page",
-    description: "Read a public HTML web page provided by the user.",
+    description:
+      "Fetch readable text from a public HTML page at a user-provided or search-result URL; it does not support interactive browsing.",
     kind: "host",
     category: "web",
     defaultAuto: true,
@@ -669,8 +670,8 @@ export function createChatToolDescriptors(
             description:
               id === "web_search"
                 ? webSearchExecution === "provider"
-                  ? "Search the live web with the selected model provider."
-                  : "Search the live web through the app when native provider search is unavailable."
+                  ? "Discover live-web sources with native provider search; use web_open when you need full-page text."
+                  : "Discover live-web sources through the app; use web_open when you need full-page text."
                 : base.description,
           }
         : {}),
@@ -1057,17 +1058,26 @@ function resolveToolChoice(
 function createToolInstructions(activeTools: string[]): string | undefined {
   const instructions: string[] = [];
   const hasWebSearch = activeTools.includes("web_search") || activeTools.includes("google_search");
+  const hasWebOpen = activeTools.includes("web_open");
   if (hasWebSearch) {
     instructions.push(
       "When the user's request depends on current, live, recent, or time-sensitive information, call the available web search tool before answering.",
       "This includes weather, news, prices, schedules, versions, laws, availability, and questions using words like today, latest, now, current, or recent.",
+      "Use web_search to discover relevant sources; its results provide snippets and links, not necessarily full page text.",
       "Use the search results in the final answer and include source links or source names when available.",
     );
   }
-  if (activeTools.includes("web_open")) {
+  if (hasWebOpen) {
     instructions.push(
-      "When the user provides a URL and asks you to read, summarize, explain, or find information on that page, call the web_open tool before answering.",
+      "When the user provides a public page URL and asks you to read, summarize, explain, or find information on it, call web_open before answering.",
       "Use the returned page text and final URL as the source of truth; do not infer page contents from the URL alone.",
+      "web_open reads static public HTML and does not interact with pages; use the conversation browser tools for clicks, forms, or other interactive tasks.",
+    );
+  }
+  if (hasWebSearch && hasWebOpen) {
+    instructions.push(
+      "When web_search returns a relevant URL that needs full-text reading or fact verification, pass that URL to web_open.",
+      "If search snippets answer the question sufficiently, do not open every result; read only the most relevant source when additional detail or verification is needed.",
     );
   }
   const browserTools = activeTools.filter((toolName) => toolName.startsWith("browser_"));
@@ -1117,7 +1127,10 @@ function createHostTools({
           inputSchema: jsonSchema<WebSearchInput>({
             type: "object",
             properties: {
-              query: { type: "string", description: "Search query." },
+              query: {
+                type: "string",
+                description: "Search terms to discover relevant current web pages.",
+              },
               maxResults: {
                 type: "number",
                 description: "Maximum search results to return.",
@@ -1138,7 +1151,11 @@ function createHostTools({
           inputSchema: jsonSchema<WebOpenInput>({
             type: "object",
             properties: {
-              url: { type: "string", description: "Public HTTP(S) page URL to read." },
+              url: {
+                type: "string",
+                description:
+                  "Public HTTP(S) URL from the user or search results whose readable page text should be fetched.",
+              },
             },
             required: ["url"],
             additionalProperties: false,

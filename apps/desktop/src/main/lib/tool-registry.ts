@@ -100,9 +100,9 @@ export function createBuiltinToolDescriptors(model: ChatToolModelContext): ChatT
       label: seed.title,
       description:
         isWebSearch && webSearchExecution === "provider"
-          ? "Search the live web with the selected model provider."
+          ? "Discover live-web sources with native provider search; use web_open when you need full-page text."
           : isWebSearch && webSearchExecution === "host"
-            ? "Search the live web through the app when native provider search is unavailable."
+            ? "Discover live-web sources through the app; use web_open when you need full-page text."
             : seed.description,
       kind:
         (isWebSearch && webSearchExecution === "provider") || isNativeOnly ? "provider" : "host",

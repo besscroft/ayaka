@@ -781,15 +781,21 @@ const entries = {
   },
   "skill.selector.empty": { zh: "没有可用 Skill", en: "No available Skills" },
   "chatTools.web_search.description": {
-    zh: "使用 {provider} 搜索 {host}",
-    en: "Search {host} using {provider}",
+    zh: "通过 {provider} 在 {host} 发现实时网页来源；需要阅读全文时请用“打开网页”。",
+    en: "Use {provider} to discover live-web sources on {host}; use Open web page when you need full text.",
   },
-  "chatTools.web_search.description.host": { zh: "目标站点", en: "target site" },
-  "chatTools.web_search.description.provider": { zh: "搜索服务", en: "search service" },
+  "chatTools.web_search.description.host": {
+    zh: "通过应用内搜索发现实时网页来源，返回摘要和链接；阅读全文请用“打开网页”。",
+    en: "Discover live-web sources through the app; use Open web page when you need full-page text.",
+  },
+  "chatTools.web_search.description.provider": {
+    zh: "通过模型服务商的原生搜索发现实时来源；阅读全文请用“打开网页”。",
+    en: "Discover live-web sources with native provider search; use Open web page when you need full-page text.",
+  },
   "chatTools.web_search.label": { zh: "联网搜索", en: "Web search" },
   "chatTools.web_open.description": {
-    zh: "读取用户提供的公开网页。",
-    en: "Read a public HTML web page provided by the user.",
+    zh: "读取用户提供或搜索发现的公开 HTML 网页正文；不支持页面交互。",
+    en: "Read the text of a public HTML page from the user or search results; interactive browsing is not supported.",
   },
   "chatTools.web_open.label": { zh: "打开网页", en: "Open web page" },
   "chatTools.browser_tabs.description": {
@@ -2539,11 +2545,14 @@ const zhOverrides: Dict = {
   "chatTools.unavailable.mcpDisabled": "MCP 服务或工具已停用。",
   "chatTools.unavailable.skillDisabled": "此技能已停用。",
   "chatTools.unavailable.skillInstructionsOnly": "技能执行尚未配置；此技能目前仅提供说明。",
-  "chatTools.web_search.description": "通过模型服务商或本地工具搜索网页。",
-  "chatTools.web_search.description.host": "使用本地搜索工具。",
-  "chatTools.web_search.description.provider": "使用模型服务商的原生搜索。",
+  "chatTools.web_search.description":
+    "搜索实时网页以发现来源，返回摘要和链接；需要阅读全文时再打开来源。",
+  "chatTools.web_search.description.host":
+    "使用应用内搜索发现实时网页来源，返回摘要和链接；阅读全文请用“打开网页”。",
+  "chatTools.web_search.description.provider":
+    "使用模型服务商的原生搜索发现实时来源；阅读全文请用“打开网页”。",
   "chatTools.web_search.label": "网页搜索",
-  "chatTools.web_open.description": "读取用户提供的公开网页。",
+  "chatTools.web_open.description": "读取用户提供或搜索发现的公开 HTML 网页正文；不支持页面交互。",
   "chatTools.web_open.label": "打开网页",
   "common.empty": "暂无内容",
   "format.unit.px": "px",
