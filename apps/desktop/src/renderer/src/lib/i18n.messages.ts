@@ -909,8 +909,8 @@ const entries = {
     en: "The attached image could not be read. Choose it again and try again.",
   },
   "error.chat.network": {
-    zh: "无法连接到 OpenCode Zen 或本地聊天服务，请检查网络后重试。",
-    en: "Unable to connect to OpenCode Zen or the local chat service. Check your network and try again.",
+    zh: "无法连接到聊天服务，请检查网络或稍后重试。",
+    en: "Unable to connect to the chat service. Check your network or try again later.",
   },
   "error.chat.provider": {
     zh: "\u6a21\u578b\u670d\u52a1\u5546\u65e0\u6cd5\u5b8c\u6210\u672c\u6b21\u8bf7\u6c42\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",

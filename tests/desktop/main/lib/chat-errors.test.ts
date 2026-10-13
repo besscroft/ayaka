@@ -28,7 +28,13 @@ void describe("chat error classification", () => {
       classifyChatError(new Error("OpenAI API key is not configured.")).code,
       "configuration",
     );
-    assert.equal(classifyChatError(new TypeError("Failed to fetch")).code, "network");
+    const network = classifyChatError(new TypeError("Failed to fetch"));
+    assert.equal(network.code, "network");
+    assert.equal(
+      network.error,
+      "Unable to connect to the chat service. Check your network or try again later.",
+    );
+    assert.equal(network.error.includes("OpenCode Zen"), false);
 
     const controller = new AbortController();
     controller.abort("user_cancelled");

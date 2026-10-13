@@ -51,8 +51,7 @@ const SAFE_MESSAGES: Record<ChatErrorCode, string> = {
   unauthorized:
     "The anonymous model service or chat session rejected the request. Try again later.",
   configuration: "The selected model is not configured correctly. Check its provider settings.",
-  network:
-    "Unable to connect to OpenCode Zen or the local chat service. Check your network and try again.",
+  network: "Unable to connect to the chat service. Check your network or try again later.",
   rate_limited:
     "The model service limit was reached. For free models, this can be a free quota or IP limit. Wait and try again.",
   timeout: "The model request timed out while contacting the model service. Try again later.",
