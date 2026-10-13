@@ -75,6 +75,31 @@ for string argv. It executes with a sandbox-relative `cwd`, and its output files
 directly to `sandbox_publish_artifact`; automatic mode exposes it for this purpose. The workspace
 command and sandbox command must not be mixed when producing a preview artifact.
 
+### Local host execution and file editing
+
+`local_run_command`, `local_read_file`, `local_write_file`, `local_edit_file`, and
+`local_apply_patch` are root-Agent tools backed by `LocalExecutionEngine` in
+`apps/desktop/src/main/lib/local-execution-engine.ts`. They operate on local host paths;
+they are not sandbox file tools. The command interface is structured executable plus argv,
+not a shell string. File operations use bounded UTF-8 reads, atomic writes, exact-match edits,
+and fully validated patch sets with conflict detection and rollback.
+
+The engine and main process own path canonicalization, symlink and sensitive-target checks,
+risk classification, approvals, cancellation, command-process cleanup, audit redaction, and
+runtime step/event recording. The conversation permission mode and Agent/tool policies may
+add review requirements, but cannot downgrade a risk the main process requires to be reviewed.
+An approval applies to its validated tool call and target state, not to a directory-wide grant.
+Runtime diagnostics retain bounded summaries rather than complete file bodies, environment
+values, or command output.
+
+Keep these host-local operations distinct from `workspace_run_command` (which is scoped to a
+conversation workspace) and from the sandbox tools (which use a separate sandbox root and
+artifact/preview lifecycle). For generated HTML, SVG, or static app files, use the sandbox
+artifact flow documented below instead of writing preview assets to arbitrary host paths.
+Focused tests live in `tests/desktop/main/lib/local-execution-engine.test.ts` and
+`workspace-command.test.ts`; run those plus the repository checks in `AGENTS.md` when this
+contract changes.
+
 ## Persistence
 
 `runtime_runs` stores origin, status, finish reason, usage, and the final summary. `agent_run_inputs`

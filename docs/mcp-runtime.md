@@ -1,5 +1,10 @@
 # MCP Runtime and Lifecycle
 
+For coding agents, current MCP runtime ownership and user-visible lifecycle
+contracts live in
+[`docs/subsystems/mcp-runtime.md`](subsystems/mcp-runtime.md). This file is the
+developer/operator guide for managed-runtime installation and troubleshooting.
+
 Ayaka stores MCP configuration in SQLite and keeps runtime binaries outside the application bundle:
 
 ```text
@@ -7,7 +12,7 @@ Ayaka stores MCP configuration in SQLite and keeps runtime binaries outside the 
 <userData>/mcp/servers/<serverId>/
 ```
 
-MCP stdio servers are started on demand. A managed Node or uv runtime is selected first; if no managed runtime is installed, Ayaka falls back to the matching executable on `PATH`. If neither exists, the server enters `needs_runtime` and the Runtime settings page provides the next action. Ayaka never uses Electron's executable as an MCP runtime.
+MCP stdio servers are lazy-started by default; startup restoration also starts eligible enabled stdio servers whose dependencies are installed. A managed Node or uv runtime is selected first; if no managed runtime is installed, Ayaka falls back to the matching executable on `PATH`. If neither exists, the server enters `needs_runtime` and the Runtime settings page provides the next action. Ayaka never uses Electron's executable as an MCP runtime. See the subsystem reference for start/recovery/stop, secret, and transport ownership contracts.
 
 Runtime installation is explicit. The selected manifest must provide a stable version, platform, architecture, archive URL, executable path, and SHA-256. Archives are downloaded into a temporary directory, checked, rejected if they contain unsafe paths or links, and atomically moved into the versioned App Data directory. Multiple versions can coexist. A running MCP keeps its resolved executable path while a newer version is installed.
 

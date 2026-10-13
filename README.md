@@ -92,6 +92,10 @@ vp run build:desktop:linux
 ## 相关文档
 
 - [架构说明](docs/architecture.md)
+- [开发 Agent 工作流](AGENTS.md)
+- [代码规范](docs/code-standards.md)
+- [子系统文档索引](docs/subsystems/README.md)
+- [工程规范与经验记录](LESSONS.md)
 - [更新日志](CHANGELOG.md)
 - [核心后端说明](apps/core/README.md)
 - [文档站说明](apps/docs/README.md)

@@ -30,9 +30,41 @@ This is a pnpm workspace for a local-first AI desktop application.
 - `tests/vite-plus`: root-level Vite+ smoke tests.
 - `tests/desktop`: desktop backend tests, kept separate from production `src` code.
 - `docs`: architecture notes, component notes, and implementation specifications. `docs/architecture.md` is the source of truth for the product/runtime model.
+- `docs/code-standards.md` and `docs/subsystems/README.md`: stable engineering rules and the index of subsystem references.
+- `LESSONS.md`: concrete, evidence-backed failures and prevention checks from Ayaka changes; independently repeated rules may be reviewed for promotion to code standards.
 - `.agents/skills`: local agent skills. Root formatting and linting intentionally ignore skill trees.
 
 Keep new reusable code in the owning app until a real cross-app consumer exists; do not create a package only to move one file. Use `apps/core` for host-agnostic HTTP/runtime contracts and `packages/assets` for genuinely shared static assets.
+
+## Coding Agent Workflow
+
+Use this repository's tracked docs as the source of truth. Do not treat local planning files such as `task_plan.md`, `findings.md`, and `progress.md` as committed project guidance; they are intentionally ignored.
+
+For every task:
+
+1. Read the relevant section of this guide and inspect `git status --short` before editing. Preserve existing user changes.
+2. Trace the affected behavior through its real callers, state/persistence, side effects, IPC and renderer surface as applicable. Prefer the focused source/test references in `docs/subsystems/README.md`; verify the linked implementation because docs can drift.
+3. Keep the change to its stated goal. Check parallel entry points and sibling flows when a shared rule or behavior changes; preserve neighboring behavior not included in the goal.
+4. For behavior changes, add or update tests that exercise observable behavior and fail if the regression is reintroduced. Select the smallest permitted relevant check first; for docs-only work validate links and formatting instead. Do not claim checks that were not run.
+5. Update the owning current-state reference in the same change when responsibilities, interfaces, state transitions, compatibility, security or failure behavior change. Design proposals belong in `docs/superpowers/specs/`; do not present a proposal as current behavior.
+6. Before handoff, review the complete diff, `git diff --check`, validation results, and whether user-facing behavior, architecture docs and tests agree. For substantial changes, also compare new failures or corrected misunderstandings with `LESSONS.md`; add a lesson only when evidence shows a reusable prevention rule. State limitations and unrun checks explicitly.
+
+For architectural work, clarify scope and trade-offs before implementation, record the approved design in a spec, then make a staged implementation plan. Narrow fixes that follow an already documented and confirmed flow may skip a separate spec, but still need a focused change and evidence. Do not change CI permissions, signing, release, or publishing policy as incidental cleanup.
+
+Read `docs/code-standards.md` before substantive code changes or code review. Read the affected subsystem reference named by `docs/subsystems/README.md`. Review `LESSONS.md` before behavior, persistence, IPC, provider, security, test-infrastructure or cross-platform changes; record new lessons only when this repository supplies concrete evidence, and promote repeated validated lessons instead of duplicating permanent rules.
+
+### Task paths
+
+- **Bug/fix:** reproduce the reported behavior when possible, trace the owning path and its sibling cases, add a focused regression, then validate the user-visible result. Do not substitute a passing intermediate step for the requested outcome.
+- **Feature/architecture:** define goal, non-goals, observable behavior, ownership/boundaries, failure handling and validation before implementation. Record approved non-obvious decisions in a dated design under `docs/superpowers/specs/`; split independent subsystems into separate designs/plans.
+- **Review:** prioritize concrete behavior, security, persistence, compatibility and missing-test findings. Trace beyond the changed lines and distinguish verified behavior from assumptions.
+- **Docs/tooling/CI:** check source-of-truth files, all links and affected callers. Workflow, release and permission changes are high-impact; do not modify them as incidental cleanup.
+
+### Documentation update rule
+
+- Current architecture references explain what the code does today and link to implementation/tests; update them alongside changes to contracts or behavior.
+- `docs/superpowers/specs/` contains design proposals/decisions and may be historical. Confirm status and source links before treating an old proposal as current guidance.
+- `LESSONS.md` contains dated, evidence-backed failure patterns. A one-off suspicion or unverified finding is not a repository rule.
 
 ## Runtime Boundaries
 
@@ -79,6 +111,13 @@ vp run docs#build
 ```
 
 The desktop scripts rebuild `better-sqlite3` as needed. If native bindings are stale after changing Node/Electron versions, run `vp run ayaka-desktop#rebuild:native` before retrying. The package also exposes `ayaka-desktop#db:generate`, `ayaka-desktop#db:studio`, and `ayaka-desktop#db:migrate` for Drizzle work.
+
+The test runner can use Node or launch Electron with `ELECTRON_RUN_AS_NODE=1`;
+`better-sqlite3` must match the ABI of the process that actually loads it. Read
+`apps/desktop/scripts/run-desktop-tests.mjs` and
+`apps/desktop/scripts/rebuild-better-sqlite3.cjs` before diagnosing native
+binding errors. A Node ABI failure is a test-environment failure, not evidence
+that an Electron-backed database test passed or failed.
 
 `vp run ayaka-desktop#test` uses Node's built-in test runner through `tsx` and includes the main/node and Electron-backed backend groups. Tests live under `tests/desktop` and are registered through the main and Electron aggregate entries. A focused group can be run with the corresponding `pnpm test:<group>` command from `apps/desktop`; the aggregate command is the expected final verification.
 

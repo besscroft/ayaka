@@ -92,6 +92,10 @@ vp run build:desktop:linux
 ## Related documentation
 
 - [Architecture guide](docs/architecture.md)
+- [Coding agent workflow](AGENTS.md)
+- [Code standards](docs/code-standards.md)
+- [Subsystem reference index](docs/subsystems/README.md)
+- [Engineering lessons](LESSONS.md)
 - [Changelog](CHANGELOG.md)
 - [Core backend guide](apps/core/README.md)
 - [Documentation site guide](apps/docs/README.md)
