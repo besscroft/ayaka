@@ -17,6 +17,7 @@ import { cn } from "../lib/utils";
 import {
   buildAgentActivityItems,
   buildAgentTree,
+  countAgentToolCalls,
   createAgentToolGroups,
   getAgentExpectedOutput,
   getAgentInstructions,
@@ -191,7 +192,7 @@ export function AgentStatusWidget({
   );
   const activeProfile = rootProfile;
   const turns = steps.filter((item) => item.kind === "model");
-  const toolCalls = steps.filter((item) => item.kind === "tool");
+  const toolCallCount = countAgentToolCalls(run?.id, steps, snapshot?.runtimeEvents ?? []);
   const queuedInputs = (snapshot?.agentRunInputs ?? []).filter(
     (item) => item.run_id === run?.id && item.status === "queued",
   );
@@ -377,7 +378,7 @@ export function AgentStatusWidget({
               <SectionLabel id="agent-status-metrics" label={t("agentStatus.metrics")} />
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <Metric label={t("agentStatus.metric.turns")} value={turns.length} />
-                <Metric label={t("agentStatus.metric.tools")} value={toolCalls.length} />
+                <Metric label={t("agentStatus.metric.tools")} value={toolCallCount} />
                 <Metric label={t("agentStatus.metric.pendingInputs")} value={queuedInputs.length} />
               </div>
             </section>

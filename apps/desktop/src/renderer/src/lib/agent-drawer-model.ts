@@ -63,6 +63,34 @@ export interface AgentActivityItem {
   error: string | null;
 }
 
+export function countAgentToolCalls(
+  runId: string | undefined,
+  steps: RuntimeStep[],
+  events: RuntimeEvent[],
+): number {
+  if (!runId) return 0;
+
+  const toolCallIds = new Set<string>();
+  for (const event of events) {
+    if (
+      event.run_id !== runId ||
+      (event.event_type !== "tool.call" && event.event_type !== "tool.result")
+    ) {
+      continue;
+    }
+    const toolCallId = readString(parseEventDetail(event.detail_json), "toolCallId");
+    toolCallIds.add(toolCallId ? `call:${toolCallId}` : `event:${event.id}`);
+  }
+
+  for (const step of steps) {
+    if (step.run_id !== runId || step.kind !== "tool") continue;
+    const toolCallId = readString(parseEventDetail(step.detail_json), "toolCallId");
+    toolCallIds.add(toolCallId ? `call:${toolCallId}` : `step:${step.id}`);
+  }
+
+  return toolCallIds.size;
+}
+
 export function getAgentInstructions(profile: AgentProfile | null): string {
   if (!profile) return "";
   return firstNonEmpty(profile.instructions, profile.persona, profile.description);
