@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.2.6]
+
+### 中文
+
+#### 新增
+
+- 新增按会话查询的运行时状态快照，支持聊天状态面板按需获取当前运行、步骤、事件、实例和排队输入等信息。
+- 新增统一的 IPC 输入校验与类型契约，覆盖消息保存、运行时输入和运行取消等操作。
+
+#### 变更
+
+- 优化消息批量保存、补丁更新和运行状态刷新流程，减少状态查询开销并提升对话状态同步稳定性。
+- 优化智能体状态面板的工具调用统计，合并运行事件与步骤数据，避免重复或遗漏计数。
+- 明确联网搜索与打开网页工具的职责边界：搜索返回来源摘要和链接，打开网页用于读取静态正文，不支持交互式浏览。
+- 更新网络错误提示，移除特定服务商名称，使错误信息更通用。
+
+#### 移除
+
+- 移除绝区零（ZZZ）主题及相关资源、样式和配置，保留白色与黑色主题。
+
+#### 修复
+
+- 修复助手消息处于流式生成且尚无可见内容时错误显示时间的问题。
+
+### English
+
+#### Added
+
+- Added conversation-scoped runtime status snapshots so the chat status panel can load current runs, steps, events, instances, and queued inputs on demand.
+- Added shared IPC input validation and type contracts for message persistence, runtime inputs, and run cancellation.
+
+#### Changed
+
+- Improved batched message saves, patch updates, and runtime-status refreshes to reduce query overhead and keep conversation state synchronized more reliably.
+- Improved tool-call metrics in the agent status panel by combining runtime events and steps without double-counting or missing calls.
+- Clarified the boundaries between Web search and Open web page: search returns source snippets and links, while Open web page reads static page text and does not support interactive browsing.
+- Updated network error messages to remove provider-specific wording and make them more general.
+
+#### Removed
+
+- Removed the Zenless Zone Zero (ZZZ) skin and its related resources, styles, and configuration, leaving the White and Black skins.
+
+#### Fixed
+
+- Fixed timestamps appearing on assistant messages during streaming before any visible content was available.
+
 ## [0.2.5]
 
 ### 中文
