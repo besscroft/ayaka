@@ -2900,7 +2900,7 @@ export interface WorkspaceMediaSaveResult {
 // ============================================================
 
 /** 主题模式 */
-export type SkinId = "white" | "black" | "zzz";
+export type SkinId = "white" | "black";
 
 /** 字号级别 */
 export type FontSizeLevel = "xs" | "sm" | "base" | "lg" | "xl";

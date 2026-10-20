@@ -2351,11 +2351,6 @@ const entries = {
     zh: "MCP 启用失败，服务器仍保持禁用",
     en: "MCP enable failed; the server remains disabled",
   },
-  "skin.zzz": { zh: "绝区零", en: "Zenless Zone Zero" },
-  "skin.zzz.desc": {
-    zh: "以霓虹蓝、石墨黑与黄色信号线构成的浅色战术终端",
-    en: "Light tactical terminal with neon blue, graphite, and yellow signal lines",
-  },
 } as const;
 
 const zhOverrides: Dict = {
@@ -2363,8 +2358,6 @@ const zhOverrides: Dict = {
   "model.apiFormat.chatCompletions": "Chat Completions (/chat/completions)",
   "model.apiFormat.responses": "Responses (/responses)",
   "model.apiFormat.anthropicMessages": "Anthropic Messages (/v1/messages)",
-  "skin.zzz": "绝区零",
-  "skin.zzz.desc": "以霓虹蓝、石墨黑与黄色信号线构成的浅色战术终端。",
   "Runtime.kind.agent": "智能体",
   "Runtime.kind.approval": "审批",
   "Runtime.kind.automation": "自动化",

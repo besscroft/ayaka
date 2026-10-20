@@ -18,7 +18,6 @@
     "setup": "pnpm install && pnpm run rebuild:native",
     "dev": "pnpm run rebuild:native && electron-vite dev",
     "build": "pnpm run rebuild:native && npm run typecheck && electron-vite build",
-    "verify:renderer-css": "node scripts/verify-renderer-css.mjs",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",

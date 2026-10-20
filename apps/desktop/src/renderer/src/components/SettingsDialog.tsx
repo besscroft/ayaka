@@ -454,7 +454,7 @@ function ResettableTabHeader({
 // ============================================================
 
 /**
- * 主题模式预览卡：三张卡片横向排列。
+ * 主题模式预览卡：两张卡片横向排列。
  * 上半部分使用 50/50 左右分屏模拟窗口预览。
  * 边框颜色随选中状态变化（accent / 默认）。
  */
@@ -553,7 +553,7 @@ function AppearanceTab({
           desc={t("appearance.skin.desc")}
           icon={<IconPalette className="size-3.5" />}
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SKIN_DEFINITIONS.map((skin) => (
               <SkinPreviewCard
                 key={skin.id}

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { api } from "./api";
 import { resolveLanguage } from "./i18n";
+import { parseSkinId } from "@shared/skin";
 import {
   SettingKey,
   DEFAULT_SETTINGS,
@@ -25,7 +26,6 @@ import {
   type SettingEntry,
 } from "@shared/types";
 import { applyTheme } from "./theme";
-import { SKIN_DEFINITIONS } from "../skins/registry";
 
 const APP_SETTING_KEYS: string[] = [
   SettingKey.Skin,
@@ -71,20 +71,6 @@ function parseEnum<T extends string>(raw: string | null, allowed: readonly T[], 
   return raw && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
 }
 
-const LEGACY_SKIN_IDS: Record<string, SkinId> = {
-  "nova-light": "white",
-  "nova-dark": "black",
-};
-
-function parseSkin(raw: string | null): SkinId {
-  const migrated = raw ? (LEGACY_SKIN_IDS[raw] ?? raw) : null;
-  return parseEnum<SkinId>(
-    migrated,
-    SKIN_DEFINITIONS.map((definition) => definition.id),
-    DEFAULT_SETTINGS.skin,
-  );
-}
-
 function parseNumber(raw: string | null, fallback: number, min: number, max: number): number {
   if (raw == null) return fallback;
   const n = Number(raw);
@@ -104,7 +90,7 @@ function getBrowserLocale(): string {
 }
 
 export function parseSettings(map: Record<string, string | null>): AppSettings {
-  const skin = parseSkin(map[SettingKey.Skin]);
+  const skin = parseSkinId(map[SettingKey.Skin]);
   const fontFamily = (map[SettingKey.FontFamily] ?? "").slice(0, 500);
   const monoFontFamily = (map[SettingKey.MonoFontFamily] ?? "").slice(0, 500);
   const usePointerCursor = parseBool(

@@ -50,3 +50,4 @@ import "./main/lib/local-execution-engine.test.ts";
 import "./main/server/index.test.ts";
 import "./main/server/core-app.test.ts";
 import "./main/lib/generated-ui.test.ts";
+import "./main/lib/skin.test.ts";
