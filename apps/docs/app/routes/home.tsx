@@ -10,11 +10,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export function meta() {
   return [
-    { title: "Ayaka" },
+    { title: "Ayaka · 住在你电脑里的数字生命体" },
     {
       name: "description",
       content:
-        "Ayaka 是一个本地优先的 AI 桌面工作台，把对话、智能体、记忆和工具连接成一条可追踪的运行链路。",
+        "Ayaka 是一个本地优先的 AI 桌面陪伴：她的记忆、你的对话、每一次行动，都留在这台电脑上。私人、主动、能延续关系。",
     },
   ];
 }

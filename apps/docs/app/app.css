@@ -1,33 +1,39 @@
 @import "tailwindcss";
 
+/* 只在指针支持 hover 的环境下启用悬浮态，避免触屏设备的粘滞悬浮 */
+@custom-variant hoverable (@media (hover: hover) and (pointer: fine));
+
 @theme {
   --font-sans:
-    "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", system-ui, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --font-mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  --color-carbon: #0b0d10;
-  --color-carbon-soft: #15181d;
-  --color-paper: #e4e5e2;
-  --color-mist: #f2f3ef;
-  --color-graphite: #626a70;
-  --color-signal: #6f83ff;
-  --color-mint: #73c8b2;
-  --color-coral: #f2936f;
-  --color-border: rgb(11 13 16 / 15%);
+  /* 单色系统：近白灰底、近黑墨色、发丝线；绿只作「存活/可用」语义 */
+  --color-paper: #fafafa;
+  --color-card: #ffffff;
+  --color-ink: #111112;
+  --color-ink-hover: #26262b;
+  --color-ink-soft: #52525b;
+  --color-ink-faint: #85858c;
+  --color-line: #e4e4e7;
+  --color-line-soft: #f0f0f2;
+  --color-hover: #f4f4f5;
+  --color-live: #16a34a;
 }
 
-@utility bg-grid-carbon {
-  background-image:
-    linear-gradient(to right, rgb(228 229 226 / 6%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(228 229 226 / 6%) 1px, transparent 1px);
-  background-size: 80px 80px;
+@utility shadow-card {
+  box-shadow: 0 1px 2px rgb(17 17 18 / 4%);
 }
 
-@utility bg-grid-paper {
-  background-image:
-    linear-gradient(to right, rgb(11 13 16 / 6%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(11 13 16 / 6%) 1px, transparent 1px);
-  background-size: 64px 64px;
+@utility shadow-float {
+  box-shadow:
+    0 1px 2px rgb(17 17 18 / 4%),
+    0 16px 40px -16px rgb(17 17 18 / 14%);
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 :root {
@@ -40,18 +46,18 @@
 
 html {
   scroll-behavior: smooth;
-  background: var(--color-carbon);
+  background: var(--color-paper);
   scrollbar-gutter: stable;
 }
 
 body {
   min-width: 320px;
   margin: 0;
-  background: var(--color-carbon);
-  color: var(--color-carbon);
+  background: var(--color-paper);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -63,13 +69,109 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--color-signal);
-  outline-offset: 4px;
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--color-signal);
+  background: var(--color-ink);
   color: var(--color-paper);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(17 17 18 / 20%) transparent;
+  caret-color: var(--color-ink);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgb(17 17 18 / 18%);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(17 17 18 / 30%);
+  background-clip: content-box;
+}
+
+/* 首屏入场：一次性、指数缓出；reduced-motion 时瞬时完成并落在终态 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-rise {
+  animation: rise-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.hero-pop {
+  animation: pop-in 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 立绘卡与状态点的呼吸：只动 transform / opacity，缓慢、可被打断 */
+@keyframes breathe {
+  from {
+    transform: translateY(-4px);
+  }
+  to {
+    transform: translateY(4px);
+  }
+}
+
+@keyframes presence {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+.breathe {
+  animation: breathe 5.5s ease-in-out infinite alternate;
+}
+
+.presence-dot {
+  animation: presence 1.6s ease-in-out infinite alternate;
+}
+
+/* 滚动显现：JS 挂上 reveal-ready 后才隐藏，无 JS / reduced-motion 时内容始终可见 */
+html.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 480ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+html.reveal-ready [data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -77,12 +179,24 @@ a:focus-visible {
     scroll-behavior: auto;
   }
 
+  html.reveal-ready [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .breathe,
+  .presence-dot,
+  .hero-rise,
+  .hero-pop {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
 }
